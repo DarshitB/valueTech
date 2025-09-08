@@ -17,8 +17,23 @@ module.exports = {
       directory: "./seeds",
     },
   },
-
+  sandbox: {
+    client: process.env.DB_CLIENT || "pg",
+    connection: process.env.SANDBOX_DATABASE_URL,
+    migrations: { directory: "./migrations" },
+    seeds: {
+      directory: "./seeds",
+    },
+  },
   production: {
+    client: process.env.DB_CLIENT || "pg",
+    connection: process.env.DATABASE_URL,
+    migrations: { directory: "./migrations" },
+    seeds: {
+      directory: "./seeds",
+    },
+  },
+  /* production: {
     client: process.env.DB_CLIENT || "pg",
     connection: {
       host: process.env.DB_PROD_HOST,
@@ -29,7 +44,7 @@ module.exports = {
       ssl:
         process.env.DB_PROD_SSL === "true"
           ? { rejectUnauthorized: false }
-          : false, // ✅ FIXED
+          : false,
     },
     migrations: {
       directory: "./migrations",
@@ -37,5 +52,5 @@ module.exports = {
     seeds: {
       directory: "./seeds",
     },
-  },
+  }, */
 };

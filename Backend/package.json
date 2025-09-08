@@ -4,13 +4,24 @@
   "main": "index.js",
   "scripts": {
     "dev": "cross-env NODE_ENV=development nodemon index.js",
-    "start": "NODE_ENV=production node index.js",
+    "sandbox": "cross-env NODE_ENV=sandbox node index.js",
+    "start": "cross-env NODE_ENV=production node index.js",
+
     "migrate:dev": "knex migrate:latest --env development",
+    "migrate:sandbox": "knex migrate:latest --env sandbox",
     "migrate:prod": "knex migrate:latest --env production",
+
     "migrate:down:dev": "knex migrate:down --env development",
     "migrate:down:prod": "knex migrate:down --env production",
+    "migrate:down:sandbox": "knex migrate:down --env sandbox",
+
     "seed:dev": "knex seed:run --env development",
-    "seed:prod": "knex seed:run --env production"
+    "seed:sandbox": "knex seed:run --env sandbox",
+    "seed:prod": "knex seed:run --env production",
+    
+    "seed:down:dev": "knex seed:rollback --env development",
+    "seed:down:prod": "knex seed:rollback --env production",
+    "seed:down:sandbox": "knex seed:rollback --env sandbox"
   },
   "keywords": [],
   "author": "",
