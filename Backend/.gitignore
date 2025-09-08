@@ -18,3 +18,4 @@ coverage/
 backup/
 tmp_uploads/
 uploads/
+src/logs/
