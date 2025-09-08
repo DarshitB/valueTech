@@ -1,0 +1,68 @@
+@use "../assets/styles/variables" as *;
+
+.modal-overlay {
+  position: fixed;
+  top: 0%;
+  bottom: 0%;
+  left: 0%;
+  right: 0%;
+  z-index: 999;
+  background-color: $model-background;
+  overflow-x: hidden;
+  overflow-y: auto;
+  box-sizing: border-box;
+
+  .modal-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: auto;
+    padding: 30px 50px;
+    border-radius: 20px;
+    min-width: 500px;
+    /* margin: 50px 0; */
+    .modal-title {
+      text-align: center;
+    }
+    .modal-message {
+      text-align: center;
+      .danger {
+        color: $color-danger;
+        font-weight: 700;
+      }
+    }
+    .modal-actions {
+      width: 100%;
+      display: flex;
+      gap: 10px;
+      .btn {
+        width: 50%;
+        border-radius: 5px;
+        font-size: 16px;
+        height: 40px;
+        &.secondary {
+          background-color: $base-hover-color !important;
+          border-color: $base-hover-color !important;
+          color: $base-font-color;
+          &:hover {
+            background-color: $primary-color !important;
+            border-color: $primary-color !important;
+            color: $base-color;
+          }
+        }
+      }
+    }
+  }
+}
+@media (max-width: 676px) {
+  .modal-overlay {
+    padding: 10px;
+    box-sizing: border-box;
+    .modal-content {
+      min-width: unset;
+      width: 95% !important;
+      padding: 30px 20px !important;
+    }
+  }
+}

@@ -1,0 +1,78 @@
+@use "../assets/styles/variables" as *;
+
+.page-title-heading {
+  color: $primary-font-color;
+  font-size: 30px;
+  margin: 0%;
+  font-weight: 500;
+}
+.page-title-heading a {
+  color: $primary-font-color;
+}
+.page-title-heading a:hover {
+  color: $primary-font-color;
+}
+.main-content {
+  padding-bottom: 30px;
+  padding-top: 105px;
+  height: 100vh;
+}
+.navbar {
+  .form-inline {
+    .hamburger {
+      background-color: transparent;
+      display: none;
+    }
+  }
+}
+@media (max-width: 1024px) {
+  .navbar {
+    .form-inline {
+      .hamburger {
+        background-color: transparent;
+        display: block;
+      }
+    }
+  }
+  .page-title-heading {
+    font-size: 20px;
+  }
+
+  .main-content {
+    padding-left: 15px;
+    padding-right: 15px;
+    height: auto;
+  }
+  .main-sidebar {
+    position: fixed;
+    left: -260px;
+    top: 0;
+    height: 100%;
+    transition: left 0.3s ease-in-out;
+    z-index: 1001;
+    background-color: #fff;
+  }
+
+  .main-sidebar.open {
+    left: 0;
+  }
+
+  .btn-toggle-sidebar {
+    font-size: 1.5rem;
+    background: none;
+    border: none;
+    color: #333;
+  }
+  .navbar {
+    left: 0;
+  }
+  .sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 999; // just below the hamburger, above sidebar
+    background-color: rgba(0, 0, 0, 0.3);
+  }
+}

@@ -1,0 +1,159 @@
+@use "../assets/styles/variables" as *;
+
+.form-model {
+  display: block;
+  height: 100%;
+  width: 100%;
+  .modal-dialog {
+    min-height: calc(100% - 3.5rem);
+    margin: 1.75rem auto;
+    display: flex;
+    align-items: center;
+    max-width: 650px;
+    &.xl {
+      max-width: 1024px;
+    }
+    .modal-content {
+      width: 100%;
+      position: relative;
+      left: 0%;
+      top: 0%;
+      transform: unset;
+      .model-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 20px;
+        .model-tital {
+          font-size: 18px;
+          text-transform: capitalize;
+          color: $base-font-color;
+          margin: 0%;
+        }
+        .close-button {
+          background-color: $base-hover-color;
+          padding: 0%;
+          border: none;
+          border-radius: 50rem;
+          &:hover {
+            background-color: $primary-color;
+            color: $primary-font-color;
+          }
+        }
+      }
+    }
+  }
+}
+.body-form-box {
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 15px;
+    label {
+      margin-bottom: 6px;
+    }
+    .form-field {
+      border: 1px solid $border-color;
+      padding: 7px 10px;
+      border-radius: 5px;
+      &:focus {
+        outline: none;
+        border-color: $primary-color;
+      }
+      &.error-border {
+        border-color: $color-danger;
+        color: $color-danger;
+      }
+    }
+    .css-13cymwt-control {
+      border: 1px solid $border-color;
+      border-radius: 5px;
+      &:focus {
+        outline: none;
+        border-color: $primary-color;
+      }
+      &:hover {
+        border-color: $primary-color;
+      }
+    }
+    .css-t3ipsp-control {
+      border: 1px solid $primary-color;
+      border-radius: 5px;
+      box-shadow: none;
+      &:hover {
+        border-color: $primary-color;
+      }
+      &:focus {
+        outline: none;
+        border-color: $primary-color;
+      }
+    }
+    .css-1nmdiq5-menu {
+    }
+  }
+  .form-group-row {
+    display: flex;
+    gap: 15px;
+    .form-group {
+      width: 50%;
+    }
+  }
+  .form-buttons {
+    .submit-button {
+      width: 100%;
+      height: 50px;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      font-weight: 500;
+      background-color: $color-success;
+      color: $primary-font-color;
+      &:focus {
+        outline: none;
+      }
+    }
+  }
+  .radio-group {
+    border-collapse: collapse;
+    padding-left: 1px;
+    .radio-label {
+      width: 25%;
+      padding: 5px 10px;
+      border: 1px solid $border-color;
+      text-align: center;
+      margin-left: -1px;
+      margin-bottom: 0%;
+      text-transform: capitalize;
+      cursor: pointer;
+      input[type="radio"] {
+        display: none;
+      }
+      // When the corresponding input is checked
+      &.selected {
+        background-color: $primary-color; // highlight when selected
+        font-weight: bold;
+        color: $primary-font-color;
+      }
+    }
+    &.officer {
+      .radio-label {
+        width: 50%;
+      }
+    }
+  }
+}
+@media (max-width: 676px) {
+  .form-model {
+    align-items: flex-start;
+    padding-top: 30px;
+    .modal-content {
+      .body-form-box {
+        .radio-group {
+          .radio-label {
+            width: 50%;
+          }
+        }
+      }
+    }
+  }
+}

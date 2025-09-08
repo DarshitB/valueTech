@@ -1,0 +1,2441 @@
+import React, { useEffect, useLayoutEffect, useState } from "react";
+import { useParams, Link } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchOrderById } from "../../../redux/reducers/orderReducer";
+import { generateOrderReport } from "../../../redux/reducers/orderReportReducer";
+import { usePageTitle } from "../../../context/PageTitleContext";
+import SingleSearchSelect from "../../../components/SingleSearchSelect";
+import { toast } from "react-toastify";
+import "../order.scss";
+import { DeleteIcon } from "../../../components/icons";
+
+function CVReport() {
+  // Extract order ID from route parameters
+  const { id } = useParams();
+  // Initialize Redux dispatch function
+  const dispatch = useDispatch();
+
+  // Select order data from Redux store
+  const order = useSelector((state) => state.orders.selected);
+  // Select order report data from Redux store
+  const { generating } = useSelector((state) => state.orderReports);
+  // Set page title using custom hook
+  const { setTitle } = usePageTitle();
+
+  // Fetch order details when component mounts or ID changes
+  useEffect(() => {
+    if (id) {
+      dispatch(fetchOrderById(id));
+    }
+  }, [dispatch, id]);
+
+  // Function to get license number based on valuer name
+  const getLicenseNumber = (valuerName) => {
+    switch (valuerName) {
+      case "V.K. ASSOCIATES":
+        return "SLA-60827";
+      case "VALUETECH SOLUTION":
+        return "CAT-VII-A-6019";
+      case "VISHAL D. KOTHARI":
+        return "SLA-60827";
+      default:
+        return "";
+    }
+  };
+
+  // Function to get current date in DD-MM-YYYY format
+  const getCurrentDate = () => {
+    const today = new Date();
+    const day = String(today.getDate()).padStart(2, "0");
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const year = today.getFullYear();
+    return `${day}-${month}-${year}`;
+  };
+
+  // Function to parse currency value (remove commas and convert to number)
+  const parseCurrency = (value) => {
+    return parseFloat(value.replace(/,/g, '')) || 0;
+  };
+
+  // Function to convert number to words in Indian format
+  const convertNumberToWordsIndian = (num) => {
+    const a = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'TEN', 'ELEVEN',
+      'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN'];
+    const b = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY'];
+
+    if (num === 0) return 'ZERO ONLY';
+
+    function numToWords(n) {
+      let str = '';
+      if (n > 19) {
+        str += b[Math.floor(n / 10)] + (n % 10 ? ' ' + a[n % 10] : '');
+      } else {
+        str += a[n];
+      }
+      return str;
+    }
+
+    let words = '';
+
+    const crore = Math.floor(num / 10000000);
+    if (crore > 0) {
+      words += numToWords(crore) + ' CRORE ';
+      num %= 10000000;
+    }
+
+    const lakh = Math.floor(num / 100000);
+    if (lakh > 0) {
+      words += numToWords(lakh) + ' LAKH ';
+      num %= 100000;
+    }
+
+    const thousand = Math.floor(num / 1000);
+    if (thousand > 0) {
+      words += numToWords(thousand) + ' THOUSAND ';
+      num %= 1000;
+    }
+
+    const hundred = Math.floor(num / 100);
+    if (hundred > 0) {
+      words += a[hundred] + ' HUNDRED ';
+      num %= 100;
+    }
+
+    if (num > 0) {
+      if (words !== '') words += 'AND ';
+      words += numToWords(num) + ' ';
+    }
+
+    return words.trim() + ' ONLY';
+  };
+
+  // Function to convert number to words for tyres
+  const numberToWords = (n) => {
+    const words = [
+      '', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE',
+      'TEN', 'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN',
+      'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN', 'TWENTY'
+    ];
+
+    if (n <= 20) {
+      return words[n];
+    }
+
+    const tens = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY'];
+    if (n < 100) {
+      return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? '-' + words[n % 10] : '');
+    }
+
+    return n.toString(); // fallback for numbers above 99
+  };
+
+  // Function to format currency input (Indian number format)
+  const handleCurrencyFormatting = (value) => {
+    // Remove everything except digits and one dot
+    let inputVal = value.replace(/[^0-9.]/g, '');
+    
+    // Allow only one decimal
+    const parts = inputVal.split('.');
+    let integerPart = parts[0];
+    let decimalPart = parts[1] ? parts[1].slice(0, 2) : ''; // limit to 2 decimal digits
+
+    // Format integer part in Indian number format
+    let lastThree = integerPart.slice(-3);
+    let otherNumbers = integerPart.slice(0, -3);
+    if (otherNumbers !== '') {
+      lastThree = ',' + lastThree;
+    }
+    let formattedInteger = otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + lastThree;
+
+    let formattedValue = formattedInteger;
+    if (decimalPart.length > 0 || inputVal.includes('.')) {
+      formattedValue += '.' + decimalPart;
+    }
+
+    return formattedValue;
+  };
+
+  // Function to update amount in words based on fair market value
+  const updateAmountInWords = () => {
+    const value = reportFormData.fair_market_value;
+    const amount = parseCurrency(value);
+    const words = convertNumberToWordsIndian(amount);
+    setReportFormData((prev) => ({
+      ...prev,
+      amount_in_words: words,
+    }));
+  };
+
+  // Function to update total number of tyres
+  const updateTyreTotal = () => {
+    const front = parseInt(reportFormData.front_tyre_no) || 0;
+    const middle = parseInt(reportFormData.middle_tyre_no) || 0;
+    const rear = parseInt(reportFormData.rear_tyre_no) || 0;
+
+    const total = front + middle + rear;
+    const word = numberToWords(total);
+
+    setReportFormData((prev) => ({
+      ...prev,
+      no_of_tyres: `${total} (${word})`,
+    }));
+  };
+
+  // Form data state for CV report generation
+  const [reportFormData, setReportFormData] = useState({
+    // Report type and reference details
+    report_type: "report_cv",
+    ref_no_year: new Date().getFullYear().toString(), // Current year (2025)
+    ref_no_bank: "",
+    state_name: "", // Default to first option
+    ref_no_code: "", // Default to first option
+    ref_no_id: "",
+    report_date: getCurrentDate(), // Default to today's date
+
+    valuer_name: "V.K. ASSOCIATES", // Default to first option
+    license_no: "SLA-60827",
+    valuer_contact: "99209-88549", // Fixed read-only value
+
+    valuation_purpose: "",
+    initiated_by: "",
+    date_of_inspection: "",
+    place_of_inspection: "",
+
+    registered_owner_name: "",
+    registered_owner_address: "",
+    proposed_owner_name: "",
+    proposed_owner_address: "",
+
+    // INSPECTED EQUIPMENT DETAILS
+    registration_no: "",
+    registration_date: "",
+    registered_location: "",
+
+    owner_serial_no: "",
+    manufacture_year: "",
+    asset_make: "",
+    model: "",
+
+    engine_no_detail: "",
+    chassis_no: "",
+    body_type: "",
+    fuel_type: "",
+
+    kilometer_reading: "",
+    invoice_no_date: "",
+    hyp_with: "",
+    hyp_from_date: "",
+
+    // COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION
+    // asset_classification: handled directly from order data
+    no_of_cylinder: "",
+
+    engine_condition: "",
+    chassis_condition: "",
+    body_condition: "",
+    cabin_condition: "",
+    electrical_condition: "",
+    gear_transmission: "",
+
+    battery_available: "YES / TWO LOCAL - 2X12V", // Fixed read-only value
+    gross_vehicle_weight: "",
+
+    front_tyre_no: "",
+    front_tyre_condition: "",
+    middle_tyre_no: "",
+    middle_tyre_condition: "",
+    rear_tyre_no: "",
+    rear_tyre_condition: "",
+    no_of_tyres: "",
+    stepney: "",
+
+    horse_power: "",
+    mechanical_unit_condition: "",
+    cubic_capacity: "",
+
+    suspension: "",
+    seating_capacity: "",
+    tool_kit_available: "",
+
+    vehicle_colour: "",
+    color_condition: "",
+    damages_if_any: "",
+
+    // RC, PERMIT, TAX, FITNESS & INSURANCE DETAILS
+    rc_book_verified: "",
+    invoice_verified: "",
+    tax_upto: "",
+    permit_upto: "",
+
+    permit_type: "",
+    fitness_upto: "",
+    insurance_co_name: "",
+    policy_no: "",
+
+    period_of_insurance: "",
+    insured_value: "",
+    insurance_verified: "",
+
+    // OVER ALL FEED BACK OF THE INSPECTED
+    current_invoice_cost: "",
+    depreciation: "",
+    depreciation_value: "",
+    appraiser_value: "",
+
+    fair_market_value: "",
+    amount_in_words: "",
+    no_of_photograph: "",
+    no_of_collage: "",
+
+    valuer_comments_remarks: "",
+    declaration: "",
+  });
+
+  // File state for chassis impression
+  const [chassisImpressionFile, setChassisImpressionFile] = useState(null);
+
+  // State for flexible fields
+  const [flexibleFields, setFlexibleFields] = useState([]);
+
+  // Set page title with breadcrumb navigation
+  useLayoutEffect(() => {
+    setTitle(
+      <>
+        <Link to="/orders" className="text-blue-600 hover:underline">
+          Orders
+        </Link>{" "}
+        &gt;{" "}
+        <Link
+          to={`/orders/${id}/details`}
+          className="text-blue-600 hover:underline"
+        >
+          {order && order.order_number ? order.order_number : "-"}
+        </Link>{" "}
+        &gt; CV Report
+      </>
+    );
+  }, [id, order, setTitle]);
+
+  // Handle form input changes
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setReportFormData((prev) => {
+      let updated = {
+        ...prev,
+        [name]: value,
+      };
+
+      // Handle currency formatting for currency fields
+      if (name === "fair_market_value" || name === "current_invoice_cost" || 
+          name === "insured_value" || name === "depreciation_value" || 
+          name === "appraiser_value") {
+        updated[name] = handleCurrencyFormatting(value);
+      }
+
+      // Auto-update amount_in_words when fair_market_value changes
+      if (name === "fair_market_value") {
+        const amount = parseCurrency(value);
+        const words = convertNumberToWordsIndian(amount);
+        updated.amount_in_words = words;
+      }
+
+      // Auto-update no_of_tyres when tyre fields change
+      if (name === "front_tyre_no" || name === "middle_tyre_no" || name === "rear_tyre_no") {
+        const front = parseInt(name === "front_tyre_no" ? value : updated.front_tyre_no) || 0;
+        const middle = parseInt(name === "middle_tyre_no" ? value : updated.middle_tyre_no) || 0;
+        const rear = parseInt(name === "rear_tyre_no" ? value : updated.rear_tyre_no) || 0;
+
+        const total = front + middle + rear;
+        const word = numberToWords(total);
+        updated.no_of_tyres = `${total} (${word})`;
+      }
+
+      return updated;
+    });
+  };
+
+  // Handle SingleSearchSelect changes
+  const handleSelectChange = (name, value) => {
+    setReportFormData((prev) => {
+      const updated = {
+        ...prev,
+        [name]: value,
+      };
+
+      // Auto-update license_no when valuer_name changes
+      if (name === "valuer_name") {
+        updated.license_no = getLicenseNumber(value);
+      }
+
+      return updated;
+    });
+  };
+
+  // Handle file input changes
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    setChassisImpressionFile(file);
+  };
+
+  // Handle date input formatting (DD-MM-YYYY)
+  const handleDateChange = (e) => {
+    const { name, value } = e.target;
+    let numericValue = value.replace(/\D/g, ""); // Remove non-numeric characters
+    if (numericValue.length > 8) numericValue = numericValue.substring(0, 8); // Limit to 8 digits (DDMMYYYY)
+
+    let formattedValue = "";
+    if (numericValue.length > 4) {
+      formattedValue =
+        numericValue.substring(0, 2) +
+        "-" +
+        numericValue.substring(2, 4) +
+        "-" +
+        numericValue.substring(4);
+    } else if (numericValue.length > 2) {
+      formattedValue =
+        numericValue.substring(0, 2) + "-" + numericValue.substring(2);
+    } else {
+      formattedValue = numericValue;
+    }
+
+    setReportFormData((prev) => ({
+      ...prev,
+      [name]: formattedValue,
+    }));
+  };
+
+  // Handle currency input formatting (Indian number format)
+  const handleCurrencyChange = (e) => {
+    const { name, value } = e.target;
+
+    // Remove everything except digits and one dot
+    let inputVal = value.replace(/[^0-9.]/g, "");
+
+    // Allow only one decimal
+    const parts = inputVal.split(".");
+    let integerPart = parts[0];
+    let decimalPart = parts[1] ? parts[1].slice(0, 2) : ""; // limit to 2 decimal digits
+
+    // Format integer part in Indian number format
+    let lastThree = integerPart.slice(-3);
+    let otherNumbers = integerPart.slice(0, -3);
+    if (otherNumbers !== "") {
+      lastThree = "," + lastThree;
+    }
+    let formattedInteger =
+      otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + lastThree;
+
+    let formattedValue = formattedInteger;
+    if (decimalPart.length > 0 || inputVal.includes(".")) {
+      formattedValue += "." + decimalPart;
+    }
+
+    setReportFormData((prev) => ({
+      ...prev,
+      [name]: formattedValue,
+    }));
+  };
+
+  // Handle flexible field changes
+  const handleFlexibleFieldChange = (fieldId, fieldType, value) => {
+    setFlexibleFields((prev) =>
+      prev.map((field) =>
+        field.id === fieldId ? { ...field, [fieldType]: value } : field
+      )
+    );
+  };
+
+  // Add flexible fields (Add One - 2 fields, Add Two - 4 fields)
+  const addFlexibleFields = (sectionName, fieldsCount) => {
+    // Calculate the next order by counting total fields in this section
+    // For Add Two sets, each set contributes 2 to the count
+    // For Add One sets, each set contributes 1 to the count
+    let nextOrder = 1;
+    flexibleFields
+      .filter((f) => f.section_name === sectionName)
+      .forEach((field) => {
+        if (field.col_span === 2) {
+          nextOrder += 2; // Add Two contributes 2 fields
+        } else {
+          nextOrder += 1; // Add One contributes 1 field
+        }
+      });
+
+    const fieldId = `${sectionName}_${Date.now()}`;
+
+    const newField = {
+      id: fieldId,
+      section_name: sectionName,
+      col_span: fieldsCount === 2 ? 1 : 2, // 1 for Add One (2 fields), 2 for Add Two (4 fields)
+      field_label: "",
+      field_value: "",
+      field_label_2: fieldsCount === 4 ? "" : undefined,
+      field_value_2: fieldsCount === 4 ? "" : undefined,
+      field_order: nextOrder, // This will be the order for the first field
+    };
+
+    setFlexibleFields((prev) => [...prev, newField]);
+  };
+
+  // Remove flexible field
+  const removeFlexibleField = (fieldId) => {
+    setFlexibleFields((prev) => prev.filter((field) => field.id !== fieldId));
+  };
+
+  // Validate flexible fields
+  const validateFlexibleFields = () => {
+    const errors = [];
+
+    flexibleFields.forEach((field, index) => {
+      if (!field.field_label.trim() || !field.field_value.trim()) {
+        errors.push(
+          `Flexible field ${index + 1}: Label and Value are required`
+        );
+      }
+
+      // For Add Two fields, validate second set
+      if (field.col_span === 2) {
+        if (!field.field_label_2?.trim() || !field.field_value_2?.trim()) {
+          errors.push(
+            `Flexible field ${index + 1}: Second Label and Value are required`
+          );
+        }
+      }
+    });
+
+    return errors;
+  };
+
+  // Handle form submission for report generation
+  const handleReportSubmit = (e) => {
+    e.preventDefault();
+
+    // Validate flexible fields
+    const validationErrors = validateFlexibleFields();
+    if (validationErrors.length > 0) {
+      validationErrors.forEach((error) => toast.error(error));
+      return;
+    }
+
+    // Create FormData for multipart/form-data submission
+    const formData = new FormData();
+
+    // Add all form fields to FormData
+    Object.keys(reportFormData).forEach((key) => {
+      let value = reportFormData[key];
+
+      // Special handling for asset_classification - use order data
+      if (key === "asset_classification") {
+        value = order?.child_category_name || "";
+      }
+
+      if (value !== null && value !== "") {
+        formData.append(key, value);
+      }
+    });
+
+    // Add chassis impression file if selected
+    if (chassisImpressionFile) {
+      formData.append("chassis_no_pencil_impression", chassisImpressionFile);
+    }
+
+    // Add flexible fields to FormData with proper sequential ordering
+    let formDataIndex = 0;
+    flexibleFields.forEach((field) => {
+      // Add first field (or only field for Add One)
+      formData.append(
+        `flexible_fields[${formDataIndex}][section_name]`,
+        field.section_name
+      );
+      formData.append(
+        `flexible_fields[${formDataIndex}][col_span]`,
+        field.col_span
+      );
+      formData.append(
+        `flexible_fields[${formDataIndex}][field_label]`,
+        field.field_label
+      );
+      formData.append(
+        `flexible_fields[${formDataIndex}][field_value]`,
+        field.field_value
+      );
+      formData.append(
+        `flexible_fields[${formDataIndex}][field_order]`,
+        field.field_order
+      );
+      formDataIndex++;
+
+      // Add second field for "Add Two" functionality
+      if (field.col_span === 2 && field.field_label_2 !== undefined) {
+        formData.append(
+          `flexible_fields[${formDataIndex}][section_name]`,
+          field.section_name
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][col_span]`,
+          field.col_span
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_label]`,
+          field.field_label_2
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_value]`,
+          field.field_value_2
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_order]`,
+          field.field_order + 1 // Sequential order for second field
+        );
+        formDataIndex++;
+      }
+    });
+
+    // Console log flexible fields ordering for debugging
+    const sectionGroups = {};
+    flexibleFields.forEach((field) => {
+      if (!sectionGroups[field.section_name]) {
+        sectionGroups[field.section_name] = [];
+      }
+
+      // Add first field
+      sectionGroups[field.section_name].push({
+        label: field.field_label,
+        value: field.field_value,
+        order: field.field_order,
+        type: field.col_span === 1 ? "Add One" : "Add Two (1st)",
+      });
+
+      // Add second field if exists
+      if (field.col_span === 2 && field.field_label_2) {
+        sectionGroups[field.section_name].push({
+          label: field.field_label_2,
+          value: field.field_value_2,
+          order: field.field_order + 1,
+          type: "Add Two (2nd)",
+        });
+      }
+    });
+
+    /* Object.keys(sectionGroups).forEach(section => {
+      console.log(`\n${section}:`);
+      sectionGroups[section]
+        .sort((a, b) => a.order - b.order)
+        .forEach(field => {
+          console.log(`  Order ${field.order}: [${field.type}] ${field.label} = ${field.value}`);
+        });
+    });
+    console.log("=== END FLEXIBLE FIELDS ORDERING ===\n"); */
+
+    // Dispatch report generation action
+    dispatch(
+      generateOrderReport({
+        orderId: id,
+        data: formData,
+      })
+    ).then((result) => {
+      if (result.meta.requestStatus === "fulfilled") {
+        // Open PDF in new tab (same approach as collage generation)
+        const downloadUrl = result.payload.data.download_url;
+        const baseUrl =
+          process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
+        const fullUrl = `${baseUrl}${downloadUrl}`;
+        window.open(fullUrl, "_blank");
+      }
+    });
+  };
+
+  // Render flexible fields for a section
+  const renderFlexibleFields = (sectionName) => {
+    const sectionFields = flexibleFields.filter(
+      (field) => field.section_name === sectionName
+    );
+
+    return sectionFields.map((field) => (
+      <div
+        key={field.id}
+        className="row mt-3"
+        style={{
+          border: "1px dashed #ccc",
+          padding: "10px",
+          borderRadius: "5px",
+          position: "relative",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => removeFlexibleField(field.id)}
+          className="flexible-field-remove-button"
+        >
+          <DeleteIcon />
+        </button>
+
+        {field.col_span === 1 ? (
+          // Add One: 2 fields (1 heading, 1 value)
+          <>
+            <div className="col-md-3">
+              <div className="form-group">
+                <label>
+                  Field Label <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  className="form-field"
+                  value={field.field_label}
+                  onChange={(e) =>
+                    handleFlexibleFieldChange(
+                      field.id,
+                      "field_label",
+                      e.target.value
+                    )
+                  }
+                  placeholder="Enter field label"
+                  required
+                />
+              </div>
+            </div>
+            <div className="col-md-9">
+              <div className="form-group">
+                <label>
+                  Field Value <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  className="form-field"
+                  value={field.field_value}
+                  onChange={(e) =>
+                    handleFlexibleFieldChange(
+                      field.id,
+                      "field_value",
+                      e.target.value
+                    )
+                  }
+                  placeholder="Enter field value"
+                  required
+                />
+              </div>
+            </div>
+          </>
+        ) : (
+          // Add Two: 4 fields (2 headings, 2 values)
+          <>
+            <div className="col-md-3">
+              <div className="form-group">
+                <label>
+                  First Label <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  className="form-field"
+                  value={field.field_label}
+                  onChange={(e) =>
+                    handleFlexibleFieldChange(
+                      field.id,
+                      "field_label",
+                      e.target.value
+                    )
+                  }
+                  placeholder="Enter first label"
+                  required
+                />
+              </div>
+            </div>
+            <div className="col-md-3">
+              <div className="form-group">
+                <label>
+                  First Value <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  className="form-field"
+                  value={field.field_value}
+                  onChange={(e) =>
+                    handleFlexibleFieldChange(
+                      field.id,
+                      "field_value",
+                      e.target.value
+                    )
+                  }
+                  placeholder="Enter first value"
+                  required
+                />
+              </div>
+            </div>
+            <div className="col-md-3">
+              <div className="form-group">
+                <label>
+                  Second Label <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  className="form-field"
+                  value={field.field_label_2 || ""}
+                  onChange={(e) =>
+                    handleFlexibleFieldChange(
+                      field.id,
+                      "field_label_2",
+                      e.target.value
+                    )
+                  }
+                  placeholder="Enter second label"
+                  required
+                />
+              </div>
+            </div>
+            <div className="col-md-3">
+              <div className="form-group">
+                <label>
+                  Second Value <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  className="form-field"
+                  value={field.field_value_2 || ""}
+                  onChange={(e) =>
+                    handleFlexibleFieldChange(
+                      field.id,
+                      "field_value_2",
+                      e.target.value
+                    )
+                  }
+                  placeholder="Enter second value"
+                  required
+                />
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    ));
+  };
+
+  return (
+    <section className="order-details-wrapper">
+      <div className="row">
+        {/* Reference Number Form Section */}
+        <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12 mb-5">
+          <div className="order-report-container">
+            <h2>CV Report</h2>
+            <form onSubmit={handleReportSubmit} className="body-form-box">
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group ">
+                    <label>
+                      Ref NO. <span class="text-danger">*</span>
+                    </label>
+                    <div className="ref-no-input">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="ref_no_year"
+                        value={reportFormData.ref_no_year}
+                        onChange={handleFormChange}
+                        readOnly
+                      />
+                      <span className="ref-no-slash">/</span>
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="ref_no_bank"
+                        value={order?.bank_initial || ""}
+                        onChange={handleFormChange}
+                        readOnly
+                      />
+                      <span className="ref-no-slash">/</span>
+                      <SingleSearchSelect
+                        options={[
+                          { value: "MUM", label: "MUM" },
+                          { value: "GUJ", label: "GUJ" },
+                        ]}
+                        value={reportFormData.state_name || "MUM"}
+                        onChange={(value) =>
+                          handleSelectChange("state_name", value)
+                        }
+                      />
+                      <span className="ref-no-slash">/</span>
+                      <SingleSearchSelect
+                        options={[
+                          { value: "VKM", label: "VKM" },
+                          { value: "VTS", label: "VTS" },
+                        ]}
+                        value={reportFormData.ref_no_code || "VKM"}
+                        onChange={(value) =>
+                          handleSelectChange("ref_no_code", value)
+                        }
+                      />
+                      <span className="ref-no-slash">/</span>
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="ref_no_id"
+                        value={reportFormData.ref_no_id}
+                        onChange={handleFormChange}
+                        placeholder="Enter ID"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label htmlFor="report_date">
+                      Report Date <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="report_date"
+                      name="report_date"
+                      value={reportFormData.report_date}
+                      onChange={handleDateChange}
+                      placeholder="DD-MM-YYYY"
+                      maxLength="10"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="valuer_name">
+                      Valuer Name <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "V.K. ASSOCIATES", label: "V.K. ASSOCIATES" },
+                        {
+                          value: "VALUETECH SOLUTIONS",
+                          label: "VALUETECH SOLUTIONS",
+                        },
+                        {
+                          value: "VISHAL D. KOTHARI",
+                          label: "VISHAL D. KOTHARI",
+                        },
+                      ]}
+                      value={reportFormData.valuer_name}
+                      onChange={(value) =>
+                        handleSelectChange("valuer_name", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="license_no">
+                      License No <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="license_no"
+                      name="license_no"
+                      value={reportFormData.license_no}
+                      readOnly
+                      placeholder="Auto-populated based on valuer"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="valuer_contact">Valuer Contact</label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="valuer_contact"
+                      name="valuer_contact"
+                      value={reportFormData.valuer_contact}
+                      readOnly
+                      placeholder="Fixed contact number"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="valuation_purpose">
+                      Valuation Purpose <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "FINANCIAL USAGE", label: "FINANCIAL USAGE" },
+                        {
+                          value: "INUSRANCE USAGE",
+                          label: "INUSRANCE USAGE",
+                        },
+                        {
+                          value: "REPO PURPOSE",
+                          label: "REPO PURPOSE",
+                        },
+                      ]}
+                      value={reportFormData.valuation_purpose}
+                      onChange={(value) =>
+                        handleSelectChange("valuation_purpose", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="initiated_by">Initiated By</label>
+                    <textarea
+                      className="form-field"
+                      id="initiated_by"
+                      name="initiated_by"
+                      value={reportFormData.initiated_by}
+                      onChange={handleFormChange}
+                      rows="2"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="date_of_inspection">
+                      Date of Inspection <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="date_of_inspection"
+                      name="date_of_inspection"
+                      value={reportFormData.date_of_inspection}
+                      onChange={handleDateChange}
+                      placeholder="DD-MM-YYYY"
+                      maxLength="10"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="place_of_inspection">
+                      Place of Inspection <span class="text-danger">*</span>
+                    </label>
+                    <textarea
+                      className="form-field"
+                      id="place_of_inspection"
+                      name="place_of_inspection"
+                      value={reportFormData.place_of_inspection}
+                      onChange={handleFormChange}
+                      rows="2"
+                      required
+                    ></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="registered_owner_name">
+                      Registered Owner Name <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="registered_owner_name"
+                      name="registered_owner_name"
+                      value={reportFormData.registered_owner_name}
+                      onChange={handleFormChange}
+                      placeholder="ABC Company"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="registered_owner_address">
+                      Registered Owner Address{" "}
+                      <span class="text-danger">*</span>
+                    </label>
+                    <textarea
+                      className="form-field"
+                      id="registered_owner_address"
+                      name="registered_owner_address"
+                      value={reportFormData.registered_owner_address}
+                      onChange={handleFormChange}
+                      rows="2"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="proposed_owner_name">
+                      Proposed Owner Name <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="proposed_owner_name"
+                      name="proposed_owner_name"
+                      value={reportFormData.proposed_owner_name}
+                      onChange={handleFormChange}
+                      placeholder="XYZ Company"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="proposed_owner_address">
+                      Proposed Owner Address <span class="text-danger">*</span>
+                    </label>
+                    <textarea
+                      className="form-field"
+                      id="proposed_owner_address"
+                      name="proposed_owner_address"
+                      value={reportFormData.proposed_owner_address}
+                      onChange={handleFormChange}
+                      rows="2"
+                      placeholder="456 Corporate Avenue, Mumbai"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Inspected Equipment Details Section */}
+              <div className="row">
+                <div className="col-12">
+                  <h4>INSPECTED EQUIPMENT DETAILS</h4>
+                  <hr />
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="registration_no">
+                      Registration No <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="registration_no"
+                      name="registration_no"
+                      value={reportFormData.registration_no}
+                      onChange={handleFormChange}
+                      placeholder="MH01AB1234"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="registration_date">
+                      Registration Date <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="registration_date"
+                      name="registration_date"
+                      value={reportFormData.registration_date}
+                      onChange={handleDateChange}
+                      placeholder="DD-MM-YYYY"
+                      maxLength="10"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="registered_location">
+                      Registered Location <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="registered_location"
+                      name="registered_location"
+                      value={reportFormData.registered_location}
+                      onChange={handleFormChange}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="owner_serial_no">
+                      Owner Serial No <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "1ST OWNER", label: "1ST OWNER" },
+                        { value: "2ND OWNER", label: "2ND OWNER" },
+                        { value: "3RD OWNER", label: "3RD OWNER" },
+                        { value: "4TH OWNER", label: "4TH OWNER" },
+                        { value: "5TH OWNER", label: "5TH OWNER" },
+                        { value: "6TH OWNER", label: "6TH OWNER" },
+                        { value: "7TH OWNER", label: "7TH OWNER" },
+                        { value: "8TH OWNER", label: "8TH OWNER" },
+                        { value: "9TH OWNER", label: "9TH OWNER" },
+                        { value: "10TH OWNER", label: "10TH OWNER" },
+                      ]}
+                      value={reportFormData.owner_serial_no}
+                      onChange={(value) =>
+                        handleSelectChange("owner_serial_no", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="manufacture_year">
+                      Manufacture Year <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="manufacture_year"
+                      name="manufacture_year"
+                      value={reportFormData.manufacture_year}
+                      onChange={handleFormChange}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="asset_make">
+                      Asset Make <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "TATA MOTORS LTD", label: "TATA MOTORS LTD" },
+                        {
+                          value: "ASHOK LEYLAND LIMITED",
+                          label: "ASHOK LEYLAND LIMITED",
+                        },
+                        {
+                          value: "VE COMMERCIAL VEHICLES LIMITED",
+                          label: "VE COMMERCIAL VEHICLES LIMITED",
+                        },
+                        {
+                          value: "MAHINDRA & MAHINDRA LIMITED",
+                          label: "MAHINDRA & MAHINDRA LIMITED",
+                        },
+                        { value: "PIAGGIO INDIA", label: "PIAGGIO INDIA" },
+                        {
+                          value: "SCANIA COMMERCIAL VEHICLE INDIA PVT. LTD",
+                          label: "SCANIA COMMERCIAL VEHICLE INDIA PVT. LTD",
+                        },
+                        { value: "FORCE MOTORS", label: "FORCE MOTORS" },
+                        {
+                          value:
+                            "DAIMLER INDIA COMMERCIAL VEHICLES PVT.LTD/BHARATBENZ",
+                          label:
+                            "DAIMLER INDIA COMMERCIAL VEHICLES PVT.LTD/BHARATBENZ",
+                        },
+                        { value: "VOLVO TRUCKS", label: "VOLVO TRUCKS" },
+                        {
+                          value: "SWARAJ MAZDA – SML ISUZU",
+                          label: "SWARAJ MAZDA – SML ISUZU",
+                        },
+                        {
+                          value: "MARUTI SUZUKI INDIA LTD",
+                          label: "MARUTI SUZUKI INDIA LTD",
+                        },
+                      ]}
+                      value={reportFormData.asset_make}
+                      onChange={(value) =>
+                        handleSelectChange("asset_make", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="model">
+                      Model <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="model"
+                      name="model"
+                      value={reportFormData.model}
+                      onChange={handleFormChange}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="engine_no_detail">
+                      Engine No./ Detail <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="engine_no_detail"
+                      name="engine_no_detail"
+                      value={reportFormData.engine_no_detail}
+                      onChange={handleFormChange}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="chassis_no">
+                      Chassis No <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="chassis_no"
+                      name="chassis_no"
+                      value={reportFormData.chassis_no}
+                      onChange={handleFormChange}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="body_type">
+                      Body Type <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="body_type"
+                      name="body_type"
+                      value={reportFormData.body_type}
+                      onChange={handleFormChange}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="fuel_type">
+                      Fuel Type <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="fuel_type"
+                      name="fuel_type"
+                      value={reportFormData.fuel_type}
+                      onChange={handleFormChange}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="kilometer_reading">
+                      Hours / Kilometer Reading{" "}
+                      <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="kilometer_reading"
+                      name="kilometer_reading"
+                      value={reportFormData.kilometer_reading}
+                      onChange={handleFormChange}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="invoice_no_date">Invoice No. & Date</label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="invoice_no_date"
+                      name="invoice_no_date"
+                      value={reportFormData.invoice_no_date}
+                      onChange={handleFormChange}
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="hyp_with">
+                      Hyp With <span class="text-danger">*</span>
+                    </label>
+                    <textarea
+                      className="form-field"
+                      id="hyp_with"
+                      name="hyp_with"
+                      value={reportFormData.hyp_with}
+                      onChange={handleFormChange}
+                      rows="2"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="hyp_from_date">Hyp From Date</label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="hyp_from_date"
+                      name="hyp_from_date"
+                      value={reportFormData.hyp_from_date}
+                      onChange={handleDateChange}
+                      placeholder="DD-MM-YYYY"
+                      maxLength="10"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Flexible Fields for INSPECTED EQUIPMENT DETAILS */}
+              <div className="row mt-3">
+                <div className="col-12">
+                  <div className="flexible-buttons-container">
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary btn-sm"
+                      onClick={() =>
+                        addFlexibleFields("INSPECTED_EQUIPMENT_DETAILS", 2)
+                      }
+                    >
+                      Add One Set
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary btn-sm"
+                      onClick={() =>
+                        addFlexibleFields("INSPECTED_EQUIPMENT_DETAILS", 4)
+                      }
+                    >
+                      Add Two Set
+                    </button>
+                  </div>
+                  {renderFlexibleFields("INSPECTED_EQUIPMENT_DETAILS")}
+                </div>
+              </div>
+
+              {/* Comments on Equipment at the Time of Inspection Section */}
+              <div className="row">
+                <div className="col-12">
+                  <h4>COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION</h4>
+                  <hr />
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label htmlFor="asset_classification">
+                      Asset Classification <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="asset_classification"
+                      name="asset_classification"
+                      value={order?.child_category_name || ""}
+                      readOnly
+                      placeholder="Auto-populated from order data"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label htmlFor="no_of_cylinder">
+                      No of Cylinders <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "1 (ONE)", label: "1 (ONE)" },
+                        { value: "2 (TWO)", label: "2 (TWO)" },
+                        { value: "3 (THREE)", label: "3 (THREE)" },
+                        { value: "4 (FOUR)", label: "4 (FOUR)" },
+                        { value: "5 (FIVE)", label: "5 (FIVE)" },
+                        { value: "6 (SIX)", label: "6 (SIX)" },
+                        { value: "7 (SEVEN)", label: "7 (SEVEN)" },
+                        { value: "8 (EIGHT)", label: "8 (EIGHT)" },
+                        { value: "9 (NINE)", label: "9 (NINE)" },
+                        { value: "10 (TEN)", label: "10 (TEN)" },
+                      ]}
+                      value={reportFormData.no_of_cylinder}
+                      onChange={(value) =>
+                        handleSelectChange("no_of_cylinder", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label htmlFor="engine_condition">
+                      Engine Condition <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "GOOD", label: "GOOD" },
+                        { value: "AVERAGE", label: "AVERAGE" },
+                        { value: "FAIR", label: "FAIR" },
+                        { value: "POOR", label: "POOR" },
+                      ]}
+                      value={reportFormData.engine_condition}
+                      onChange={(value) =>
+                        handleSelectChange("engine_condition", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label htmlFor="chassis_condition">
+                      Chassis Condition <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "GOOD", label: "GOOD" },
+                        { value: "AVERAGE", label: "AVERAGE" },
+                        { value: "FAIR", label: "FAIR" },
+                        { value: "POOR", label: "POOR" },
+                      ]}
+                      value={reportFormData.chassis_condition}
+                      onChange={(value) =>
+                        handleSelectChange("chassis_condition", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label htmlFor="body_condition">
+                      Body Condition <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "GOOD", label: "GOOD" },
+                        { value: "AVERAGE", label: "AVERAGE" },
+                        { value: "FAIR", label: "FAIR" },
+                        { value: "POOR", label: "POOR" },
+                      ]}
+                      value={reportFormData.body_condition}
+                      onChange={(value) =>
+                        handleSelectChange("body_condition", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label htmlFor="cabin_condition">
+                      Cabin Condition <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "GOOD", label: "GOOD" },
+                        { value: "AVERAGE", label: "AVERAGE" },
+                        { value: "FAIR", label: "FAIR" },
+                        { value: "POOR", label: "POOR" },
+                      ]}
+                      value={reportFormData.cabin_condition}
+                      onChange={(value) =>
+                        handleSelectChange("cabin_condition", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label htmlFor="electrical_condition">
+                      Electrical Condition <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "GOOD", label: "GOOD" },
+                        { value: "AVERAGE", label: "AVERAGE" },
+                        { value: "FAIR", label: "FAIR" },
+                        { value: "POOR", label: "POOR" },
+                      ]}
+                      value={reportFormData.electrical_condition}
+                      onChange={(value) =>
+                        handleSelectChange("electrical_condition", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label htmlFor="gear_transmission">
+                      Gear Transmission <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "GOOD", label: "GOOD" },
+                        { value: "AVERAGE", label: "AVERAGE" },
+                        { value: "FAIR", label: "FAIR" },
+                        { value: "POOR", label: "POOR" },
+                      ]}
+                      value={reportFormData.gear_transmission}
+                      onChange={(value) =>
+                        handleSelectChange("gear_transmission", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label htmlFor="battery_available">
+                      Battery Available-yes/no{" "}
+                      <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="battery_available"
+                      name="battery_available"
+                      value={reportFormData.battery_available}
+                      readOnly
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label htmlFor="gross_vehicle_weight">
+                      Gross Vehicle Weight <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="gross_vehicle_weight"
+                      name="gross_vehicle_weight"
+                      value={reportFormData.gross_vehicle_weight}
+                      onChange={handleFormChange}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>Tyre Condition</label>
+                    <div className="row">
+                      <div className="col-md-6">
+                        <label htmlFor="front_tyre_no">
+                          Number Of Front Tires{" "}
+                          <span class="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="front_tyre_no"
+                          name="front_tyre_no"
+                          value={reportFormData.front_tyre_no}
+                          onChange={handleFormChange}
+                          required
+                        />
+                      </div>
+                      <div className="col-md-6">
+                        <label htmlFor="front_tyre_condition">
+                          Front Tyre Condition{" "}
+                          <span class="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="front_tyre_condition"
+                          name="front_tyre_condition"
+                          value={reportFormData.front_tyre_condition}
+                          onChange={handleFormChange}
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>&nbsp;</label>
+                    <div className="row">
+                      <div className="col-md-6">
+                        <label htmlFor="middle_tyre_no">
+                          Number Of Middle Tires
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="middle_tyre_no"
+                          name="middle_tyre_no"
+                          value={reportFormData.middle_tyre_no}
+                          onChange={handleFormChange}
+                        />
+                      </div>
+                      <div className="col-md-6">
+                        <label htmlFor="middle_tyre_condition">
+                          Middle Tyre Condition
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="middle_tyre_condition"
+                          name="middle_tyre_condition"
+                          value={reportFormData.middle_tyre_condition}
+                          onChange={handleFormChange}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>&nbsp;</label>
+                    <div className="row">
+                      <div className="col-md-6">
+                        <label htmlFor="rear_tyre_no">
+                          Number Of Rear Tires{" "}
+                          <span class="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="rear_tyre_no"
+                          name="rear_tyre_no"
+                          value={reportFormData.rear_tyre_no}
+                          onChange={handleFormChange}
+                          required
+                        />
+                      </div>
+                      <div className="col-md-6">
+                        <label htmlFor="rear_tyre_condition">
+                          Rear Tyre Condition <span class="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="rear_tyre_condition"
+                          name="rear_tyre_condition"
+                          value={reportFormData.rear_tyre_condition}
+                          onChange={handleFormChange}
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>&nbsp;</label>
+                    <div className="row">
+                      <div className="col-md-6">
+                        <label htmlFor="no_of_tyres">
+                          Total Tyres <span class="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="no_of_tyres"
+                          name="no_of_tyres"
+                          value={reportFormData.no_of_tyres}
+                          readOnly
+                          style={{
+                            backgroundColor: "#f8f9fa",
+                            cursor: "not-allowed",
+                          }}
+                          placeholder="Auto-calculated from tyre counts"
+                          required
+                        />
+                      </div>
+                      <div className="col-md-6">
+                        <label htmlFor="stepney">
+                          Stepney- Yes/no <span class="text-danger">*</span>
+                        </label>
+                        <SingleSearchSelect
+                          options={[
+                            { value: "YES", label: "YES" },
+                            { value: "NO", label: "NO" },
+                          ]}
+                          value={reportFormData.stepney}
+                          onChange={(value) =>
+                            handleSelectChange("stepney", value)
+                          }
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="horse_power">
+                      Horse Power <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="horse_power"
+                      name="horse_power"
+                      value={reportFormData.horse_power}
+                      onChange={handleFormChange}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="mechanical_unit_condition">
+                      Mechanical Unit Condition{" "}
+                      <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "GOOD", label: "GOOD" },
+                        { value: "AVERAGE", label: "AVERAGE" },
+                        { value: "FAIR", label: "FAIR" },
+                        { value: "POOR", label: "POOR" },
+                      ]}
+                      value={reportFormData.mechanical_unit_condition}
+                      onChange={(value) =>
+                        handleSelectChange("mechanical_unit_condition", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="cubic_capacity">
+                      Cubic Capacity <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="cubic_capacity"
+                      name="cubic_capacity"
+                      value={reportFormData.cubic_capacity}
+                      onChange={handleFormChange}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="suspension">
+                      Suspension <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "GOOD", label: "GOOD" },
+                        { value: "AVERAGE", label: "AVERAGE" },
+                        { value: "FAIR", label: "FAIR" },
+                        { value: "POOR", label: "POOR" },
+                      ]}
+                      value={reportFormData.suspension}
+                      onChange={(value) =>
+                        handleSelectChange("suspension", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="seating_capacity">
+                      Seating Capacity <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="seating_capacity"
+                      name="seating_capacity"
+                      value={reportFormData.seating_capacity}
+                      onChange={handleFormChange}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="tool_kit_available">
+                      Tool Kit Available <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "YES", label: "YES" },
+                        { value: "NO", label: "NO" },
+                      ]}
+                      value={reportFormData.tool_kit_available}
+                      onChange={(value) =>
+                        handleSelectChange("tool_kit_available", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="vehicle_colour">
+                      Vehicle Colour <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="vehicle_colour"
+                      name="vehicle_colour"
+                      value={reportFormData.vehicle_colour}
+                      onChange={handleFormChange}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="color_condition">
+                      Color Condition <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "GOOD", label: "GOOD" },
+                        { value: "FAIR", label: "FAIR" },
+                        { value: "POOR", label: "POOR" },
+                      ]}
+                      value={reportFormData.color_condition}
+                      onChange={(value) =>
+                        handleSelectChange("color_condition", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="damages_if_any">Damages If Any</label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="damages_if_any"
+                      name="damages_if_any"
+                      value={reportFormData.damages_if_any}
+                      onChange={handleFormChange}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Flexible Fields for COMMENTS ON EQUIPMENT */}
+              <div className="row mt-3">
+                <div className="col-12">
+                  <div className="flexible-buttons-container">
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary btn-sm"
+                      onClick={() =>
+                        addFlexibleFields(
+                          "COMMENTS_ON_EQUIPMENT_AT_THE_TIME_OF_INSPECTION",
+                          2
+                        )
+                      }
+                    >
+                      Add One Set
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary btn-sm"
+                      onClick={() =>
+                        addFlexibleFields(
+                          "COMMENTS_ON_EQUIPMENT_AT_THE_TIME_OF_INSPECTION",
+                          4
+                        )
+                      }
+                    >
+                      Add Two Set
+                    </button>
+                  </div>
+                  {renderFlexibleFields(
+                    "COMMENTS_ON_EQUIPMENT_AT_THE_TIME_OF_INSPECTION"
+                  )}
+                </div>
+              </div>
+
+              {/* RC, PERMIT, TAX, FITNESS & INSURANCE Section */}
+              <div className="row">
+                <div className="col-12">
+                  <h4>RC, PERMIT, TAX, FITNESS & INSURANCE DETAILS</h4>
+                  <hr />
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="rc_book_verified">
+                      RC Book Verified <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "COPY", label: "COPY" },
+                        {
+                          value: "COPY NOT AVAILABLE",
+                          label: "COPY NOT AVAILABLE",
+                        },
+                      ]}
+                      value={reportFormData.rc_book_verified}
+                      onChange={(value) =>
+                        handleSelectChange("rc_book_verified", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="invoice_verified">
+                      Invoice Verified <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "COPY", label: "COPY" },
+                        {
+                          value: "COPY NOT AVAILABLE",
+                          label: "COPY NOT AVAILABLE",
+                        },
+                      ]}
+                      value={reportFormData.invoice_verified}
+                      onChange={(value) =>
+                        handleSelectChange("invoice_verified", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="tax_upto">Tax Upto</label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="tax_upto"
+                      name="tax_upto"
+                      value={reportFormData.tax_upto}
+                      onChange={handleDateChange}
+                      placeholder="DD-MM-YYYY"
+                      maxLength="10"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="permit_upto">Permit Upto</label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="permit_upto"
+                      name="permit_upto"
+                      value={reportFormData.permit_upto}
+                      onChange={handleDateChange}
+                      placeholder="DD-MM-YYYY"
+                      maxLength="10"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="permit_type">Permit Type</label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="permit_type"
+                      name="permit_type"
+                      value={reportFormData.permit_type}
+                      onChange={handleFormChange}
+                      placeholder="All India"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="fitness_upto">Fitness Upto</label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="fitness_upto"
+                      name="fitness_upto"
+                      value={reportFormData.fitness_upto}
+                      onChange={handleDateChange}
+                      placeholder="DD-MM-YYYY"
+                      maxLength="10"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="insurance_co_name">Insurance Co.name</label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="insurance_co_name"
+                      name="insurance_co_name"
+                      value={reportFormData.insurance_co_name}
+                      onChange={handleFormChange}
+                      placeholder="New India Assurance"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="policy_no">Policy No</label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="policy_no"
+                      name="policy_no"
+                      value={reportFormData.policy_no}
+                      onChange={handleFormChange}
+                      placeholder="POL123456789"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="period_of_insurance">
+                      Period Of Insurance
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="period_of_insurance"
+                      name="period_of_insurance"
+                      value={reportFormData.period_of_insurance}
+                      onChange={handleFormChange}
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="insured_value">Insured Value</label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="insured_value"
+                      name="insured_value"
+                      value={reportFormData.insured_value}
+                      onChange={handleCurrencyChange}
+                      placeholder="₹ 0.00"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="insurance_verified">
+                      Insurance Verified <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "COPY", label: "COPY" },
+                        {
+                          value: "COPY NOT AVAILABLE",
+                          label: "COPY NOT AVAILABLE",
+                        },
+                      ]}
+                      value={reportFormData.insurance_verified}
+                      onChange={(value) =>
+                        handleSelectChange("insurance_verified", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Over All Feed Back Of The Inspected Section */}
+              <div className="row">
+                <div className="col-12">
+                  <h4>OVER ALL FEED BACK OF THE INSPECTED</h4>
+                  <hr />
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="current_invoice_cost">
+                      Current Invoice Cost <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="current_invoice_cost"
+                      name="current_invoice_cost"
+                      value={reportFormData.current_invoice_cost}
+                      onChange={handleCurrencyChange}
+                      placeholder="₹ 0.00"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="depreciation">
+                      Depreciation <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="depreciation"
+                      name="depreciation"
+                      value={reportFormData.depreciation}
+                      onChange={handleFormChange}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="depreciation_value">
+                      Depreciation Value <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="depreciation_value"
+                      name="depreciation_value"
+                      value={reportFormData.depreciation_value}
+                      onChange={handleCurrencyChange}
+                      placeholder="₹ 0.00"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="appraiser_value">
+                      Appraiser Value <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="appraiser_value"
+                      name="appraiser_value"
+                      value={reportFormData.appraiser_value}
+                      onChange={handleCurrencyChange}
+                      placeholder="₹ 0.00"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="fair_market_value">
+                      Fair Market Value <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="fair_market_value"
+                      name="fair_market_value"
+                      value={reportFormData.fair_market_value}
+                      onChange={handleFormChange}
+                      placeholder="₹ 0.00"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="amount_in_words">
+                      Fair Market Value Amount In Words{" "}
+                      <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="amount_in_words"
+                      name="amount_in_words"
+                      value={reportFormData.amount_in_words}
+                      readOnly
+                      style={{
+                        backgroundColor: "#f8f9fa",
+                        cursor: "not-allowed",
+                      }}
+                      placeholder="Auto-generated from fair market value"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="no_of_photograph">
+                      No of Photographs <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="no_of_photograph"
+                      name="no_of_photograph"
+                      value={reportFormData.no_of_photograph}
+                      onChange={handleFormChange}
+                      placeholder="10"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="no_of_collage">
+                      No of Collages <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="no_of_collage"
+                      name="no_of_collage"
+                      value={reportFormData.no_of_collage}
+                      onChange={handleFormChange}
+                      placeholder="2"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group">
+                    <label htmlFor="valuer_comments_remarks">
+                      Valuer Comments/remarks <span class="text-danger">*</span>
+                    </label>
+                    <textarea
+                      className="form-field"
+                      id="valuer_comments_remarks"
+                      name="valuer_comments_remarks"
+                      value={reportFormData.valuer_comments_remarks}
+                      onChange={handleFormChange}
+                      rows="2"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group">
+                    <label htmlFor="declaration">
+                      Declaration <span class="text-danger">*</span>
+                    </label>
+                    <p className="mb-0">
+                      The aforesaid COMMERCIAL VEHICLE / TATA LPT 3518 inspected
+                      by us & found in{" "}
+                    </p>
+                    <SingleSearchSelect
+                      options={[
+                        {
+                          value: "ROAD WORTHY CONDITION",
+                          label: "ROAD WORTHY CONDITION",
+                        },
+                        {
+                          value: "ACCIDENTAL CONDITION",
+                          label: "ACCIDENTAL CONDITION",
+                        },
+                        { value: "NOT WORKING", label: "NOT WORKING" },
+                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        {
+                          value: "STACKED CONDITION",
+                          label: "STACKED CONDITION",
+                        },
+                        { value: "KNOCK DOWN", label: "KNOCK DOWN" },
+                        { value: "PARKING YARD", label: "PARKING YARD" },
+                      ]}
+                      value={reportFormData.declaration}
+                      onChange={(value) =>
+                        handleSelectChange("declaration", value)
+                      }
+                      required
+                    />
+                    <p className="mb-0">
+                      on the date of my inspection.This Report issued for
+                      [valuation_purpose] of HINDUJA LEYLAND FINANCE LTD, PUNE,
+                      GUJARAT Only.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group">
+                    <label htmlFor="chassis_no_pencil_impression">
+                      Chassis No Pencil Impression (Image)
+                    </label>
+                    <input
+                      type="file"
+                      className="form-field"
+                      id="chassis_no_pencil_impression"
+                      name="chassis_no_pencil_impression"
+                      onChange={handleFileChange}
+                      accept="image/*"
+                    />
+                    {chassisImpressionFile && (
+                      <small className="text-muted">
+                        Selected: {chassisImpressionFile.name}
+                      </small>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Generate Report Button */}
+              <div className="row">
+                <div className="col-12 text-center">
+                  <div className="form-buttons">
+                    <button
+                      type="submit"
+                      className="submit-button"
+                      disabled={generating}
+                    >
+                      {generating
+                        ? "Generating Report..."
+                        : "Generate CV Report"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export default CVReport;

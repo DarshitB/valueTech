@@ -1,0 +1,269 @@
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import * as orderApi from "../../api/order.api"; // API functions for orders
+import * as orderMediaApi from "../../api/orderMedia.api"; // API functions for order media
+import { toast } from "react-toastify";
+
+// Async action: Fetch all orders
+export const fetchOrders = createAsyncThunk(
+  "orders/fetchAll",
+  async () => {
+    const res = await orderApi.getOrders();
+    return res.data;
+  }
+);
+
+// Async action: Fetch a single order by ID
+export const fetchOrderById = createAsyncThunk(
+  "orders/fetchById",
+  async (id) => {
+    const res = await orderApi.getOrderById(id);
+    return res.data;
+  }
+);
+
+// Async action: Create a new order
+export const addOrder = createAsyncThunk("orders/add", async (data, { rejectWithValue }) => {
+  try {
+    const res = await orderApi.createOrder(data);
+    return res.data;
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.message || err.message);
+  }
+});
+
+// Async action: Update an existing order
+export const editOrder = createAsyncThunk("orders/edit", async ({ id, data }, { rejectWithValue }) => {
+  try {
+    const res = await orderApi.updateOrder(id, data);
+    return res.data;
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.message || err.message);
+  }
+});
+
+// Async action: Delete an order
+export const removeOrder = createAsyncThunk("orders/delete", async (id, { rejectWithValue }) => {
+  try {
+    await orderApi.deleteOrder(id);
+    return id; // Return ID to remove it from local state
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.message || err.message);
+  }
+});
+
+// Async action: Fetch all comments for an order
+export const fetchComments = createAsyncThunk(
+  "orders/fetchComments",
+  async (id) => {
+    const res = await orderApi.getComments(id);
+    return res.data;
+  }
+);
+
+// Async action: Create a new comment
+export const addComment = createAsyncThunk("orders/addComment", async ({ id, data }, { rejectWithValue }) => {
+  try {
+    const res = await orderApi.addComment(id, data);
+    return res.data;
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.message || err.message);
+  }
+});
+
+// Async action: Fetch order media
+export const fetchOrderMedia = createAsyncThunk(
+  "orders/fetchMedia",
+  async (orderId) => {
+    const res = await orderMediaApi.getOrderMedia(orderId);
+    return res.data;
+  }
+);
+
+// Async action: Update order media status
+export const updateOrderMediaStatus = createAsyncThunk(
+  "orders/updateMediaStatus",
+  async (payload, { rejectWithValue }) => {
+    try {
+      const res = await orderMediaApi.updateOrderMediaStatus(payload);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+// Async action: Update payment status/details for an order
+export const updatePaymentStatus = createAsyncThunk(
+  "orders/updatePaymentStatus",
+  async ({ id, data }, { rejectWithValue }) => {
+    try {
+      const res = await orderApi.updatePaymentStatus(id, data);
+      // Some APIs return { success, message, data }; normalize to res.data
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+// Initial state
+const initialState = {
+  list: [],        // All orders
+  selected: null,  // Selected order (for view/edit)
+  loading: false,  // Loading state
+  error: null,     // Error message
+  media: null,     // Order media data
+  mediaLoading: false, // Media loading state
+  mediaError: null,    // Media error state
+  paymentUpdating: false, // Payment update loading
+  paymentError: null,     // Payment update error
+};
+
+// Order slice
+const orderSlice = createSlice({
+  name: "orders",
+  initialState,
+  reducers: {}, // No synchronous reducers yet
+
+  extraReducers: (builder) => {
+    builder
+      // Fetch all orders
+      .addCase(fetchOrders.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchOrders.fulfilled, (state, action) => {
+        state.list = action.payload;
+        state.loading = false;
+      })
+      .addCase(fetchOrders.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+        toast.error(`Failed to fetch orders: ${action.payload}`);
+      })
+
+      // Fetch order by ID
+      .addCase(fetchOrderById.fulfilled, (state, action) => {
+        state.selected = action.payload;
+      })
+      .addCase(fetchOrderById.rejected, (state, action) => {
+        toast.error(`Failed to fetch order: ${action.payload}`);
+      })
+
+      // Add new order
+      .addCase(addOrder.fulfilled, (state, action) => {
+        state.list.push(action.payload);
+        toast.success("Order added successfully");
+      })
+      .addCase(addOrder.rejected, (state, action) => {
+        toast.error(`Failed to add order: ${action.payload}`);
+      })
+
+      // Edit existing order
+      .addCase(editOrder.fulfilled, (state, action) => {
+        const index = state.list.findIndex((o) => o.id === action.payload.id);
+        if (index !== -1) {
+          state.list[index] = action.payload;
+        }
+        toast.success("Order updated successfully");
+      })
+      .addCase(editOrder.rejected, (state, action) => {
+        toast.error(`Failed to update order: ${action.payload}`);
+      })
+
+      // Delete order
+      .addCase(removeOrder.fulfilled, (state, action) => {
+        state.list = state.list.filter((o) => o.id !== action.payload);
+        toast.success("Order deleted successfully");
+      })
+      .addCase(removeOrder.rejected, (state, action) => {
+        toast.error(`Failed to delete order: ${action.payload}`);
+      })
+
+      // Fetch all comments for an order
+      .addCase(fetchComments.fulfilled, (state, action) => {
+        state.comments = action.payload;
+      })
+      .addCase(fetchComments.rejected, (state, action) => {
+        toast.error(`Failed to fetch comments: ${action.payload}`);
+      })
+
+      // Add a new comment
+      .addCase(addComment.fulfilled, (state, action) => {
+        state.comments.push(action.payload);
+        toast.success("Comment added successfully");
+      })
+      .addCase(addComment.rejected, (state, action) => {
+        toast.error(`Failed to add comment: ${action.payload}`);
+      })
+
+      // Fetch order media
+      .addCase(fetchOrderMedia.pending, (state) => {
+        state.mediaLoading = true;
+        state.mediaError = null;
+      })
+      .addCase(fetchOrderMedia.fulfilled, (state, action) => {
+        // Store the data property since API returns {success: true, data: {...}}
+        state.media = action.payload.data;
+        state.mediaLoading = false;
+      })
+      .addCase(fetchOrderMedia.rejected, (state, action) => {
+        state.mediaLoading = false;
+        state.mediaError = action.payload;
+        toast.error(`Failed to fetch order media: ${action.payload}`);
+      })
+
+      // Update order media status
+      .addCase(updateOrderMediaStatus.fulfilled, (state, action) => {
+        // Update the media status in the current media state
+        if (state.media && state.media.media && action.payload && action.payload.updated_records) {
+          const updatedRecords = action.payload.updated_records;
+          if (Array.isArray(updatedRecords)) {
+            updatedRecords.forEach((record) => {
+              if (record && Array.isArray(record) && record[0]) {
+                const mediaItem = state.media.media.find(item => item.id === record[0].id);
+                if (mediaItem) {
+                  mediaItem.status = record[0].status;
+                  mediaItem.updated_at = record[0].updated_at;
+                  mediaItem.updated_by = record[0].updated_by;
+                }
+              }
+            });
+          }
+        }
+        toast.success(action.payload?.message || "Media status updated successfully");
+      })
+      .addCase(updateOrderMediaStatus.rejected, (state, action) => {
+        toast.error(`Failed to update media status: ${action.payload}`);
+      })
+
+      // Update payment status/details for an order
+      .addCase(updatePaymentStatus.pending, (state) => {
+        state.paymentUpdating = true;
+        state.paymentError = null;
+      })
+      .addCase(updatePaymentStatus.fulfilled, (state, action) => {
+        state.paymentUpdating = false;
+        const updated = action.payload?.data || action.payload;
+        if (updated && typeof updated === "object") {
+          // Merge into selected order if it matches
+          if (state.selected && state.selected.id === updated.id) {
+            state.selected = { ...state.selected, ...updated };
+          }
+          // Merge into list if present
+          const listIdx = state.list.findIndex((o) => o.id === updated.id);
+          if (listIdx !== -1) {
+            state.list[listIdx] = { ...state.list[listIdx], ...updated };
+          }
+        }
+        toast.success(action.payload?.message || "Payment updated successfully");
+      })
+      .addCase(updatePaymentStatus.rejected, (state, action) => {
+        state.paymentUpdating = false;
+        state.paymentError = action.payload;
+        toast.error(`Failed to update payment: ${action.payload}`);
+      });
+  },
+});
+
+export default orderSlice.reducer;
