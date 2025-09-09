@@ -4,7 +4,7 @@
  */
 exports.seed = async function (knex) {
   // Deletes ALL existing entries
-  a/* wait knex("roles").del(); */
+ /*  await knex("roles").del(); */
 
   // Inserts seed entries
   await knex("roles").insert([
