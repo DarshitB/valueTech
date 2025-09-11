@@ -18,7 +18,7 @@ function AVRReport() {
   const { generating } = useSelector((state) => state.orderReports);
   // Set page title using custom hook
   const { setTitle } = usePageTitle();
-  console.log(order);
+  /* console.log(order); */
   // Fetch order details when component mounts or ID changes
   useEffect(() => {
     if (id) {
@@ -406,7 +406,7 @@ function AVRReport() {
       formData.append(key, value || "");
     });
 
-    // Debug: Log the form data being sent
+    /* // Debug: Log the form data being sent
     console.log("Form Data being sent:", reportFormData);
     console.log("Flexible Fields being sent:", flexibleFields);
 
@@ -414,7 +414,7 @@ function AVRReport() {
     console.log("FormData contents:");
     for (let [key, value] of formData.entries()) {
       console.log(`${key}: ${value}`);
-    }
+    } */
 
     // Add flexible fields to FormData with proper sequential ordering
     let formDataIndex = 0;
@@ -443,11 +443,11 @@ function AVRReport() {
       formDataIndex++;
     });
 
-    // Debug: Log final FormData contents after flexible fields
+   /*  // Debug: Log final FormData contents after flexible fields
     console.log("Final FormData contents after flexible fields:");
     for (let [key, value] of formData.entries()) {
       console.log(`${key}: ${value}`);
-    }
+    } */
 
     // Dispatch report generation action
     dispatch(

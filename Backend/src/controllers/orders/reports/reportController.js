@@ -351,7 +351,7 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
     console.warn("Could not load background image:", error.message);
     // Continue without background image rather than failing
   }
-
+  /* console.log(formData); */
   // Generate HTML content based on report type
   const htmlContent = generateReportHTML(
     reportType,

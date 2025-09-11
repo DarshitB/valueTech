@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useState, useCallback, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchOrderById } from "../../../redux/reducers/orderReducer";
@@ -30,35 +30,31 @@ function CVReport() {
   }, [dispatch, id]);
 
   // Function to get license number based on valuer name
-  const getLicenseNumber = (valuerName) => {
-    switch (valuerName) {
-      case "V.K. ASSOCIATES":
-        return "SLA-60827";
-      case "VALUETECH SOLUTIONS":
-        return "CAT-VII-A-6019";
-      case "VISHAL D. KOTHARI":
-        return "SLA-60827";
-      default:
-        return "";
-    }
-  };
+  const getLicenseNumber = useCallback((valuerName) => {
+    const licenseMap = {
+      "V.K. ASSOCIATES": "SLA-60827",
+      "VALUETECH SOLUTIONS": "CAT-VII-A-6019",
+      "VISHAL D. KOTHARI": "SLA-60827",
+    };
+    return licenseMap[valuerName] || "";
+  }, []);
 
   // Function to get current date in DD-MM-YYYY format
-  const getCurrentDate = () => {
+  const getCurrentDate = useCallback(() => {
     const today = new Date();
     const day = String(today.getDate()).padStart(2, "0");
     const month = String(today.getMonth() + 1).padStart(2, "0");
     const year = today.getFullYear();
     return `${day}-${month}-${year}`;
-  };
+  }, []);
 
   // Function to parse currency value (remove commas and convert to number)
-  const parseCurrency = (value) => {
+  const parseCurrency = useCallback((value) => {
     return parseFloat(value.replace(/,/g, "")) || 0;
-  };
+  }, []);
 
   // Function to convert number to words in Indian format
-  const convertNumberToWordsIndian = (num) => {
+  const convertNumberToWordsIndian = useCallback((num) => {
     const a = [
       "",
       "ONE",
@@ -138,10 +134,10 @@ function CVReport() {
     }
 
     return words.trim() + " ONLY";
-  };
+  }, []);
 
   // Function to convert number to words for tyres
-  const numberToWords = (n) => {
+  const numberToWords = useCallback((n) => {
     const words = [
       "",
       "ONE",
@@ -189,10 +185,10 @@ function CVReport() {
     }
 
     return n.toString(); // fallback for numbers above 99
-  };
+  }, []);
 
   // Function to format currency input (Indian number format)
-  const handleCurrencyFormatting = (value) => {
+  const handleCurrencyFormatting = useCallback((value) => {
     // Remove everything except digits and one dot
     let inputVal = value.replace(/[^0-9.]/g, "");
 
@@ -216,33 +212,9 @@ function CVReport() {
     }
 
     return formattedValue;
-  };
+  }, []);
 
-  // Function to update amount in words based on fair market value
-  const updateAmountInWords = () => {
-    const value = reportFormData.fair_market_value;
-    const amount = parseCurrency(value);
-    const words = convertNumberToWordsIndian(amount);
-    setReportFormData((prev) => ({
-      ...prev,
-      amount_in_words: words,
-    }));
-  };
 
-  // Function to update total number of tyres
-  const updateTyreTotal = () => {
-    const front = parseInt(reportFormData.front_tyre_no) || 0;
-    const middle = parseInt(reportFormData.middle_tyre_no) || 0;
-    const rear = parseInt(reportFormData.rear_tyre_no) || 0;
-
-    const total = front + middle + rear;
-    const word = numberToWords(total);
-
-    setReportFormData((prev) => ({
-      ...prev,
-      no_of_tyres: `${total} (${word})`,
-    }));
-  };
 
   // Form data state for CV report generation
   const [reportFormData, setReportFormData] = useState({
@@ -286,6 +258,8 @@ function CVReport() {
 
     kilometer_reading: "",
     invoice_no_date: "",
+    invoice_no: "",
+    invoice_date: "",
     hyp_with: "",
     hyp_from_date: "",
 
@@ -368,6 +342,10 @@ function CVReport() {
         initiated_by: order?.officer_name && order?.bank_name
           ? `${order.officer_name}, ${order.bank_name}`
           : "",
+        model: order?.sub_category_name && order?.child_category_name
+          ? `${order.sub_category_name}, ${order.child_category_name}`
+          : "",
+        hyp_with: order?.bank_name || "",
       }));
     }
   }, [order]);
@@ -392,7 +370,7 @@ function CVReport() {
   }, [id, order, setTitle]);
 
   // Handle form input changes
-  const handleFormChange = (e) => {
+  const handleFormChange = useCallback((e) => {
     const { name, value } = e.target;
     setReportFormData((prev) => {
       let updated = {
@@ -411,33 +389,6 @@ function CVReport() {
         updated[name] = handleCurrencyFormatting(value);
       }
 
-      // Auto-update amount_in_words when fair_market_value changes
-      if (name === "fair_market_value") {
-        const amount = parseCurrency(value);
-        const words = convertNumberToWordsIndian(amount);
-        updated.amount_in_words = words;
-      }
-
-      // Auto-update no_of_tyres when tyre fields change
-      if (
-        name === "front_tyre_no" ||
-        name === "middle_tyre_no" ||
-        name === "rear_tyre_no"
-      ) {
-        const front =
-          parseInt(name === "front_tyre_no" ? value : updated.front_tyre_no) ||
-          0;
-        const middle =
-          parseInt(
-            name === "middle_tyre_no" ? value : updated.middle_tyre_no
-          ) || 0;
-        const rear =
-          parseInt(name === "rear_tyre_no" ? value : updated.rear_tyre_no) || 0;
-
-        const total = front + middle + rear;
-        const word = numberToWords(total);
-        updated.no_of_tyres = `${total} (${word})`;
-      }
 
       // Auto-calculate depreciation_value when current_invoice_cost or depreciation changes
       if (name === "current_invoice_cost" || name === "depreciation") {
@@ -459,12 +410,28 @@ function CVReport() {
         }
       }
 
+      // Auto-combine invoice_no and invoice_date into invoice_no_date
+      if (name === "invoice_no" || name === "invoice_date") {
+        const invoiceNo = name === "invoice_no" ? value : updated.invoice_no;
+        const invoiceDate = name === "invoice_date" ? value : updated.invoice_date;
+        
+        if (invoiceNo && invoiceDate) {
+          updated.invoice_no_date = `${invoiceNo} Dated ${invoiceDate}`;
+        } else if (invoiceNo) {
+          updated.invoice_no_date = invoiceNo;
+        } else if (invoiceDate) {
+          updated.invoice_no_date = `Dated ${invoiceDate}`;
+        } else {
+          updated.invoice_no_date = "";
+        }
+      }
+
       return updated;
     });
-  };
+  }, [parseCurrency, handleCurrencyFormatting, numberToWords, convertNumberToWordsIndian]);
 
   // Handle SingleSearchSelect changes
-  const handleSelectChange = (name, value) => {
+  const handleSelectChange = useCallback((name, value) => {
     setReportFormData((prev) => {
       const updated = {
         ...prev,
@@ -478,16 +445,16 @@ function CVReport() {
 
       return updated;
     });
-  };
+  }, [getLicenseNumber]);
 
   // Handle file input changes
-  const handleFileChange = (e) => {
+  const handleFileChange = useCallback((e) => {
     const file = e.target.files[0];
     setChassisImpressionFile(file);
-  };
+  }, []);
 
   // Handle date input formatting (DD-MM-YYYY)
-  const handleDateChange = (e) => {
+  const handleDateChange = useCallback((e) => {
     const { name, value } = e.target;
     let numericValue = value.replace(/\D/g, ""); // Remove non-numeric characters
     if (numericValue.length > 8) numericValue = numericValue.substring(0, 8); // Limit to 8 digits (DDMMYYYY)
@@ -511,10 +478,10 @@ function CVReport() {
       ...prev,
       [name]: formattedValue,
     }));
-  };
+  }, []);
 
   // Handle currency input formatting (Indian number format)
-  const handleCurrencyChange = (e) => {
+  const handleCurrencyChange = useCallback((e) => {
     const { name, value } = e.target;
 
     // Remove everything except digits and one dot
@@ -543,19 +510,19 @@ function CVReport() {
       ...prev,
       [name]: formattedValue,
     }));
-  };
+  }, []);
 
   // Handle flexible field changes
-  const handleFlexibleFieldChange = (fieldId, fieldType, value) => {
+  const handleFlexibleFieldChange = useCallback((fieldId, fieldType, value) => {
     setFlexibleFields((prev) =>
       prev.map((field) =>
         field.id === fieldId ? { ...field, [fieldType]: value } : field
       )
     );
-  };
+  }, []);
 
   // Add flexible fields (Add One - 2 fields, Add Two - 4 fields)
-  const addFlexibleFields = (sectionName, fieldsCount) => {
+  const addFlexibleFields = useCallback((sectionName, fieldsCount) => {
     // Calculate the next order by counting total fields in this section
     // For Add Two sets, each set contributes 2 to the count
     // For Add One sets, each set contributes 1 to the count
@@ -584,15 +551,15 @@ function CVReport() {
     };
 
     setFlexibleFields((prev) => [...prev, newField]);
-  };
+  }, [flexibleFields]);
 
   // Remove flexible field
-  const removeFlexibleField = (fieldId) => {
+  const removeFlexibleField = useCallback((fieldId) => {
     setFlexibleFields((prev) => prev.filter((field) => field.id !== fieldId));
-  };
+  }, []);
 
   // Validate flexible fields
-  const validateFlexibleFields = () => {
+  const validateFlexibleFields = useCallback(() => {
     const errors = [];
 
     flexibleFields.forEach((field, index) => {
@@ -613,10 +580,10 @@ function CVReport() {
     });
 
     return errors;
-  };
+  }, [flexibleFields]);
 
   // Handle form submission for report generation
-  const handleReportSubmit = (e) => {
+  const handleReportSubmit = useCallback((e) => {
     e.preventDefault();
 
     // Pre-open a tab synchronously to avoid popup blockers
@@ -648,9 +615,28 @@ function CVReport() {
     // Create FormData for multipart/form-data submission
     const formData = new FormData();
 
+    // Ensure invoice_no_date is properly combined before sending
+    const invoiceNo = reportFormData.invoice_no || "";
+    const invoiceDate = reportFormData.invoice_date || "";
+    let combinedInvoiceData = "";
+    
+    if (invoiceNo && invoiceDate) {
+      combinedInvoiceData = `${invoiceNo} Dated ${invoiceDate}`;
+    } else if (invoiceNo) {
+      combinedInvoiceData = invoiceNo;
+    } else if (invoiceDate) {
+      combinedInvoiceData = `Dated ${invoiceDate}`;
+    }
+    
+
     // Add all form fields to FormData
     Object.keys(reportFormData).forEach((key) => {
       let value = reportFormData[key];
+
+      // Skip individual invoice fields and invoice_no_date - we'll add invoice_no_date separately
+      if (key === "invoice_no" || key === "invoice_date" || key === "invoice_no_date") {
+        return;
+      }
 
       // Special handling for asset_classification - use order data
       if (key === "asset_classification") {
@@ -661,6 +647,11 @@ function CVReport() {
         formData.append(key, value);
       }
     });
+
+    // Add the combined invoice data
+    if (combinedInvoiceData) {
+      formData.append("invoice_no_date", combinedInvoiceData);
+    }
 
     // Add chassis impression file if selected
     if (chassisImpressionFile) {
@@ -780,10 +771,10 @@ function CVReport() {
         }
       }
     });
-  };
+  }, [reportFormData, flexibleFields, validateFlexibleFields, chassisImpressionFile, dispatch, id, order]);
 
   // Render flexible fields for a section
-  const renderFlexibleFields = (sectionName) => {
+  const renderFlexibleFields = useCallback((sectionName) => {
     const sectionFields = flexibleFields.filter(
       (field) => field.section_name === sectionName
     );
@@ -944,7 +935,29 @@ function CVReport() {
         )}
       </div>
     ));
-  };
+  }, [flexibleFields, handleFlexibleFieldChange, removeFlexibleField]);
+
+  // Memoized values for expensive calculations
+  const currentDate = useMemo(() => getCurrentDate(), [getCurrentDate]);
+  const amountInWords = useMemo(() => {
+    const value = reportFormData.fair_market_value;
+    const amount = parseCurrency(value);
+    return amount > 0 ? convertNumberToWordsIndian(amount) : "";
+  }, [reportFormData.fair_market_value, parseCurrency, convertNumberToWordsIndian]);
+
+  const tyreCountInWords = useMemo(() => {
+    const count = parseInt(reportFormData.tyre_count) || 0;
+    return count > 0 ? numberToWords(count) : "";
+  }, [reportFormData.tyre_count, numberToWords]);
+
+  const totalTyres = useMemo(() => {
+    const front = parseInt(reportFormData.front_tyre_no) || 0;
+    const middle = parseInt(reportFormData.middle_tyre_no) || 0;
+    const rear = parseInt(reportFormData.rear_tyre_no) || 0;
+    const total = front + middle + rear;
+    const word = numberToWords(total);
+    return `${total} (${word})`;
+  }, [reportFormData.front_tyre_no, reportFormData.middle_tyre_no, reportFormData.rear_tyre_no, numberToWords]);
 
   return (
     <section className="order-details-wrapper">
@@ -1402,8 +1415,13 @@ function CVReport() {
                       className="form-field"
                       id="model"
                       name="model"
-                      value={reportFormData.model}
-                      onChange={handleFormChange}
+                      value={
+                        order?.sub_category_name && order?.child_category_name
+                          ? `${order.sub_category_name} - ${order.child_category_name}`
+                          : ""
+                      }
+                      readOnly
+                      placeholder="Auto-populated from order data"
                       required
                     />
                   </div>
@@ -1496,14 +1514,25 @@ function CVReport() {
                 </div>
                 <div className="col-md-3">
                   <div className="form-group">
-                    <label htmlFor="invoice_no_date">Invoice No. & Date</label>
+                  <label htmlFor="invoice_no">Invoice No. & Date</label>
+                    <input
+                      type="text"
+                      className="form-field mb-2"
+                      id="invoice_no"
+                      name="invoice_no"
+                      value={reportFormData.invoice_no}
+                      onChange={handleFormChange}
+                      placeholder="Invoice No."
+                    />
                     <input
                       type="text"
                       className="form-field"
-                      id="invoice_no_date"
-                      name="invoice_no_date"
-                      value={reportFormData.invoice_no_date}
-                      onChange={handleFormChange}
+                      id="invoice_date"
+                      name="invoice_date"
+                      value={reportFormData.invoice_date}
+                      placeholder="DD-MM-YYYY"
+                      maxLength="10"
+                      onChange={handleDateChange}
                     />
                   </div>
                 </div>
@@ -1897,7 +1926,7 @@ function CVReport() {
                           className="form-field"
                           id="no_of_tyres"
                           name="no_of_tyres"
-                          value={reportFormData.no_of_tyres}
+                          value={totalTyres}
                           readOnly
                           style={{
                             backgroundColor: "#f8f9fa",
@@ -2423,7 +2452,7 @@ function CVReport() {
                       className="form-field"
                       id="amount_in_words"
                       name="amount_in_words"
-                      value={reportFormData.amount_in_words}
+                      value={amountInWords}
                       readOnly
                       placeholder="Auto-generated from fair market value"
                       required

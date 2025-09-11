@@ -163,7 +163,7 @@ function generateCVReportHTML(formData, extraData, bgImageBase64) {
             <td>ASSET MAKE:</td>
             <td colspan="2">${formData.asset_make}</td>
             <td>MODEL:</td>
-            <td colspan="2">${extraData.subCat}</td>
+            <td colspan="2">${formData.model}</td>
         </tr>
         <tr>
             <td>ENGINE NO./ DETAIL:</td>

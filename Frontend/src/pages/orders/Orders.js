@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import "./order.scss";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   fetchOrders,
   addOrder,
@@ -11,7 +12,7 @@ import { fetchUsers } from "../../redux/reducers/userReducer";
 import { fetchOfficers } from "../../redux/reducers/officerReducer";
 import { fetchChildCategories } from "../../redux/reducers/childCategoryReducer";
 import CustomDataTable from "../../components/CustomDataTable";
-import { DeleteIcon, EditIcon, ViewIcon } from "../../components/icons";
+import { DeleteIcon, EditIcon } from "../../components/icons";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import FormModel from "../../components/FormModel";
 import SingleSearchSelect from "../../components/SingleSearchSelect";
@@ -22,6 +23,7 @@ import { Link } from "react-router-dom";
 
 function Orders() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   /* get logged user permission */
   const allowedPermissions = useSelector(selectPermissions);
@@ -182,8 +184,21 @@ function Orders() {
               </tr>
             ),
             rows: orders.map((order) => (
-              <tr key={order.id}>
-                <td>{order.order_number}</td>
+              <tr 
+                key={order.id}
+                className={hasPermission(allowedPermissions, "view_order_details") ? "clickable-row" : ""}
+                onClick={() => {
+                  if (hasPermission(allowedPermissions, "view_order_details")) {
+                    navigate(`/orders/${order.id}/details`);
+                  }
+                }}
+                style={{ 
+                  cursor: hasPermission(allowedPermissions, "view_order_details") ? "pointer" : "default" 
+                }}
+              >
+                <td className={hasPermission(allowedPermissions, "view_order_details") ? "get-me-inside" : ""}>
+                  {order.order_number}
+                </td>
                 <td>{order.officer_name || "-"}</td>
                 <td>{order.registration_number || "-"}</td>
                 <td>{order.bank_name || "-"}</td>
@@ -195,15 +210,13 @@ function Orders() {
                   </span>
                 </td>
                 <td style={{ textAlign: "center" }}>
-                  {hasPermission(allowedPermissions, "view_order_details") && (
-                    <Link to={`/orders/${order.id}/details`}>
-                      <ViewIcon />
-                    </Link>
-                  )}
                   {hasPermission(allowedPermissions, "edit_order") && (
                     <button
                       className="action-icons"
-                      onClick={() => openEditModal(order)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEditModal(order);
+                      }}
                     >
                       <EditIcon />
                     </button>
@@ -211,9 +224,10 @@ function Orders() {
                   {hasPermission(allowedPermissions, "delete_order") && (
                     <button
                       className="action-icons"
-                      onClick={() =>
-                        confirmDelete(order.id, order.customer_name)
-                      }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        confirmDelete(order.id, order.customer_name);
+                      }}
                     >
                       <DeleteIcon />
                     </button>
