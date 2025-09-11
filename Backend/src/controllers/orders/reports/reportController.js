@@ -362,8 +362,12 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
   );
 
   // Launch Puppeteer with optimized settings
+  const executablePath =
+    process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROMIUM_PATH || undefined;
+
   const browser = await puppeteer.launch({
     headless: true,
+    executablePath,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
