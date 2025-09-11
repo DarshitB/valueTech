@@ -12,6 +12,7 @@ service-account.json
 steps_to_follow.md
 step_to_depoye_to_vps.md
 LOCAL_UPLOAD_SETUP.md
+PUPPETEER_SETUP.md
 
 # Optional: ignore coverage reports
 coverage/

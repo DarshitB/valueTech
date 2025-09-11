@@ -52,6 +52,8 @@ exports.create = async (req, res, next) => {
       customer_name,
       contact,
       alternative_contact,
+      supervisor_number,
+      driver_number,
       child_category_id,
       officer_id,
       manager_id,
@@ -88,7 +90,7 @@ exports.create = async (req, res, next) => {
     }
 
     // Generate unique random order number with configurable length
-    const ORDER_NUMBER_LENGTH = 8; // Change this number to modify order number length
+    const ORDER_NUMBER_LENGTH = 9; // Change this number to modify order number length
 
     const generateOrderNumber = async () => {
       const maxAttempts = 10;
@@ -125,6 +127,8 @@ exports.create = async (req, res, next) => {
       customer_name,
       contact,
       alternative_contact: alternative_contact || null,
+      supervisor_number: supervisor_number || null,
+      driver_number: driver_number || null,
       child_category_id: child_category_id || null,
       officer_id: officer_id || null,
       manager_id: manager_id || null,
@@ -194,6 +198,8 @@ exports.update = async (req, res, next) => {
       customer_name,
       contact,
       alternative_contact,
+      supervisor_number,
+      driver_number,
       child_category_id,
       officer_id,
       manager_id,
@@ -247,6 +253,12 @@ exports.update = async (req, res, next) => {
         alternative_contact !== undefined
           ? alternative_contact
           : existingOrder.alternative_contact,
+      supervisor_number:
+        supervisor_number !== undefined
+          ? supervisor_number
+          : existingOrder.supervisor_number,
+      driver_number:
+        driver_number !== undefined ? driver_number : existingOrder.driver_number,
       child_category_id:
         child_category_id !== undefined
           ? child_category_id

@@ -54,76 +54,138 @@ function CVReport() {
 
   // Function to parse currency value (remove commas and convert to number)
   const parseCurrency = (value) => {
-    return parseFloat(value.replace(/,/g, '')) || 0;
+    return parseFloat(value.replace(/,/g, "")) || 0;
   };
 
   // Function to convert number to words in Indian format
   const convertNumberToWordsIndian = (num) => {
-    const a = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'TEN', 'ELEVEN',
-      'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN'];
-    const b = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY'];
+    const a = [
+      "",
+      "ONE",
+      "TWO",
+      "THREE",
+      "FOUR",
+      "FIVE",
+      "SIX",
+      "SEVEN",
+      "EIGHT",
+      "NINE",
+      "TEN",
+      "ELEVEN",
+      "TWELVE",
+      "THIRTEEN",
+      "FOURTEEN",
+      "FIFTEEN",
+      "SIXTEEN",
+      "SEVENTEEN",
+      "EIGHTEEN",
+      "NINETEEN",
+    ];
+    const b = [
+      "",
+      "",
+      "TWENTY",
+      "THIRTY",
+      "FORTY",
+      "FIFTY",
+      "SIXTY",
+      "SEVENTY",
+      "EIGHTY",
+      "NINETY",
+    ];
 
-    if (num === 0) return 'ZERO ONLY';
+    if (num === 0) return "ZERO ONLY";
 
     function numToWords(n) {
-      let str = '';
+      let str = "";
       if (n > 19) {
-        str += b[Math.floor(n / 10)] + (n % 10 ? ' ' + a[n % 10] : '');
+        str += b[Math.floor(n / 10)] + (n % 10 ? " " + a[n % 10] : "");
       } else {
         str += a[n];
       }
       return str;
     }
 
-    let words = '';
+    let words = "";
 
     const crore = Math.floor(num / 10000000);
     if (crore > 0) {
-      words += numToWords(crore) + ' CRORE ';
+      words += numToWords(crore) + " CRORE ";
       num %= 10000000;
     }
 
     const lakh = Math.floor(num / 100000);
     if (lakh > 0) {
-      words += numToWords(lakh) + ' LAKH ';
+      words += numToWords(lakh) + " LAKH ";
       num %= 100000;
     }
 
     const thousand = Math.floor(num / 1000);
     if (thousand > 0) {
-      words += numToWords(thousand) + ' THOUSAND ';
+      words += numToWords(thousand) + " THOUSAND ";
       num %= 1000;
     }
 
     const hundred = Math.floor(num / 100);
     if (hundred > 0) {
-      words += a[hundred] + ' HUNDRED ';
+      words += a[hundred] + " HUNDRED ";
       num %= 100;
     }
 
     if (num > 0) {
-      if (words !== '') words += 'AND ';
-      words += numToWords(num) + ' ';
+      if (words !== "") words += "AND ";
+      words += numToWords(num) + " ";
     }
 
-    return words.trim() + ' ONLY';
+    return words.trim() + " ONLY";
   };
 
   // Function to convert number to words for tyres
   const numberToWords = (n) => {
     const words = [
-      '', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE',
-      'TEN', 'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN',
-      'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN', 'TWENTY'
+      "",
+      "ONE",
+      "TWO",
+      "THREE",
+      "FOUR",
+      "FIVE",
+      "SIX",
+      "SEVEN",
+      "EIGHT",
+      "NINE",
+      "TEN",
+      "ELEVEN",
+      "TWELVE",
+      "THIRTEEN",
+      "FOURTEEN",
+      "FIFTEEN",
+      "SIXTEEN",
+      "SEVENTEEN",
+      "EIGHTEEN",
+      "NINETEEN",
+      "TWENTY",
     ];
 
     if (n <= 20) {
       return words[n];
     }
 
-    const tens = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY'];
+    const tens = [
+      "",
+      "",
+      "TWENTY",
+      "THIRTY",
+      "FORTY",
+      "FIFTY",
+      "SIXTY",
+      "SEVENTY",
+      "EIGHTY",
+      "NINETY",
+    ];
     if (n < 100) {
-      return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? '-' + words[n % 10] : '');
+      return (
+        tens[Math.floor(n / 10)] + (n % 10 !== 0 ? "-" + words[n % 10] : "")
+      );
     }
 
     return n.toString(); // fallback for numbers above 99
@@ -132,24 +194,25 @@ function CVReport() {
   // Function to format currency input (Indian number format)
   const handleCurrencyFormatting = (value) => {
     // Remove everything except digits and one dot
-    let inputVal = value.replace(/[^0-9.]/g, '');
-    
+    let inputVal = value.replace(/[^0-9.]/g, "");
+
     // Allow only one decimal
-    const parts = inputVal.split('.');
+    const parts = inputVal.split(".");
     let integerPart = parts[0];
-    let decimalPart = parts[1] ? parts[1].slice(0, 2) : ''; // limit to 2 decimal digits
+    let decimalPart = parts[1] ? parts[1].slice(0, 2) : ""; // limit to 2 decimal digits
 
     // Format integer part in Indian number format
     let lastThree = integerPart.slice(-3);
     let otherNumbers = integerPart.slice(0, -3);
-    if (otherNumbers !== '') {
-      lastThree = ',' + lastThree;
+    if (otherNumbers !== "") {
+      lastThree = "," + lastThree;
     }
-    let formattedInteger = otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + lastThree;
+    let formattedInteger =
+      otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + lastThree;
 
     let formattedValue = formattedInteger;
-    if (decimalPart.length > 0 || inputVal.includes('.')) {
-      formattedValue += '.' + decimalPart;
+    if (decimalPart.length > 0 || inputVal.includes(".")) {
+      formattedValue += "." + decimalPart;
     }
 
     return formattedValue;
@@ -297,6 +360,18 @@ function CVReport() {
   // State for flexible fields
   const [flexibleFields, setFlexibleFields] = useState([]);
 
+  // Auto-populate form data when order data is available
+  useEffect(() => {
+    if (order) {
+      setReportFormData((prev) => ({
+        ...prev,
+        initiated_by: order?.officer_name && order?.bank_name
+          ? `${order.officer_name}, ${order.bank_name}`
+          : "",
+      }));
+    }
+  }, [order]);
+
   // Set page title with breadcrumb navigation
   useLayoutEffect(() => {
     setTitle(
@@ -326,9 +401,13 @@ function CVReport() {
       };
 
       // Handle currency formatting for currency fields
-      if (name === "fair_market_value" || name === "current_invoice_cost" || 
-          name === "insured_value" || name === "depreciation_value" || 
-          name === "appraiser_value") {
+      if (
+        name === "fair_market_value" ||
+        name === "current_invoice_cost" ||
+        name === "insured_value" ||
+        name === "depreciation_value" ||
+        name === "appraiser_value"
+      ) {
         updated[name] = handleCurrencyFormatting(value);
       }
 
@@ -340,14 +419,44 @@ function CVReport() {
       }
 
       // Auto-update no_of_tyres when tyre fields change
-      if (name === "front_tyre_no" || name === "middle_tyre_no" || name === "rear_tyre_no") {
-        const front = parseInt(name === "front_tyre_no" ? value : updated.front_tyre_no) || 0;
-        const middle = parseInt(name === "middle_tyre_no" ? value : updated.middle_tyre_no) || 0;
-        const rear = parseInt(name === "rear_tyre_no" ? value : updated.rear_tyre_no) || 0;
+      if (
+        name === "front_tyre_no" ||
+        name === "middle_tyre_no" ||
+        name === "rear_tyre_no"
+      ) {
+        const front =
+          parseInt(name === "front_tyre_no" ? value : updated.front_tyre_no) ||
+          0;
+        const middle =
+          parseInt(
+            name === "middle_tyre_no" ? value : updated.middle_tyre_no
+          ) || 0;
+        const rear =
+          parseInt(name === "rear_tyre_no" ? value : updated.rear_tyre_no) || 0;
 
         const total = front + middle + rear;
         const word = numberToWords(total);
         updated.no_of_tyres = `${total} (${word})`;
+      }
+
+      // Auto-calculate depreciation_value when current_invoice_cost or depreciation changes
+      if (name === "current_invoice_cost" || name === "depreciation") {
+        const invoiceCost = parseCurrency(
+          name === "current_invoice_cost" ? value : updated.current_invoice_cost
+        );
+        const depreciationRate = parseFloat(
+          name === "depreciation" ? value : updated.depreciation
+        );
+
+        if (invoiceCost > 0 && depreciationRate >= 0) {
+          const depreciationAmount = (invoiceCost * depreciationRate) / 100;
+          const depreciationValue = invoiceCost - depreciationAmount;
+          updated.depreciation_value = handleCurrencyFormatting(
+            depreciationValue.toString()
+          );
+        } else {
+          updated.depreciation_value = "";
+        }
       }
 
       return updated;
@@ -510,10 +619,29 @@ function CVReport() {
   const handleReportSubmit = (e) => {
     e.preventDefault();
 
+    // Pre-open a tab synchronously to avoid popup blockers
+    const preOpenedTab = window.open("about:blank", "_blank");
+    if (preOpenedTab && !preOpenedTab.closed) {
+      try {
+        const doc = preOpenedTab.document;
+        doc.open();
+        doc.write(
+          `<!doctype html><html><head><meta charset="utf-8"><title>Preparing report…</title><style>html,body{height:100%;margin:0}body{display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}.box{text-align:center}.spinner{width:44px;height:44px;border: 4px solid rgba(88, 100, 189, 0.2);border-top-color: #5864bd;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px}@keyframes spin{to{transform:rotate(360deg)}}small{opacity:.75}</style></head><body><div class="box"><div class="spinner"></div><div>Preparing your Report...</div><small>This tab will update automatically. So don't close the tab.</small></div></body></html>`
+        );
+        doc.close();
+      } catch (err) {
+        // If writing fails, ignore and proceed
+      }
+    }
+
     // Validate flexible fields
     const validationErrors = validateFlexibleFields();
     if (validationErrors.length > 0) {
       validationErrors.forEach((error) => toast.error(error));
+      // Close the preOpenedTab if validation fails
+      if (preOpenedTab && !preOpenedTab.closed) {
+        preOpenedTab.close();
+      }
       return;
     }
 
@@ -635,12 +763,21 @@ function CVReport() {
       })
     ).then((result) => {
       if (result.meta.requestStatus === "fulfilled") {
-        // Open PDF in new tab (same approach as collage generation)
+        // Open PDF in the pre-opened tab
         const downloadUrl = result.payload.data.download_url;
         const baseUrl =
           process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
         const fullUrl = `${baseUrl}${downloadUrl}`;
-        window.open(fullUrl, "_blank");
+        if (preOpenedTab && !preOpenedTab.closed) {
+          preOpenedTab.location.href = fullUrl;
+        } else {
+          window.open(fullUrl, "_blank");
+        }
+      } else {
+        // Close the preOpenedTab if generation failed
+        if (preOpenedTab && !preOpenedTab.closed) {
+          preOpenedTab.close();
+        }
       }
     });
   };
@@ -986,9 +1123,14 @@ function CVReport() {
                       className="form-field"
                       id="initiated_by"
                       name="initiated_by"
-                      value={reportFormData.initiated_by}
+                      value={
+                        order?.officer_name && order?.bank_name
+                          ? `${order.officer_name}, ${order.bank_name}`
+                          : ""
+                      }
                       onChange={handleFormChange}
                       rows="2"
+                      readOnly
                     />
                   </div>
                 </div>
@@ -2228,8 +2370,8 @@ function CVReport() {
                       id="depreciation_value"
                       name="depreciation_value"
                       value={reportFormData.depreciation_value}
-                      onChange={handleCurrencyChange}
-                      placeholder="₹ 0.00"
+                      readOnly
+                      placeholder="Auto-calculated from invoice cost and depreciation rate"
                       required
                     />
                   </div>
@@ -2283,10 +2425,6 @@ function CVReport() {
                       name="amount_in_words"
                       value={reportFormData.amount_in_words}
                       readOnly
-                      style={{
-                        backgroundColor: "#f8f9fa",
-                        cursor: "not-allowed",
-                      }}
                       placeholder="Auto-generated from fair market value"
                       required
                     />

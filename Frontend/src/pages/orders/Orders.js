@@ -47,6 +47,8 @@ function Orders() {
     customer_name: "",
     contact: "",
     alternative_contact: "",
+    supervisor_number: "",
+    driver_number: "",
     child_category_id: "",
     registration_number: "",
     place_of_inspection: "",
@@ -77,6 +79,8 @@ function Orders() {
       customer_name: "",
       contact: "",
       alternative_contact: "",
+      supervisor_number: "",
+      driver_number: "",
       child_category_id: "",
       registration_number: "",
       place_of_inspection: "",
@@ -94,6 +98,8 @@ function Orders() {
       customer_name: order.customer_name || "",
       contact: order.contact || "",
       alternative_contact: order.alternative_contact || "",
+      supervisor_number: order.supervisor_number || "",
+      driver_number: order.driver_number || "",
       child_category_id: order.child_category_id || "",
       registration_number: order.registration_number || "",
       place_of_inspection: order.place_of_inspection || "",
@@ -121,6 +127,8 @@ function Orders() {
       customer_name: formData.customer_name.trim(),
       contact: formData.contact.trim(),
       alternative_contact: formData.alternative_contact.trim() || null,
+      supervisor_number: formData.supervisor_number.trim() || null,
+      driver_number: formData.driver_number.trim() || null,
       child_category_id: formData.child_category_id,
       registration_number: formData.registration_number.trim() || null,
       place_of_inspection: formData.place_of_inspection.trim() || null,
@@ -247,48 +255,94 @@ function Orders() {
                       }}
                     />
                   </div>
-
-                  <div className="form-group">
-                    <label htmlFor="contactNumber">Contact Number *</label>
-                    <input
-                      className="form-field"
-                      id="contactNumber"
-                      name="contactNumber"
-                      value={formData.contact}
-                      inputMode="numeric"
-                      maxLength={10}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Allow only numeric input
-                        if (/^\d*$/.test(value)) {
-                          setFormData({ ...formData, contact: value });
-                        }
-                      }}
-                    />
+                  <div className="form-group-row">
+                    <div className="form-group">
+                      <label htmlFor="contactNumber">Contact Number *</label>
+                      <input
+                        className="form-field"
+                        id="contactNumber"
+                        name="contactNumber"
+                        value={formData.contact}
+                        inputMode="numeric"
+                        maxLength={10}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Allow only numeric input
+                          if (/^\d*$/.test(value)) {
+                            setFormData({ ...formData, contact: value });
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="alternativeContact">
+                        Alternative Contact Number
+                      </label>
+                      <input
+                        className="form-field"
+                        id="alternativeContact"
+                        name="alternativeContact"
+                        value={formData.alternative_contact}
+                        inputMode="numeric"
+                        maxLength={10}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Allow only numeric input
+                          if (/^\d*$/.test(value)) {
+                            setFormData({
+                              ...formData,
+                              alternative_contact: value,
+                            });
+                          }
+                        }}
+                      />
+                    </div>
                   </div>
-
-                  <div className="form-group">
-                    <label htmlFor="alternativeContact">
-                      Alternative Contact Number
-                    </label>
-                    <input
-                      className="form-field"
-                      id="alternativeContact"
-                      name="alternativeContact"
-                      value={formData.alternative_contact}
-                      inputMode="numeric"
-                      maxLength={10}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Allow only numeric input
-                        if (/^\d*$/.test(value)) {
-                          setFormData({
-                            ...formData,
-                            alternative_contact: value,
-                          });
-                        }
-                      }}
-                    />
+                  <div className="form-group-row">
+                    <div className="form-group">
+                      <label htmlFor="supervisor_number">
+                        Supervisor Number
+                      </label>
+                      <input
+                        className="form-field"
+                        id="supervisor_number"
+                        name="supervisor_number"
+                        value={formData.supervisor_number}
+                        inputMode="numeric"
+                        maxLength={10}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Allow only numeric input
+                          if (/^\d*$/.test(value)) {
+                            setFormData({
+                              ...formData,
+                              supervisor_number: value,
+                            });
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="driver_number">Driver Number</label>
+                      <input
+                        className="form-field"
+                        id="driver_number"
+                        name="driver_number"
+                        value={formData.driver_number}
+                        inputMode="numeric"
+                        maxLength={10}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Allow only numeric input
+                          if (/^\d*$/.test(value)) {
+                            setFormData({
+                              ...formData,
+                              driver_number: value,
+                            });
+                          }
+                        }}
+                      />
+                    </div>
                   </div>
 
                   <div className="form-group">
@@ -395,6 +449,8 @@ function Orders() {
                 customer_name: "",
                 contact: "",
                 alternative_contact: "",
+                supervisor_number: "",
+                driver_number: "",
                 child_category_id: "",
                 registration_number: "",
                 place_of_inspection: "",

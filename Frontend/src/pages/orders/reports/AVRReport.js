@@ -38,11 +38,11 @@ function AVRReport() {
   // Function to get license number based on surveyor name
   const getLicenseNumber = (surveyorName) => {
     switch (surveyorName) {
-      case "V.K.ASSOCIATES":
+      case "V.K. ASSOCIATES":
         return "SLA-60827";
       case "VALUETECH SOLUTIONS":
         return "CAT-VII-A-6019";
-      case "VISHAL D.KOTHARI":
+      case "VISHAL D. KOTHARI":
         return "SLA-60827";
       default:
         return "";
@@ -369,10 +369,29 @@ function AVRReport() {
   const handleReportSubmit = (e) => {
     e.preventDefault();
 
+    // Pre-open a tab synchronously to avoid popup blockers
+    const preOpenedTab = window.open("about:blank", "_blank");
+    if (preOpenedTab && !preOpenedTab.closed) {
+      try {
+        const doc = preOpenedTab.document;
+        doc.open();
+        doc.write(
+          `<!doctype html><html><head><meta charset="utf-8"><title>Preparing report…</title><style>html,body{height:100%;margin:0}body{display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}.box{text-align:center}.spinner{width:44px;height:44px;border: 4px solid rgba(88, 100, 189, 0.2);border-top-color: #5864bd;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px}@keyframes spin{to{transform:rotate(360deg)}}small{opacity:.75}</style></head><body><div class="box"><div class="spinner"></div><div>Preparing your Report...</div><small>This tab will update automatically. So don't close the tab.</small></div></body></html>`
+        );
+        doc.close();
+      } catch (err) {
+        // If writing fails, ignore and proceed
+      }
+    }
+
     // Validate flexible fields
     const validationErrors = validateFlexibleFields();
     if (validationErrors.length > 0) {
       validationErrors.forEach((error) => toast.error(error));
+      // Close the preOpenedTab if validation fails
+      if (preOpenedTab && !preOpenedTab.closed) {
+        preOpenedTab.close();
+      }
       return;
     }
 
@@ -390,7 +409,7 @@ function AVRReport() {
     // Debug: Log the form data being sent
     console.log("Form Data being sent:", reportFormData);
     console.log("Flexible Fields being sent:", flexibleFields);
-    
+
     // Debug: Log FormData contents
     console.log("FormData contents:");
     for (let [key, value] of formData.entries()) {
@@ -438,12 +457,21 @@ function AVRReport() {
       })
     ).then((result) => {
       if (result.meta.requestStatus === "fulfilled") {
-        // Open PDF in new tab (same approach as collage generation)
+        // Open PDF in the pre-opened tab
         const downloadUrl = result.payload.data.download_url;
         const baseUrl =
           process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
         const fullUrl = `${baseUrl}${downloadUrl}`;
-        window.open(fullUrl, "_blank");
+        if (preOpenedTab && !preOpenedTab.closed) {
+          preOpenedTab.location.href = fullUrl;
+        } else {
+          window.open(fullUrl, "_blank");
+        }
+      } else {
+        // Close the preOpenedTab if generation failed
+        if (preOpenedTab && !preOpenedTab.closed) {
+          preOpenedTab.close();
+        }
       }
     });
   };

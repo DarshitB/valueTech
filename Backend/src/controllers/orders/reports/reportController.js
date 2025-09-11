@@ -62,7 +62,6 @@ exports.generateReport = async (req, res, next) => {
     const { order_id } = req.params;
     const { report_type: requestedReportType } = req.body;
     const { id: userId } = req.user;
-
     /* console.log("req.body", req.body); */
     // Get order details with relationships
     const order = await Order.findById(order_id, req.user);
