@@ -34,7 +34,7 @@ function CVReport() {
     switch (valuerName) {
       case "V.K. ASSOCIATES":
         return "SLA-60827";
-      case "VALUETECH SOLUTION":
+      case "VALUETECH SOLUTIONS":
         return "CAT-VII-A-6019";
       case "VISHAL D. KOTHARI":
         return "SLA-60827";
