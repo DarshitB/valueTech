@@ -643,6 +643,16 @@ function CVReport() {
         value = order?.child_category_name || "";
       }
 
+      // Special handling for amount_in_words - use memoized value
+      if (key === "amount_in_words") {
+        value = amountInWords;
+      }
+
+      // Special handling for no_of_tyres - use memoized value
+      if (key === "no_of_tyres") {
+        value = totalTyres;
+      }
+
       if (value !== null && value !== "") {
         formData.append(key, value);
       }
