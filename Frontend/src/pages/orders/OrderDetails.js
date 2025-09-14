@@ -405,6 +405,28 @@ function OrderDetails() {
                         <p>{showValue(order?.registration_number)}</p>
                       </div>
                     </div>
+                    <div className="order-details-info-set">
+                      <div className="order-details-info-set-heading">
+                        <p>
+                          <span>Supervisor Number</span>
+                          <span>:</span>
+                        </p>
+                      </div>
+                      <div className="order-details-info-set-details">
+                        <p>{showValue(order?.supervisor_number)}</p>
+                      </div>
+                    </div>
+                    <div className="order-details-info-set">
+                      <div className="order-details-info-set-heading">
+                        <p>
+                          <span>Driver Number</span>
+                          <span>:</span>
+                        </p>
+                      </div>
+                      <div className="order-details-info-set-details">
+                        <p>{showValue(order?.driver_number)}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
