@@ -83,11 +83,11 @@ exports.create = async (req, res, next) => {
     // Determine order status based on manager_id
     let orderStatusId;
     if (manager_id) {
-      // If manager is assigned, status should be 2 (Assigned to Manager)
-      orderStatusId = 2;
+      // If manager is assigned, status should be 3 (Assigned to Manager)
+      orderStatusId = 3;
     } else {
-      // If no manager, status should be 1 (Pending)
-      orderStatusId = 1;
+      // If no manager, status should be 2 (Assigned to Telecaller)
+      orderStatusId = 2;
     }
 
     // Generate unique random order number with configurable length
@@ -156,16 +156,16 @@ exports.create = async (req, res, next) => {
         changed_at: new Date(),
       };
 
-      const assignedStatusHistory = {
+      const managerAssignedStatusHistory = {
         order_id: order.id,
-        status_id: 2, // Assigned to Manager status
+        status_id: 3, // Assigned to Manager status
         changed_by: req.user?.id,
         changed_at: new Date(),
       };
 
       // Create both status history entries
       await OrderStatusHistory.createStatusHistory(pendingStatusHistory);
-      await OrderStatusHistory.createStatusHistory(assignedStatusHistory);
+      await OrderStatusHistory.createStatusHistory(managerAssignedStatusHistory);
     }
 
     if (field_verifier_id) {
@@ -189,8 +189,15 @@ exports.create = async (req, res, next) => {
         changed_by: req.user?.id,
         changed_at: new Date(),
       };
+      const assignToTelecaller = {
+        order_id: order.id,
+        status_id: 2, // Assigned to Telecaller status
+        changed_by: req.user?.id,
+        changed_at: new Date(),
+      };
 
       await OrderStatusHistory.createStatusHistory(statusHistoryData);
+      await OrderStatusHistory.createStatusHistory(assignToTelecaller);
     }
 
     res.locals.newRecordId = order.id;
@@ -252,11 +259,11 @@ exports.update = async (req, res, next) => {
     if (manager_id !== undefined) {
       // If manager_id is being updated
       if (manager_id) {
-        // If manager is assigned, status should be 2 (Assigned to Manager)
-        newStatusId = 2;
+        // If manager is assigned, status should be 3 (Assigned to Manager)
+        newStatusId = 3;
       } else {
-        // If no manager, status should be 1 (Pending)
-        newStatusId = 1;
+        // If no manager, status should be 2 (Assigned to Telecaller)
+        newStatusId = 2;
       }
     } else {
       // If manager_id is not being updated, keep existing status

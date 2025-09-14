@@ -11,6 +11,7 @@ exports.seed = async function(knex) {
   // Inserts seed entries
   await knex('order_status_master').insert([
     { name: 'Order Initiated', description: 'Order has been created' },
+    { name: 'Telecaller Assigned', description: 'Telecaller allocated to the order, if Supervisor and Driver number are not provided' },
     { name: 'Manager Assigned', description: 'Manager allocated to the order' },
     { name: 'Verification In Progress', description: 'Field verification is underway' },
     { name: 'Assets Submitted', description: 'Photos have been uploaded' },
