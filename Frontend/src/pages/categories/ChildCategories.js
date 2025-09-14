@@ -143,7 +143,7 @@ function ChildCategories() {
                   placeholder="Add Subcategory"
                   value={formData.name}
                   onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
+                    setFormData({ ...formData, name: e.target.value.toUpperCase() })
                   }
                 />
                 <button className="btn" type="submit">
@@ -213,7 +213,7 @@ function ChildCategories() {
                     id="childCategoryName"
                     value={formData.name}
                     onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
+                      setFormData({ ...formData, name: e.target.value.toUpperCase() })
                     }
                   />
                 </div>

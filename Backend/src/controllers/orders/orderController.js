@@ -57,6 +57,7 @@ exports.create = async (req, res, next) => {
       child_category_id,
       officer_id,
       manager_id,
+      field_verifier_id,
       registration_number,
       place_of_inspection,
       date_of_inspection,
@@ -132,6 +133,7 @@ exports.create = async (req, res, next) => {
       child_category_id: child_category_id || null,
       officer_id: officer_id || null,
       manager_id: manager_id || null,
+      field_verifier_id: field_verifier_id || null,
       registration_number: registration_number || null,
       place_of_inspection: place_of_inspection || null,
       date_of_inspection: date_of_inspection || null,
@@ -144,7 +146,7 @@ exports.create = async (req, res, next) => {
     const order = await Order.createOrder(orderData);
     /* console.log("Order created successfully:", order); */
 
-    // Create status history entries
+    // Create status history entries based on assignments
     if (manager_id) {
       // If manager is assigned, create both status 1 and 2
       const pendingStatusHistory = {
@@ -164,7 +166,22 @@ exports.create = async (req, res, next) => {
       // Create both status history entries
       await OrderStatusHistory.createStatusHistory(pendingStatusHistory);
       await OrderStatusHistory.createStatusHistory(assignedStatusHistory);
-    } else {
+    }
+
+    if (field_verifier_id) {
+      // If field verifier is assigned, create field verifier assignment record
+      const fieldVerifierStatusHistory = {
+        order_id: order.id,
+        activity_extra: "Field Verifier Assigned",
+        changed_by: req.user?.id,
+        changed_at: new Date(),
+      };
+
+      // Create status history entry
+      await OrderStatusHistory.createStatusHistory(fieldVerifierStatusHistory);
+    }
+
+    if (!manager_id && !field_verifier_id) {
       // If no manager, only create status 1
       const statusHistoryData = {
         order_id: order.id,
@@ -203,11 +220,12 @@ exports.update = async (req, res, next) => {
       child_category_id,
       officer_id,
       manager_id,
+      field_verifier_id,
       registration_number,
       place_of_inspection,
       date_of_inspection,
     } = req.body;
-
+    /* console.log(req.body); */
     // Fetch existing order to check permissions
     const existingOrder = await Order.findById(orderId, req.user);
     if (!existingOrder) throw new NotFoundError("Order not found");
@@ -245,6 +263,14 @@ exports.update = async (req, res, next) => {
       newStatusId = existingOrder.current_status_id;
     }
 
+    // Helper function to handle empty strings for integer fields
+    const getIntegerValue = (value, defaultValue) => {
+      if (value === undefined || value === null || value === "") {
+        return defaultValue;
+      }
+      return value;
+    };
+
     // Update order - only update fields that are provided
     const updateData = {
       customer_name,
@@ -258,15 +284,19 @@ exports.update = async (req, res, next) => {
           ? supervisor_number
           : existingOrder.supervisor_number,
       driver_number:
-        driver_number !== undefined ? driver_number : existingOrder.driver_number,
-      child_category_id:
-        child_category_id !== undefined
-          ? child_category_id
-          : existingOrder.child_category_id,
-      officer_id:
-        officer_id !== undefined ? officer_id : existingOrder.officer_id,
-      manager_id:
-        manager_id !== undefined ? manager_id : existingOrder.manager_id,
+        driver_number !== undefined
+          ? driver_number
+          : existingOrder.driver_number,
+      child_category_id: getIntegerValue(
+        child_category_id,
+        existingOrder.child_category_id
+      ),
+      officer_id: getIntegerValue(officer_id, existingOrder.officer_id),
+      manager_id: getIntegerValue(manager_id, existingOrder.manager_id),
+      field_verifier_id: getIntegerValue(
+        field_verifier_id,
+        existingOrder.field_verifier_id
+      ),
       registration_number:
         registration_number !== undefined
           ? registration_number
@@ -290,7 +320,10 @@ exports.update = async (req, res, next) => {
       req.user?.id
     );
 
-    // Create status history entry if status changed
+    // Create status history entries based on changes
+    let hasStatusChange = false;
+
+    // Check if manager assignment changed
     if (
       manager_id !== undefined &&
       newStatusId !== existingOrder.current_status_id
@@ -303,7 +336,27 @@ exports.update = async (req, res, next) => {
       };
 
       await OrderStatusHistory.createStatusHistory(statusHistoryData);
-    } else {
+      hasStatusChange = true;
+    }
+
+    // Check if field verifier assignment changed
+    if (
+      field_verifier_id &&
+      field_verifier_id !== existingOrder.field_verifier_id
+    ) {
+      const fieldVerifierStatusHistory = {
+        order_id: orderId,
+        activity_extra: "Field Verifier Assigned",
+        changed_by: req.user?.id,
+        changed_at: new Date(),
+      };
+
+      await OrderStatusHistory.createStatusHistory(fieldVerifierStatusHistory);
+      hasStatusChange = true;
+    }
+
+    // If no specific status changes, create general edit record
+    if (!hasStatusChange) {
       const statusHistoryData = {
         order_id: orderId,
         activity_extra: "Order Edited",
@@ -338,15 +391,23 @@ exports.addingPayment = async (req, res, next) => {
 
     const updateData = {
       payment_amount:
-        payment_amount !== undefined ? payment_amount : existingOrder.payment_amount,
+        payment_amount !== undefined
+          ? payment_amount
+          : existingOrder.payment_amount,
       payment_mode:
         payment_mode !== undefined ? payment_mode : existingOrder.payment_mode,
       payment_status:
-        payment_status !== undefined ? payment_status : existingOrder.payment_status,
+        payment_status !== undefined
+          ? payment_status
+          : existingOrder.payment_status,
     };
 
-    const updated = await Order.updatePaymentStatus(orderId, updateData, req.user?.id);
-    
+    const updated = await Order.updatePaymentStatus(
+      orderId,
+      updateData,
+      req.user?.id
+    );
+
     // Log activity in status history for audit trail
     const statusHistoryData = {
       order_id: orderId,

@@ -125,7 +125,7 @@ function Categories() {
                         className="input-filed"
                         placeholder="Add category"
                         value={newCategoryName}
-                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        onChange={(e) => setNewCategoryName(e.target.value.toUpperCase())}
                       />
                       <button className="btn" type="submit">
                         Add Category
@@ -210,7 +210,7 @@ function Categories() {
                       className="form-field"
                       id="category_input"
                       value={editCategoryName}
-                      onChange={(e) => setEditCategoryName(e.target.value)}
+                      onChange={(e) => setEditCategoryName(e.target.value.toUpperCase())}
                     />
                   </div>
                   <div className="form-buttons">

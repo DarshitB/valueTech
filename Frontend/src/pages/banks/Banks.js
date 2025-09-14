@@ -190,7 +190,7 @@ function Banks() {
                       id="bankName"
                       value={formData.name}
                       onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
+                        setFormData({ ...formData, name: e.target.value.toUpperCase() })
                       }
                     />
                   </div>
@@ -201,7 +201,7 @@ function Banks() {
                       id="bankInitial"
                       value={formData.initial}
                       onChange={(e) =>
-                        setFormData({ ...formData, initial: e.target.value })
+                        setFormData({ ...formData, initial: e.target.value.toUpperCase() })
                       }
                     />
                   </div>

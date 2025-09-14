@@ -11,6 +11,7 @@ import {
 import { fetchUsers } from "../../redux/reducers/userReducer";
 import { fetchOfficers } from "../../redux/reducers/officerReducer";
 import { fetchChildCategories } from "../../redux/reducers/childCategoryReducer";
+import { fetchFieldVerifiers } from "../../redux/reducers/fieldVerifierReducer";
 import CustomDataTable from "../../components/CustomDataTable";
 import { DeleteIcon, EditIcon } from "../../components/icons";
 import ConfirmationModal from "../../components/ConfirmationModal";
@@ -35,6 +36,7 @@ function Orders() {
   const { list: allChildCategories } = useSelector(
     (state) => state.childCategories
   );
+  const { list: fieldVerifiers } = useSelector((state) => state.fieldVerifier);
 
   // Fetch everything on mount
   useEffect(() => {
@@ -42,6 +44,7 @@ function Orders() {
     dispatch(fetchOfficers());
     dispatch(fetchUsers());
     dispatch(fetchChildCategories());
+    dispatch(fetchFieldVerifiers());
   }, [dispatch]);
   /* console.log("allChildCategories", allChildCategories); */
   // New/Edit Order State
@@ -56,6 +59,7 @@ function Orders() {
     place_of_inspection: "",
     officer_id: null,
     manager_id: null,
+    field_verifier_id: null,
   });
 
   const [isEdit, setIsEdit] = useState(false);
@@ -88,6 +92,7 @@ function Orders() {
       place_of_inspection: "",
       officer_id: null,
       manager_id: null,
+      field_verifier_id: null,
     });
     setShowFormModal(true);
   };
@@ -107,6 +112,7 @@ function Orders() {
       place_of_inspection: order.place_of_inspection || "",
       officer_id: order.officer_id || null,
       manager_id: order.manager_id || null,
+      field_verifier_id: order.field_verifier_id || null,
     });
     setShowFormModal(true);
   };
@@ -124,6 +130,8 @@ function Orders() {
       return;
     }
 
+    // No validation needed - field verifier is optional
+
     // All validations passed — build payload
     const payload = {
       customer_name: formData.customer_name.trim(),
@@ -137,6 +145,11 @@ function Orders() {
       officer_id: formData.officer_id,
       manager_id: formData.manager_id,
     };
+
+    // Only include field_verifier_id in payload if manager is assigned
+    if (formData.manager_id) {
+      payload.field_verifier_id = formData.field_verifier_id;
+    }
 
     if (isEdit) {
       dispatch(editOrder({ id: editOrderId, data: payload }));
@@ -261,7 +274,7 @@ function Orders() {
                       name="nameField"
                       value={formData.customer_name}
                       onChange={(e) => {
-                        const customer_name = e.target.value;
+                        const customer_name = e.target.value.toUpperCase();
                         setFormData({
                           ...formData,
                           customer_name,
@@ -369,7 +382,7 @@ function Orders() {
                       name="registrationNumber"
                       value={formData.registration_number}
                       onChange={(e) => {
-                        const registration_number = e.target.value;
+                        const registration_number = e.target.value.toUpperCase();
                         setFormData({
                           ...formData,
                           registration_number,
@@ -388,7 +401,7 @@ function Orders() {
                       name="placeOfInspection"
                       value={formData.place_of_inspection}
                       onChange={(e) => {
-                        const place_of_inspection = e.target.value;
+                        const place_of_inspection = e.target.value.toUpperCase();
                         setFormData({
                           ...formData,
                           place_of_inspection,
@@ -441,11 +454,36 @@ function Orders() {
                       }))}
                       value={formData.manager_id}
                       onChange={(val) =>
-                        setFormData({ ...formData, manager_id: val })
+                        setFormData({ 
+                          ...formData, 
+                          manager_id: val,
+                          // Clear field verifier when manager is removed
+                          field_verifier_id: val ? formData.field_verifier_id : null
+                        })
                       }
                       placeholder="Select manager"
                     />
                   </div>
+
+                  {/* Field Verifier - Only show when manager is assigned */}
+                  {formData.manager_id && (
+                    <div className="form-group">
+                      <label htmlFor="fieldVerifierField">Field Verifier</label>
+                      <SingleSearchSelect
+                        id="fieldVerifierField"
+                        className="search-selector"
+                        options={fieldVerifiers.map((verifier) => ({
+                          value: verifier.id,
+                          label: verifier.name,
+                        }))}
+                        value={formData.field_verifier_id}
+                        onChange={(val) =>
+                          setFormData({ ...formData, field_verifier_id: val })
+                        }
+                        placeholder="Select field verifier"
+                      />
+                    </div>
+                  )}
 
                   <div className="form-buttons">
                     <button className="submit-button" type="submit">

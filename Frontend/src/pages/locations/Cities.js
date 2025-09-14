@@ -169,7 +169,7 @@ function Cities() {
                         className="input-filed"
                         placeholder="Add city"
                         value={newCityName}
-                        onChange={(e) => setNewCityName(e.target.value)}
+                        onChange={(e) => setNewCityName(e.target.value.toUpperCase())}
                       />
                       <button className="btn" type="submit">
                         Add City
@@ -241,7 +241,7 @@ function Cities() {
                       className="form-field"
                       id="city_input"
                       value={editCityName}
-                      onChange={(e) => setEditCityName(e.target.value)}
+                      onChange={(e) => setEditCityName(e.target.value.toUpperCase())}
                     />
                   </div>
                   <div className="form-buttons">

@@ -128,7 +128,7 @@ function SubCategories() {
                   placeholder="Add asset category"
                   value={formData.name}
                   onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
+                    setFormData({ ...formData, name: e.target.value.toUpperCase() })
                   }
                 />
                 <button className="btn" type="submit">
@@ -207,7 +207,7 @@ function SubCategories() {
                       id="subCategoryName"
                       value={formData.name}
                       onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
+                        setFormData({ ...formData, name: e.target.value.toUpperCase() })
                       }
                     />
                   </div>

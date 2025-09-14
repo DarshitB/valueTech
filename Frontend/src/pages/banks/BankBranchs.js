@@ -218,7 +218,7 @@ function BankBranches() {
                       id="branchName"
                       value={formData.name}
                       onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
+                        setFormData({ ...formData, name: e.target.value.toUpperCase() })
                       }
                     />
                   </div>

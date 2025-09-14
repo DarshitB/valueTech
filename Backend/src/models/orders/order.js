@@ -19,6 +19,7 @@ const order = {
       .leftJoin("users as manager", "orders.manager_id", "manager.id")
       .leftJoin("users as created_user", "orders.created_by", "created_user.id")
       .leftJoin("users as updated_user", "orders.updated_by", "updated_user.id")
+      .leftJoin("field_verifiers", "orders.field_verifier_id", "field_verifiers.id")
       .leftJoin(
         "child_category",
         "orders.child_category_id",
@@ -65,6 +66,8 @@ const order = {
         "created_user.name as created_by",
         "orders.updated_at",
         "updated_user.name as updated_by",
+        "orders.field_verifier_id",
+        "field_verifiers.name as field_verifier_name",
         "child_category.id as child_category_id",
         "child_category.name as child_category_name",
         "sub_category.id as sub_category_id",
@@ -109,6 +112,7 @@ const order = {
       .leftJoin("users as manager", "orders.manager_id", "manager.id")
       .leftJoin("users as created_user", "orders.created_by", "created_user.id")
       .leftJoin("users as updated_user", "orders.updated_by", "updated_user.id")
+      .leftJoin("field_verifiers", "orders.field_verifier_id", "field_verifiers.id")
       .leftJoin(
         "child_category",
         "orders.child_category_id",
@@ -156,6 +160,8 @@ const order = {
         "created_user.name as created_by",
         "orders.updated_at",
         "updated_user.name as updated_by",
+        "orders.field_verifier_id",
+        "field_verifiers.name as field_verifier_name",
         "child_category.id as child_category_id",
         "child_category.name as child_category_name",
         "sub_category.id as sub_category_id",
@@ -186,6 +192,7 @@ const order = {
       .leftJoin("users as manager", "orders.manager_id", "manager.id")
       .leftJoin("users as created_user", "orders.created_by", "created_user.id")
       .leftJoin("users as updated_user", "orders.updated_by", "updated_user.id")
+      .leftJoin("field_verifiers", "orders.field_verifier_id", "field_verifiers.id")
       .leftJoin(
         "child_category",
         "orders.child_category_id",
@@ -233,6 +240,8 @@ const order = {
         "created_user.name as created_by",
         "orders.updated_at",
         "updated_user.name as updated_by",
+        "orders.field_verifier_id",
+        "field_verifiers.name as field_verifier_name",
         "child_category.id as child_category_id",
         "child_category.name as child_category_name",
         "sub_category.id as sub_category_id",

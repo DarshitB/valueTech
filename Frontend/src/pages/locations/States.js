@@ -113,7 +113,7 @@ function States() {
                         name="state_name"
                         placeholder="Add state"
                         value={newStateName}
-                        onChange={(e) => setNewStateName(e.target.value)}
+                        onChange={(e) => setNewStateName(e.target.value.toUpperCase())}
                       />
                       <button className="btn" type="submit">
                         Add State
@@ -197,7 +197,7 @@ function States() {
                       name="stateName"
                       id="state_input"
                       value={editStateName}
-                      onChange={(e) => setEditStateName(e.target.value)}
+                      onChange={(e) => setEditStateName(e.target.value.toUpperCase())}
                     />
                   </div>
                   <div className="form-buttons">
