@@ -29,6 +29,9 @@ function Orders() {
   /* get logged user permission */
   const allowedPermissions = useSelector(selectPermissions);
 
+  /* get current user data */
+  const currentUser = useSelector((state) => state.auth.user);
+
   // Redux data
   const { list: orders, loading } = useSelector((state) => state.orders);
   const { list: officers } = useSelector((state) => state.officers);
@@ -77,6 +80,18 @@ function Orders() {
   );
 
   const managers = users.filter((user) => user.role_name === "Manager");
+
+  // Check if current user is TELECALLER (case-insensitive)
+  const isTelecaller = currentUser?.role.name?.toUpperCase() === "TELECALLER";
+  /* console.log("isTelecaller", currentUser?.role.name); */
+  // Fields allowed for TELECALLER role
+  const telecallerAllowedFields = [
+    "contact",
+    "alternative_contact",
+    "supervisor_number",
+    "driver_number",
+    "place_of_inspection",
+  ];
 
   // Open Add Order Form
   const openAddModal = () => {
@@ -197,19 +212,34 @@ function Orders() {
               </tr>
             ),
             rows: orders.map((order) => (
-              <tr 
+              <tr
                 key={order.id}
-                className={hasPermission(allowedPermissions, "view_order_details") ? "clickable-row" : ""}
+                className={
+                  hasPermission(allowedPermissions, "view_order_details")
+                    ? "clickable-row"
+                    : ""
+                }
                 onClick={() => {
                   if (hasPermission(allowedPermissions, "view_order_details")) {
                     navigate(`/orders/${order.id}/details`);
                   }
                 }}
-                style={{ 
-                  cursor: hasPermission(allowedPermissions, "view_order_details") ? "pointer" : "default" 
+                style={{
+                  cursor: hasPermission(
+                    allowedPermissions,
+                    "view_order_details"
+                  )
+                    ? "pointer"
+                    : "default",
                 }}
               >
-                <td className={hasPermission(allowedPermissions, "view_order_details") ? "get-me-inside" : ""}>
+                <td
+                  className={
+                    hasPermission(allowedPermissions, "view_order_details")
+                      ? "get-me-inside"
+                      : ""
+                  }
+                >
                   {order.order_number}
                 </td>
                 <td>{order.officer_name || "-"}</td>
@@ -274,12 +304,16 @@ function Orders() {
                       name="nameField"
                       value={formData.customer_name}
                       onChange={(e) => {
-                        const customer_name = e.target.value.toUpperCase();
-                        setFormData({
-                          ...formData,
-                          customer_name,
-                        });
+                        // Only allow TELECALLER to change this field if they have permission
+                        if (!isTelecaller) {
+                          const customer_name = e.target.value.toUpperCase();
+                          setFormData({
+                            ...formData,
+                            customer_name,
+                          });
+                        }
                       }}
+                      disabled={isTelecaller}
                     />
                   </div>
                   <div className="form-group-row">
@@ -299,6 +333,7 @@ function Orders() {
                             setFormData({ ...formData, contact: value });
                           }
                         }}
+                        disabled={false}
                       />
                     </div>
                     <div className="form-group">
@@ -322,6 +357,7 @@ function Orders() {
                             });
                           }
                         }}
+                        disabled={false}
                       />
                     </div>
                   </div>
@@ -347,6 +383,7 @@ function Orders() {
                             });
                           }
                         }}
+                        disabled={false}
                       />
                     </div>
                     <div className="form-group">
@@ -368,6 +405,7 @@ function Orders() {
                             });
                           }
                         }}
+                        disabled={false}
                       />
                     </div>
                   </div>
@@ -382,12 +420,17 @@ function Orders() {
                       name="registrationNumber"
                       value={formData.registration_number}
                       onChange={(e) => {
-                        const registration_number = e.target.value.toUpperCase();
-                        setFormData({
-                          ...formData,
-                          registration_number,
-                        });
+                        // Only allow TELECALLER to change this field if they have permission
+                        if (!isTelecaller) {
+                          const registration_number =
+                            e.target.value.toUpperCase();
+                          setFormData({
+                            ...formData,
+                            registration_number,
+                          });
+                        }
                       }}
+                      disabled={isTelecaller}
                     />
                   </div>
 
@@ -401,12 +444,15 @@ function Orders() {
                       name="placeOfInspection"
                       value={formData.place_of_inspection}
                       onChange={(e) => {
-                        const place_of_inspection = e.target.value.toUpperCase();
+                        // TELECALLER is allowed to change this field
+                        const place_of_inspection =
+                          e.target.value.toUpperCase();
                         setFormData({
                           ...formData,
                           place_of_inspection,
                         });
                       }}
+                      disabled={false}
                     />
                   </div>
 
@@ -420,10 +466,14 @@ function Orders() {
                         label: `${childCategory.name}`,
                       }))}
                       value={formData.child_category_id}
-                      onChange={(val) =>
-                        setFormData({ ...formData, child_category_id: val })
-                      }
+                      onChange={(val) => {
+                        // Only allow TELECALLER to change this field if they have permission
+                        if (!isTelecaller) {
+                          setFormData({ ...formData, child_category_id: val });
+                        }
+                      }}
                       placeholder="Select Subcategory"
+                      disabled={isTelecaller}
                     />
                   </div>
                   <div className="form-group">
@@ -436,10 +486,14 @@ function Orders() {
                         label: `${user.name} (${user.role_name})`,
                       }))}
                       value={formData.officer_id}
-                      onChange={(val) =>
-                        setFormData({ ...formData, officer_id: val })
-                      }
+                      onChange={(val) => {
+                        // Only allow TELECALLER to change this field if they have permission
+                        if (!isTelecaller) {
+                          setFormData({ ...formData, officer_id: val });
+                        }
+                      }}
                       placeholder="Select officer"
+                      disabled={isTelecaller}
                     />
                   </div>
 
@@ -453,15 +507,21 @@ function Orders() {
                         label: user.name,
                       }))}
                       value={formData.manager_id}
-                      onChange={(val) =>
-                        setFormData({ 
-                          ...formData, 
-                          manager_id: val,
-                          // Clear field verifier when manager is removed
-                          field_verifier_id: val ? formData.field_verifier_id : null
-                        })
-                      }
+                      onChange={(val) => {
+                        // Only allow TELECALLER to change this field if they have permission
+                        if (!isTelecaller) {
+                          setFormData({
+                            ...formData,
+                            manager_id: val,
+                            // Clear field verifier when manager is removed
+                            field_verifier_id: val
+                              ? formData.field_verifier_id
+                              : null,
+                          });
+                        }
+                      }}
                       placeholder="Select manager"
+                      disabled={isTelecaller}
                     />
                   </div>
 
@@ -477,10 +537,14 @@ function Orders() {
                           label: verifier.name,
                         }))}
                         value={formData.field_verifier_id}
-                        onChange={(val) =>
-                          setFormData({ ...formData, field_verifier_id: val })
-                        }
+                        onChange={(val) => {
+                          // Only allow TELECALLER to change this field if they have permission
+                          if (!isTelecaller) {
+                            setFormData({ ...formData, field_verifier_id: val });
+                          }
+                        }}
                         placeholder="Select field verifier"
+                        disabled={isTelecaller}
                       />
                     </div>
                   )}

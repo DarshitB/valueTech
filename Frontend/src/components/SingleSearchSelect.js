@@ -8,8 +8,10 @@ import Select from "react-select";
  * @param {Function} onChange - Callback with selected value(s)
  * @param {String} placeholder - Placeholder text
  * @param {Boolean} isMulti - If true, enables multiple selection
+ * @param {Boolean} required - If true, marks field as required
+ * @param {Boolean} disabled - If true, disables the select component
  */
-const SingleSearchSelect = ({ options, value, onChange, placeholder, isMulti = false, required = false }) => {
+const SingleSearchSelect = ({ options, value, onChange, placeholder, isMulti = false, required = false, disabled = false }) => {
   // Handle selected value(s)
   const selected = isMulti
     ? options.filter((opt) => value?.includes(opt.value))
@@ -33,6 +35,7 @@ const SingleSearchSelect = ({ options, value, onChange, placeholder, isMulti = f
       isMulti={isMulti}
       placeholder={placeholder || "Select an option..."}
       required={required}
+      isDisabled={disabled}
     />
   );
 };

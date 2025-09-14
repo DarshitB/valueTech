@@ -102,7 +102,9 @@ function Permissions() {
                       className="input-filed"
                       placeholder="Add role"
                       value={newRoleName}
-                      onChange={(e) => setNewRoleName(e.target.value)}
+                      onChange={(e) =>
+                        setNewRoleName(e.target.value.toUpperCase())
+                      }
                     />
                     <button className="btn" type="submit">
                       Add Role
