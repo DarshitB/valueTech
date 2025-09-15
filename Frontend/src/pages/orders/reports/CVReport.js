@@ -333,6 +333,7 @@ function CVReport() {
 
   // State for flexible fields
   const [flexibleFields, setFlexibleFields] = useState([]);
+  
 
   // Auto-populate form data when order data is available
   useEffect(() => {
@@ -937,6 +938,170 @@ function CVReport() {
                     )
                   }
                   placeholder="Enter second value"
+                  required
+                />
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    ));
+  }, [flexibleFields, handleFlexibleFieldChange, removeFlexibleField]);
+
+  // Render flexible fields with textarea for specific section
+  const renderFlexibleFieldsWithTextarea = useCallback((sectionName) => {
+    const sectionFields = flexibleFields.filter(
+      (field) => field.section_name === sectionName
+    );
+
+    return sectionFields.map((field) => (
+      <div
+        key={field.id}
+        className="row mb-3"
+        style={{
+          border: "1px dashed #ccc",
+          padding: "10px",
+          borderRadius: "5px",
+          position: "relative",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => removeFlexibleField(field.id)}
+          className="flexible-field-remove-button"
+        >
+          <DeleteIcon />
+        </button>
+
+        {field.col_span === 1 ? (
+          // Add One: 2 fields (1 heading, 1 value)
+          <>
+            <div className="col-md-3">
+              <div className="form-group">
+                <label>
+                  Field Label <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  className="form-field"
+                  value={field.field_label}
+                  onChange={(e) =>
+                    handleFlexibleFieldChange(
+                      field.id,
+                      "field_label",
+                      e.target.value
+                    )
+                  }
+                  placeholder="Enter field label"
+                  required
+                />
+              </div>
+            </div>
+            <div className="col-md-9">
+              <div className="form-group">
+                <label>
+                  Field Value <span className="text-danger">*</span>
+                </label>
+                <textarea
+                  className="form-field"
+                  value={field.field_value}
+                  onChange={(e) =>
+                    handleFlexibleFieldChange(
+                      field.id,
+                      "field_value",
+                      e.target.value
+                    )
+                  }
+                  placeholder="Enter field value"
+                  rows="2"
+                  required
+                />
+              </div>
+            </div>
+          </>
+        ) : (
+          // Add Two: 4 fields (2 headings, 2 values)
+          <>
+            <div className="col-md-3">
+              <div className="form-group">
+                <label>
+                  First Label <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  className="form-field"
+                  value={field.field_label}
+                  onChange={(e) =>
+                    handleFlexibleFieldChange(
+                      field.id,
+                      "field_label",
+                      e.target.value
+                    )
+                  }
+                  placeholder="Enter first label"
+                  required
+                />
+              </div>
+            </div>
+            <div className="col-md-3">
+              <div className="form-group">
+                <label>
+                  First Value <span className="text-danger">*</span>
+                </label>
+                <textarea
+                  className="form-field"
+                  value={field.field_value}
+                  onChange={(e) =>
+                    handleFlexibleFieldChange(
+                      field.id,
+                      "field_value",
+                      e.target.value
+                    )
+                  }
+                  placeholder="Enter first value"
+                  rows="2"
+                  required
+                />
+              </div>
+            </div>
+            <div className="col-md-3">
+              <div className="form-group">
+                <label>
+                  Second Label <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  className="form-field"
+                  value={field.field_label_2 || ""}
+                  onChange={(e) =>
+                    handleFlexibleFieldChange(
+                      field.id,
+                      "field_label_2",
+                      e.target.value
+                    )
+                  }
+                  placeholder="Enter second label"
+                  required
+                />
+              </div>
+            </div>
+            <div className="col-md-3">
+              <div className="form-group">
+                <label>
+                  Second Value <span className="text-danger">*</span>
+                </label>
+                <textarea
+                  className="form-field"
+                  value={field.field_value_2 || ""}
+                  onChange={(e) =>
+                    handleFlexibleFieldChange(
+                      field.id,
+                      "field_value_2",
+                      e.target.value
+                    )
+                  }
+                  placeholder="Enter second value"
+                  rows="2"
                   required
                 />
               </div>
@@ -2521,6 +2686,29 @@ function CVReport() {
                       required
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Flexible Fields for Additional Fields */}
+              <div className="row mt-3">
+                <div className="col-12">
+                  <div className="flexible-buttons-container">
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary btn-sm"
+                      onClick={() =>
+                        addFlexibleFields(
+                          "OVER_ALL_FEED_BACK_OF_THE_INSPECTED",
+                          2
+                        )
+                      }
+                    >
+                      Add New Set
+                    </button>
+                  </div>
+                  {renderFlexibleFieldsWithTextarea(
+                    "OVER_ALL_FEED_BACK_OF_THE_INSPECTED"
+                  )}
                 </div>
               </div>
 

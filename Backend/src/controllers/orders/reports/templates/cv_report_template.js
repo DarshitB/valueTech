@@ -421,6 +421,7 @@ function generateCVReportHTML(formData, extraData, bgImageBase64) {
             <td>VALUER COMMENTS/REMARKS:</td>
             <td colspan="5">${formData.valuer_comments_remarks}</td>
         </tr>
+        ${generateFlexibleFieldsForSection(formData.flexible_fields || [], "OVER_ALL_FEED_BACK_OF_THE_INSPECTED")}
         <tr>
             <td>DECLARATION:</td>
             <td colspan="5" style="text-transform: none;">
