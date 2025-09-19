@@ -13,7 +13,10 @@ import CustomDataTable from "../../components/CustomDataTable";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import FormModel from "../../components/FormModel";
 import SingleSearchSelect from "../../components/SingleSearchSelect";
-import { selectPermissions, selectUser } from "../../redux/selectors/authSelectors";
+import {
+  selectPermissions,
+  selectUser,
+} from "../../redux/selectors/authSelectors";
 import { hasPermission } from "../../utils/permissionUtils";
 import {
   DeleteIcon,
@@ -37,7 +40,7 @@ function Officers() {
   const { list: categories } = useSelector((state) => state.categories);
 
   // get loggedin user
- const users = useSelector(selectUser);
+  const users = useSelector(selectUser);
 
   useEffect(() => {
     dispatch(fetchOfficers());
@@ -66,6 +69,10 @@ function Officers() {
   const [emailError, setEmailError] = useState(null);
 
   /* console.log("users",users); */
+
+  // Check if current user is Bank Authority
+  const isBankAuthority = users?.role.name?.toUpperCase() === "BANK AUTHORITY";
+
   const officerRoles = roles.filter((role) => {
     // If user is Bank Authority or Bank Officer, allow only Bank Officer to be selected
     if (["Bank Authority", "Bank Officer"].includes(users?.role.name)) {
@@ -77,11 +84,40 @@ function Officers() {
 
   const openAddModal = () => {
     setIsEdit(false);
+
+    // Find current user's officer record if they are Bank Authority
+    let preSelectedDepartment = [];
+    let preSelectedBranch = "";
+
+    if (isBankAuthority) {
+      // Find the officer record that matches the current user
+      const currentOfficer = officers.find(
+        (officer) =>
+          officer.user_id === users?.id ||
+          officer.email === users?.email ||
+          officer.name === users?.name
+      );
+
+      if (currentOfficer) {
+        // Pre-select the same department(s) and branch as the Bank Authority user
+        preSelectedDepartment = (currentOfficer.departments || []).map(
+          (d) => d.id
+        );
+        preSelectedBranch = currentOfficer.branch_id;
+
+        /* console.log("Bank Authority pre-selection:", {
+          currentOfficer,
+          preSelectedDepartment,
+          preSelectedBranch
+        }); */
+      }
+    }
+
     setFormData({
       name: "",
       role_id: "",
-      department: [],
-      branch_id: "",
+      department: preSelectedDepartment,
+      branch_id: preSelectedBranch,
       mobile: "",
       email: "",
       password: "",
@@ -350,37 +386,42 @@ function Officers() {
                     placeholder="Select role"
                   /> */}
                 </div>
-
-                <div className="form-group">
-                  <label>Department</label>
-                  <SingleSearchSelect
-                    isMulti
-                    options={categories.map((c) => ({
-                      value: c.id,
-                      label: c.name,
-                    }))}
-                    value={formData.department}
-                    onChange={(val) =>
-                      setFormData({ ...formData, department: val })
-                    }
-                    placeholder="Select departments"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Branch</label>
-                  <SingleSearchSelect
-                    options={branches.map((b) => ({
-                      value: b.id,
-                      label: b.name + " - " + b.bank_name + " - " + b.city_name,
-                    }))}
-                    value={formData.branch_id}
-                    onChange={(val) =>
-                      setFormData({ ...formData, branch_id: val })
-                    }
-                    placeholder="Select branch"
-                  />
-                </div>
+                {!isBankAuthority && (
+                  <>
+                    <div className="form-group">
+                      <label>Department</label>
+                      <SingleSearchSelect
+                        isMulti
+                        options={categories.map((c) => ({
+                          value: c.id,
+                          label: c.name,
+                        }))}
+                        value={formData.department}
+                        onChange={(val) =>
+                          setFormData({ ...formData, department: val })
+                        }
+                        placeholder="Select departments"
+                        isDisabled={isBankAuthority}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Branch</label>
+                      <SingleSearchSelect
+                        options={branches.map((b) => ({
+                          value: b.id,
+                          label:
+                            b.name + " - " + b.bank_name + " - " + b.city_name,
+                        }))}
+                        value={formData.branch_id}
+                        onChange={(val) =>
+                          setFormData({ ...formData, branch_id: val })
+                        }
+                        placeholder="Select branch"
+                        isDisabled={isBankAuthority}
+                      />
+                    </div>
+                  </>
+                )}
 
                 <div className="form-group">
                   <label>Email</label>
