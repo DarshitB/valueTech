@@ -24,6 +24,19 @@ export const fetchChildCategoryById = createAsyncThunk(
   }
 );
 
+// Async: Fetch child categories by category name
+export const fetchChildCategoriesByCategoryName = createAsyncThunk(
+  "childcategories/fetchByCategoryName",
+  async (payload, { rejectWithValue }) => {
+    try {
+      const res = await childCategoryApi.getChildCategoryByCategoryName(payload);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
 // Async: Add new child category
 export const addChildCategory = createAsyncThunk(
   "childcategories/add",
@@ -97,6 +110,21 @@ const childCategorySlice = createSlice({
       // Fetch one
       .addCase(fetchChildCategoryById.fulfilled, (state, action) => {
         state.selected = action.payload;
+      })
+
+      // Fetch by category name
+      .addCase(fetchChildCategoriesByCategoryName.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchChildCategoriesByCategoryName.fulfilled, (state, action) => {
+        state.list = action.payload;
+        state.loading = false;
+      })
+      .addCase(fetchChildCategoriesByCategoryName.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+        toast.error(`Failed to fetch child categories by category name: ${action.payload}`);
       })
 
       // Add

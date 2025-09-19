@@ -28,6 +28,37 @@ exports.getById = async (req, res, next) => {
   }
 };
 
+// Get child categories by category name(s)
+exports.getByCategoryName = async (req, res, next) => {
+  try {
+    const { categoryNames } = req.query;
+    
+    if (!categoryNames) {
+      throw new BadRequestError("categoryNames parameter is required");
+    }
+
+    // Parse categoryNames - can be a single string or comma-separated values
+    let names;
+    if (typeof categoryNames === 'string') {
+      // Split by comma and trim whitespace
+      names = categoryNames.split(',').map(name => name.trim()).filter(name => name.length > 0);
+    } else if (Array.isArray(categoryNames)) {
+      names = categoryNames.map(name => name.trim()).filter(name => name.length > 0);
+    } else {
+      throw new BadRequestError("categoryNames must be a string or array");
+    }
+
+    if (names.length === 0) {
+      throw new BadRequestError("At least one category name must be provided");
+    }
+
+    const records = await ChildCategory.findByCategoryName(names);
+    res.json(records);
+  } catch (err) {
+    next(err);
+  }
+};
+
 // Create child category
 exports.create = async (req, res, next) => {
   try {

@@ -5,6 +5,8 @@ const ENDPOINT = "/api/child-categories"; // Base endpoint for all state-related
 
 export const getChildCategories = () => axios.get(ENDPOINT); // Fetch all category
 export const getChildCategoryById = (id) => axios.get(`${ENDPOINT}/${id}`); // Get category by ID
+export const getChildCategoryByCategoryName = (payload) =>
+  axios.get(`${ENDPOINT}/by-category`, { params: payload }); // Get child category by category name
 export const createChildCategory = (data) => axios.post(ENDPOINT, data); // Add new category
 export const updateChildCategory = (id, payload) =>
   axios.put(`${ENDPOINT}/${id}`, payload); // Update existing category

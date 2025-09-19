@@ -12,6 +12,7 @@ const activityLogger = require("../../middleware/activityLogger"); // Middleware
 router.use(auth);
 
 router.get("/", childCategoryController.getAll);
+router.get("/by-category", childCategoryController.getByCategoryName);
 router.get("/:id", childCategoryController.getById);
 router.post(
   "/",

@@ -25,6 +25,7 @@ import OrderImages from "../pages/orders/OrderImages";
 import OrderDocuments from "../pages/orders/OrderDocuments";
 import CVReport from "../pages/orders/reports/CVReport";
 import AVRReport from "../pages/orders/reports/AVRReport";
+import CustomReport from "../pages/orders/reports/CustomReport";
 
 const AppRoutes = () => {
   return (
@@ -84,6 +85,14 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute permission="view_order_details">
               <AVRReport />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="orders/:id/details/custom-report"
+          element={
+            <ProtectedRoute permission="view_order_details">
+              <CustomReport />
             </ProtectedRoute>
           }
         />

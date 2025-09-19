@@ -202,9 +202,10 @@ exports.create = async (req, res, next) => {
 
     res.locals.newRecordId = order.id;
 
+    /* console.log("order if",order.id); */
     // Get enriched order data for response
     const enrichedOrder = await Order.findById(order.id, req.user);
-
+    /* console.log(enrichedOrder); */
     res.status(201).json(enrichedOrder);
   } catch (err) {
     if (err.code === "23505") {

@@ -81,11 +81,11 @@ const order = {
     if (user.role_name === "Bank Authority") {
       baseQuery.andWhere(function () {
         this.where("orders.created_by", user.id)
-          .orWhere("orders.officer_id", user.id)
+          .orWhere("officers.user_id", user.id)
           .orWhere("orders.manager_id", user.id);
       });
     } else if (user.role_name === "Bank Officer") {
-      baseQuery.andWhere("orders.officer_id", user.id);
+      baseQuery.andWhere("officers.user_id", user.id);
     } else if (user.role_name === "Manager") {
       baseQuery.andWhere("orders.manager_id", user.id);
     } else if (user.role_name === "TELECALLER") {
@@ -222,6 +222,7 @@ const order = {
         "orders.payment_mode",
         "orders.payment_status",
         "orders.officer_id",
+        "officers.user_id as officer_user_id",
         "officer_user.name as officer_name",
         "officer_user.email as officer_email",
         "officer_user.mobile as officer_mobile",
@@ -261,16 +262,18 @@ const order = {
 
     if (!order) return null;
 
-    // Check user access permissions
-    if (user.role_name === "Bank Officer" && order.officer_id !== user.id) {
-      return null; // Officer can only see their own orders
+    // Check user access permissions - now we have officer_user_id in the order data
+    if (user.role_name === "Bank Officer") {
+      if (order.officer_user_id !== user.id) {
+        return null; // Officer can only see orders assigned to them
+      }
     } else if (user.role_name === "Manager" && order.manager_id !== user.id) {
       return null; // Manager can only see their own orders
     } else if (user.role_name === "Bank Authority") {
       // Bank Authority can see orders they created, are assigned to, or manage
       if (
         order.created_by !== user.id &&
-        order.officer_id !== user.id &&
+        order.officer_user_id !== user.id &&
         order.manager_id !== user.id
       ) {
         return null;

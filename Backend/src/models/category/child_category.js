@@ -65,6 +65,34 @@ const childCategory = {
       .whereNull("deleted_at")
       .where("is_active", true)
       .first(),
+
+  // Find child categories by category name(s)
+  // Accepts either a single category name string or an array of category names
+  findByCategoryName: (categoryNames) => {
+    // Ensure categoryNames is always an array
+    const names = Array.isArray(categoryNames) ? categoryNames : [categoryNames];
+    
+    return db("child_category")
+      .leftJoin("sub_category", "child_category.sub_category_id", "sub_category.id")
+      .leftJoin("category", "sub_category.category_id", "category.id")
+      .leftJoin("users as created_user", "child_category.created_by", "created_user.id")
+      .leftJoin("users as updated_user", "child_category.updated_by", "updated_user.id")
+      .select(
+        "child_category.id",
+        "child_category.name",
+        "child_category.sub_category_id",
+        "sub_category.name as sub_category_name",
+        "sub_category.category_id",
+        "category.name as category_name",
+      )
+      .whereIn("category.name", names)
+      .whereNull("child_category.deleted_at")
+      .whereNull("sub_category.deleted_at")
+      .whereNull("category.deleted_at")
+      .where("child_category.is_active", true)
+      .where("sub_category.is_active", true)
+      .where("category.is_active", true);
+  },
 };
 
 module.exports = childCategory;

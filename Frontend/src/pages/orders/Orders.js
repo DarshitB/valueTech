@@ -10,7 +10,7 @@ import {
 } from "../../redux/reducers/orderReducer";
 import { fetchUsers } from "../../redux/reducers/userReducer";
 import { fetchOfficers } from "../../redux/reducers/officerReducer";
-import { fetchChildCategories } from "../../redux/reducers/childCategoryReducer";
+import { fetchChildCategories, fetchChildCategoriesByCategoryName } from "../../redux/reducers/childCategoryReducer";
 import { fetchFieldVerifiers } from "../../redux/reducers/fieldVerifierReducer";
 import CustomDataTable from "../../components/CustomDataTable";
 import { DeleteIcon, EditIcon } from "../../components/icons";
@@ -41,6 +41,8 @@ function Orders() {
   );
   const { list: fieldVerifiers } = useSelector((state) => state.fieldVerifier);
 
+  // console.log("officers", officers);
+  // console.log("currentUser", currentUser);
   // Fetch everything on mount
   useEffect(() => {
     dispatch(fetchOrders());
@@ -71,6 +73,25 @@ function Orders() {
 
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [confirmDeleteName, setConfirmDeleteName] = useState("");
+  
+  // State for filtered child categories for Bank Officers
+  const [filteredChildCategories, setFilteredChildCategories] = useState([]);
+
+  // Check if current user is TELECALLER (case-insensitive)
+  const isTelecaller = currentUser?.role.name?.toUpperCase() === "TELECALLER";
+  /* console.log("isTelecaller", currentUser?.role.name); */
+  
+  // Check if current user is Bank Officer (case-insensitive)
+  const isBankOfficer = currentUser?.role.name?.toUpperCase() === "BANK OFFICER";
+  /* console.log("isBankOfficer", currentUser?.role.name); */
+  
+  // Check if current user is Manager (case-insensitive)
+  const isManager = currentUser?.role.name?.toUpperCase() === "MANAGER";
+  /* console.log("isManager", currentUser?.role.name); */
+  
+  // Check if current user is Super Admin (case-insensitive)
+  const isSuperAdmin = currentUser?.role.name?.toUpperCase() === "SUPER ADMIN";
+  /* console.log("isSuperAdmin", currentUser?.role.name); */
 
   // Filter users by role for officer and manager selection
   const bankOfficers = officers.filter(
@@ -81,9 +102,6 @@ function Orders() {
 
   const managers = users.filter((user) => user.role_name === "Manager");
 
-  // Check if current user is TELECALLER (case-insensitive)
-  const isTelecaller = currentUser?.role.name?.toUpperCase() === "TELECALLER";
-  /* console.log("isTelecaller", currentUser?.role.name); */
   // Fields allowed for TELECALLER role
   const telecallerAllowedFields = [
     "contact",
@@ -92,10 +110,68 @@ function Orders() {
     "driver_number",
     "place_of_inspection",
   ];
+// console.log("isBankOfficer", isBankOfficer);
+// console.log("currentUser", currentUser);
+// console.log("departments", currentUser?.departments);
+  // Fetch filtered child categories for Bank Officers based on their departments
+  useEffect(() => {
+    if (isBankOfficer && officers.length > 0) {
+      // Find the officer record that matches the current user
+      const currentOfficer = officers.find(officer => 
+        officer.user_id === currentUser?.id || 
+        officer.name === currentUser?.name ||
+        officer.email === currentUser?.email
+      );
+      
+      // console.log("currentOfficer", currentOfficer);
+      
+      if (currentOfficer?.departments && currentOfficer.departments.length > 0) {
+        // Extract department names and create comma-separated string
+        const categoryNames = currentOfficer.departments
+          .map(dept => dept.name)
+          .join(',');
+        
+        // console.log("categoryNames", categoryNames);
+        
+        // Fetch child categories based on department names
+        dispatch(fetchChildCategoriesByCategoryName({ categoryNames }))
+          .unwrap()
+          .then((data) => {
+            // console.log("data", data);
+            setFilteredChildCategories(data);
+          })
+          .catch((error) => {
+            console.error('Failed to fetch filtered child categories:', error);
+            setFilteredChildCategories([]);
+          });
+      } else {
+        // If no departments found, use all child categories
+        setFilteredChildCategories(allChildCategories);
+      }
+    } else {
+      // For non-Bank Officers, use all child categories
+      setFilteredChildCategories(allChildCategories);
+    }
+  }, [isBankOfficer, currentUser, officers, allChildCategories, dispatch]);
 
   // Open Add Order Form
   const openAddModal = () => {
     setIsEdit(false);
+    
+    // Find PAN INDIA manager (case-insensitive) for pre-selection
+    const panIndiaManager = managers.find(manager => 
+      manager.name?.toUpperCase() === "PAN INDIA"
+    );
+    
+    /* console.log("PAN INDIA Manager found:", panIndiaManager); */
+    
+    // Pre-select PAN INDIA manager if user has access to manager field and manager exists
+    const preSelectedManagerId = hasPermission(allowedPermissions, "view_order_add_edit_manager_filed") && 
+                                 !isManager && 
+                                 panIndiaManager ? panIndiaManager.id : null;
+    
+    /* console.log("Pre-selected Manager ID:", preSelectedManagerId); */
+    
     setFormData({
       customer_name: "",
       contact: "",
@@ -106,7 +182,7 @@ function Orders() {
       registration_number: "",
       place_of_inspection: "",
       officer_id: null,
-      manager_id: null,
+      manager_id: preSelectedManagerId,
       field_verifier_id: null,
     });
     setShowFormModal(true);
@@ -157,15 +233,50 @@ function Orders() {
       child_category_id: formData.child_category_id,
       registration_number: formData.registration_number.trim() || null,
       place_of_inspection: formData.place_of_inspection.trim() || null,
-      officer_id: formData.officer_id,
-      manager_id: formData.manager_id,
     };
 
-    // Only include field_verifier_id in payload if manager is assigned
-    if (formData.manager_id) {
+    // Handle officer_id, manager_id, and field_verifier_id based on permissions and user role
+    
+    // Officer ID handling - Bank Officers get their own officer ID automatically
+    if (isBankOfficer) {
+      // For Bank Officer users, find their officer record and use the officer's ID
+      const currentOfficer = officers.find(officer => 
+        officer.user_id === currentUser?.id
+      );
+      
+      if (currentOfficer) {
+        // Use the officer's ID, not the user's ID
+        payload.officer_id = currentOfficer.id;
+      }
+    } else if (hasPermission(allowedPermissions, "view_order_add_edit_officer_filed")) {
+      // For other users, use form data if they have permission
+      payload.officer_id = formData.officer_id;
+    }
+    
+    // Manager ID handling - Manager users get their own user ID automatically
+    if (isManager) {
+      // For Manager users, use their own user ID as manager_id
+      payload.manager_id = currentUser?.id;
+      
+      // Field Verifier - only include if manager is assigned (which it will be for Manager users)
+      if (payload.manager_id) {
+        payload.field_verifier_id = formData.field_verifier_id;
+      }
+    } else if (hasPermission(allowedPermissions, "view_order_add_edit_manager_filed")) {
+      // For other users, use form data if they have permission
+      payload.manager_id = formData.manager_id;
+      
+      // Field Verifier - only include if manager is assigned and user has manager permission
+      if (formData.manager_id) {
+        payload.field_verifier_id = formData.field_verifier_id;
+      }
+    }
+    
+    // Field Verifier for Super Admin - can assign field verifier even without manager
+    if (isSuperAdmin && formData.field_verifier_id) {
       payload.field_verifier_id = formData.field_verifier_id;
     }
-
+    
     if (isEdit) {
       dispatch(editOrder({ id: editOrderId, data: payload }));
     } else {
@@ -186,7 +297,6 @@ function Orders() {
     dispatch(removeOrder(confirmDeleteId));
     setConfirmDeleteId(null);
   };
-
   return (
     <div className="height-full-occupied order-data-container">
       {loading ? (
@@ -456,77 +566,86 @@ function Orders() {
                     />
                   </div>
 
-                  <div className="form-group">
-                    <label htmlFor="Subcategory">Subcategory</label>
-                    <SingleSearchSelect
-                      id="Subcategory"
-                      className="search-selector"
-                      options={allChildCategories.map((childCategory) => ({
-                        value: childCategory.id,
-                        label: `${childCategory.name}`,
-                      }))}
-                      value={formData.child_category_id}
-                      onChange={(val) => {
-                        // Only allow TELECALLER to change this field if they have permission
-                        if (!isTelecaller) {
-                          setFormData({ ...formData, child_category_id: val });
-                        }
-                      }}
-                      placeholder="Select Subcategory"
-                      disabled={isTelecaller}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="officerField">Officer</label>
-                    <SingleSearchSelect
-                      id="officerField"
-                      className="search-selector"
-                      options={bankOfficers.map((user) => ({
-                        value: user.id,
-                        label: `${user.name} (${user.role_name})`,
-                      }))}
-                      value={formData.officer_id}
-                      onChange={(val) => {
-                        // Only allow TELECALLER to change this field if they have permission
-                        if (!isTelecaller) {
-                          setFormData({ ...formData, officer_id: val });
-                        }
-                      }}
-                      placeholder="Select officer"
-                      disabled={isTelecaller}
-                    />
-                  </div>
+                  {/* Subcategory field - Show based on permission */}
+                  {hasPermission(allowedPermissions, "view_order_add_edit_subcategory_filed") && (
+                    <div className="form-group">
+                      <label htmlFor="Subcategory">Subcategory</label>
+                      <SingleSearchSelect
+                        id="Subcategory"
+                        className="search-selector"
+                        options={filteredChildCategories.map((childCategory) => ({
+                          value: childCategory.id,
+                          label: `${childCategory.name}`,
+                        }))}
+                        value={formData.child_category_id}
+                        onChange={(val) => {
+                          // Only allow TELECALLER to change this field if they have permission
+                          if (!isTelecaller) {
+                            setFormData({ ...formData, child_category_id: val });
+                          }
+                        }}
+                        placeholder="Select Subcategory"
+                        disabled={isTelecaller}
+                      />
+                    </div>
+                  )}
+                  {/* Officer field - Show based on permission but hidden for Bank Officers */}
+                  {hasPermission(allowedPermissions, "view_order_add_edit_officer_filed") && !isBankOfficer && (
+                    <div className="form-group">
+                      <label htmlFor="officerField">Officer</label>
+                      <SingleSearchSelect
+                        id="officerField"
+                        className="search-selector"
+                        options={bankOfficers.map((user) => ({
+                          value: user.id,
+                          label: `${user.name} (${user.role_name})`,
+                        }))}
+                        value={formData.officer_id}
+                        onChange={(val) => {
+                          // Only allow TELECALLER to change this field if they have permission
+                          if (!isTelecaller) {
+                            setFormData({ ...formData, officer_id: val });
+                          }
+                        }}
+                        placeholder="Select officer"
+                        disabled={isTelecaller}
+                      />
+                    </div>
+                  )}
 
-                  <div className="form-group">
-                    <label htmlFor="managerField">Manager</label>
-                    <SingleSearchSelect
-                      id="managerField"
-                      className="search-selector"
-                      options={managers.map((user) => ({
-                        value: user.id,
-                        label: user.name,
-                      }))}
-                      value={formData.manager_id}
-                      onChange={(val) => {
-                        // Only allow TELECALLER to change this field if they have permission
-                        if (!isTelecaller) {
-                          setFormData({
-                            ...formData,
-                            manager_id: val,
-                            // Clear field verifier when manager is removed
-                            field_verifier_id: val
-                              ? formData.field_verifier_id
-                              : null,
-                          });
-                        }
-                      }}
-                      placeholder="Select manager"
-                      disabled={isTelecaller}
-                    />
-                  </div>
+                  {/* Manager field - Show based on permission but hidden for Manager users */}
+                  {hasPermission(allowedPermissions, "view_order_add_edit_manager_filed") && !isManager && (
+                    <div className="form-group">
+                      <label htmlFor="managerField">Manager</label>
+                      <SingleSearchSelect
+                        id="managerField"
+                        className="search-selector"
+                        options={managers.map((user) => ({
+                          value: user.id,
+                          label: user.name,
+                        }))}
+                        value={formData.manager_id}
+                        onChange={(val) => {
+                          // Only allow TELECALLER to change this field if they have permission
+                          if (!isTelecaller) {
+                            setFormData({
+                              ...formData,
+                              manager_id: val,
+                              // Clear field verifier when manager is removed
+                              field_verifier_id: val
+                                ? formData.field_verifier_id
+                                : null,
+                            });
+                          }
+                        }}
+                        placeholder="Select manager"
+                        disabled={isTelecaller}
+                      />
+                    </div>
+                  )}
 
-                  {/* Field Verifier - Only show when manager is assigned */}
-                  {formData.manager_id && (
+                  {/* Field Verifier - Show when manager is assigned, user is Manager, or user is Super Admin (but not Bank Officer) */}
+                  {(formData.manager_id || isManager || isSuperAdmin) && !isBankOfficer && (
                     <div className="form-group">
                       <label htmlFor="fieldVerifierField">Field Verifier</label>
                       <SingleSearchSelect
@@ -561,6 +680,8 @@ function Orders() {
               setShowFormModal(false);
               setIsEdit(false);
               setEditOrderId(null);
+              
+              // Reset form data (will be properly initialized when opening again)
               setFormData({
                 customer_name: "",
                 contact: "",
@@ -572,6 +693,7 @@ function Orders() {
                 place_of_inspection: "",
                 officer_id: null,
                 manager_id: null,
+                field_verifier_id: null,
               });
             },
           }}

@@ -79,6 +79,10 @@ exports.seed = async function (knex) {
     "add_order_media_documents",
     "download_order_media_documents",
     "delete_order_media_documents",
+
+    "view_order_add_edit_subcategory_filed",
+    "view_order_add_edit_officer_filed",
+    "view_order_add_edit_manager_filed",
   ];
 
   // Insert permissions
