@@ -24,7 +24,20 @@ exports.getAll = async (req, res, next) => {
 exports.getForMobile = async (req, res, next) => {
   try {
     const orders = await Order.getForMobile();
-    res.json(orders);
+    
+    if (orders && orders.length > 0) {
+      res.json({
+        state: 1,
+        message: "orders fetch successfully",
+        orders: orders
+      });
+    } else {
+      res.json({
+        state: 0,
+        message: "No Orders",
+        orders: []
+      });
+    }
   } catch (err) {
     next(err);
   }
