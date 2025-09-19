@@ -6,11 +6,15 @@ function errorHandler(err, req, res, next) {
   logger.error(err); // this logs full stack trace to `error.log`
 
   if (err instanceof AppError) {
-    return res.status(err.statusCode).json({ message: err.message });
+    return res.status(err.statusCode).json({ 
+      state: 0, 
+      message: err.message 
+    });
   }
 
   // Catch all fallback
   res.status(500).json({
+    state: 0,
     message: 'Something went wrong. Please try again later.'
   });
 }

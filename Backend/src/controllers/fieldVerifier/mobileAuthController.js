@@ -56,6 +56,7 @@ const mobileAuthController = {
       const [session] = await mobileAuth.logLogin(loginData);
 
       return res.status(200).json({
+        state: 1,
         message: "Login successful",
         token,
         verifier_id: verifier.id,
@@ -78,11 +79,17 @@ const mobileAuthController = {
       const session = await mobileAuth.findValidSession(token);
       /* console.log("SESSION FOUND:", session); */
       if (!session)
-        return res.status(401).json({ message: "Invalid or expired token." });
+        return res.status(401).json({ 
+          state: 0, 
+          message: "Invalid or expired token." 
+        });
 
       await mobileAuth.logoutById(session.id);
 
-      return res.status(200).json({ message: "Logout successful." });
+      return res.status(200).json({ 
+        state: 1, 
+        message: "Logout successful." 
+      });
     } catch (error) {
       console.error("Logout error:", error);
       next(error);
