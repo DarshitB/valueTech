@@ -63,14 +63,13 @@ const mobileAuthController = {
         expires_at: session.expires_at,
       });
     } catch (error) {
-      /* console.error("Login error:", error); */
-      next(err);
-      return res.status(500).json({ message: "Something went wrong." });
+      console.error("Login error:", error);
+      next(error);
     }
   },
 
   // LOGOUT handler
-  async logout(req, res) {
+  async logout(req, res, next) {
     try {
       const token = req.headers.authorization?.split(" ")[1];
       if (!token) throw new NotFoundError("Token missing.");
@@ -86,7 +85,7 @@ const mobileAuthController = {
       return res.status(200).json({ message: "Logout successful." });
     } catch (error) {
       console.error("Logout error:", error);
-      return res.status(500).json({ message: "Something went wrong." });
+      next(error);
     }
   },
 
