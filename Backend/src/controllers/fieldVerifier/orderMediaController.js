@@ -9,6 +9,7 @@ const {
   cleanupTempFiles
 } = require('../../utils/localFileHelper');
 const { insertMedia, getOrderByNumber } = require('../../models/fieldVerifier/order_media');
+const { BadRequestError } = require('../../utils/customErrors');
 
 /**
  * Helper: write base64 data to temp file and return path + filename
@@ -31,7 +32,7 @@ function writeBase64ToTemp(dataUrl) {
  * POST /api/media/upload-multipart
  * Accepts multipart form data with files and order_number
  */
-async function uploadMultipart(req, res) {
+async function uploadMultipart(req, res, next) {
   try {
     const { order_number } = req.body;
     const files = req.files;
@@ -46,11 +47,11 @@ async function uploadMultipart(req, res) {
       console.log('📋 First file mimetype:', files[0].mimetype);
     } */
 
-    if (!order_number) return res.status(400).json({ error: 'order_number is required' });
-    if (!files || !Array.isArray(files) || files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
+    if (!order_number) throw new BadRequestError('order_number is required');
+    if (!files || !Array.isArray(files) || files.length === 0) throw new BadRequestError('No files uploaded');
 
     const orderRow = await getOrderByNumber(order_number);
-    if (!orderRow) return res.status(400).json({ error: 'Order not found with provided order_number' });
+    if (!orderRow) throw new BadRequestError('Order not found with provided order_number');
 
     // Ensure order folders (this is now cached and optimized)
     const { orderPath } = await ensureOrderFolders(order_number);
@@ -114,7 +115,7 @@ async function uploadMultipart(req, res) {
     /* console.log(`🧹 Cleaning up ${tempPaths.length} temporary files...`); */
     cleanupTempFiles(tempPaths);
 
-    res.json({ success: true, files: saved });
+    res.json({ state: 1, message: 'successfully uploaded the images', files: saved });
   } catch (err) {
     // If there's an error, still try to cleanup temp files
     console.error('uploadMultipart error:', err);
@@ -122,7 +123,7 @@ async function uploadMultipart(req, res) {
       /* console.log(`🧹 Error occurred, cleaning up ${tempPaths.length} temp files...`); */
       cleanupTempFiles(tempPaths);
     }
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 }
 
@@ -137,16 +138,16 @@ async function uploadMultipart(req, res) {
  *    ]
  *  }
  */
-async function uploadBase64(req, res) {
+async function uploadBase64(req, res, next) {
   try {
     const { order_number, files } = req.body;
     const { id } = req.verifier;
 
-    if (!order_number) return res.status(400).json({ error: 'order_number is required' });
-    if (!files || !Array.isArray(files) || files.length === 0) return res.status(400).json({ error: 'No files in payload' });
+    if (!order_number) throw new BadRequestError('order_number is required');
+    if (!files || !Array.isArray(files) || files.length === 0) throw new BadRequestError('No files in payload');
 
     const orderRow = await getOrderByNumber(order_number);
-    if (!orderRow) return res.status(400).json({ error: 'Order not found with provided order_number' });
+    if (!orderRow) throw new BadRequestError('Order not found with provided order_number');
 
     // Ensure order folders (this is now cached and optimized)
     const { orderPath } = await ensureOrderFolders(order_number);
@@ -213,7 +214,7 @@ async function uploadBase64(req, res) {
    /*  console.log(`🧹 Cleaning up ${tempPaths.length} temporary files...`); */
     cleanupTempFiles(tempPaths);
 
-    res.json({ success: true, files: saved });
+    res.json({ state: 1, message: 'successfully uploaded the images', files: saved });
   } catch (err) {
     // If there's an error, still try to cleanup temp files
     console.error('uploadBase64 error:', err);
@@ -221,7 +222,7 @@ async function uploadBase64(req, res) {
       /* console.log(`🧹 Error occurred, cleaning up ${tempPaths.length} temp files...`); */
       cleanupTempFiles(tempPaths);
     }
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 }
 
