@@ -33,6 +33,7 @@ function writeBase64ToTemp(dataUrl) {
  * Accepts multipart form data with files and order_number
  */
 async function uploadMultipart(req, res, next) {
+  let tempPaths = [];
   try {
     const { order_number } = req.body;
     const files = req.files;
@@ -59,7 +60,6 @@ async function uploadMultipart(req, res, next) {
 
     // Prepare all files for parallel upload
     const filesToUpload = [];
-    const tempPaths = [];
 
     for (const f of files) {
       // Generate filename: orderNumber_fileType_randomNumber.extension
@@ -139,6 +139,7 @@ async function uploadMultipart(req, res, next) {
  *  }
  */
 async function uploadBase64(req, res, next) {
+  let tempPaths = [];
   try {
     const { order_number, files } = req.body;
     const { id } = req.verifier;
@@ -155,7 +156,6 @@ async function uploadBase64(req, res, next) {
 
     // Prepare all files for parallel upload
     const filesToUpload = [];
-    const tempPaths = [];
 
     for (const item of files) {
       if (!item.data) continue;
