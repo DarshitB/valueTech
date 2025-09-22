@@ -147,6 +147,8 @@ async function uploadBase64(req, res, next) {
     if (!order_number) throw new BadRequestError('order_number is required');
     if (!files || !Array.isArray(files) || files.length === 0) throw new BadRequestError('No files in payload');
 
+    console.log("files", files);
+    
     const orderRow = await getOrderByNumber(order_number);
     if (!orderRow) throw new BadRequestError('Order not found with provided order_number');
 
