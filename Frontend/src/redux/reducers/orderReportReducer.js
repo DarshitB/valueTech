@@ -28,6 +28,19 @@ export const generateOrderReport = createAsyncThunk(
   }
 );
 
+// Async action: Generate custom report with content structure
+export const generateCustomReport = createAsyncThunk(
+  "orderReports/generateCustomReport",
+  async ({ orderId, content }, { rejectWithValue }) => {
+    try {
+      const res = await orderReportApi.generateCustomReport(orderId, content);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
 // Initial state
 const initialState = {
   currentReport: null,     // Currently selected/fetched report data
@@ -36,6 +49,9 @@ const initialState = {
   generating: false,       // Loading state for generate operations
   error: null,            // Error message for fetch operations
   generateError: null,    // Error message for generate operations
+  customReportGenerating: false, // Loading state for custom report generation
+  customReportError: null,       // Error state for custom report generation
+  customReportData: null,        // Generated custom report data
 };
 
 // Order Report slice
@@ -93,6 +109,25 @@ const orderReportSlice = createSlice({
         state.generating = false;
         state.generateError = action.payload;
         toast.error(`Failed to generate report: ${action.payload}`);
+      })
+
+      // Generate custom report
+      .addCase(generateCustomReport.pending, (state) => {
+        state.customReportGenerating = true;
+        state.customReportError = null;
+        state.customReportData = null;
+      })
+      .addCase(generateCustomReport.fulfilled, (state, action) => {
+        state.customReportGenerating = false;
+        state.customReportError = null;
+        state.customReportData = action.payload;
+        toast.success("Custom report generated successfully!");
+      })
+      .addCase(generateCustomReport.rejected, (state, action) => {
+        state.customReportGenerating = false;
+        state.customReportError = action.payload;
+        state.customReportData = null;
+        toast.error(`Failed to generate custom report: ${action.payload}`);
       });
   },
 });

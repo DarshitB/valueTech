@@ -14,3 +14,14 @@ export const generateOrderReport = (orderId, data) =>
       'Content-Type': 'multipart/form-data', // Required for FormData uploads
     },
   }); // Generate order report with FormData payload
+
+// Generate custom report with content structure
+export const generateCustomReport = (orderId, content) => 
+  axios.post(`${ENDPOINT}/custom-report/generate`, {
+    order_id: orderId,
+    content: content
+  }, {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  }); // Generate custom report with JSON payload

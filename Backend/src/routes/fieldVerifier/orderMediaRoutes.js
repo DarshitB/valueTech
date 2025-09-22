@@ -32,7 +32,7 @@ router.post(
 );
 router.post(
   "/upload-base64",
-  /* express.json({ limit: "50mb" }), */
+  express.json({ limit: "200mb" }),
   orderMediaController.uploadBase64
 );
 

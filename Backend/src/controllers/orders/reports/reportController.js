@@ -7,12 +7,14 @@ const multer = require("multer");
 const Order = require("../../../models/orders/order");
 const CvReport = require("../../../models/orders/reports/cvReport");
 const AvrReport = require("../../../models/orders/reports/avrReport");
+const MachineryReport = require("../../../models/orders/reports/machineryReport");
 const orderMediaDocument = require("../../../models/orders/orderMediaDocument");
 const { ensureDirectoryExists } = require("../../../utils/localFileHelper");
 
 // Import report templates
 const cvReportTemplate = require("./templates/cv_report_template");
 const avrReportTemplate = require("./templates/avr_report_template");
+const machineryReportTemplate = require("./templates/machinery_report_template");
 
 // Import custom error classes
 const {
@@ -180,6 +182,9 @@ exports.generateReport = async (req, res, next) => {
         break;
       case "report_avr":
         ReportModel = AvrReport;
+        break;
+      case "report_machinery":
+        ReportModel = MachineryReport;
         break;
       default:
         throw new BadRequestError(
@@ -452,11 +457,16 @@ function generateReportHTML(reportType, formData, extraData, bgImageBase64) {
         bgImageBase64
       );
 
+    case "report_machinery":
+      return machineryReportTemplate.generateMachineryReportHTML(
+        formData,
+        extraData,
+        bgImageBase64
+      );
+
     // Future report types can be added here
     // case 'property_report':
     //   return propertyReportTemplate.generatePropertyReportHTML(formData, extraData, bgImageBase64);
-    // case 'machinery_report':
-    //   return machineryReportTemplate.generateMachineryReportHTML(formData, extraData, bgImageBase64);
 
     default:
       throw new BadRequestError(`Report type '${reportType}' is not supported`);
@@ -498,6 +508,11 @@ exports.getReportByOrderAndType = async (req, res, next) => {
       case "report_avr":
         // Get AVR report with flexible fields
         report = await AvrReport.findByOrderIdWithFlexibleFields(order_id);
+        break;
+
+      case "report_machinery":
+        // Get Machinery report with flexible fields
+        report = await MachineryReport.findByOrderIdWithFlexibleFields(order_id);
         break;
 
       default:

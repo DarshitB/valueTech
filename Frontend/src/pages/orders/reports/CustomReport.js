@@ -57,6 +57,8 @@ function CustomReport() {
   const [selectedAlignment, setSelectedAlignment] = useState('left') // Default alignment
   const [focusedInput, setFocusedInput] = useState(null) // { blockId, childIndex } for focused input/textarea
   const [paginationInProgress, setPaginationInProgress] = useState(false) // Prevent pagination loops
+  const [lastPageDimensions, setLastPageDimensions] = useState(null) // Track page dimension changes
+  const paginationTimeoutRef = useRef(null) // Debounce pagination calls
 
   const documentRef = useRef(null)
   const cursorRef = useRef(null)
@@ -122,9 +124,31 @@ function CustomReport() {
   // Measure individual block height
   const measureBlockHeight = useCallback((blockId) => {
     const blockElement = document.querySelector(`[data-block-id="${blockId}"]`)
-    if (!blockElement) return 0
+    if (!blockElement) {
+      console.warn(`Block element not found for ID: ${blockId}`)
+      return 30 // Fallback height
+    }
     
-    return blockElement.offsetHeight
+    // Get the actual rendered height
+    const height = blockElement.offsetHeight
+    
+    // If height is 0, try alternative measurements
+    if (height === 0) {
+      const computedStyle = window.getComputedStyle(blockElement)
+      const rect = blockElement.getBoundingClientRect()
+      
+      console.warn(`Block ${blockId} has 0 offsetHeight, trying alternatives:`)
+      console.warn(`- getBoundingClientRect height: ${rect.height}`)
+      console.warn(`- scrollHeight: ${blockElement.scrollHeight}`)
+      console.warn(`- computed height: ${computedStyle.height}`)
+      
+      // Use the best alternative measurement
+      const alternativeHeight = Math.max(rect.height, blockElement.scrollHeight, 30)
+      console.warn(`Using alternative height: ${alternativeHeight}px for block ${blockId}`)
+      return alternativeHeight
+    }
+    
+    return height
   }, [])
 
   // Find the optimal break point for content using real DOM measurements
@@ -140,9 +164,9 @@ function CustomReport() {
       
       // Check if adding this block would exceed the limit
       if (accumulatedHeight + blockHeight > maxHeight) {
-        // If this is the first block and it's too big, we need to split anyway
+        // If this is the first block and it's too big, we need to move it
         if (i === 0) {
-          breakIndex = 1 // Move everything except the first block
+          breakIndex = 1 // Move the first block to next page
         } else {
           breakIndex = i // Break before this block
         }
@@ -150,14 +174,6 @@ function CustomReport() {
       }
       
       accumulatedHeight += blockHeight
-      
-      // For containers and tables, ensure we don't split them inappropriately
-      if (block.type === BLOCK_TYPES.CONTAINER || block.type === BLOCK_TYPES.TWO_COLUMN || block.type === BLOCK_TYPES.TABLE) {
-        if (accumulatedHeight > maxHeight) {
-          breakIndex = i + 1
-          break
-        }
-      }
     }
     
     // If we didn't find a break point but content is overflowing, 
@@ -169,46 +185,64 @@ function CustomReport() {
     return breakIndex
   }, [measureBlockHeight])
 
-  // Check if page needs to be added/removed based on content
-  const checkPageOverflow = useCallback(() => {
+  // Immediate redistribution (internal function)
+  const redistributeContentImmediate = useCallback(() => {
     if (paginationInProgress) {
       console.log('Pagination already in progress, skipping...')
       return
     }
     
+    console.log('Starting content redistribution...')
     setPaginationInProgress(true)
     
-    // Wait longer for DOM to be fully updated and rendered
+    // Wait for DOM to be fully updated and rendered - increased delay for stability
     setTimeout(() => {
       const pageDimensions = getPageDimensions()
       const maxContentHeight = pageDimensions.height - inToPx(pageDimensions.margins.top + pageDimensions.margins.bottom)
+      const bufferHeight = 50 // Increased buffer to be less aggressive
+      const availableHeight = maxContentHeight - bufferHeight
       
       setDocumentContent(prev => {
         const newContent = [...prev]
         let hasChanges = false
         
-        // Check each page for overflow and redistribute content
+        // Process each page individually to check for overflow
         for (let pageIndex = 0; pageIndex < newContent.length; pageIndex++) {
           const page = newContent[pageIndex]
           
-          // Remove empty pages except the first one
+          // Remove empty pages except the first one - but be more careful about timing
           if (page.blocks.length === 0 && pageIndex > 0) {
-            newContent.splice(pageIndex, 1)
-            hasChanges = true
-            pageIndex-- // Adjust index after removal
-            continue
+            // Only remove empty pages that have been empty for a while (not just created)
+            if (!page.justCreated) {
+              console.log(`Removing empty page ${page.id} at index ${pageIndex}`)
+              newContent.splice(pageIndex, 1)
+              hasChanges = true
+              pageIndex-- // Adjust index after removal
+              continue
+            } else {
+              console.log(`Skipping removal of just-created empty page ${page.id} - giving it time to populate`)
+              // Clear the justCreated flag after one pass
+              page.justCreated = false
+            }
+          }
+          
+          // CRITICAL: Double-check that this page actually has blocks rendered
+          if (page.blocks.length > 0) {
+            const containerBlocks = page.blocks.filter(block => 
+              block.type === BLOCK_TYPES.CONTAINER || block.type === BLOCK_TYPES.TWO_COLUMN
+            )
+            if (containerBlocks.length > 0) {
+              console.log(`Page ${pageIndex + 1} has ${containerBlocks.length} container(s):`, 
+                containerBlocks.map(b => `${b.type}(${b.id})`))
+            }
           }
           
           // Check if page content overflows using actual DOM measurements
           if (page.blocks.length > 0) {
             const actualContentHeight = measurePageContentHeight(page.id)
             
-            // Add some buffer to account for margins and padding
-            const bufferHeight = 20 // Reduced buffer since we're using real measurements
-            
             // Mark page as overflowing for visual feedback
-            const isCurrentlyOverflowing = actualContentHeight > (maxContentHeight - bufferHeight)
-            console.log(`Page ${page.id}: actualHeight=${actualContentHeight}, maxHeight=${maxContentHeight - bufferHeight}, overflowing=${isCurrentlyOverflowing}`)
+            const isCurrentlyOverflowing = actualContentHeight > availableHeight
             
             if (page.isOverflowing !== isCurrentlyOverflowing) {
               page.isOverflowing = isCurrentlyOverflowing
@@ -217,15 +251,24 @@ function CustomReport() {
             
             if (isCurrentlyOverflowing) {
               // Find the break point where content should split using real measurements
-              let breakIndex = findContentBreakPoint(page.id, page.blocks, maxContentHeight - bufferHeight)
+              let breakIndex = findContentBreakPoint(page.id, page.blocks, availableHeight)
               
-              console.log(`Break index for page ${page.id}: ${breakIndex}, total blocks: ${page.blocks.length}`)
-              
+              // If we have a valid break point (some blocks need to move)
               if (breakIndex > 0 && breakIndex < page.blocks.length) {
-                console.log(`Creating new page - moving ${page.blocks.length - breakIndex} blocks`)
-                
-                // Move overflow blocks to next page or create new page
+                // CRITICAL: Ensure we never lose user content - move overflow blocks to next page
                 const blocksToMove = page.blocks.slice(breakIndex)
+                
+                // Validate that we're not losing content
+                if (blocksToMove.length === 0) {
+                  console.error('ERROR: No blocks to move despite overflow detected')
+                  continue
+                }
+                
+                console.log(`MOVING BLOCKS: Page ${pageIndex + 1} overflow detected`)
+                console.log(`Break index: ${breakIndex}, Total blocks: ${page.blocks.length}`)
+                console.log(`Blocks staying on page:`, page.blocks.slice(0, breakIndex).map(b => `${b.type}(${b.id})`))
+                console.log(`Blocks being moved:`, blocksToMove.map(b => `${b.type}(${b.id})`))
+                
                 page.blocks = page.blocks.slice(0, breakIndex)
                 page.isOverflowing = false // No longer overflowing after split
                 
@@ -233,25 +276,33 @@ function CustomReport() {
                 
                 // If there's a next page, move blocks there, otherwise create new page
                 if (pageIndex + 1 < newContent.length) {
-                  newContent[pageIndex + 1].blocks = [...blocksToMove, ...newContent[pageIndex + 1].blocks]
-                  targetPageId = newContent[pageIndex + 1].id
-                  console.log(`Moved blocks to existing next page: ${targetPageId}`)
+                  // Add blocks to existing next page
+                  const nextPage = newContent[pageIndex + 1]
+                  nextPage.blocks = [...blocksToMove, ...nextPage.blocks]
+                  targetPageId = nextPage.id
+                  
+                  // Validate blocks were added
+                  console.log(`Moved ${blocksToMove.length} blocks to existing page ${targetPageId}`)
                 } else {
+                  // Create new page for overflow content
                   const newPageId = `page-${Date.now()}-${newContent.length + 1}`
-                  newContent.push({
+                  const newPage = {
                     id: newPageId,
                     type: 'page',
-                    blocks: blocksToMove,
-                    isOverflowing: false
-                  })
+                    blocks: [...blocksToMove], // Ensure we copy the blocks
+                    isOverflowing: false,
+                    justCreated: true // Flag to prevent immediate removal
+                  }
+                  newContent.push(newPage)
                   targetPageId = newPageId
-                  console.log(`Created new page: ${newPageId}`)
+                  
+                  // Validate new page was created with blocks
+                  console.log(`Created new page ${targetPageId} with ${blocksToMove.length} blocks`)
                 }
                 
                 // Update cursor position and selection states if they reference moved blocks
                 const movedBlockIds = blocksToMove.map(block => block.id)
                 
-                // Update cursor position and selection states if they reference moved blocks  
                 setTimeout(() => {
                   // Check if current active/selected blocks were moved
                   const activeBlockMoved = activeBlock && movedBlockIds.some(id => 
@@ -267,7 +318,6 @@ function CustomReport() {
                   
                   if (activeBlockMoved || selectedBlockMoved) {
                     setCursorPosition(prev => ({ ...prev, pageId: targetPageId }))
-                    console.log(`Updated cursor position to new page: ${targetPageId}`)
                     
                     // If we have a selected block that moved, ensure it stays selected
                     if (selectedBlockMoved) {
@@ -277,7 +327,6 @@ function CustomReport() {
                         setTimeout(() => {
                           setSelectedBlock(movedBlock)
                           setActiveBlock(movedBlock.id)
-                          console.log(`Maintained selection for moved block: ${movedBlock.id}`)
                         }, 200)
                       }
                     }
@@ -287,9 +336,21 @@ function CustomReport() {
                 hasChanges = true
               } else if (breakIndex === 0 && page.blocks.length > 1) {
                 // Fallback: if no break point found but we have multiple blocks, move the last block
-                console.log(`Fallback: moving last block to new page`)
                 const lastBlock = page.blocks.pop()
+                
+                // Validate we got a block to move
+                if (!lastBlock) {
+                  console.error('ERROR: Failed to get last block for fallback move')
+                  continue
+                }
+                
+                // Special handling for containers - ensure they're preserved
+                if (lastBlock.type === BLOCK_TYPES.CONTAINER || lastBlock.type === BLOCK_TYPES.TWO_COLUMN) {
+                  console.warn(`CONTAINER FALLBACK: Moving ${lastBlock.type} container ${lastBlock.id} to preserve user content`)
+                }
+                
                 page.isOverflowing = false
+                console.log(`Fallback: Moving last block ${lastBlock.id} (${lastBlock.type}) to new page`)
                 
                 let targetPageId = null
                 
@@ -302,10 +363,10 @@ function CustomReport() {
                     id: newPageId,
                     type: 'page',
                     blocks: [lastBlock],
-                    isOverflowing: false
+                    isOverflowing: false,
+                    justCreated: true // Flag to prevent immediate removal
                   })
                   targetPageId = newPageId
-                  console.log(`Created new page via fallback: ${newPageId}`)
                 }
                 
                 // Update cursor position if the moved block was selected/active
@@ -321,22 +382,18 @@ function CustomReport() {
                   
                   if (activeBlockMoved || selectedBlockMoved) {
                     setCursorPosition(prev => ({ ...prev, pageId: targetPageId }))
-                    console.log(`Updated cursor position to new page via fallback: ${targetPageId}`)
                     
                     // If we have a selected block that moved, ensure it stays selected
                     if (selectedBlockMoved) {
                       setTimeout(() => {
                         setSelectedBlock(lastBlock)
                         setActiveBlock(lastBlock.id)
-                        console.log(`Maintained selection for moved block via fallback: ${lastBlock.id}`)
                       }, 200)
                     }
                   }
                 }, 100)
                 
                 hasChanges = true
-              } else {
-                console.log(`No valid break index found for page ${page.id}`)
               }
             }
           } else {
@@ -348,6 +405,120 @@ function CustomReport() {
           }
         }
         
+        // Handle backward flow when page size increases (e.g., A4 to Legal)
+        // Check if content from next pages can fit back into previous pages
+        let backflowOccurred = true
+        while (backflowOccurred && newContent.length > 1) {
+          backflowOccurred = false
+          
+          for (let pageIndex = 0; pageIndex < newContent.length - 1; pageIndex++) {
+            const currentPage = newContent[pageIndex]
+            const nextPage = newContent[pageIndex + 1]
+            
+            if (nextPage && nextPage.blocks.length > 0) {
+              // Calculate current page height
+              const currentPageHeight = measurePageContentHeight(currentPage.id)
+              const remainingSpace = availableHeight - currentPageHeight
+              
+              // Try to move blocks from next page back to current page if there's space
+              let blocksToMoveBack = []
+              let accumulatedHeight = 0
+              
+              for (let blockIndex = 0; blockIndex < nextPage.blocks.length; blockIndex++) {
+                const blockHeight = measureBlockHeight(nextPage.blocks[blockIndex].id) || 30
+                
+                if (accumulatedHeight + blockHeight <= remainingSpace) {
+                  blocksToMoveBack.push(nextPage.blocks[blockIndex])
+                  accumulatedHeight += blockHeight
+                } else {
+                  break // Stop if this block would cause overflow
+                }
+              }
+              
+              // Move blocks back if any can fit
+              if (blocksToMoveBack.length > 0) {
+                currentPage.blocks = [...currentPage.blocks, ...blocksToMoveBack]
+                nextPage.blocks = nextPage.blocks.slice(blocksToMoveBack.length)
+                hasChanges = true
+                backflowOccurred = true
+                
+                // If next page is now empty, remove it (but only if it's truly empty)
+                if (nextPage.blocks.length === 0) {
+                  console.log(`Removing empty page ${nextPage.id} after backward flow`)
+                  newContent.splice(pageIndex + 1, 1)
+                  break // Restart the loop after removing a page
+                }
+              }
+            }
+          }
+        }
+        
+        // Ensure we have at least one page
+        if (newContent.length === 0) {
+          newContent.push({
+            id: 'page-1',
+            type: 'page',
+            blocks: [],
+            isOverflowing: false,
+            justCreated: false // First page is not "just created"
+          })
+          hasChanges = true
+        }
+        
+        // Final validation: ensure no content was lost
+        if (hasChanges) {
+          const originalBlockCount = prev.reduce((count, page) => count + page.blocks.length, 0)
+          const newBlockCount = newContent.reduce((count, page) => count + page.blocks.length, 0)
+          
+          // Get all block IDs for detailed tracking
+          const originalBlockIds = prev.flatMap(page => page.blocks.map(block => block.id)).sort()
+          const newBlockIds = newContent.flatMap(page => page.blocks.map(block => block.id)).sort()
+          
+          // Find missing and extra blocks
+          const missingBlocks = originalBlockIds.filter(id => !newBlockIds.includes(id))
+          const extraBlocks = newBlockIds.filter(id => !originalBlockIds.includes(id))
+          
+          // Only error if we have missing blocks (lost content) - extra blocks might be newly added
+          if (missingBlocks.length > 0) {
+            console.error(`CRITICAL ERROR: Missing blocks detected!`)
+            console.error('Original blocks:', originalBlockIds)
+            console.error('New blocks:', newBlockIds)
+            console.error('MISSING BLOCKS:', missingBlocks)
+            
+            // Return original content to prevent data loss
+            return prev
+          }
+          
+          // Log extra blocks as info, not error (these might be newly added blocks)
+          if (extraBlocks.length > 0) {
+            console.log('INFO: Extra blocks detected (likely newly added):', extraBlocks)
+          }
+          
+          // Only warn about count mismatch, don't fail
+          if (originalBlockCount !== newBlockCount) {
+            console.log(`INFO: Block count changed during redistribution. Original: ${originalBlockCount}, New: ${newBlockCount}`)
+          }
+          
+          // Check for duplicate blocks
+          const blockIdCounts = {}
+          newBlockIds.forEach(id => {
+            blockIdCounts[id] = (blockIdCounts[id] || 0) + 1
+          })
+          
+          const duplicates = Object.entries(blockIdCounts).filter(([id, count]) => count > 1)
+          if (duplicates.length > 0) {
+            console.error('DUPLICATE BLOCKS DETECTED:', duplicates)
+            return prev // Prevent duplicate content
+          }
+          
+          console.log(`Content redistribution successful: ${newBlockCount} blocks across ${newContent.length} pages`)
+          
+          // Log page distribution for debugging
+          newContent.forEach((page, index) => {
+            console.log(`Page ${index + 1}: ${page.blocks.length} blocks [${page.blocks.map(b => b.type).join(', ')}]`)
+          })
+        }
+        
         return hasChanges ? newContent : prev
       })
       
@@ -355,8 +526,27 @@ function CustomReport() {
       setTimeout(() => {
         setPaginationInProgress(false)
       }, 500)
-    }, 300) // Longer delay to ensure DOM is fully rendered and measured
-  }, [documentSettings, getPageDimensions, measurePageContentHeight, findContentBreakPoint, paginationInProgress])
+    }, 400) // Increased from 300ms to 400ms for better DOM stability
+  }, [documentSettings, getPageDimensions, measurePageContentHeight, findContentBreakPoint, paginationInProgress, activeBlock, selectedBlock])
+
+  // Debounced redistribution to prevent race conditions
+  const debouncedRedistributeContent = useCallback(() => {
+    // Clear any existing timeout
+    if (paginationTimeoutRef.current) {
+      clearTimeout(paginationTimeoutRef.current)
+    }
+    
+    // Set a new timeout to debounce rapid calls
+    paginationTimeoutRef.current = setTimeout(() => {
+      redistributeContentImmediate()
+    }, 200) // 200ms debounce - increased for better DOM stability
+  }, [redistributeContentImmediate])
+
+  // Create a public redistributeContent function that uses the debounced version
+  const redistributeContent = debouncedRedistributeContent
+
+  // Legacy function name for compatibility
+  const checkPageOverflow = redistributeContent
 
   // Effect to auto-resize textareas when content changes
   useEffect(() => {
@@ -371,24 +561,42 @@ function CustomReport() {
   useEffect(() => {
     // Check for page overflow after content changes with longer delay for DOM measurements
     const timeoutId = setTimeout(() => {
-      checkPageOverflow()
+      debouncedRedistributeContent()
     }, 500) // Even longer delay to ensure DOM is fully rendered and measured
     
     return () => clearTimeout(timeoutId)
-  }, [documentContent, checkPageOverflow])
+  }, [documentContent, redistributeContent])
+
+  // Effect to redistribute content when page size changes
+  useEffect(() => {
+    const currentDimensions = getPageDimensions()
+    const dimensionsKey = `${currentDimensions.width}-${currentDimensions.height}`
+    
+    // Only redistribute if dimensions actually changed
+    if (lastPageDimensions && lastPageDimensions !== dimensionsKey) {
+      // Redistribute content when page size changes
+      const timeoutId = setTimeout(() => {
+        debouncedRedistributeContent()
+      }, 300) // Delay to ensure page dimensions are updated
+      
+      return () => clearTimeout(timeoutId)
+    }
+    
+    setLastPageDimensions(dimensionsKey)
+  }, [documentSettings.pageSize, redistributeContent, getPageDimensions, lastPageDimensions])
 
   // Additional effect to handle window resize and re-measure content
   useEffect(() => {
     const handleResize = () => {
       // Re-measure content when window is resized
       setTimeout(() => {
-        checkPageOverflow()
+        debouncedRedistributeContent()
       }, 200)
     }
 
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
-  }, [checkPageOverflow])
+  }, [redistributeContent])
 
   // Auto-add new page when needed
   const addNewPage = useCallback(() => {
@@ -564,7 +772,22 @@ function CustomReport() {
     // Update cursor position to ensure it's on the correct page
     setCursorPosition(prev => ({ ...prev, pageId: targetPageId, blockId: blockId }))
     
-    checkPageOverflow()
+    // Auto-focus newly created heading or paragraph blocks
+    if (blockType === BLOCK_TYPES.HEADING || blockType === BLOCK_TYPES.PARAGRAPH) {
+      setTimeout(() => {
+        try {
+          const newBlockElement = document.querySelector(`[data-block-id="${blockId}"] textarea`)
+          if (newBlockElement && newBlockElement.focus) {
+            newBlockElement.focus()
+            newBlockElement.setSelectionRange(0, 0)
+          }
+        } catch (error) {
+          // Focus error handling
+        }
+      }, 200) // Increased delay to ensure DOM is fully rendered
+    }
+    
+        debouncedRedistributeContent()
     
     // Reset processing flag after a delay
     setTimeout(() => {
@@ -814,9 +1037,9 @@ function CustomReport() {
     
     // Trigger pagination check after content update
     setTimeout(() => {
-      checkPageOverflow()
+      debouncedRedistributeContent()
     }, 100)
-  }, [checkPageOverflow])
+  }, [redistributeContent])
 
   // Delete block
   const deleteBlock = useCallback((blockId) => {
@@ -1207,16 +1430,7 @@ function CustomReport() {
             key={block.id}
             data-block-id={block.id}
             className={`content-block heading-block ${activeBlock === block.id ? 'active' : ''} ${selectedBlock?.id === block.id ? 'selected' : ''}`}
-            style={{
-              ...baseStyle,
-              opacity: 0.5,
-              margin: block.type === BLOCK_TYPES.PARAGRAPH ? '0 0 5px 0' : 
-                     block.type === BLOCK_TYPES.HEADING ? '0 0 5px 0' : '0',
-              padding: '0',
-              minHeight: 'auto',
-              lineHeight: block.type === BLOCK_TYPES.PARAGRAPH ? '1.6' : 
-                         block.type === BLOCK_TYPES.HEADING ? '1.2' : 'normal'
-            }}
+            style={baseStyle}
             onClick={(e) => {
               // Only stop propagation if we're not clicking on a textarea or input
               if (e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT') {
@@ -1286,30 +1500,7 @@ function CustomReport() {
               onFocus={handleTextareaFocus}
               onBlur={handleTextareaBlur}
               placeholder="Enter heading..."
-              style={{ 
-                width: '100%',
-                border: 'none',
-                background: 'transparent',
-                  margin: 0, 
-                  outline: 'none',
-                height: 'auto',
-                minHeight: '1em',
-                  cursor: 'text',
-                  direction: 'ltr',
-                textAlign: block.styles?.textAlign || 'left',
-                fontSize: block.headingType === 'h1' ? '24px' : 
-                        block.headingType === 'h2' ? '18px' :
-                        block.headingType === 'h3' ? '16px' :
-                        block.headingType === 'h4' ? '13px' :
-                        block.headingType === 'h5' ? '12px' : '11px',
-                fontWeight: 'bold',
-                fontFamily: 'inherit',
-                padding: '0',
-                boxSizing: 'border-box',
-                lineHeight: 'inherit',
-                resize: 'none',
-                overflow: 'hidden'
-              }}
+              className={`heading-${block.headingType || 'h2'} ${block.styles?.textAlign ? `text-align-${block.styles.textAlign}` : 'text-align-left'}`}
             />
           </div>
         )
@@ -1320,16 +1511,7 @@ function CustomReport() {
             key={block.id}
             data-block-id={block.id}
             className={`content-block paragraph-block ${activeBlock === block.id ? 'active' : ''} ${selectedBlock?.id === block.id ? 'selected' : ''}`}
-            style={{
-              ...baseStyle,
-              opacity: 0.5,
-              margin: block.type === BLOCK_TYPES.PARAGRAPH ? '0 0 5px 0' : 
-                     block.type === BLOCK_TYPES.HEADING ? '0 0 5px 0' : '0',
-              padding: '0',
-              minHeight: 'auto',
-              lineHeight: block.type === BLOCK_TYPES.PARAGRAPH ? '1.6' : 
-                         block.type === BLOCK_TYPES.HEADING ? '1.2' : 'normal'
-            }}
+            style={baseStyle}
             onClick={(e) => {
               // Only stop propagation if we're not clicking on a textarea or input
               if (e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT') {
@@ -1399,25 +1581,7 @@ function CustomReport() {
               onFocus={handleTextareaFocus}
               onBlur={handleTextareaBlur}
               placeholder="Start typing..."
-              style={{ 
-                width: '100%',
-                border: 'none',
-                background: 'transparent',
-                margin: 0, 
-                outline: 'none',
-                height: 'auto',
-                minHeight: '1.2em', // Natural text height
-                cursor: 'text',
-                lineHeight: '1.6',
-                direction: 'ltr',
-                textAlign: block.styles?.textAlign || 'left',
-                fontSize: '12px',
-                fontFamily: 'inherit',
-                padding: '1px', // Minimal padding to preserve appearance
-                boxSizing: 'border-box',
-                resize: 'none',
-                overflow: 'hidden'
-              }}
+              className={block.styles?.textAlign ? `text-align-${block.styles.textAlign}` : 'text-align-left'}
             />
           </div>
         )
@@ -1488,13 +1652,11 @@ function CustomReport() {
                 }
                 input.click()
               }}
-              style={{ cursor: 'pointer' }}
             >
               {block.content ? (
                 <img 
                   src={block.content} 
-                  alt="Uploaded" 
-                  style={{ maxWidth: '100%', height: 'auto' }}
+                  alt="Uploaded"
                 />
               ) : (
                 <div className="image-upload-placeholder">
@@ -1559,24 +1721,22 @@ function CustomReport() {
           >
             <div className="block-controls child-controls">
               <button onClick={() => deleteBlock(block.id)}>×</button>
-              <button onClick={() => handleTableEdit(block.id, 'addRow')}>+ Row</button>
-              <button onClick={() => handleTableEdit(block.id, 'addColumn')}>+ Col</button>
+              <button className='addrow' onClick={() => handleTableEdit(block.id, 'addRow')}>+ Row</button>
+              <button className='addcol' onClick={() => handleTableEdit(block.id, 'addColumn')}>+ Col</button>
             </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table>
               <thead>
                 <tr>
                   {tableData.headers.map((header, colIndex) => (
-                    <th key={colIndex} style={{ border: '1px solid #ccc', padding: '8px', position: 'relative' }}>
+                    <th key={colIndex}>
                       <input
                         type="text"
                         value={header}
                         onChange={(e) => handleTableEdit(block.id, 'updateHeader', { colIndex, value: e.target.value })}
-                        style={{ border: 'none', background: 'transparent', width: '100%', textAlign: 'center', fontWeight: 'bold' }}
                       />
                       {tableData.headers.length > 1 && (
                         <button
                           onClick={() => handleTableEdit(block.id, 'removeColumn', { colIndex })}
-                          style={{ position: 'absolute', top: '2px', right: '2px', fontSize: '10px', padding: '2px' }}
                         >
                           ×
                         </button>
@@ -1589,20 +1749,18 @@ function CustomReport() {
                 {tableData.rows.map((row, rowIndex) => (
                   <tr key={rowIndex}>
                     {row.map((cell, colIndex) => (
-                      <td key={colIndex} style={{ border: '1px solid #ccc', padding: '8px', position: 'relative' }}>
+                      <td key={colIndex}>
                         <input
                           type="text"
                           value={cell}
                           onChange={(e) => handleTableEdit(block.id, 'updateCell', { rowIndex, colIndex, value: e.target.value })}
-                          style={{ border: 'none', background: 'transparent', width: '100%' }}
                         />
                       </td>
                     ))}
-                    <td style={{ border: '1px solid #ccc', padding: '4px', textAlign: 'center' }}>
+                    <td className="table-action-cell">
                       {tableData.rows.length > 1 && (
                         <button
                           onClick={() => handleTableEdit(block.id, 'removeRow', { rowIndex })}
-                          style={{ fontSize: '13px', padding: '2px 6px' }}
                         >
                           ×
                         </button>
@@ -1716,12 +1874,10 @@ function CustomReport() {
                   reader.readAsDataURL(file)
                 }
               }}
-              style={{ display: 'none' }}
               id="background-upload"
             />
             <button
               onClick={() => document.getElementById('background-upload').click()}
-              style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', background: 'white', cursor: 'pointer' }}
             >
               Upload Image
             </button>
@@ -1731,12 +1887,13 @@ function CustomReport() {
                   ...prev,
                   background: { type: 'image', value: null }
                 }))}
-                style={{ padding: '8px 12px', border: '1px solid #dc3545', borderRadius: '4px', background: '#dc3545', color: 'white', cursor: 'pointer', marginLeft: '8px' }}
+                className="remove-btn"
               >
                 Remove
               </button>
             )}
           </div>
+            <button onClick={handleGenerateReport} className="generate-btn">Generate Report</button>
         </div>
       </div>
 
@@ -1790,8 +1947,7 @@ function CustomReport() {
               </button>
             </div>
           )}
-          <button onClick={() => checkPageOverflow()} className="debug-btn" title="Force pagination check">Check Pagination</button>
-          <button onClick={handleGenerateReport} className="generate-btn">Generate Report</button>
+          <button onClick={() => redistributeContentImmediate()} className="debug-btn" title="Force content redistribution">Redistribute Content</button>
         </div>
       </div>
 
@@ -1805,6 +1961,7 @@ function CustomReport() {
             style={{
               width: pageDimensions.width,
               minHeight: pageDimensions.height,
+              maxHeight: pageDimensions.height * 1.1, // Allow slight expansion but limit it
               margin: '30px auto',
               padding: `${inToPx(pageDimensions.margins.top)}px ${inToPx(pageDimensions.margins.right)}px ${inToPx(pageDimensions.margins.bottom)}px ${inToPx(pageDimensions.margins.left)}px`,
               backgroundImage: documentSettings.background.value ? `url(${documentSettings.background.value})` : 'none',
@@ -1815,7 +1972,7 @@ function CustomReport() {
               border: '1px solid #ccc',
               boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
               position: 'relative',
-              overflow: 'visible'
+              overflow: 'visible' // Allow content to show while pagination works
             }}
             onClick={(e) => handlePageClick(page.id, e)}
           >

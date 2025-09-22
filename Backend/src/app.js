@@ -36,6 +36,7 @@ const collageGeneratorRoutes = require("./routes/orders/collageGeneratorRoutes")
 
 // Orders-Reports routes
 const ordersReportsRoutes = require("./routes/orders/ordersReportsRoutes");
+const customReportRoutes = require("./routes/orders/customReportRoutes");
 
 // Field Verifier routes
 const fieldVerifierPortalOperationsRoutes = require("./routes/fieldVerifier/portalOperationsRoutes");
@@ -153,6 +154,7 @@ app.use("/api/subcategories", subcategoryRoutes);
 app.use("/api/child-categories", childCategoryRoutes);
 app.use("/api/officers", officerRouter);
 app.use("/api/orders", orderRoutes);
+app.use("/api/orders-reports/custom-report", customReportRoutes);
 app.use("/api/orders-reports", ordersReportsRoutes);
 app.use("/api/field-verifiers", fieldVerifierPortalOperationsRoutes);
 app.use("/api/order-media", orderMediaPortalRoutes);

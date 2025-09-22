@@ -209,7 +209,9 @@ function OrderDetails() {
   const OpenPaymentModal = () => {
     // Populate form with existing payment data if available
     setPaymentFormData({
-      paymentAmount: order?.payment_amount ? order.payment_amount.toString() : "",
+      paymentAmount: order?.payment_amount
+        ? order.payment_amount.toString()
+        : "",
       paymentMode: order?.payment_mode || "",
       paymentStatus: order?.payment_status || "",
     });
@@ -232,17 +234,23 @@ function OrderDetails() {
   // Handle form submission
   const handlePaymentFormSubmit = () => {
     // Validation: Check if all required fields are filled
-    if (!paymentFormData.paymentAmount || !paymentFormData.paymentMode || !paymentFormData.paymentStatus) {
+    if (
+      !paymentFormData.paymentAmount ||
+      !paymentFormData.paymentMode ||
+      !paymentFormData.paymentStatus
+    ) {
       toast.error("Please fill in all required fields");
       return;
     }
 
     // Check if data has changed by comparing with current order data
-    const currentAmount = order?.payment_amount ? order.payment_amount.toString() : "";
+    const currentAmount = order?.payment_amount
+      ? order.payment_amount.toString()
+      : "";
     const currentMode = order?.payment_mode || "";
     const currentStatus = order?.payment_status || "";
-    
-    const hasChanged = 
+
+    const hasChanged =
       paymentFormData.paymentAmount !== currentAmount ||
       paymentFormData.paymentMode !== currentMode ||
       paymentFormData.paymentStatus !== currentStatus;
@@ -256,7 +264,7 @@ function OrderDetails() {
     const payload = {
       payment_amount: parseFloat(paymentFormData.paymentAmount),
       payment_mode: paymentFormData.paymentMode,
-      payment_status: paymentFormData.paymentStatus
+      payment_status: paymentFormData.paymentStatus,
     };
 
     // Dispatch API call
@@ -345,10 +353,10 @@ function OrderDetails() {
               <p>Order Status</p>
               <h6>{showValue(order?.current_status_name)}</h6>
             </div>
-                         <div className="order-impo-info-card">
-               <p>Payment Status</p>
-               <h6>{order?.payment_status ? order.payment_status : "-"}</h6>
-             </div>
+            <div className="order-impo-info-card">
+              <p>Payment Status</p>
+              <h6>{order?.payment_status ? order.payment_status : "-"}</h6>
+            </div>
           </div>
         </div>
         {/* Main content area for order details */}
@@ -553,23 +561,30 @@ function OrderDetails() {
                 <Link title="Folder" className="tooltip-link">
                   <FolderIcon />
                 </Link>
-                <Link 
+                <Link
                   to={`/orders/${id}/details/cv-report`}
-                  title="CV Report" 
+                  title="CV Report"
                   className="tooltip-link"
                 >
                   <ReportIcon />
                 </Link>
-                <Link 
+                <Link
                   to={`/orders/${id}/details/avr-report`}
-                  title="AVR Report" 
+                  title="AVR Report"
                   className="tooltip-link"
                 >
                   <ReportIcon />
                 </Link>
-                {/* <Link 
+                <Link
+                  to={`/orders/${id}/details/machinery-report`}
+                  title="Machinery Report"
+                  className="tooltip-link"
+                >
+                  <ReportIcon />
+                </Link>
+                {/* <Link
                   to={`/orders/${id}/details/custom-report`}
-                  title="Custom Report" 
+                  title="Custom Report"
                   className="tooltip-link"
                 >
                   <ReportIcon />
@@ -744,7 +759,7 @@ function OrderDetails() {
           {{
             title: " ",
             body: (
-              <div 
+              <div
                 className="payment-modal-content"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
@@ -896,8 +911,8 @@ function OrderDetails() {
                           </div>
                         </div>
                         <div className="form-buttons">
-                          <button 
-                            type="submit" 
+                          <button
+                            type="submit"
                             className="submit-button"
                             disabled={paymentUpdating}
                           >
