@@ -358,9 +358,9 @@ function Orders() {
                 <td>{order.created_by}</td>
                 <td>{order.updated_by || "-"}</td>
                 <td>
-                  <span className="status-state order-state">
+                  <p className="status-state order-state">
                     {order.current_status_name}
-                  </span>
+                  </p>
                 </td>
                 <td style={{ textAlign: "center" }}>
                   {hasPermission(allowedPermissions, "edit_order") && (
@@ -644,8 +644,8 @@ function Orders() {
                     </div>
                   )}
 
-                  {/* Field Verifier - Show when manager is assigned, user is Manager, or user is Super Admin (but not Bank Officer) */}
-                  {(formData.manager_id || isManager || isSuperAdmin) && !isBankOfficer && (
+                  {/* Field Verifier - Show when manager is assigned, user is Manager, or user has permission to edit manager field (but not Bank Officer) */}
+                  {(formData.manager_id || isManager || isSuperAdmin) && hasPermission(allowedPermissions, "view_order_add_edit_manager_filed") && !isBankOfficer && (
                     <div className="form-group">
                       <label htmlFor="fieldVerifierField">Field Verifier</label>
                       <SingleSearchSelect

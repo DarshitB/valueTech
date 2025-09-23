@@ -93,13 +93,18 @@ exports.create = async (req, res, next) => {
       if (!manager) throw new BadRequestError("Invalid manager selected");
     }
 
-    // Determine order status based on manager_id
+    // Determine order status based on supervisor_number, driver_number, and manager_id
     let orderStatusId;
+    const hasSupervisorAndDriver = supervisor_number && driver_number;
+    
     if (manager_id) {
-      // If manager is assigned, status should be 3 (Assigned to Manager)
+      // If both supervisor and driver numbers are set AND manager is assigned, status should be 4 (Manager Assigned)
+      orderStatusId = 4;
+    } else if (hasSupervisorAndDriver) {
+      // If both supervisor and driver numbers are set but no manager, status should be 3 (Telecaller Completed)
       orderStatusId = 3;
     } else {
-      // If no manager, status should be 2 (Assigned to Telecaller)
+      // If supervisor or driver number is missing, status should be 2 (Telecaller Assigned)
       orderStatusId = 2;
     }
 
@@ -160,26 +165,23 @@ exports.create = async (req, res, next) => {
     /* console.log("Order created successfully:", order); */
 
     // Create status history entries based on assignments
-    if (manager_id) {
-      // If manager is assigned, create both status 1 and 2
-      const pendingStatusHistory = {
-        order_id: order.id,
-        status_id: 1, // Pending status
-        changed_by: req.user?.id,
-        changed_at: new Date(),
-      };
+    // Always create Order Initiated status first
+    const pendingStatusHistory = {
+      order_id: order.id,
+      status_id: 1, // Order Initiated
+      changed_by: req.user?.id,
+      changed_at: new Date(),
+    };
+    await OrderStatusHistory.createStatusHistory(pendingStatusHistory);
 
-      const managerAssignedStatusHistory = {
-        order_id: order.id,
-        status_id: 3, // Assigned to Manager status
-        changed_by: req.user?.id,
-        changed_at: new Date(),
-      };
-
-      // Create both status history entries
-      await OrderStatusHistory.createStatusHistory(pendingStatusHistory);
-      await OrderStatusHistory.createStatusHistory(managerAssignedStatusHistory);
-    }
+    // Create the appropriate status based on supervisor_number, driver_number, and manager_id
+    const finalStatusHistory = {
+      order_id: order.id,
+      status_id: orderStatusId,
+      changed_by: req.user?.id,
+      changed_at: new Date(),
+    };
+    await OrderStatusHistory.createStatusHistory(finalStatusHistory);
 
     if (field_verifier_id) {
       // If field verifier is assigned, create field verifier assignment record
@@ -192,25 +194,6 @@ exports.create = async (req, res, next) => {
 
       // Create status history entry
       await OrderStatusHistory.createStatusHistory(fieldVerifierStatusHistory);
-    }
-
-    if (!manager_id && !field_verifier_id) {
-      // If no manager, only create status 1
-      const statusHistoryData = {
-        order_id: order.id,
-        status_id: 1, // Pending status
-        changed_by: req.user?.id,
-        changed_at: new Date(),
-      };
-      const assignToTelecaller = {
-        order_id: order.id,
-        status_id: 2, // Assigned to Telecaller status
-        changed_by: req.user?.id,
-        changed_at: new Date(),
-      };
-
-      await OrderStatusHistory.createStatusHistory(statusHistoryData);
-      await OrderStatusHistory.createStatusHistory(assignToTelecaller);
     }
 
     res.locals.newRecordId = order.id;
@@ -268,20 +251,23 @@ exports.update = async (req, res, next) => {
       if (!manager) throw new BadRequestError("Invalid manager selected");
     }
 
-    // Determine new order status based on manager_id
+    // Determine new order status based on supervisor_number, driver_number, and manager_id
     let newStatusId;
-    if (manager_id !== undefined) {
-      // If manager_id is being updated
-      if (manager_id) {
-        // If manager is assigned, status should be 3 (Assigned to Manager)
-        newStatusId = 3;
-      } else {
-        // If no manager, status should be 2 (Assigned to Telecaller)
-        newStatusId = 2;
-      }
+    const currentSupervisorNumber = supervisor_number !== undefined ? supervisor_number : existingOrder.supervisor_number;
+    const currentDriverNumber = driver_number !== undefined ? driver_number : existingOrder.driver_number;
+    const currentManagerId = manager_id !== undefined ? manager_id : existingOrder.manager_id;
+    
+    const hasSupervisorAndDriver = currentSupervisorNumber && currentDriverNumber;
+    
+    if (currentManagerId) {
+      // manager is assigned, status should be 4 (Manager Assigned)
+      newStatusId = 4;
+    } else if (hasSupervisorAndDriver) {
+      // If both supervisor and driver numbers are set but no manager, status should be 3 (Telecaller Completed)
+      newStatusId = 3;
     } else {
-      // If manager_id is not being updated, keep existing status
-      newStatusId = existingOrder.current_status_id;
+      // If supervisor or driver number is missing, status should be 2 (Telecaller Assigned)
+      newStatusId = 2;
     }
 
     // Helper function to handle empty strings for integer fields
@@ -344,11 +330,8 @@ exports.update = async (req, res, next) => {
     // Create status history entries based on changes
     let hasStatusChange = false;
 
-    // Check if manager assignment changed
-    if (
-      manager_id !== undefined &&
-      newStatusId !== existingOrder.current_status_id
-    ) {
+    // Check if status changed due to supervisor_number, driver_number, or manager_id changes
+    if (newStatusId !== existingOrder.current_status_id) {
       const statusHistoryData = {
         order_id: orderId,
         status_id: newStatusId,

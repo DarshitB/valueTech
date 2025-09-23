@@ -9,7 +9,9 @@ const {
   cleanupTempFiles
 } = require('../../utils/localFileHelper');
 const { insertMedia, getOrderByNumber } = require('../../models/fieldVerifier/order_media');
-const { BadRequestError } = require('../../utils/customErrors');
+const Order = require('../../models/orders/order');
+const OrderStatusHistory = require('../../models/orders/orderStatusHistory');
+const { BadRequestError, NotFoundError } = require('../../utils/customErrors');
 
 /**
  * Helper: write base64 data to temp file and return path + filename
@@ -26,6 +28,33 @@ function writeBase64ToTemp(dataUrl) {
   const tmpPath = path.join(os.tmpdir(), filename);
   fs.writeFileSync(tmpPath, Buffer.from(base64, 'base64'));
   return { tmpPath, filename, mime };
+}
+
+/**
+ * Helper: Update order status to 6 (Assets Submitted) after successful upload
+ */
+async function updateOrderStatusToAssetsSubmitted(orderId, verifierId) {
+  try {
+    // Update order status to 6 (Assets Submitted)
+    await Order.updateOrder(orderId, {
+      current_status_id: 6,
+      updated_at: new Date(),
+      updated_by: verifierId
+    });
+
+    // Create status history entry
+    const statusHistoryData = {
+      order_id: orderId,
+      status_id: 6, // Assets Submitted
+      changed_by: verifierId,
+      changed_at: new Date(),
+    };
+
+    await OrderStatusHistory.createStatusHistory(statusHistoryData);
+  } catch (error) {
+    console.error('Error updating order status:', error);
+    // Don't throw error here as upload was successful
+  }
 }
 
 /**
@@ -115,6 +144,9 @@ async function uploadMultipart(req, res, next) {
     /* console.log(`🧹 Cleaning up ${tempPaths.length} temporary files...`); */
     cleanupTempFiles(tempPaths);
 
+    // Update order status to 6 (Assets Submitted) after successful upload
+    await updateOrderStatusToAssetsSubmitted(orderRow.id, id);
+
     res.json({ state: 1, message: 'successfully uploaded the images', files: saved });
   } catch (err) {
     // If there's an error, still try to cleanup temp files
@@ -147,7 +179,7 @@ async function uploadBase64(req, res, next) {
     if (!order_number) throw new BadRequestError('order_number is required');
     if (!files || !Array.isArray(files) || files.length === 0) throw new BadRequestError('No files in payload');
 
-    console.log("files", files);
+    /* console.log("files", files); */
     
     const orderRow = await getOrderByNumber(order_number);
     if (!orderRow) throw new BadRequestError('Order not found with provided order_number');
@@ -215,6 +247,9 @@ async function uploadBase64(req, res, next) {
     // Cleanup temp files ONLY after successful database insertion
    /*  console.log(`🧹 Cleaning up ${tempPaths.length} temporary files...`); */
     cleanupTempFiles(tempPaths);
+
+    // Update order status to 6 (Assets Submitted) after successful upload
+    await updateOrderStatusToAssetsSubmitted(orderRow.id, id);
 
     res.json({ state: 1, message: 'successfully uploaded the images', files: saved });
   } catch (err) {

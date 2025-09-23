@@ -90,10 +90,10 @@ const order = {
       baseQuery.andWhere("orders.manager_id", user.id);
     } else if (user.role_name === "TELECALLER") {
       // TELECALLER can only see orders that don't have supervisor_number or driver_number
-      baseQuery.andWhere(function () {
+      /* baseQuery.andWhere(function () {
         this.whereNull("orders.supervisor_number")
           .orWhereNull("orders.driver_number");
-      });
+      }); */
     }
 
     const orders = await baseQuery;

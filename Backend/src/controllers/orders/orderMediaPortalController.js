@@ -1,5 +1,33 @@
 const orderMediaPortal = require("../../models/orders/orderMediaPortal");
 const Order = require("../../models/orders/order");
+const OrderStatusHistory = require("../../models/orders/orderStatusHistory");
+
+/**
+ * Helper: Update order status to 7 (Assets Approved) when images are approved
+ */
+async function updateOrderStatusToAssetsApproved(orderId, userId) {
+  try {
+    // Update order status to 7 (Assets Approved)
+    await Order.updateOrder(orderId, {
+      current_status_id: 7,
+      updated_at: new Date(),
+      updated_by: userId
+    });
+
+    // Create status history entry
+    const statusHistoryData = {
+      order_id: orderId,
+      status_id: 7, // Assets Approved
+      changed_by: userId,
+      changed_at: new Date(),
+    };
+
+    await OrderStatusHistory.createStatusHistory(statusHistoryData);
+  } catch (error) {
+    console.error('Error updating order status to Assets Approved:', error);
+    // Don't throw error here as media status update was successful
+  }
+}
 
 /**
  * GET /api/portal/order-media/:orderId
@@ -110,6 +138,16 @@ async function updateMediaStatus(req, res) {
       updates,
       userId
     );
+
+    // Check if any media was approved (status = 1) and update order status
+    const hasApprovedMedia = updates.some(update => update.status === 1);
+    if (hasApprovedMedia && updatedRecords.length > 0) {
+      // Get order ID from the first updated record
+      const orderId = updatedRecords[0].order_id;
+      if (orderId) {
+        await updateOrderStatusToAssetsApproved(orderId, userId);
+      }
+    }
 
     res.locals.id = updatedRecords[0].id;
 

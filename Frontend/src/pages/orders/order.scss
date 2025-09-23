@@ -3,6 +3,10 @@
 .status-state {
   color: $primary-color;
   border-color: $primary-color;
+  margin-bottom: 0;
+  width: fit-content;
+  text-align: center;
+  line-height: 20px;
   &.order-states {
     white-space: nowrap;
   }
