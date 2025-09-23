@@ -582,6 +582,13 @@ function OrderDetails() {
                 >
                   <ReportIcon />
                 </Link>
+                <Link
+                  to={`/orders/${id}/details/ce-report`}
+                  title="CE Report"
+                  className="tooltip-link"
+                >
+                  <ReportIcon />
+                </Link>
                 {/* <Link
                   to={`/orders/${id}/details/custom-report`}
                   title="Custom Report"

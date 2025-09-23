@@ -15,7 +15,7 @@ import { toast } from "react-toastify";
 import "../order.scss";
 import { DeleteIcon } from "../../../components/icons";
 
-function MachineryReport() {
+function CEReport() {
   // Extract order ID from route parameters
   const { id } = useParams();
   // Initialize Redux dispatch function
@@ -142,6 +142,57 @@ function MachineryReport() {
     return words.trim() + " ONLY";
   }, []);
 
+  // Function to convert number to words for tyres
+  const numberToWords = useCallback((n) => {
+    const words = [
+      "",
+      "ONE",
+      "TWO",
+      "THREE",
+      "FOUR",
+      "FIVE",
+      "SIX",
+      "SEVEN",
+      "EIGHT",
+      "NINE",
+      "TEN",
+      "ELEVEN",
+      "TWELVE",
+      "THIRTEEN",
+      "FOURTEEN",
+      "FIFTEEN",
+      "SIXTEEN",
+      "SEVENTEEN",
+      "EIGHTEEN",
+      "NINETEEN",
+      "TWENTY",
+    ];
+
+    if (n <= 20) {
+      return words[n];
+    }
+
+    const tens = [
+      "",
+      "",
+      "TWENTY",
+      "THIRTY",
+      "FORTY",
+      "FIFTY",
+      "SIXTY",
+      "SEVENTY",
+      "EIGHTY",
+      "NINETY",
+    ];
+    if (n < 100) {
+      return (
+        tens[Math.floor(n / 10)] + (n % 10 !== 0 ? "-" + words[n % 10] : "")
+      );
+    }
+
+    return n.toString(); // fallback for numbers above 99
+  }, []);
+
   // Function to format currency input (Indian number format)
   const handleCurrencyFormatting = useCallback((value) => {
     // Remove everything except digits and one dot
@@ -169,19 +220,19 @@ function MachineryReport() {
     return formattedValue;
   }, []);
 
-  // Form data state for Machinery report generation
+  // Form data state for CE report generation
   const [reportFormData, setReportFormData] = useState({
     // Report type and reference details
-    report_type: "report_machinery",
+    report_type: "report_ce",
     ref_no_year: new Date().getFullYear().toString(), // Current year (2025)
     ref_no_bank: "",
     state_name: "", // Default to first option
     ref_no_code: "", // Default to first option
     ref_no_id: "",
-    report_date: getCurrentDate(), // Default to today's date
+    rev_report_date: getCurrentDate(), // Default to today's date
 
-    valuer_name: "VALUETECH SOLUTIONS", // Default to first option
-    license_no: "CAT-VII-A-6019",
+    valuer_name: "V.K. ASSOCIATES", // Default to first option
+    license_no: "SLA-60827",
     valuer_contact: "99209-88549", // Fixed read-only value
 
     valuation_purpose: "FINANCIAL USAGE",
@@ -197,81 +248,123 @@ function MachineryReport() {
     // INSPECTED EQUIPMENT DETAILS
     registration_no: "",
     registration_date: "",
-    location_of_machinery: "",
+    registered_location: "",
 
     owner_serial_no: "",
     manufacture_year: "",
     asset_make: "",
     model: "",
 
-    control_system: "",
-    machine_serial_no: "",
-    laf_id: "",
-    application_usage: "",
+    engine_no_detail: "",
+    crane_chassis_no: "",
+    body_type: "",
+    crane_model_code: "",
 
+    hours_meter_reading: "",
     invoice_no_date: "",
     invoice_no: "",
     invoice_date: "",
     hyp_with: "",
-    machine_type: "",
+    hyp_from_date: "",
 
     // COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION
-    machine_technology: "",
-    machine_condition: "",
-    electrical_condition: "",
-    mechanical_condition: "",
+    // asset_classification: handled directly from order data
+    no_of_cylinder: "",
 
+    engine_condition: "",
+    chassis_condition: "",
+    body_condition: "",
+    cabin_condition: "",
+    electrical_condition: "",
+    gear_transmission: "",
+
+    battery_available: "YES / TWO", // Fixed read-only value
+    gross_machine_weight: "",
+
+    // FIX BUT FLEX
     fix_but_flex_heading_1: "",
     fix_but_flex_value_1: "",
     fix_but_flex_heading_2: "",
     fix_but_flex_value_2: "",
-
     fix_but_flex_heading_3: "",
     fix_but_flex_value_3: "",
+
+    fix_but_flex_title_1: "",
+    fix_but_flex_title_2: "",
+    fix_but_flex_title_3: "",
+
     fix_but_flex_heading_4: "",
     fix_but_flex_value_4: "",
-
     fix_but_flex_heading_5: "",
     fix_but_flex_value_5: "",
     fix_but_flex_heading_6: "",
     fix_but_flex_value_6: "",
+
     fix_but_flex_heading_7: "",
     fix_but_flex_value_7: "",
-
     fix_but_flex_heading_8: "",
     fix_but_flex_value_8: "",
     fix_but_flex_heading_9: "",
     fix_but_flex_value_9: "",
+
     fix_but_flex_heading_10: "",
     fix_but_flex_value_10: "",
-
     fix_but_flex_heading_11: "",
     fix_but_flex_value_11: "",
     fix_but_flex_heading_12: "",
     fix_but_flex_value_12: "",
 
-    machine_colour: "",
-    color_condition: "",
+    fix_but_flex_top_heading_13: "",
+    fix_but_flex_heading_13: "",
+    fix_but_flex_value_13: "",
+    fix_but_flex_heading_14: "",
+    fix_but_flex_value_14: "",
+    fix_but_flex_heading_15: "",
+    fix_but_flex_value_15: "",
+
+    fix_but_flex_heading_16: "",
+    fix_but_flex_value_16: "",
+    fix_but_flex_heading_17: "",
+    fix_but_flex_value_17: "",
+
+    fix_but_flex_heading_18: "",
+    fix_but_flex_value_18: "",
+    fix_but_flex_heading_19: "MECHANICAL UNIT CONDITION",
+    fix_but_flex_value_19: "",
+    fix_but_flex_heading_20: "",
+    fix_but_flex_value_20: "",
+
+    fix_but_flex_heading_21: "TOOL KIT AVAILABLE",
+    fix_but_flex_value_21: "",
+    fix_but_flex_heading_22: " SEATING CAPACITY",
+    fix_but_flex_value_22: "",
+    fix_but_flex_heading_23: "",
+    fix_but_flex_value_23: "",
+
+    fix_but_flex_heading_24: "",
+    fix_but_flex_value_24: "",
+    fix_but_flex_heading_25: "",
+    fix_but_flex_value_25: "",
+
     damages_if_any: "",
 
-    // INSURANCE DETAILS OF THE
-    rc_book_verified: "",
-    tax_invoice_copy: "COPY AVAILABLE & VERIFIED",
-    tax_upto_title: "",
+    // RC, PERMIT, TAX, FITNESS & INSURANCE DETAILS
+    bill_of_entry: "",
+    proforma_invoice_verified: "",
     tax_upto: "",
-    permit_upto: "",
-    permit_type: "",
-    fitness_upto_title: "",
-    fitness_upto: "",
+    bill_of_lading: "",
 
+    chartered_engineer_certificate: "",
+    fitness_upto: "",
     insurance_co_name: "",
     policy_no: "",
+
     insurance_valid_date: "",
     insured_value: "",
     insurance_verified: "",
 
     // OVER ALL FEED BACK OF THE INSPECTED
-    tax_invoice_cost: "",
+    invoice_cost: "",
     depreciation: "",
     depreciation_value: "",
     appraiser_value: "",
@@ -283,9 +376,10 @@ function MachineryReport() {
 
     valuer_comments_remarks: "",
     declaration: "",
-    disclaimer:
-      "THIS REPORT IS GENERATED BY THE VALUETECH SOLUTIONS AT THE SOLE REQUEST OF UGRO CAPITAL LIMITED, KAROL BAGH BRANCH, NEW DELHI WHOM, THIS VALUATION REPORT IS ADDRESSED AND IS TO BE USED SOLELY BY THE SAID PARTY FOR THE STATED PURPOSE ONLY. VALUETECH SOLUTIONS WILL NOT BE HELD LIABLE FOR ANY LOSS OR LIABLITY SUSTAINED BY ANY PARTY RELYING ON THIS VALUATION REPORT. VALUETECH SOLUTIONS HAS RELIED ON THE DATA PROVIDED BY THE CLIENT & HAS NOT VERIFIED GENUIUNENESS THEREOFF. AS THERE IS NO STANDARD PRICE LIST FOR PRE-OWNED/USED MACHINERY / CRANE, THIS VALUATION INDICATED IN THE REPORT IS OUR PROFESSIONAL OPINION ONLY ON THE MARKET VALUE OF THE PRODUCT SHOWN IN COLLAGE OR IN DETAILS BASED ON STANDARD VALUATION METHODOLOGY & PROCEDURES CALCULATING FLUCTUATIONS & LIMITATIONS OF VALUATED PRODUCTS. ACUAL REALISATION MAY DIFFER FROM THE VALUATION INDICATED IN THE REPORT. VALUETECH SOLUTIONS (SIGNATORY & EMPLOYEES WILL NOT BE HELD LIABLE FOR ANY DIRECT, INDIRECT CONSEQUENTIAL OR EXEMPLARY DAMAGES FOR ANY LOSS RESULTING FROM THE USE OF THIS REPORT. VALUETECH SOLUTIONS IS NOT RESPONSIBLE FOR VERIFYING THE GENUINENESS OF THE PROVIDED DOCUMENTS. THE VALUATION OF ASSET IS PRIMARILY BASED ON THE CONDITION OF THE MACHINERY AT THE TIME OF INSPECTION & SURVEY. TO GIVE LOAN TO THE APPLICANT IS THE RESPONSIIBLITY OF THE FINANCE COMPANY/BANK. WE ARE NOT RESPONSIBLE OR CONCERNED FOR THE SAME.",
   });
+
+  // File state for chassis impression
+  const [chassisImpressionFile, setChassisImpressionFile] = useState(null);
 
   // State for flexible fields
   const [flexibleFields, setFlexibleFields] = useState([]);
@@ -297,7 +391,7 @@ function MachineryReport() {
         ...prev,
         ref_no_bank: order?.bank_initial || "",
         state_name: prev.state_name || "MUM",
-        ref_no_code: prev.ref_no_code || "VTS",
+        ref_no_code: prev.ref_no_code || "VKM",
         initiated_by:
           order?.officer_name && order?.bank_name
             ? `${order.officer_name}, ${order.bank_name}`
@@ -325,7 +419,7 @@ function MachineryReport() {
         >
           {order && order.order_number ? order.order_number : "-"}
         </Link>{" "}
-        &gt; Machinery Report
+        &gt; CE Report
       </>
     );
   }, [id, order, setTitle]);
@@ -343,7 +437,7 @@ function MachineryReport() {
         // Handle currency formatting for currency fields
         if (
           name === "fair_market_value" ||
-          name === "tax_invoice_cost" ||
+          name === "invoice_cost" ||
           name === "insured_value" ||
           name === "depreciation_value" ||
           name === "appraiser_value"
@@ -351,10 +445,10 @@ function MachineryReport() {
           updated[name] = handleCurrencyFormatting(value);
         }
 
-        // Auto-calculate depreciation_value when tax_invoice_cost or depreciation changes
-        if (name === "tax_invoice_cost" || name === "depreciation") {
+        // Auto-calculate depreciation_value when invoice_cost or depreciation changes
+        if (name === "invoice_cost" || name === "depreciation") {
           const invoiceCost = parseCurrency(
-            name === "tax_invoice_cost" ? value : updated.tax_invoice_cost
+            name === "invoice_cost" ? value : updated.invoice_cost
           );
           const depreciationRate = parseFloat(
             name === "depreciation" ? value : updated.depreciation
@@ -391,7 +485,12 @@ function MachineryReport() {
         return updated;
       });
     },
-    [parseCurrency, handleCurrencyFormatting, convertNumberToWordsIndian]
+    [
+      parseCurrency,
+      handleCurrencyFormatting,
+      numberToWords,
+      convertNumberToWordsIndian,
+    ]
   );
 
   // Handle SingleSearchSelect changes
@@ -415,6 +514,10 @@ function MachineryReport() {
   );
 
   // Handle file input changes
+  const handleFileChange = useCallback((e) => {
+    const file = e.target.files[0];
+    setChassisImpressionFile(file);
+  }, []);
 
   // Handle date input formatting (DD-MM-YYYY)
   const handleDateChange = useCallback((e) => {
@@ -618,6 +721,11 @@ function MachineryReport() {
           value = amountInWords;
         }
 
+        // Special handling for no_of_tyres - use memoized value
+        if (key === "no_of_tyres") {
+          value = totalTyres;
+        }
+
         if (value !== null && value !== "") {
           formData.append(key, value);
         }
@@ -626,6 +734,11 @@ function MachineryReport() {
       // Add the combined invoice data
       if (combinedInvoiceData) {
         formData.append("invoice_no_date", combinedInvoiceData);
+      }
+
+      // Add chassis impression file if selected
+      if (chassisImpressionFile) {
+        formData.append("chassis_no_pencil_impression", chassisImpressionFile);
       }
 
       // Add flexible fields to FormData with proper sequential ordering
@@ -715,6 +828,7 @@ function MachineryReport() {
         });
     });
     console.log("=== END FLEXIBLE FIELDS ORDERING ===\n"); */
+
       // Dispatch report generation action
       dispatch(
         generateOrderReport({
@@ -745,6 +859,7 @@ function MachineryReport() {
       reportFormData,
       flexibleFields,
       validateFlexibleFields,
+      chassisImpressionFile,
       dispatch,
       id,
       order,
@@ -1097,13 +1212,32 @@ function MachineryReport() {
     convertNumberToWordsIndian,
   ]);
 
+  const tyreCountInWords = useMemo(() => {
+    const count = parseInt(reportFormData.tyre_count) || 0;
+    return count > 0 ? numberToWords(count) : "";
+  }, [reportFormData.tyre_count, numberToWords]);
+
+  const totalTyres = useMemo(() => {
+    const front = parseInt(reportFormData.front_tyre_no) || 0;
+    const middle = parseInt(reportFormData.middle_tyre_no) || 0;
+    const rear = parseInt(reportFormData.rear_tyre_no) || 0;
+    const total = front + middle + rear;
+    const word = numberToWords(total);
+    return `${total} (${word})`;
+  }, [
+    reportFormData.front_tyre_no,
+    reportFormData.middle_tyre_no,
+    reportFormData.rear_tyre_no,
+    numberToWords,
+  ]);
+
   return (
     <section className="order-details-wrapper">
       <div className="row">
         {/* Reference Number Form Section */}
         <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12 mb-5">
           <div className="order-report-container">
-            <h2>Machinery Report</h2>
+            <h2>CE Report</h2>
             <form onSubmit={handleReportSubmit} className="body-form-box">
               <div className="row">
                 <div className="col-md-6">
@@ -1143,10 +1277,10 @@ function MachineryReport() {
                       <span className="ref-no-slash">/</span>
                       <SingleSearchSelect
                         options={[
-                          { value: "VTS", label: "VTS" },
                           { value: "VKM", label: "VKM" },
+                          { value: "VTS", label: "VTS" },
                         ]}
-                        value={reportFormData.ref_no_code || "VTS"}
+                        value={reportFormData.ref_no_code || "VKM"}
                         onChange={(value) =>
                           handleSelectChange("ref_no_code", value)
                         }
@@ -1166,15 +1300,15 @@ function MachineryReport() {
                 </div>
                 <div className="col-md-6">
                   <div className="form-group">
-                    <label htmlFor="report_date">
-                      Report Date <span class="text-danger">*</span>
+                    <label htmlFor="rev_report_date">
+                      Rev-Report Date <span class="text-danger">*</span>
                     </label>
                     <input
                       type="text"
                       className="form-field"
-                      id="report_date"
-                      name="report_date"
-                      value={reportFormData.report_date}
+                      id="rev_report_date"
+                      name="rev_report_date"
+                      value={reportFormData.rev_report_date}
                       onChange={handleDateChange}
                       placeholder="DD-MM-YYYY"
                       maxLength="10"
@@ -1212,7 +1346,7 @@ function MachineryReport() {
                 <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="license_no">
-                      License No <span class="text-danger">*</span>
+                      SLA NO <span class="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -1391,7 +1525,9 @@ function MachineryReport() {
                 </div>
                 <div className="col-md-4">
                   <div className="form-group">
-                    <label htmlFor="registration_no">Registration No</label>
+                    <label htmlFor="registration_no">
+                      Registration No <span class="text-danger">*</span>
+                    </label>
                     <input
                       type="text"
                       className="form-field"
@@ -1400,12 +1536,15 @@ function MachineryReport() {
                       value={reportFormData.registration_no}
                       onChange={handleFormChange}
                       placeholder="MH01AB1234"
+                      required
                     />
                   </div>
                 </div>
                 <div className="col-md-4">
                   <div className="form-group">
-                    <label htmlFor="registration_date">Registration Date</label>
+                    <label htmlFor="registration_date">
+                      Registration Date <span class="text-danger">*</span>
+                    </label>
                     <input
                       type="text"
                       className="form-field"
@@ -1415,21 +1554,22 @@ function MachineryReport() {
                       onChange={handleDateChange}
                       placeholder="DD-MM-YYYY"
                       maxLength="10"
+                      required
                     />
                   </div>
                 </div>
                 <div className="col-md-4">
                   <div className="form-group">
-                    <label htmlFor="location_of_machinery">
-                      Location Of Machinery <span class="text-danger">*</span>
+                    <label htmlFor="registered_location">
+                      Registered Location <span class="text-danger">*</span>
                     </label>
-                    <textarea
+                    <input
+                      type="text"
                       className="form-field"
-                      id="location_of_machinery"
-                      name="location_of_machinery"
-                      value={reportFormData.location_of_machinery}
+                      id="registered_location"
+                      name="registered_location"
+                      value={reportFormData.registered_location}
                       onChange={handleFormChange}
-                      rows="2"
                       required
                     />
                   </div>
@@ -1481,7 +1621,7 @@ function MachineryReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="asset_make">
-                      Asset Make & Supplier <span class="text-danger">*</span>
+                      Asset Make <span class="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -1553,15 +1693,15 @@ function MachineryReport() {
               <div className="row">
                 <div className="col-md-3">
                   <div className="form-group">
-                    <label htmlFor="control_system">
-                      Control System <span class="text-danger">*</span>
+                    <label htmlFor="engine_no_detail">
+                      Engine No./ Detail <span class="text-danger">*</span>
                     </label>
                     <input
                       type="text"
                       className="form-field"
-                      id="control_system"
-                      name="control_system"
-                      value={reportFormData.control_system}
+                      id="engine_no_detail"
+                      name="engine_no_detail"
+                      value={reportFormData.engine_no_detail}
                       onChange={handleFormChange}
                       required
                     />
@@ -1569,15 +1709,15 @@ function MachineryReport() {
                 </div>
                 <div className="col-md-3">
                   <div className="form-group">
-                    <label htmlFor="machine_serial_no">
-                      Machine Serial No <span class="text-danger">*</span>
+                    <label htmlFor="crane_chassis_no">
+                      Crane Chassis No <span class="text-danger">*</span>
                     </label>
                     <input
                       type="text"
                       className="form-field"
-                      id="machine_serial_no"
-                      name="machine_serial_no"
-                      value={reportFormData.machine_serial_no}
+                      id="crane_chassis_no"
+                      name="crane_chassis_no"
+                      value={reportFormData.crane_chassis_no}
                       onChange={handleFormChange}
                       required
                     />
@@ -1585,15 +1725,15 @@ function MachineryReport() {
                 </div>
                 <div className="col-md-3">
                   <div className="form-group">
-                    <label htmlFor="laf_id">
-                      LAF Id <span class="text-danger">*</span>
+                    <label htmlFor="body_type">
+                      Body Type <span class="text-danger">*</span>
                     </label>
                     <input
                       type="text"
                       className="form-field"
-                      id="laf_id"
-                      name="laf_id"
-                      value={reportFormData.laf_id}
+                      id="body_type"
+                      name="body_type"
+                      value={reportFormData.body_type}
                       onChange={handleFormChange}
                       required
                     />
@@ -1601,15 +1741,15 @@ function MachineryReport() {
                 </div>
                 <div className="col-md-3">
                   <div className="form-group">
-                    <label htmlFor="application_usage">
-                      Application / Usage <span class="text-danger">*</span>
+                    <label htmlFor="crane_model_code">
+                      Crane Model Code <span class="text-danger">*</span>
                     </label>
                     <input
                       type="text"
                       className="form-field"
-                      id="application_usage"
-                      name="application_usage"
-                      value={reportFormData.application_usage}
+                      id="crane_model_code"
+                      name="crane_model_code"
+                      value={reportFormData.crane_model_code}
                       onChange={handleFormChange}
                       required
                     />
@@ -1618,7 +1758,23 @@ function MachineryReport() {
               </div>
 
               <div className="row">
-                <div className="col-md-4">
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="hours_meter_reading">
+                      Hours Meter Reading <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="hours_meter_reading"
+                      name="hours_meter_reading"
+                      value={reportFormData.hours_meter_reading}
+                      onChange={handleFormChange}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="invoice_no">Invoice No. & Date</label>
                     <input
@@ -1642,7 +1798,7 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-4">
+                <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="hyp_with">
                       Hyp With <span class="text-danger">*</span>
@@ -1658,16 +1814,18 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-4">
+                <div className="col-md-3">
                   <div className="form-group">
-                    <label htmlFor="machine_type">Machine Type</label>
+                    <label htmlFor="hyp_from_date">Hyp From Date</label>
                     <input
                       type="text"
                       className="form-field"
-                      id="machine_type"
-                      name="machine_type"
-                      value={reportFormData.machine_type}
-                      onChange={handleFormChange}
+                      id="hyp_from_date"
+                      name="hyp_from_date"
+                      value={reportFormData.hyp_from_date}
+                      onChange={handleDateChange}
+                      placeholder="DD-MM-YYYY"
+                      maxLength="10"
                     />
                   </div>
                 </div>
@@ -1723,13 +1881,39 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label htmlFor="no_of_cylinder">
+                      No of Cylinders <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "1 (ONE)", label: "1 (ONE)" },
+                        { value: "2 (TWO)", label: "2 (TWO)" },
+                        { value: "3 (THREE)", label: "3 (THREE)" },
+                        { value: "4 (FOUR)", label: "4 (FOUR)" },
+                        { value: "5 (FIVE)", label: "5 (FIVE)" },
+                        { value: "6 (SIX)", label: "6 (SIX)" },
+                        { value: "7 (SEVEN)", label: "7 (SEVEN)" },
+                        { value: "8 (EIGHT)", label: "8 (EIGHT)" },
+                        { value: "9 (NINE)", label: "9 (NINE)" },
+                        { value: "10 (TEN)", label: "10 (TEN)" },
+                      ]}
+                      value={reportFormData.no_of_cylinder}
+                      onChange={(value) =>
+                        handleSelectChange("no_of_cylinder", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="row">
-                <div className="col-md-3">
+                <div className="col-md-2">
                   <div className="form-group">
-                    <label htmlFor="machine_technology">
-                      Machine Technology <span class="text-danger">*</span>
+                    <label htmlFor="engine_condition">
+                      Engine Condition <span class="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -1738,18 +1922,18 @@ function MachineryReport() {
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
                       ]}
-                      value={reportFormData.machine_technology}
+                      value={reportFormData.engine_condition}
                       onChange={(value) =>
-                        handleSelectChange("machine_technology", value)
+                        handleSelectChange("engine_condition", value)
                       }
                       required
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-2">
                   <div className="form-group">
-                    <label htmlFor="machine_condition">
-                      Machine Condition <span class="text-danger">*</span>
+                    <label htmlFor="chassis_condition">
+                      Chassis Condition <span class="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -1758,15 +1942,55 @@ function MachineryReport() {
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
                       ]}
-                      value={reportFormData.machine_condition}
+                      value={reportFormData.chassis_condition}
                       onChange={(value) =>
-                        handleSelectChange("machine_condition", value)
+                        handleSelectChange("chassis_condition", value)
                       }
                       required
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label htmlFor="body_condition">
+                      Body Condition <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "GOOD", label: "GOOD" },
+                        { value: "AVERAGE", label: "AVERAGE" },
+                        { value: "FAIR", label: "FAIR" },
+                        { value: "POOR", label: "POOR" },
+                      ]}
+                      value={reportFormData.body_condition}
+                      onChange={(value) =>
+                        handleSelectChange("body_condition", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label htmlFor="cabin_condition">
+                      Cabin Condition <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "GOOD", label: "GOOD" },
+                        { value: "AVERAGE", label: "AVERAGE" },
+                        { value: "FAIR", label: "FAIR" },
+                        { value: "POOR", label: "POOR" },
+                      ]}
+                      value={reportFormData.cabin_condition}
+                      onChange={(value) =>
+                        handleSelectChange("cabin_condition", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
                   <div className="form-group">
                     <label htmlFor="electrical_condition">
                       Electrical Condition <span class="text-danger">*</span>
@@ -1786,10 +2010,10 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-2">
                   <div className="form-group">
-                    <label htmlFor="mechanical_condition">
-                      Mechanical Condition <span class="text-danger">*</span>
+                    <label htmlFor="gear_transmission">
+                      Gear Transmission <span class="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -1798,10 +2022,46 @@ function MachineryReport() {
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
                       ]}
-                      value={reportFormData.mechanical_condition}
+                      value={reportFormData.gear_transmission}
                       onChange={(value) =>
-                        handleSelectChange("mechanical_condition", value)
+                        handleSelectChange("gear_transmission", value)
                       }
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label htmlFor="battery_available">
+                      Battery Available-yes/no{" "}
+                      <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="battery_available"
+                      name="battery_available"
+                      value={reportFormData.battery_available}
+                      readOnly
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label htmlFor="gross_machine_weight">
+                      Gross Machine Weight <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="gross_machine_weight"
+                      name="gross_machine_weight"
+                      value={reportFormData.gross_machine_weight}
+                      onChange={handleFormChange}
                       required
                     />
                   </div>
@@ -1828,7 +2088,7 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-4">
+                <div className="col-md-2">
                   <div className="form-group">
                     <input
                       type="text"
@@ -1854,7 +2114,7 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-4">
+                <div className="col-md-2">
                   <div className="form-group">
                     <input
                       type="text"
@@ -1867,8 +2127,6 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-              </div>
-              <div className="row">
                 <div className="col-md-2">
                   <div className="form-group">
                     <input
@@ -1882,7 +2140,7 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-4">
+                <div className="col-md-2">
                   <div className="form-group">
                     <input
                       type="text"
@@ -1895,6 +2153,49 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
+              </div>
+              <div className="row">
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="fix_but_flex_title_1"
+                      name="fix_but_flex_title_1"
+                      value={reportFormData.fix_but_flex_title_1}
+                      onChange={handleFormChange}
+                      placeholder="Title..."
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="fix_but_flex_title_2"
+                      name="fix_but_flex_title_2"
+                      value={reportFormData.fix_but_flex_title_2}
+                      onChange={handleFormChange}
+                      placeholder="Value..."
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="fix_but_flex_title_3"
+                      name="fix_but_flex_title_3"
+                      value={reportFormData.fix_but_flex_title_3}
+                      onChange={handleFormChange}
+                      placeholder="Title..."
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="row">
                 <div className="col-md-2">
                   <div className="form-group">
                     <input
@@ -1908,7 +2209,7 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-4">
+                <div className="col-md-2">
                   <div className="form-group">
                     <input
                       type="text"
@@ -1921,8 +2222,6 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-              </div>
-              <div className="row">
                 <div className="col-md-2">
                   <div className="form-group">
                     <input
@@ -1949,7 +2248,7 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-1">
+                <div className="col-md-2">
                   <div className="form-group">
                     <input
                       type="text"
@@ -1962,7 +2261,7 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-1">
+                <div className="col-md-2">
                   <div className="form-group">
                     <input
                       type="text"
@@ -1975,6 +2274,8 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
+              </div>
+              <div className="row">
                 <div className="col-md-2">
                   <div className="form-group">
                     <input
@@ -1988,7 +2289,7 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-4">
+                <div className="col-md-2">
                   <div className="form-group">
                     <input
                       type="text"
@@ -2001,8 +2302,6 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-              </div>
-              <div className="row">
                 <div className="col-md-2">
                   <div className="form-group">
                     <input
@@ -2042,7 +2341,7 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-1">
+                <div className="col-md-2">
                   <div className="form-group">
                     <input
                       type="text"
@@ -2055,7 +2354,9 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-1">
+              </div>
+              <div className="row">
+                <div className="col-md-2">
                   <div className="form-group">
                     <input
                       type="text"
@@ -2068,7 +2369,7 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-4">
+                <div className="col-md-2">
                   <div className="form-group">
                     <input
                       type="text"
@@ -2081,8 +2382,6 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-              </div>
-              <div className="row">
                 <div className="col-md-2">
                   <div className="form-group">
                     <input
@@ -2096,9 +2395,9 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-4">
+                <div className="col-md-2">
                   <div className="form-group">
-                    <textarea
+                    <input
                       type="text"
                       className="form-field"
                       id="fix_but_flex_value_11"
@@ -2106,7 +2405,6 @@ function MachineryReport() {
                       value={reportFormData.fix_but_flex_value_11}
                       onChange={handleFormChange}
                       placeholder="Value..."
-                      rows="2"
                     />
                   </div>
                 </div>
@@ -2123,7 +2421,7 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-4">
+                <div className="col-md-2">
                   <div className="form-group">
                     <input
                       type="text"
@@ -2137,44 +2435,394 @@ function MachineryReport() {
                   </div>
                 </div>
               </div>
-
               <div className="row">
-                <div className="col-md-4">
+                <div className="col-md-2">
                   <div className="form-group">
-                    <label htmlFor="machine_colour">
-                      Machine Colour <span class="text-danger">*</span>
-                    </label>
                     <input
                       type="text"
                       className="form-field"
-                      id="machine_colour"
-                      name="machine_colour"
-                      value={reportFormData.machine_colour}
+                      id="fix_but_flex_top_heading_13"
+                      name="fix_but_flex_top_heading_13"
+                      value={reportFormData.fix_but_flex_top_heading_13}
                       onChange={handleFormChange}
-                      required
+                      placeholder="Title..."
+                    />
+                  </div>
+                </div>
+                <div className="col-md-10">
+                  <div className="row">
+                    <div className="col-md-2">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_heading_13"
+                          name="fix_but_flex_heading_13"
+                          value={reportFormData.fix_but_flex_heading_13}
+                          onChange={handleFormChange}
+                          placeholder="Value..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-2">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_value_13"
+                          name="fix_but_flex_value_13"
+                          value={reportFormData.fix_but_flex_value_13}
+                          onChange={handleFormChange}
+                          placeholder="Title..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-2">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_heading_14"
+                          name="fix_but_flex_heading_14"
+                          value={reportFormData.fix_but_flex_heading_14}
+                          onChange={handleFormChange}
+                          placeholder="Value..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-2">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_value_14"
+                          name="fix_but_flex_value_14"
+                          value={reportFormData.fix_but_flex_value_14}
+                          onChange={handleFormChange}
+                          placeholder="Title..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-2">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_heading_15"
+                          name="fix_but_flex_heading_15"
+                          value={reportFormData.fix_but_flex_heading_15}
+                          onChange={handleFormChange}
+                          placeholder="Value..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-2">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_value_15"
+                          name="fix_but_flex_value_15"
+                          value={reportFormData.fix_but_flex_value_15}
+                          onChange={handleFormChange}
+                          placeholder="Value..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="fix_but_flex_heading_16"
+                      name="fix_but_flex_heading_16"
+                      value={reportFormData.fix_but_flex_heading_16}
+                      onChange={handleFormChange}
+                      placeholder="Title..."
                     />
                   </div>
                 </div>
                 <div className="col-md-4">
                   <div className="form-group">
-                    <label htmlFor="color_condition">
-                      Color Condition <span class="text-danger">*</span>
-                    </label>
-                    <SingleSearchSelect
-                      options={[
-                        { value: "GOOD", label: "GOOD" },
-                        { value: "FAIR", label: "FAIR" },
-                        { value: "POOR", label: "POOR" },
-                      ]}
-                      value={reportFormData.color_condition}
-                      onChange={(value) =>
-                        handleSelectChange("color_condition", value)
-                      }
-                      required
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="fix_but_flex_value_16"
+                      name="fix_but_flex_value_16"
+                      value={reportFormData.fix_but_flex_value_16}
+                      onChange={handleFormChange}
+                      placeholder="Value..."
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="fix_but_flex_heading_17"
+                      name="fix_but_flex_heading_17"
+                      value={reportFormData.fix_but_flex_heading_17}
+                      onChange={handleFormChange}
+                      placeholder="Title..."
                     />
                   </div>
                 </div>
                 <div className="col-md-4">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="fix_but_flex_value_17"
+                      name="fix_but_flex_value_17"
+                      value={reportFormData.fix_but_flex_value_17}
+                      onChange={handleFormChange}
+                      placeholder="Value..."
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="fix_but_flex_heading_18"
+                      name="fix_but_flex_heading_18"
+                      value={reportFormData.fix_but_flex_heading_18}
+                      onChange={handleFormChange}
+                      placeholder="Title..."
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="row">
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_value_18"
+                          name="fix_but_flex_value_18"
+                          value={reportFormData.fix_but_flex_value_18}
+                          onChange={handleFormChange}
+                          placeholder="Value..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_heading_19"
+                          name="fix_but_flex_heading_19"
+                          value={reportFormData.fix_but_flex_heading_19}
+                          onChange={handleFormChange}
+                          placeholder="Title..."
+                          readOnly
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="fix_but_flex_value_19"
+                      name="fix_but_flex_value_19"
+                      value={reportFormData.fix_but_flex_value_19}
+                      onChange={handleFormChange}
+                      placeholder="Value..."
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="row">
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_heading_20"
+                          name="fix_but_flex_heading_20"
+                          value={reportFormData.fix_but_flex_heading_20}
+                          onChange={handleFormChange}
+                          placeholder="Value..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_value_20"
+                          name="fix_but_flex_value_20"
+                          value={reportFormData.fix_but_flex_value_20}
+                          onChange={handleFormChange}
+                          placeholder="Value..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="fix_but_flex_heading_21"
+                      name="fix_but_flex_heading_21"
+                      value={reportFormData.fix_but_flex_heading_21}
+                      onChange={handleFormChange}
+                      placeholder="Title..."
+                      readOnly
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="row">
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_value_21"
+                          name="fix_but_flex_value_21"
+                          value={reportFormData.fix_but_flex_value_21}
+                          onChange={handleFormChange}
+                          placeholder="Value..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_heading_22"
+                          name="fix_but_flex_heading_22"
+                          value={reportFormData.fix_but_flex_heading_22}
+                          onChange={handleFormChange}
+                          placeholder="Title..."
+                          readOnly
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="fix_but_flex_value_22"
+                      name="fix_but_flex_value_22"
+                      value={reportFormData.fix_but_flex_value_22}
+                      onChange={handleFormChange}
+                      placeholder="Value..."
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="row">
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_heading_23"
+                          name="fix_but_flex_heading_23"
+                          value={reportFormData.fix_but_flex_heading_23}
+                          onChange={handleFormChange}
+                          placeholder="Value..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_value_23"
+                          name="fix_but_flex_value_23"
+                          value={reportFormData.fix_but_flex_value_23}
+                          onChange={handleFormChange}
+                          placeholder="Value..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="fix_but_flex_heading_24"
+                      name="fix_but_flex_heading_24"
+                      value={reportFormData.fix_but_flex_heading_24}
+                      onChange={handleFormChange}
+                      placeholder="Title..."
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="fix_but_flex_value_24"
+                      name="fix_but_flex_value_24"
+                      value={reportFormData.fix_but_flex_value_24}
+                      onChange={handleFormChange}
+                      placeholder="Value..."
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="fix_but_flex_heading_25"
+                      name="fix_but_flex_heading_25"
+                      value={reportFormData.fix_but_flex_heading_25}
+                      onChange={handleFormChange}
+                      placeholder="Title..."
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="fix_but_flex_value_25"
+                      name="fix_but_flex_value_25"
+                      value={reportFormData.fix_but_flex_value_25}
+                      onChange={handleFormChange}
+                      placeholder="Value..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-12">
                   <div className="form-group">
                     <label htmlFor="damages_if_any">Damages If Any</label>
                     <input
@@ -2227,13 +2875,13 @@ function MachineryReport() {
               {/* RC, PERMIT, TAX, FITNESS & INSURANCE Section */}
               <div className="row">
                 <div className="col-12">
-                  <h4>INSURANCE DETAILS OF THE</h4>
+                  <h4>RC, PERMIT, TAX, FITNESS & INSURANCE DETAILS</h4>
                   <hr />
                 </div>
                 <div className="col-md-3">
                   <div className="form-group">
-                    <label htmlFor="rc_book_verified">
-                      RC Book Verified <span class="text-danger">*</span>
+                    <label htmlFor="bill_of_entry">
+                      Bill Of Entry <span class="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -2243,9 +2891,9 @@ function MachineryReport() {
                           label: "COPY NOT AVAILABLE",
                         },
                       ]}
-                      value={reportFormData.rc_book_verified}
+                      value={reportFormData.bill_of_entry}
                       onChange={(value) =>
-                        handleSelectChange("rc_book_verified", value)
+                        handleSelectChange("bill_of_entry", value)
                       }
                       required
                     />
@@ -2253,31 +2901,23 @@ function MachineryReport() {
                 </div>
                 <div className="col-md-3">
                   <div className="form-group">
-                    <label htmlFor="tax_invoice_copy">
-                      Tax Invoice Copy <span class="text-danger">*</span>
+                    <label htmlFor="proforma_invoice_verified">
+                      Proforma Invoice Verified{" "}
+                      <span class="text-danger">*</span>
                     </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="tax_invoice_copy"
-                      name="tax_invoice_copy"
-                      value={reportFormData.tax_invoice_copy}
-                      readOnly
-                      onChange={handleFormChange}
-                    />
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="tax_upto_title">Title</label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="tax_upto_title"
-                      name="tax_upto_title"
-                      value={reportFormData.tax_upto_title}
-                      onChange={handleFormChange}
-                      placeholder="Tax Upto"
+                    <SingleSearchSelect
+                      options={[
+                        { value: "COPY", label: "COPY" },
+                        {
+                          value: "COPY NOT AVAILABLE",
+                          label: "COPY NOT AVAILABLE",
+                        },
+                      ]}
+                      value={reportFormData.proforma_invoice_verified}
+                      onChange={(value) =>
+                        handleSelectChange("proforma_invoice_verified", value)
+                      }
+                      required
                     />
                   </div>
                 </div>
@@ -2296,49 +2936,35 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="bill_of_lading">Bill Of Lading</label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="bill_of_lading"
+                      name="bill_of_lading"
+                      value={reportFormData.bill_of_lading}
+                      onChange={handleFormChange}
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="row">
                 <div className="col-md-3">
                   <div className="form-group">
-                    <label htmlFor="permit_upto">Permit Upto</label>
+                    <label htmlFor="chartered_engineer_certificate">
+                      Chartered Engineer Certificate
+                    </label>
                     <input
                       type="text"
                       className="form-field"
-                      id="permit_upto"
-                      name="permit_upto"
-                      value={reportFormData.permit_upto}
-                      onChange={handleDateChange}
-                      placeholder="DD-MM-YYYY"
-                      maxLength="10"
-                    />
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="permit_type">Permit Type</label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="permit_type"
-                      name="permit_type"
-                      value={reportFormData.permit_type}
+                      id="chartered_engineer_certificate"
+                      name="chartered_engineer_certificate"
+                      value={reportFormData.chartered_engineer_certificate}
                       onChange={handleFormChange}
                       placeholder="All India"
-                    />
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="fitness_upto_title">Title</label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fitness_upto_title"
-                      name="fitness_upto_title"
-                      value={reportFormData.fitness_upto_title}
-                      onChange={handleFormChange}
-                      placeholder="Fitness Upto"
                     />
                   </div>
                 </div>
@@ -2357,7 +2983,7 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-6">
+                <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="insurance_co_name">Insurance Co.name</label>
                     <input
@@ -2371,7 +2997,7 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-6">
+                <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="policy_no">Policy No</label>
                     <input
@@ -2399,9 +3025,7 @@ function MachineryReport() {
                       id="insurance_valid_date"
                       name="insurance_valid_date"
                       value={reportFormData.insurance_valid_date}
-                      onChange={handleDateChange}
-                      placeholder="DD-MM-YYYY"
-                      maxLength="10"
+                      onChange={handleFormChange}
                     />
                   </div>
                 </div>
@@ -2422,15 +3046,21 @@ function MachineryReport() {
                 <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="insurance_verified">
-                      Insurance Verified
+                      Insurance Verified <span class="text-danger">*</span>
                     </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="insurance_verified"
-                      name="insurance_verified"
+                    <SingleSearchSelect
+                      options={[
+                        { value: "COPY", label: "COPY" },
+                        {
+                          value: "COPY NOT AVAILABLE",
+                          label: "COPY NOT AVAILABLE",
+                        },
+                      ]}
                       value={reportFormData.insurance_verified}
-                      onChange={handleFormChange}
+                      onChange={(value) =>
+                        handleSelectChange("insurance_verified", value)
+                      }
+                      required
                     />
                   </div>
                 </div>
@@ -2444,15 +3074,15 @@ function MachineryReport() {
                 </div>
                 <div className="col-md-3">
                   <div className="form-group">
-                    <label htmlFor="tax_invoice_cost">
-                      Tax Invoice Cost <span class="text-danger">*</span>
+                    <label htmlFor="invoice_cost">
+                      Invoice Cost <span class="text-danger">*</span>
                     </label>
                     <input
                       type="text"
                       className="form-field"
-                      id="tax_invoice_cost"
-                      name="tax_invoice_cost"
-                      value={reportFormData.tax_invoice_cost}
+                      id="invoice_cost"
+                      name="invoice_cost"
+                      value={reportFormData.invoice_cost}
                       onChange={handleCurrencyChange}
                       placeholder="₹ 0.00"
                       required
@@ -2599,38 +3229,6 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-12">
-                  <div className="form-group">
-                    <label htmlFor="declaration">
-                      Declaration <span class="text-danger">*</span>
-                    </label>
-                    <textarea
-                      className="form-field"
-                      id="declaration"
-                      name="declaration"
-                      value={reportFormData.declaration}
-                      onChange={handleFormChange}
-                      rows="2"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="col-md-12">
-                  <div className="form-group">
-                    <label htmlFor="disclaimer">
-                      Disclaimer <span class="text-danger">*</span>
-                    </label>
-                    <textarea
-                      className="form-field"
-                      id="disclaimer"
-                      name="disclaimer"
-                      value={reportFormData.disclaimer}
-                      rows="8"
-                      required
-                      readOnly
-                    />
-                  </div>
-                </div>
               </div>
 
               {/* Flexible Fields for Additional Fields */}
@@ -2656,6 +3254,73 @@ function MachineryReport() {
                 </div>
               </div>
 
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group">
+                    <label htmlFor="declaration">
+                      Declaration <span class="text-danger">*</span>
+                    </label>
+                    <p className="mb-0">
+                      The aforesaid COMMERCIAL VEHICLE / TATA LPT 3518 inspected
+                      by us & found in{" "}
+                    </p>
+                    <SingleSearchSelect
+                      options={[
+                        {
+                          value: "ROAD WORTHY CONDITION",
+                          label: "ROAD WORTHY CONDITION",
+                        },
+                        {
+                          value: "ACCIDENTAL CONDITION",
+                          label: "ACCIDENTAL CONDITION",
+                        },
+                        { value: "NOT WORKING", label: "NOT WORKING" },
+                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        {
+                          value: "STACKED CONDITION",
+                          label: "STACKED CONDITION",
+                        },
+                        { value: "KNOCK DOWN", label: "KNOCK DOWN" },
+                        { value: "PARKING YARD", label: "PARKING YARD" },
+                      ]}
+                      value={reportFormData.declaration}
+                      onChange={(value) =>
+                        handleSelectChange("declaration", value)
+                      }
+                      required
+                    />
+                    <p className="mb-0">
+                      on the date of my inspection.This Report issued for
+                      [valuation_purpose] of HINDUJA LEYLAND FINANCE LTD, PUNE,
+                      GUJARAT Only.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group">
+                    <label htmlFor="chassis_no_pencil_impression">
+                      Chassis No Pencil Impression (Image)
+                    </label>
+                    <input
+                      type="file"
+                      className="form-field"
+                      id="chassis_no_pencil_impression"
+                      name="chassis_no_pencil_impression"
+                      onChange={handleFileChange}
+                      accept="image/*"
+                    />
+                    {chassisImpressionFile && (
+                      <small className="text-muted">
+                        Selected: {chassisImpressionFile.name}
+                      </small>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* Generate Report Button */}
               <div className="row">
                 <div className="col-12 text-center">
@@ -2667,7 +3332,7 @@ function MachineryReport() {
                     >
                       {generating
                         ? "Generating Report..."
-                        : "Generate Machinery Report"}
+                        : "Generate CE Report"}
                     </button>
                   </div>
                 </div>
@@ -2680,4 +3345,4 @@ function MachineryReport() {
   );
 }
 
-export default MachineryReport;
+export default CEReport;

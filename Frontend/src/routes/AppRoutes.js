@@ -28,6 +28,7 @@ import AVRReport from "../pages/orders/reports/AVRReport";
 import CustomReport from "../pages/orders/reports/CustomReport";
 import WordLikeEditor from "../pages/orders/reports/WordLikeEditor";
 import MachineryReport from "../pages/orders/reports/MachineryReport";
+import CEReport from "../pages/orders/reports/CEReport";
 
 const AppRoutes = () => {
   return (
@@ -95,6 +96,14 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute permission="view_order_details">
               <MachineryReport />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="orders/:id/details/ce-report"
+          element={
+            <ProtectedRoute permission="view_order_details">
+              <CEReport />
             </ProtectedRoute>
           }
         />

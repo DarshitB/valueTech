@@ -8,6 +8,7 @@ const Order = require("../../../models/orders/order");
 const CvReport = require("../../../models/orders/reports/cvReport");
 const AvrReport = require("../../../models/orders/reports/avrReport");
 const MachineryReport = require("../../../models/orders/reports/machineryReport");
+const CeReport = require("../../../models/orders/reports/ceReport");
 const orderMediaDocument = require("../../../models/orders/orderMediaDocument");
 const { ensureDirectoryExists } = require("../../../utils/localFileHelper");
 
@@ -15,6 +16,7 @@ const { ensureDirectoryExists } = require("../../../utils/localFileHelper");
 const cvReportTemplate = require("./templates/cv_report_template");
 const avrReportTemplate = require("./templates/avr_report_template");
 const machineryReportTemplate = require("./templates/machinery_report_template");
+const ceReportTemplate = require("./templates/ce_report_template");
 
 // Import custom error classes
 const {
@@ -167,8 +169,8 @@ exports.generateReport = async (req, res, next) => {
       created_at: new Date(),
     };
 
-    // Add chassis_no_pencil_impression only for CV reports
-    if (requestedReportType.toLowerCase() === "report_cv") {
+    // Add chassis_no_pencil_impression for CV and CE reports
+    if (["report_cv", "report_ce"].includes(requestedReportType.toLowerCase())) {
       reportData.chassis_no_pencil_impression = chassisImageBase64
         ? reportName
         : null;
@@ -185,6 +187,9 @@ exports.generateReport = async (req, res, next) => {
         break;
       case "report_machinery":
         ReportModel = MachineryReport;
+        break;
+      case "report_ce":
+        ReportModel = CeReport;
         break;
       default:
         throw new BadRequestError(
@@ -464,6 +469,13 @@ function generateReportHTML(reportType, formData, extraData, bgImageBase64) {
         bgImageBase64
       );
 
+      case "report_ce":
+        return ceReportTemplate.generateCEReportHTML(
+          formData,
+          extraData,
+          bgImageBase64
+        );
+
     // Future report types can be added here
     // case 'property_report':
     //   return propertyReportTemplate.generatePropertyReportHTML(formData, extraData, bgImageBase64);
@@ -513,6 +525,11 @@ exports.getReportByOrderAndType = async (req, res, next) => {
       case "report_machinery":
         // Get Machinery report with flexible fields
         report = await MachineryReport.findByOrderIdWithFlexibleFields(order_id);
+        break;
+
+      case "report_ce":
+        // Get CE report with flexible fields
+        report = await CeReport.findByOrderIdWithFlexibleFields(order_id);
         break;
 
       default:

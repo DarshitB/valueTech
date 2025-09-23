@@ -125,6 +125,7 @@ exports.up = async function (knex) {
     table.string("no_of_collage", 255).nullable();
     table.text("valuer_comments_remarks").nullable();
     table.text("declaration").nullable();
+    table.text("disclaimer").nullable();
     table.text("chassis_no_pencil_impression").nullable();
     
     // Audit fields
