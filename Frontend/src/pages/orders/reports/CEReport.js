@@ -32,7 +32,7 @@ function CEReport() {
   useEffect(() => {
     if (id) {
       dispatch(fetchOrderById(id));
-      dispatch(fetchOrderReport({ orderId: id, reportType: "report_ce" }));
+      dispatch(fetchOrderReport({ orderId: id, reportType: "report_ce", silent: true }));
     }
   }, [dispatch, id]);
 

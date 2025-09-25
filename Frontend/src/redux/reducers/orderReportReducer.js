@@ -92,7 +92,11 @@ const orderReportSlice = createSlice({
       .addCase(fetchOrderReport.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
-        toast.error(`Failed to fetch report: ${action.payload}`);
+        // Allow silent fetches (e.g., when missing report should not toast)
+        const isSilent = Boolean(action.meta?.arg?.silent);
+        if (!isSilent) {
+          toast.error(`Failed to fetch report: ${action.payload}`);
+        }
       })
 
       // Generate order report

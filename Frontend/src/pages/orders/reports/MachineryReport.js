@@ -32,7 +32,7 @@ function MachineryReport() {
   useEffect(() => {
     if (id) {
       dispatch(fetchOrderById(id));
-      dispatch(fetchOrderReport({ orderId: id, reportType: "report_machinery" }));
+      dispatch(fetchOrderReport({ orderId: id, reportType: "report_machinery", silent: true }));
     }
   }, [dispatch, id]);
 

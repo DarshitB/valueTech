@@ -23,7 +23,7 @@ function AVRReport() {
   useEffect(() => {
     if (id) {
       dispatch(fetchOrderById(id));
-      dispatch(fetchOrderReport({ orderId: id, reportType: "report_avr" }));
+      dispatch(fetchOrderReport({ orderId: id, reportType: "report_avr", silent: true }));
     }
   }, [dispatch, id]);
 

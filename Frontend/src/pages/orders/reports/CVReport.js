@@ -26,7 +26,7 @@ function CVReport() {
   useEffect(() => {
     if (id) {
       dispatch(fetchOrderById(id));
-      dispatch(fetchOrderReport({ orderId: id, reportType: "report_cv" }));
+      dispatch(fetchOrderReport({ orderId: id, reportType: "report_cv", silent: true }));
     }
   }, [dispatch, id]);
 
