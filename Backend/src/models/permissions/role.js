@@ -15,7 +15,8 @@ const role = {
         "updated_user.name as updated_by"
       )
       .whereNull("roles.deleted_at")
-      .whereNot("roles.name", PROTECTED_ROLE), // Get all roles that are not soft-deleted and not the protected role
+      .whereNot("roles.name", PROTECTED_ROLE)
+      .orderBy("roles.id", "asc"), // Get all roles that are not soft-deleted and not the protected role
 
   findById: (id) =>
     db("roles")
