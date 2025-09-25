@@ -8,7 +8,7 @@ import React, {
 import { useParams, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchOrderById } from "../../../redux/reducers/orderReducer";
-import { generateOrderReport } from "../../../redux/reducers/orderReportReducer";
+import { fetchOrderReport, generateOrderReport } from "../../../redux/reducers/orderReportReducer";
 import { usePageTitle } from "../../../context/PageTitleContext";
 import SingleSearchSelect from "../../../components/SingleSearchSelect";
 import { toast } from "react-toastify";
@@ -24,7 +24,7 @@ function CEReport() {
   // Select order data from Redux store
   const order = useSelector((state) => state.orders.selected);
   // Select order report data from Redux store
-  const { generating } = useSelector((state) => state.orderReports);
+  const { currentReport, loading: reportLoading, generating } = useSelector((state) => state.orderReports);
   // Set page title using custom hook
   const { setTitle } = usePageTitle();
 
@@ -32,6 +32,7 @@ function CEReport() {
   useEffect(() => {
     if (id) {
       dispatch(fetchOrderById(id));
+      dispatch(fetchOrderReport({ orderId: id, reportType: "report_ce" }));
     }
   }, [dispatch, id]);
 
@@ -404,6 +405,68 @@ function CEReport() {
       }));
     }
   }, [order]);
+
+  // Populate form data from fetched CE report (if available)
+  useEffect(() => {
+    const report = currentReport?.report;
+    if (!report) return; // Gracefully do nothing when data is null
+
+    setReportFormData((prev) => {
+      const updated = { ...prev };
+      Object.entries(report).forEach(([key, value]) => {
+        if (Object.prototype.hasOwnProperty.call(prev, key)) {
+          updated[key] = value ?? "";
+        }
+      });
+      return updated;
+    });
+
+    // Flexible fields - combine pairs for Add Two
+    if (Array.isArray(report.flexible_fields)) {
+      const apiFields = report.flexible_fields;
+      const sectionToFields = apiFields.reduce((acc, f) => {
+        const key = f.section_name || "__UNKNOWN__";
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(f);
+        return acc;
+      }, {});
+
+      const combined = [];
+      Object.keys(sectionToFields).forEach((section) => {
+        const list = sectionToFields[section]
+          .slice()
+          .sort((a, b) => (a.field_order || 0) - (b.field_order || 0));
+        for (let i = 0; i < list.length; i++) {
+          const first = list[i];
+          if (first.col_span === 2) {
+            const second = list[i + 1] && list[i + 1].col_span === 2 ? list[i + 1] : null;
+            combined.push({
+              id: `${section}_${first.id || first.field_order || i}_combined`,
+              section_name: section,
+              col_span: 2,
+              field_label: first.field_label || "",
+              field_value: first.field_value || "",
+              field_label_2: second?.field_label || "",
+              field_value_2: second?.field_value || "",
+              field_order: first.field_order || (i + 1),
+            });
+            if (second) i++;
+          } else {
+            combined.push({
+              id: `${section}_${first.id || first.field_order || i}`,
+              section_name: section,
+              col_span: 1,
+              field_label: first.field_label || "",
+              field_value: first.field_value || "",
+              field_order: first.field_order || (i + 1),
+            });
+          }
+        }
+      });
+
+      setFlexibleFields(combined);
+    }
+  }, [currentReport]);
 
   // Set page title with breadcrumb navigation
   useLayoutEffect(() => {

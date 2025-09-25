@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { Link, useNavigate } from "react-router-dom";
 import { fetchOrders, editOrder } from "../../redux/reducers/orderReducer";
 import { fetchUsers } from "../../redux/reducers/userReducer";
 import { fetchOfficers } from "../../redux/reducers/officerReducer";
@@ -15,9 +16,12 @@ import { hasPermission } from "../../utils/permissionUtils";
 import { toast } from "react-toastify";
 import CustomDataTable from "../../components/CustomDataTable";
 import "./dashboard.scss";
+import { DashboardIcon, CheckinIcon } from "../../components/icons/Icons";
+import { EditIcon } from "../../components/icons";
 
 function Dashboard() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   /* get logged user permission */
   const allowedPermissions = useSelector(selectPermissions);
@@ -50,7 +54,7 @@ function Dashboard() {
   const isBankOfficer =
     currentUser?.role.name?.toUpperCase() === "BANK OFFICER";
 
-  // Check if current user is Manager (case-insensitive)
+  // Check if current user is MANAGER (case-insensitive)
   const isManager = currentUser?.role.name?.toUpperCase() === "MANAGER";
 
   // Check if current user is Super Admin (case-insensitive)
@@ -59,11 +63,13 @@ function Dashboard() {
   // Filter users by role for officer and manager selection
   const bankOfficers = officers.filter(
     (officer) =>
-      officer.role_name === "Bank Officer" ||
-      officer.role_name === "Bank Authority"
+      officer.role_name.toUpperCase() === "BANK OFFICER" ||
+      officer.role_name.toUpperCase() === "BANK AUTHORITY"
   );
 
-  const managers = users.filter((user) => user.role_name === "Manager");
+  const managers = users.filter(
+    (user) => user.role_name.toUpperCase() === "MANAGER"
+  );
 
   // Fields allowed for TELECALLER role
   const telecallerAllowedFields = [
@@ -136,6 +142,27 @@ function Dashboard() {
   const [editOrderId, setEditOrderId] = useState(null);
   const [showFormModal, setShowFormModal] = useState(false);
 
+  // Helper: count today's orders (by created date)
+  const isSameDay = (d1, d2) =>
+    d1 &&
+    d2 &&
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate();
+
+  const getCreatedDate = (order) => {
+    const value = order?.created_at; // API provides created_at
+    if (!value) return null;
+    const date = new Date(value);
+    return isNaN(date) ? null : date;
+  };
+
+  const todaysOrdersCount = (orders || []).filter((o) =>
+    isSameDay(getCreatedDate(o), new Date())
+  ).length;
+
+  const formatTwoDigits = (num) => String(num ?? 0).padStart(2, "0");
+
   // Open Edit Modal
   const openEditModal = (order) => {
     setIsEdit(true);
@@ -201,12 +228,12 @@ function Dashboard() {
       payload.officer_id = formData.officer_id;
     }
 
-    // Manager ID handling - Manager users get their own user ID automatically
+    // MANAGER ID handling - MANAGER users get their own user ID automatically
     if (isManager) {
-      // For Manager users, use their own user ID as manager_id
+      // For MANAGER users, use their own user ID as manager_id
       payload.manager_id = currentUser?.id;
 
-      // Field Verifier - only include if manager is assigned (which it will be for Manager users)
+      // Field Verifier - only include if manager is assigned (which it will be for MANAGER users)
       if (payload.manager_id) {
         payload.field_verifier_id = formData.field_verifier_id;
       }
@@ -233,54 +260,261 @@ function Dashboard() {
     setShowFormModal(false);
   };
 
+  // Check if user has any dashboard permissions
+  const hasStatisticsPermission = hasPermission(
+    allowedPermissions,
+    "view_dashboard_statistics"
+  );
+  const hasCheckinPermission = hasPermission(
+    allowedPermissions,
+    "view_dashboard_checkin_checkout"
+  );
+  const hasOrderTablePermission = hasPermission(
+    allowedPermissions,
+    "view_dashboard_order_table"
+  );
+  const hasAnyDashboardPermission =
+    hasStatisticsPermission || hasCheckinPermission || hasOrderTablePermission;
+
   return (
     <div className="dashboard-container height-full-occupied">
-      {/*  <CustomDataTable>
-        {{
-          buttons: (
-            <div className="add-action-buttons">
-              <button className="btn" onClick={() => console.log("add user")}>
-                + Add User
-              </button>
+      <div className="dashboard-container-sneak-peek">
+        {!hasAnyDashboardPermission && !isTelecaller ? (
+          <div className="welcome-message-container">
+            <div className="welcome-message">
+              <h2>Welcome {currentUser?.name || "User"}</h2>
+              <p>Hope you are doing well</p>
             </div>
-          ),
-          header: (
-            <tr>
-              <th style={{ width: "20px" }}>
-                <div>id</div>
-              </th>
-              <th style={{ width: "150px" }}>
-                <div style={{ width: "150px" }}>name</div>
-              </th>
-              <th style={{ width: "150px" }}>
-                <div style={{ width: "150px" }}>Email</div>
-              </th>
-              <th>
-                <div style={{ minWidth: "150px" }}>Class</div>
-              </th>
-              <th style={{ width: "50px" }}>
-                <div style={{ width: "50px" }}>Role</div>
-              </th>
-            </tr>
-          ),
-          rows: data.map((item) => (
-            <tr key={item.id}>
-              <td>{item.id}</td>
-              <td style={{ width: "50px" }}>{item.name}</td>
-              <td>{item.email}</td>
-              <td>{item.class}</td>
-              <td>{item.role}</td>
-            </tr>
-          )),
-          footer: (
-            <tr>
-              <td colSpan="5">Total Users: {data.length}</td>
-            </tr>
-          ),
-        }}
-      </CustomDataTable> */}
+          </div>
+        ) : (
+          <div className="row">
+            {hasStatisticsPermission && (
+              <div
+                className={`${
+                  hasPermission(
+                    allowedPermissions,
+                    "view_dashboard_checkin_checkout"
+                  )
+                    ? "col-xl-7"
+                    : "col-xl-12"
+                } col-lg-12 col-md-12 col-sm-12 col-xs-12`}
+              >
+                <div className="left-part-of-sneak-peek">
+                  <div className="row">
+                    <div className="col-xl-4 col-lg-4 col-md-4 col-sm-12 col-xs-12">
+                      <div className="padding-top-bottom">
+                        <div className="sneak-peek-card today-orders">
+                          <DashboardIcon className="sneak-peek-card-icon" />
+                          <h3>Today's Orders</h3>
+                          <p>{formatTwoDigits(todaysOrdersCount)}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-xl-8 col-lg-8 col-md-8 col-sm-12 col-xs-12">
+                      <div className="row">
+                        <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                          <div className="padding-top-bottom">
+                            <div className="sneak-peek-card order-status ongoing-orders">
+                              <h3>Ongoing</h3>
+                              <p>
+                                {formatTwoDigits(
+                                  orders.filter(
+                                    (order) =>
+                                      order.current_status_name === "Ongoing"
+                                  ).length
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                          <div className="padding-top-bottom">
+                            <div className="sneak-peek-card order-status submitted-orders">
+                              <h3>Submitted</h3>
+                              <p>
+                                {formatTwoDigits(
+                                  orders.filter(
+                                    (order) =>
+                                      order.current_status_name === "Submitted"
+                                  ).length
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                          <div className="padding-top-bottom">
+                            <div className="sneak-peek-card order-status validate-orders">
+                              <h3>Validate</h3>
+                              <p>
+                                {formatTwoDigits(
+                                  orders.filter(
+                                    (order) =>
+                                      order.current_status_name === "Validate"
+                                  ).length
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                          <div className="padding-top-bottom">
+                            <div className="sneak-peek-card order-status re-validate-orders">
+                              <h3>re-validate</h3>
+                              <p>
+                                {formatTwoDigits(
+                                  orders.filter(
+                                    (order) =>
+                                      order.current_status_name ===
+                                      "re-validate"
+                                  ).length
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            {hasCheckinPermission && (
+              <div className="col-xl-5 col-lg-12 col-md-12 col-sm-12 col-xs-12">
+                <div className="attendance-card-container">
+                  <div className="attendance-card">
+                    <div className="attendance-card-buttons-container">
+                      <button className="attendance-card-button check-in-button">
+                        <DashboardIcon /> Checkin
+                      </button>
+                      <button className="attendance-card-button check-out-button">
+                        <DashboardIcon /> Checkout
+                      </button>
+                    </div>
+                    <div className="attendance-card-checkin-time">
+                      <p>Your Current Checkin Time was</p>
+                      <h4>09:35 AM Monday, 15th-09-2025</h4>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            {hasOrderTablePermission && (
+              <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12">
+                <div className="orders-container">
+                  {loading ? (
+                    <p>Loading...</p>
+                  ) : (
+                    <CustomDataTable
+                      showEntriesSelector={false}
+                      showFooter={false}
+                    >
+                      {{
+                        buttons: hasPermission(
+                          allowedPermissions,
+                          "add_order"
+                        ) && (
+                          <Link className="btn" to="/orders">
+                            See All
+                          </Link>
+                        ),
+                        header: (
+                          <tr>
+                            <th style={{ width: "150px" }}>Order Number</th>
+                            <th style={{ width: "200px" }}>
+                              Registration Number
+                            </th>
+                            <th style={{ width: "150px" }}>Bank</th>
+                            <th style={{ width: "150px" }}>Officer</th>
+                            <th style={{ width: "120px" }}>Created By</th>
+                            <th>Updated By</th>
+                            <th style={{ width: "175px" }}>Status</th>
+                            <th style={{ textAlign: "center", width: "100px" }}>
+                              Action
+                            </th>
+                          </tr>
+                        ),
+                        rows: orders.slice(0, 9).map((order) => (
+                          <tr
+                            key={order.id}
+                            className={
+                              hasPermission(
+                                allowedPermissions,
+                                "view_order_details"
+                              )
+                                ? "clickable-row"
+                                : ""
+                            }
+                            onClick={() => {
+                              if (
+                                hasPermission(
+                                  allowedPermissions,
+                                  "view_order_details"
+                                )
+                              ) {
+                                navigate(`/orders/${order.id}/details`);
+                              }
+                            }}
+                            style={{
+                              cursor: hasPermission(
+                                allowedPermissions,
+                                "view_order_details"
+                              )
+                                ? "pointer"
+                                : "default",
+                            }}
+                          >
+                            <td
+                              className={
+                                hasPermission(
+                                  allowedPermissions,
+                                  "view_order_details"
+                                )
+                                  ? "get-me-inside"
+                                  : ""
+                              }
+                            >
+                              {order.order_number}
+                            </td>
+                            <td>{order.registration_number || "-"}</td>
+                            <td>{order.bank_name || "-"}</td>
+                            <td>{order.officer_name || "-"}</td>
+                            <td>{order.created_by}</td>
+                            <td>{order.updated_by || "-"}</td>
+                            <td>
+                              <p className="status-state order-state">
+                                {order.current_status_name}
+                              </p>
+                            </td>
+                            <td style={{ textAlign: "center" }}>
+                              {hasPermission(
+                                allowedPermissions,
+                                "edit_order"
+                              ) && (
+                                <button
+                                  className="action-icons"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openEditModal(order);
+                                  }}
+                                >
+                                  <EditIcon />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        )),
+                      }}
+                    </CustomDataTable>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
       {/* just for telecoller */}
-      {isTelecaller ? (
+      {isTelecaller && (
         <div className="telecoller-dashboard">
           {loading ? (
             <div className="loading-message">
@@ -349,15 +583,16 @@ function Dashboard() {
             </div>
           )}
         </div>
-      ) : (
-        "Dashboard"
       )}
 
       {/* 👤 Form Modal (Edit) */}
       {showFormModal && (
         <FormModel>
           {{
-            title: `Edit Order - ${orders.find(order => order.id === editOrderId)?.order_number || 'N/A'}`,
+            title: `Edit Order - ${
+              orders.find((order) => order.id === editOrderId)?.order_number ||
+              "N/A"
+            }`,
             body: (
               <form
                 className="body-form-box"
@@ -586,7 +821,7 @@ function Dashboard() {
                       </div>
                     )}
 
-                  {/* Manager field - Show based on permission but hidden for Manager users */}
+                  {/* MANAGER field - Show based on permission but hidden for MANAGER users */}
                   {hasPermission(
                     allowedPermissions,
                     "view_order_add_edit_manager_filed"
@@ -621,7 +856,7 @@ function Dashboard() {
                       </div>
                     )}
 
-                  {/* Field Verifier - Show when manager is assigned, user is Manager, or user has permission to edit manager field (but not Bank Officer) */}
+                  {/* Field Verifier - Show when manager is assigned, user is MANAGER, or user has permission to edit manager field (but not Bank Officer) */}
                   {(formData.manager_id || isManager || isSuperAdmin) &&
                     hasPermission(
                       allowedPermissions,

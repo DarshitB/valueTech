@@ -19,7 +19,11 @@ const order = {
       .leftJoin("users as manager", "orders.manager_id", "manager.id")
       .leftJoin("users as created_user", "orders.created_by", "created_user.id")
       .leftJoin("users as updated_user", "orders.updated_by", "updated_user.id")
-      .leftJoin("field_verifiers", "orders.field_verifier_id", "field_verifiers.id")
+      .leftJoin(
+        "field_verifiers",
+        "orders.field_verifier_id",
+        "field_verifiers.id"
+      )
       .leftJoin(
         "child_category",
         "orders.child_category_id",
@@ -78,23 +82,26 @@ const order = {
       .whereNull("orders.deleted_at");
 
     // Role-based filters - similar to officer model
-    if (user.role_name === "Bank Authority") {
+    if (user.role_name.toUpperCase() === "BANK AUTHORITY") {
       baseQuery.andWhere(function () {
         this.where("orders.created_by", user.id)
           .orWhere("officers.user_id", user.id)
           .orWhere("orders.manager_id", user.id);
       });
-    } else if (user.role_name === "Bank Officer") {
+    } else if (user.role_name.toUpperCase() === "BANK OFFICER") {
       baseQuery.andWhere("officers.user_id", user.id);
-    } else if (user.role_name === "Manager") {
+    } else if (user.role_name.toUpperCase() === "MANAGER") {
       baseQuery.andWhere("orders.manager_id", user.id);
-    } else if (user.role_name === "TELECALLER") {
+    } else if (user.role_name.toUpperCase() === "TELECALLER") {
       // TELECALLER can only see orders that don't have supervisor_number or driver_number
       /* baseQuery.andWhere(function () {
         this.whereNull("orders.supervisor_number")
           .orWhereNull("orders.driver_number");
       }); */
     }
+
+    // Sort by newest first
+    baseQuery.orderBy("orders.created_at", "desc");
 
     const orders = await baseQuery;
     return orders;
@@ -118,7 +125,11 @@ const order = {
       .leftJoin("users as manager", "orders.manager_id", "manager.id")
       .leftJoin("users as created_user", "orders.created_by", "created_user.id")
       .leftJoin("users as updated_user", "orders.updated_by", "updated_user.id")
-      .leftJoin("field_verifiers", "orders.field_verifier_id", "field_verifiers.id")
+      .leftJoin(
+        "field_verifiers",
+        "orders.field_verifier_id",
+        "field_verifiers.id"
+      )
       .leftJoin(
         "child_category",
         "orders.child_category_id",
@@ -177,6 +188,9 @@ const order = {
       )
       .whereNull("orders.deleted_at");
 
+    // Sort by newest first
+    baseQuery.orderBy("orders.created_at", "desc");
+
     const orders = await baseQuery;
     return orders;
   },
@@ -198,7 +212,11 @@ const order = {
       .leftJoin("users as manager", "orders.manager_id", "manager.id")
       .leftJoin("users as created_user", "orders.created_by", "created_user.id")
       .leftJoin("users as updated_user", "orders.updated_by", "updated_user.id")
-      .leftJoin("field_verifiers", "orders.field_verifier_id", "field_verifiers.id")
+      .leftJoin(
+        "field_verifiers",
+        "orders.field_verifier_id",
+        "field_verifiers.id"
+      )
       .leftJoin(
         "child_category",
         "orders.child_category_id",
@@ -263,14 +281,14 @@ const order = {
     if (!order) return null;
 
     // Check user access permissions - now we have officer_user_id in the order data
-    if (user.role_name === "Bank Officer") {
+    if (user.role_name.toUpperCase() === "BANK OFFICER") {
       if (order.officer_user_id !== user.id) {
         return null; // Officer can only see orders assigned to them
       }
-    } else if (user.role_name === "Manager" && order.manager_id !== user.id) {
+    } else if (user.role_name.toUpperCase() === "MANAGER" && order.manager_id !== user.id) {
       return null; // Manager can only see their own orders
-    } else if (user.role_name === "Bank Authority") {
-      // Bank Authority can see orders they created, are assigned to, or manage
+    } else if (user.role_name.toUpperCase() === "BANK AUTHORITY") {
+      // BANK AUTHORITY can see orders they created, are assigned to, or manage
       if (
         order.created_by !== user.id &&
         order.officer_user_id !== user.id &&
@@ -306,7 +324,7 @@ const order = {
   // Get orders by officer ID
   /* getOrdersByOfficer: async (officerId, user) => {
     // Check if user has permission to view this officer's orders
-    if (user.role_name === "Bank Officer" && user.id !== officerId) {
+      if (user.role_name.toUpperCase() === "BANK OFFICER" && user.id !== officerId) {
       return []; // Officers can only see their own orders
     }
 
@@ -397,11 +415,11 @@ const order = {
     if (!order) return null;
 
     // Check user access permissions
-    if (user.role_name === "Bank Officer" && order.officer_id !== user.id) {
+    if (user.role_name.toUpperCase() === "BANK OFFICER" && order.officer_id !== user.id) {
       return null;
-    } else if (user.role_name === "Manager" && order.manager_id !== user.id) {
+    } else if (user.role_name.toUpperCase() === "MANAGER" && order.manager_id !== user.id) {
       return null;
-    } else if (user.role_name === "Bank Authority") {
+    } else if (user.role_name.toUpperCase() === "BANK AUTHORITY") {
       if (order.created_by !== user.id && 
           order.officer_id !== user.id && 
           order.manager_id !== user.id) {

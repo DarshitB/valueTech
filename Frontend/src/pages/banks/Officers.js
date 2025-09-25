@@ -70,22 +70,22 @@ function Officers() {
 
   /* console.log("users",users); */
 
-  // Check if current user is Bank Authority
+  // Check if current user is BANK AUTHORITY
   const isBankAuthority = users?.role.name?.toUpperCase() === "BANK AUTHORITY";
 
   const officerRoles = roles.filter((role) => {
-    // If user is Bank Authority or Bank Officer, allow only Bank Officer to be selected
-    if (["Bank Authority", "Bank Officer"].includes(users?.role.name)) {
-      return role.name === "Bank Officer";
+    // If user is BANK AUTHORITY or Bank Officer, allow only Bank Officer to be selected
+    if (["BANK AUTHORITY", "BANK OFFICER"].includes(users?.role.name)) {
+      return role.name === "BANK OFFICER";
     }
     // Otherwise, allow both
-    return ["Bank Authority", "Bank Officer"].includes(role.name);
+    return ["BANK AUTHORITY", "BANK OFFICER"].includes(role.name);
   });
 
   const openAddModal = () => {
     setIsEdit(false);
 
-    // Find current user's officer record if they are Bank Authority
+    // Find current user's officer record if they are BANK AUTHORITY
     let preSelectedDepartment = [];
     let preSelectedBranch = "";
 
@@ -99,13 +99,13 @@ function Officers() {
       );
 
       if (currentOfficer) {
-        // Pre-select the same department(s) and branch as the Bank Authority user
+        // Pre-select the same department(s) and branch as the BANK AUTHORITY user
         preSelectedDepartment = (currentOfficer.departments || []).map(
           (d) => d.id
         );
         preSelectedBranch = currentOfficer.branch_id;
 
-        /* console.log("Bank Authority pre-selection:", {
+        /* console.log("BANK AUTHORITY pre-selection:", {
           currentOfficer,
           preSelectedDepartment,
           preSelectedBranch

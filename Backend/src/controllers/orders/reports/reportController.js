@@ -324,7 +324,7 @@ async function generateReportFileName(orderId, orderNumber) {
  */
 async function generateReportPDF(reportType, formData, extraData, outputPath) {
   // Determine background image based on valuer_name (CV) or surveyor (AVR)
-  let bgImageFileName = "vkassociate_letter_head.png"; // Default image
+  let bgImageFileName = "vkassociate_letter_head.jpg"; // Default image
 
   // Check for valuer_name (CV reports) or surveyor (AVR reports)
   const nameField = formData.valuer_name || formData.surveyor;
@@ -333,7 +333,7 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
     const name = nameField.toUpperCase().trim();
     
     if (name === "V.K. ASSOCIATES") {
-      bgImageFileName = "vkassociate_letter_head.png";
+      bgImageFileName = "vkassociate_letter_head.jpg";
     } else if (name === "VALUETECH SOLUTIONS") {
       bgImageFileName = "valuetech-solutions.png";
     } else if (name === "VISHAL D. KOTHARI") {

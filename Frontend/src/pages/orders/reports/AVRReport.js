@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchOrderById } from "../../../redux/reducers/orderReducer";
-import { generateOrderReport } from "../../../redux/reducers/orderReportReducer";
+import { fetchOrderReport, generateOrderReport } from "../../../redux/reducers/orderReportReducer";
 import { usePageTitle } from "../../../context/PageTitleContext";
 import SingleSearchSelect from "../../../components/SingleSearchSelect";
 import { toast } from "react-toastify";
@@ -15,7 +15,7 @@ function AVRReport() {
   // Select order data from Redux store
   const order = useSelector((state) => state.orders.selected);
   // Select order report data from Redux store
-  const { generating } = useSelector((state) => state.orderReports);
+  const { currentReport, loading: reportLoading, generating } = useSelector((state) => state.orderReports);
   // Set page title using custom hook
   const { setTitle } = usePageTitle();
   /* console.log(order); */
@@ -23,6 +23,7 @@ function AVRReport() {
   useEffect(() => {
     if (id) {
       dispatch(fetchOrderById(id));
+      dispatch(fetchOrderReport({ orderId: id, reportType: "report_avr" }));
     }
   }, [dispatch, id]);
 
@@ -249,6 +250,26 @@ function AVRReport() {
       }));
     }
   }, [order]);
+
+  // Populate form data from fetched AVR report (if available)
+  useEffect(() => {
+    const report = currentReport?.report;
+    if (!report) return; // Gracefully do nothing when data is null
+
+    setReportFormData((prev) => {
+      const updated = { ...prev };
+      Object.entries(report).forEach(([key, value]) => {
+        if (Object.prototype.hasOwnProperty.call(prev, key)) {
+          updated[key] = value ?? "";
+        }
+      });
+      return updated;
+    });
+
+    if (Array.isArray(report.flexible_fields)) {
+      setFlexibleFields(report.flexible_fields);
+    }
+  }, [currentReport]);
 
   // Handle form input changes
   const handleFormChange = (e) => {
@@ -1210,7 +1231,7 @@ function AVRReport() {
                     <div className="col-md-12">
                       <button
                         type="button"
-                        className="btn btn-outline-primary"
+                        className="btn"
                         onClick={() =>
                           addFlexibleFields(
                             "PRESENT_PARTICULARS_OF_THE_MACHINE"

@@ -85,7 +85,7 @@ function Orders() {
   const isBankOfficer = currentUser?.role.name?.toUpperCase() === "BANK OFFICER";
   /* console.log("isBankOfficer", currentUser?.role.name); */
   
-  // Check if current user is Manager (case-insensitive)
+  // Check if current user is MANAGER (case-insensitive)
   const isManager = currentUser?.role.name?.toUpperCase() === "MANAGER";
   /* console.log("isManager", currentUser?.role.name); */
   
@@ -96,11 +96,11 @@ function Orders() {
   // Filter users by role for officer and manager selection
   const bankOfficers = officers.filter(
     (officer) =>
-      officer.role_name === "Bank Officer" ||
-      officer.role_name === "Bank Authority"
+      officer.role_name.toUpperCase() === "BANK OFFICER" ||
+      officer.role_name.toUpperCase() === "BANK AUTHORITY"
   );
 
-  const managers = users.filter((user) => user.role_name === "Manager");
+  const managers = users.filter((user) => user.role_name.toUpperCase() === "MANAGER");
 
   // Fields allowed for TELECALLER role
   const telecallerAllowedFields = [
@@ -163,14 +163,14 @@ function Orders() {
       manager.name?.toUpperCase() === "PAN INDIA"
     );
     
-    /* console.log("PAN INDIA Manager found:", panIndiaManager); */
+    /* console.log("PAN INDIA MANAGER found:", panIndiaManager); */
     
     // Pre-select PAN INDIA manager if user has access to manager field and manager exists
     const preSelectedManagerId = hasPermission(allowedPermissions, "view_order_add_edit_manager_filed") && 
                                  !isManager && 
                                  panIndiaManager ? panIndiaManager.id : null;
     
-    /* console.log("Pre-selected Manager ID:", preSelectedManagerId); */
+    /* console.log("Pre-selected MANAGER ID:", preSelectedManagerId); */
     
     setFormData({
       customer_name: "",
@@ -253,12 +253,12 @@ function Orders() {
       payload.officer_id = formData.officer_id;
     }
     
-    // Manager ID handling - Manager users get their own user ID automatically
+    // MANAGER ID handling - MANAGER users get their own user ID automatically
     if (isManager) {
-      // For Manager users, use their own user ID as manager_id
+      // For MANAGER users, use their own user ID as manager_id
       payload.manager_id = currentUser?.id;
       
-      // Field Verifier - only include if manager is assigned (which it will be for Manager users)
+      // Field Verifier - only include if manager is assigned (which it will be for MANAGER users)
       if (payload.manager_id) {
         payload.field_verifier_id = formData.field_verifier_id;
       }
@@ -613,7 +613,7 @@ function Orders() {
                     </div>
                   )}
 
-                  {/* Manager field - Show based on permission but hidden for Manager users */}
+                  {/* MANAGER field - Show based on permission but hidden for MANAGER users */}
                   {hasPermission(allowedPermissions, "view_order_add_edit_manager_filed") && !isManager && (
                     <div className="form-group">
                       <label htmlFor="managerField">Manager</label>
@@ -644,7 +644,7 @@ function Orders() {
                     </div>
                   )}
 
-                  {/* Field Verifier - Show when manager is assigned, user is Manager, or user has permission to edit manager field (but not Bank Officer) */}
+                  {/* Field Verifier - Show when manager is assigned, user is MANAGER, or user has permission to edit manager field (but not Bank Officer) */}
                   {(formData.manager_id || isManager || isSuperAdmin) && hasPermission(allowedPermissions, "view_order_add_edit_manager_filed") && !isBankOfficer && (
                     <div className="form-group">
                       <label htmlFor="fieldVerifierField">Field Verifier</label>

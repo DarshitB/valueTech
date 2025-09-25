@@ -47,11 +47,11 @@ const orderStatusHistory = {
     if (!historyEntry) return null;
 
     // Check user access permissions
-    if (user.role_name === "Bank Officer" && historyEntry.officer_id !== user.id) {
+    if (user.role_name === "BANK OFFICER" && historyEntry.officer_id !== user.id) {
       return null;
-    } else if (user.role_name === "Manager" && historyEntry.manager_id !== user.id) {
+    } else if (user.role_name === "MANAGER" && historyEntry.manager_id !== user.id) {
       return null;
-    } else if (user.role_name === "Bank Authority") {
+    } else if (user.role_name === "BANK AUTHORITY") {
       if (historyEntry.created_by !== user.id && 
           historyEntry.officer_id !== user.id && 
           historyEntry.manager_id !== user.id) {
@@ -71,7 +71,7 @@ const orderStatusHistory = {
   // Get status change history for a specific user
   /* getUserStatusChangeHistory: async (userId, user) => {
     // Check if requesting user has permission to view this user's history
-    if (user.role_name === "Bank Officer" && user.id !== userId) {
+    if (user.role_name === "BANK OFFICER" && user.id !== userId) {
       return []; // Officers can only see their own history
     }
 
@@ -118,11 +118,11 @@ const orderStatusHistory = {
       .limit(limit);
 
     // Apply role-based filters
-    if (user.role_name === "Bank Officer") {
+    if (user.role_name === "BANK OFFICER") {
       baseQuery.andWhere("orders.officer_id", user.id);
-    } else if (user.role_name === "Manager") {
+    } else if (user.role_name === "MANAGER") {
       baseQuery.andWhere("orders.manager_id", user.id);
-    } else if (user.role_name === "Bank Authority") {
+    } else if (user.role_name === "BANK AUTHORITY") {
       baseQuery.andWhere(function () {
         this.where("orders.created_by", user.id)
           .orWhere("orders.officer_id", user.id)
@@ -150,11 +150,11 @@ const orderStatusHistory = {
       .orderBy("change_count", "desc");
 
     // Apply role-based filters
-    if (user.role_name === "Bank Officer") {
+    if (user.role_name === "BANK OFFICER") {
       baseQuery.andWhere("orders.officer_id", user.id);
-    } else if (user.role_name === "Manager") {
+    } else if (user.role_name === "MANAGER") {
       baseQuery.andWhere("orders.manager_id", user.id);
-    } else if (user.role_name === "Bank Authority") {
+    } else if (user.role_name === "BANK AUTHORITY") {
       baseQuery.andWhere(function () {
         this.where("orders.created_by", user.id)
           .orWhere("orders.officer_id", user.id)

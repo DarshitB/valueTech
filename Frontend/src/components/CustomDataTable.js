@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import "./CustomDataTable.scss";
 import { SearchIcon } from "./icons";
 
-const CustomDataTable = ({ children }) => {
+const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = true }) => {
   const { header, rows, footer, buttons } = children;
 
   const [search, setSearch] = useState("");
@@ -100,24 +100,26 @@ const CustomDataTable = ({ children }) => {
   return (
     <div className="dataTable-container">
       <div className="dataTable-header">
-        <div className="show-x-entries">
-          Show &nbsp;
-          <select
-            value={entriesPerPage}
-            onChange={(e) => {
-              setEntriesPerPage(Number(e.target.value));
-              setCurrentPage(1);
-            }}
-            className="count-of-page-selector"
-          >
-            {[10, 25, 50, 100].map((num) => (
-              <option key={num} value={num}>
-                {num}
-              </option>
-            ))}
-          </select>{" "}
-          &nbsp; Entries
-        </div>
+        {showEntriesSelector && (
+          <div className="show-x-entries">
+            Show &nbsp;
+            <select
+              value={entriesPerPage}
+              onChange={(e) => {
+                setEntriesPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="count-of-page-selector"
+            >
+              {[10, 25, 50, 100].map((num) => (
+                <option key={num} value={num}>
+                  {num}
+                </option>
+              ))}
+            </select>{" "}
+            &nbsp; Entries
+          </div>
+        )}
         <div className="search-bar-container">
           <span className="search-icon">
             <SearchIcon className="search-icon-svg" />
@@ -166,49 +168,51 @@ const CustomDataTable = ({ children }) => {
         </table>
       </div>
 
-      <div className="dataTable-footer">
-        <div>
-          Showing {(currentPage - 1) * entriesPerPage + 1} to{" "}
-          {Math.min(currentPage * entriesPerPage, filteredData.length)} of{" "}
-          {filteredData.length} entries
+      {showFooter && (
+        <div className="dataTable-footer">
+          <div>
+            Showing {(currentPage - 1) * entriesPerPage + 1} to{" "}
+            {Math.min(currentPage * entriesPerPage, filteredData.length)} of{" "}
+            {filteredData.length} entries
+          </div>
+
+          <div className="pagination-box flex items-center gap-1">
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => p - 1)}
+              className="pagination-button-nav"
+            >
+              ◀
+            </button>
+
+            {getPageNumbers(currentPage, totalPages).map((page, i) =>
+              page === "..." ? (
+                <span key={i} className="px-2">
+                  ...
+                </span>
+              ) : (
+                <button
+                  key={i}
+                  onClick={() => setCurrentPage(page)}
+                  className={`pagination-button ${
+                    currentPage === page ? "active" : ""
+                  }`}
+                >
+                  {page}
+                </button>
+              )
+            )}
+
+            <button
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage((p) => p + 1)}
+              className="pagination-button-nav"
+            >
+              ▶
+            </button>
+          </div>
         </div>
-
-        <div className="pagination-box flex items-center gap-1">
-          <button
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage((p) => p - 1)}
-            className="pagination-button-nav"
-          >
-            ◀
-          </button>
-
-          {getPageNumbers(currentPage, totalPages).map((page, i) =>
-            page === "..." ? (
-              <span key={i} className="px-2">
-                ...
-              </span>
-            ) : (
-              <button
-                key={i}
-                onClick={() => setCurrentPage(page)}
-                className={`pagination-button ${
-                  currentPage === page ? "active" : ""
-                }`}
-              >
-                {page}
-              </button>
-            )
-          )}
-
-          <button
-            disabled={currentPage === totalPages}
-            onClick={() => setCurrentPage((p) => p + 1)}
-            className="pagination-button-nav"
-          >
-            ▶
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

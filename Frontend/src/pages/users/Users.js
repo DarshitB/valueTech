@@ -141,22 +141,13 @@ function Users() {
       return;
     } */
 
-    // For Add mode: password is required
-    if (!isEdit && !formData.password) {
-      toast.error("Password is required.");
+    // Password handling: set default "123456" if empty, validate confirm password only if custom password is entered
+    let finalPassword = formData.password || "123456";
+    
+    // Only validate confirm password if user entered a custom password
+    if (formData.password && formData.password !== formData.confirm_password) {
+      toast.error("Password and Confirm Password do not match.");
       return;
-    }
-    if (!isEdit && !formData.confirm_password) {
-      toast.error("Confirm Password is required.");
-      return;
-    }
-
-    // ✅ Validate password match (if filled)
-    if (formData.password || formData.confirm_password) {
-      if (formData.password !== formData.confirm_password) {
-        toast.error("Password and Confirm Password do not match.");
-        return;
-      }
     }
     if (mobileError) {
       toast.error("Please fix mobile number error before submitting.");
@@ -172,7 +163,7 @@ function Users() {
     };
 
     if (!isEdit || formData.password) {
-      payload.password = formData.password;
+      payload.password = finalPassword;
     }
 
     if (isEdit) {
@@ -220,9 +211,18 @@ function Users() {
   };
 
   const handleEmailBlur = async () => {
-    const email = formData.email.trim().toLowerCase();
+    let email = formData.email.trim().toLowerCase();
     /* console.log("email", email); */
     if (!email) return;
+
+    // Add domain if not present
+    if (!email.includes('@')) {
+      email = email + '@valuetechsolutions.in';
+      setFormData({
+        ...formData,
+        email,
+      });
+    }
 
     try {
       const resultAction = await dispatch(checkEmailExist(email));
@@ -331,7 +331,7 @@ function Users() {
                       name="nameFiled"
                       value={formData.name}
                       onChange={(e) => {
-                        const name = e.target.value;
+                        const name = e.target.value.toUpperCase();
                         setFormData({
                           ...formData,
                           name,
@@ -349,7 +349,10 @@ function Users() {
                       name="emailFiled"
                       value={formData.email}
                       onChange={(e) => {
-                        const email = e.target.value;
+                        // Remove spaces and symbols, convert to lowercase
+                        const email = e.target.value
+                          .toLowerCase()
+                          .replace(/[^a-z0-9]/g, '');
                         setFormData({
                           ...formData,
                           email,
@@ -399,8 +402,8 @@ function Users() {
                       {roles
                         .filter(
                           (role) =>
-                            role.name !== "Bank Authority" &&
-                            role.name !== "Bank Officer"
+                            role.name.toUpperCase() !== "BANK AUTHORITY" &&
+                            role.name.toUpperCase() !== "BANK OFFICER"
                         )
                         .map((role) => (
                           <label

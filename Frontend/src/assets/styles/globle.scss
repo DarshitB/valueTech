@@ -20,18 +20,21 @@
 }
 .btn {
   background-color: $primary-color;
-  color: $primary-font-color;
+  color: $primary-font-color !important;
   border-radius: 50rem;
   border: 1px solid $primary-color;
   padding: 2px 15px;
   &:hover {
     background-color: $base-hover-color !important;
-    color: $primary-color;
+    color: $primary-color !important;
   }
   &:focus {
     border-color: $primary-color !important;
     background-color: $base-hover-color !important;
-    color: $primary-color;
+    color: $primary-color !important;
+  }
+  &.btn-outline-primary {
+    color: $primary-color !important;
   }
 }
 .get-me-inside {
@@ -183,11 +186,10 @@
   display: none;
 }
 
-
 .tooltip-link {
   position: relative;
   cursor: pointer;
-  
+
   &:hover::after {
     content: attr(title);
     position: absolute;
@@ -203,10 +205,10 @@
     z-index: 1000;
     margin-bottom: 5px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    
+
     /* Bootstrap-style arrow */
     &::before {
-      content: '';
+      content: "";
       position: absolute;
       top: 100%;
       left: 50%;

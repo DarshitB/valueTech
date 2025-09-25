@@ -8,10 +8,10 @@ exports.seed = async function (knex) {
 
   // Inserts seed entries
   await knex("roles").insert([
-    { name: "Super Admin" },
-    { name: "Admin" },
-    { name: "Manager" },
-    { name: "Bank Authority" },
-    { name: "Bank Officer" },
+    { name: "SUPER ADMIN" },
+    { name: "ADMIN" },
+    { name: "MANAGER" },
+    { name: "BANK AUTHORITY" },
+    { name: "BANK OFFICER" },
   ]);
 };

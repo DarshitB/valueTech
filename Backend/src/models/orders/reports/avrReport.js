@@ -1,7 +1,7 @@
 const db = require("../../../../db");
 
 const avrReport = {
-  // Find AVR report by order ID
+  // Find AVR report by order ID (gets the last created report)
   findByOrderId: async (orderId) => {
     const report = await db("report_avr")
       .leftJoin("users as created_user", "report_avr.created_by", "created_user.id")
@@ -12,6 +12,7 @@ const avrReport = {
         "created_user.name as created_by_name",
         "updated_user.name as updated_by_name"
       )
+      .orderBy("report_avr.created_at", "desc")
       .first();
 
     return report;

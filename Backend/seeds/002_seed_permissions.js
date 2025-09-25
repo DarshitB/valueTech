@@ -5,6 +5,10 @@
 exports.seed = async function (knex) {
   const permissions = [
     "view_dashboard",
+    "view_dashboard_statistics",
+    "view_dashboard_checkin_checkout",
+    "view_dashboard_order_table",
+
     "view_user",
     "add_user",
     "edit_user",
@@ -22,7 +26,7 @@ exports.seed = async function (knex) {
     "add_cities",
     "edit_cities",
     "delete_cities",
-    
+
     "view_bank",
     "add_bank",
     "edit_bank",
@@ -48,7 +52,7 @@ exports.seed = async function (knex) {
     "add_child_category",
     "edit_child_category",
     "delete_child_category",
-    
+
     "view_field_verifier",
     "add_field_verifier",
     "edit_field_verifier",
