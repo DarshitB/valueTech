@@ -83,6 +83,12 @@ function Dashboard() {
   // State for filtered child categories for Bank Officers
   const [filteredChildCategories, setFilteredChildCategories] = useState([]);
 
+  // State for order type filter
+  const [selectedOrderType, setSelectedOrderType] = useState("");
+  
+  // State for priority filter
+  const [selectedPriority, setSelectedPriority] = useState("");
+
   // Fetch filtered child categories for Bank Officers based on their departments
   useEffect(() => {
     if (isBankOfficer && officers.length > 0) {
@@ -410,13 +416,38 @@ function Dashboard() {
                       showFooter={false}
                     >
                       {{
-                        buttons: hasPermission(
-                          allowedPermissions,
-                          "add_order"
-                        ) && (
-                          <Link className="btn" to="/orders">
-                            See All
-                          </Link>
+                        buttons: (
+                          <div
+                            style={{ display: "flex", gap: "10px", alignItems: "center" }}
+                          >
+                            <select
+                              className="form-field type-priority-selector"
+                              value={selectedOrderType}
+                              onChange={(e) => setSelectedOrderType(e.target.value)}
+                            >
+                              <option value="">All Types</option>
+                              <option value="VKA1">VKA1</option>
+                              <option value="VKA2">VKA2</option>
+                            </select>
+                            <select
+                              className="form-field type-priority-selector"
+                              value={selectedPriority}
+                              onChange={(e) => setSelectedPriority(e.target.value)}
+                            >
+                              <option value="">All Priorities</option>
+                              <option value="High">High</option>
+                              <option value="Medium">Medium</option>
+                              <option value="Low">Low</option>
+                            </select>
+                            {hasPermission(
+                              allowedPermissions,
+                              "add_order"
+                            ) && (
+                              <Link className="btn" to="/orders">
+                                See All
+                              </Link>
+                            )}
+                          </div>
                         ),
                         header: (
                           <tr>
@@ -428,13 +459,30 @@ function Dashboard() {
                             <th style={{ width: "150px" }}>Officer</th>
                             <th style={{ width: "120px" }}>Created By</th>
                             <th>Updated By</th>
+                            <th style={{ width: "120px" }}>Type</th>
+                            <th style={{ width: "120px" }}>Priority</th>
                             <th style={{ width: "175px" }}>Status</th>
                             <th style={{ textAlign: "center", width: "100px" }}>
                               Action
                             </th>
                           </tr>
                         ),
-                        rows: orders.slice(0, 9).map((order) => (
+                        rows: orders
+                          .filter((order) => {
+                            // Filter by order type if selected
+                            const typeMatch =
+                              !selectedOrderType || order.order_type === selectedOrderType;
+
+                            // Filter by priority if selected
+                            const priorityMatch =
+                              !selectedPriority ||
+                              order.order_priority === selectedPriority;
+
+                            // Show order only if both filters match (or no filter is selected)
+                            return typeMatch && priorityMatch;
+                          })
+                          .slice(0, 9)
+                          .map((order) => (
                           <tr
                             key={order.id}
                             className={
@@ -481,6 +529,16 @@ function Dashboard() {
                             <td>{order.officer_name || "-"}</td>
                             <td>{order.created_by}</td>
                             <td>{order.updated_by || "-"}</td>
+                            <td>{order.order_type || "-"}</td>
+                            <td>
+                              <span
+                                className={`priority-badge priority-${
+                                  order.order_priority?.toLowerCase() || "none"
+                                }`}
+                              >
+                                {order.order_priority || "-"}
+                              </span>
+                            </td>
                             <td>
                               <p className="status-state order-state">
                                 {order.current_status_name}
@@ -514,7 +572,7 @@ function Dashboard() {
         )}
       </div>
       {/* just for telecoller */}
-      {isTelecaller && (
+      {isTelecaller && hasPermission(allowedPermissions, "view_dashboard_order_cards_telecaller") && (
         <div className="telecoller-dashboard">
           {loading ? (
             <div className="loading-message">

@@ -134,9 +134,9 @@ function States() {
               </tr>
             ),
 
-            rows: data.map((item) => (
+            rows: data.map((item, index) => (
               <tr key={item.id}>
-                <td>{item.id}</td>
+                <td className="sequential-number">{index + 1}</td>
                 <td>
                   {hasPermission(allowedPermissions, "view_cities") ? (
                     <Link

@@ -145,9 +145,9 @@ function SubCategories() {
                 <th style={{ textAlign: "center", width: "150px" }}>Action</th>
               </tr>
             ),
-            rows: subcategories.map((sub) => (
+            rows: subcategories.map((sub, index) => (
               <tr key={sub.id}>
-                <td>{sub.id}</td>
+                <td className="sequential-number">{index + 1}</td>
                 <td>
                   {hasPermission(allowedPermissions, "view_child_category") ? (
                     <Link

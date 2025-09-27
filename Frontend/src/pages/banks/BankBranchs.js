@@ -166,9 +166,9 @@ function BankBranches() {
                 <th style={{ textAlign: "center", width: "150px" }}>Action</th>
               </tr>
             ),
-            rows: branches.map((branch) => (
+            rows: branches.map((branch, index) => (
               <tr key={branch.id}>
-                <td>{branch.id}</td>
+                <td className="sequential-number">{index + 1}</td>
                 <td>{branch.name}</td>
                 <td>{branch.city_name}</td>
                 <td>{branch.created_by}</td>

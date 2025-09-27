@@ -55,6 +55,9 @@ const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = tr
 
   // Sort handler
   const handleSort = (index) => {
+    // Skip sorting for sequential number column (index 0)
+    if (index === 0) return;
+    
     if (sortConfig.index === index) {
       setSortConfig({
         index,
@@ -158,11 +161,24 @@ const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = tr
             </tr>
           </thead>
           <tbody>
-            {paginatedData.map(({ element }) =>
-              React.cloneElement(element, {
+            {paginatedData.map(({ element }, index) => {
+              // Calculate the actual sequential number based on current page and entries per page
+              const sequentialNumber = (currentPage - 1) * entriesPerPage + index + 1;
+              
+              return React.cloneElement(element, {
                 className: "hover:bg-gray-50",
-              })
-            )}
+                key: element.key,
+                children: React.Children.map(element.props.children, (child, childIndex) => {
+                  // Replace the sequential number in the first column (index 0)
+                  if (childIndex === 0 && child.props.className === "sequential-number") {
+                    return React.cloneElement(child, {
+                      children: sequentialNumber
+                    });
+                  }
+                  return child;
+                })
+              });
+            })}
           </tbody>
           <tfoot>{footer}</tfoot>
         </table>

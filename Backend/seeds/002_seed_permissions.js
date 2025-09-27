@@ -8,6 +8,7 @@ exports.seed = async function (knex) {
     "view_dashboard_statistics",
     "view_dashboard_checkin_checkout",
     "view_dashboard_order_table",
+    "view_dashboard_order_cards_telecaller",
 
     "view_user",
     "add_user",
@@ -67,6 +68,7 @@ exports.seed = async function (knex) {
     "edit_order",
     "delete_order",
     "view_order_details",
+    "edit_order_priority_and_type",
 
     "view_order_recent_activity",
 

@@ -260,9 +260,9 @@ function FieldVerifiers() {
                 <th style={{ width: "150px" }}>Action</th>
               </tr>
             ),
-            rows: fieldVerifiers.map((verifier) => (
+            rows: fieldVerifiers.map((verifier, index) => (
               <tr key={verifier.id}>
-                <td>{verifier.id}</td>
+                <td className="sequential-number">{index + 1}</td>
                 <td>{verifier.name}</td>
                 <td>{verifier.username}</td>
                 <td>{getMaskedMobile(verifier.mobile)}</td>

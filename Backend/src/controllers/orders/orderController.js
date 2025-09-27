@@ -23,7 +23,10 @@ exports.getAll = async (req, res, next) => {
 // Get All Orders for Mobile App
 exports.getForMobile = async (req, res, next) => {
   try {
-    const orders = await Order.getForMobile();
+    // Get field verifier ID from the authenticated user
+    const fieldVerifierId = req.verifier.id;
+    
+    const orders = await Order.getForMobile(fieldVerifierId);
     
     if (orders && orders.length > 0) {
       res.json({
@@ -486,3 +489,78 @@ exports.softDelete = async (req, res, next) => {
     next(err);
   }
 }; */
+
+/**
+ * PATCH /orders/:id/attributes
+ * Update specific order attributes (flexible partial update)
+ * 
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next function
+ */
+exports.updateOrderAttributes = async (req, res, next) => {
+  try {
+    const orderId = req.params.id;
+    const updateData = req.body;
+    const userId = req.user?.id;
+
+    // Validate that order exists
+    const existingOrder = await Order.findById(orderId, req.user);
+    if (!existingOrder) {
+      throw new NotFoundError("Order not found");
+    }
+
+    // Validate that at least one attribute is provided
+    if (!updateData || Object.keys(updateData).length === 0) {
+      throw new BadRequestError("At least one attribute must be provided for update");
+    }
+
+    // Remove any system fields that shouldn't be updated directly
+    const restrictedFields = ['id', 'order_number', 'created_at', 'created_by', 'updated_by', 'updated_at', 'deleted_at'];
+    const filteredUpdateData = {};
+
+    for (const [key, value] of Object.entries(updateData)) {
+      if (restrictedFields.includes(key)) {
+        throw new BadRequestError(`Field '${key}' cannot be updated through this endpoint`);
+      }
+      // Only include fields that have actual values (not undefined)
+      if (value !== undefined) {
+        filteredUpdateData[key] = value;
+      }
+    }
+
+    // Validate that we have at least one valid field to update
+    if (Object.keys(filteredUpdateData).length === 0) {
+      throw new BadRequestError("No valid fields provided for update");
+    }
+
+    // Update the order attributes
+    const updatedOrder = await Order.updateOrderAttributes(orderId, filteredUpdateData, userId);
+
+    // Get the complete updated order with all relationships for response
+    const enrichedOrder = await Order.findById(orderId, req.user);
+
+    // Log the activity
+    const statusHistoryData = {
+      order_id: orderId,
+      activity_extra: `Order attributes updated: ${Object.keys(filteredUpdateData).join(', ')}`,
+      changed_by: userId,
+      changed_at: new Date(),
+    };
+
+    await OrderStatusHistory.createStatusHistory(statusHistoryData);
+
+    res.status(200).json({
+      success: true,
+      message: "Order attributes updated successfully",
+      data: enrichedOrder,
+      updated_fields: Object.keys(filteredUpdateData)
+    });
+
+  } catch (err) {
+    if (err.code === "23505") {
+      return next(new ConflictError("Order number already exists"));
+    }
+    next(err);
+  }
+};

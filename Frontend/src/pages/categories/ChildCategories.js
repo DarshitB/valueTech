@@ -160,9 +160,9 @@ function ChildCategories() {
                 <th style={{ width: "200px", textAlign: "center" }}>Action</th>
               </tr>
             ),
-            rows: childCategories.map((child) => (
+            rows: childCategories.map((child, index) => (
               <tr key={child.id}>
-                <td>{child.id}</td>
+                <td className="sequential-number">{index + 1}</td>
                 <td>{child.name}</td>
                 <td>{child.created_by}</td>
                 <td>{child.updated_by || "-"}</td>

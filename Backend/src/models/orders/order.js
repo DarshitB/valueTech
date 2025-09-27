@@ -66,6 +66,8 @@ const order = {
         "orders.current_status_id",
         "order_status_master.name as current_status_name",
         "order_status_master.description as current_status_description",
+        "orders.order_priority",
+        "orders.order_type",
         "orders.created_at",
         "created_user.name as created_by",
         "orders.updated_at",
@@ -107,8 +109,8 @@ const order = {
     return orders;
   },
 
-  // Get all orders for mobile app
-  getForMobile: async () => {
+  // Get orders for mobile app filtered by field verifier ID
+  getForMobile: async (fieldVerifierId) => {
     // Base order query
     const baseQuery = db("orders")
       .leftJoin(
@@ -173,6 +175,8 @@ const order = {
         "orders.current_status_id",
         "order_status_master.name as current_status_name",
         "order_status_master.description as current_status_description",
+        "orders.order_priority",
+        "orders.order_type",
         "orders.created_at",
         "created_user.name as created_by",
         "orders.updated_at",
@@ -186,7 +190,8 @@ const order = {
         "category.id as category_id",
         "category.name as category_name"
       )
-      .whereNull("orders.deleted_at");
+      .whereNull("orders.deleted_at")
+      .where("orders.field_verifier_id", fieldVerifierId);
 
     // Sort by newest first
     baseQuery.orderBy("orders.created_at", "desc");
@@ -261,6 +266,8 @@ const order = {
         "orders.current_status_id",
         "order_status_master.name as current_status_name",
         "order_status_master.description as current_status_description",
+        "orders.order_priority",
+        "orders.order_type",
         "orders.created_at",
         "created_user.name as created_by",
         "orders.updated_at",
@@ -443,7 +450,25 @@ const order = {
       .orderBy("order_status_history.changed_at", "desc");
 
     return statusHistory;
-  } */
+  }, */
+
+  // Update specific order attributes (partial update)
+  updateOrderAttributes: async (orderId, updateData, userId) => {
+    // Add updated_by and updated_at to the update data
+    const finalUpdateData = {
+      ...updateData,
+      updated_by: userId,
+      updated_at: new Date(),
+    };
+
+    // Update the order with the provided attributes
+    const [updatedOrder] = await db("orders")
+      .where({ id: orderId })
+      .update(finalUpdateData)
+      .returning("*");
+
+    return updatedOrder;
+  },
 };
 
 module.exports = order;

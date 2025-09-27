@@ -286,9 +286,9 @@ function Officers() {
                 <th>Action</th>
               </tr>
             ),
-            rows: officers.map((officer) => (
+            rows: officers.map((officer, index) => (
               <tr key={officer.id}>
-                <td>{officer.id}</td>
+                <td className="sequential-number">{index + 1}</td>
                 <td>{officer.name}</td>
                 <td>{officer.role_name}</td>
                 <td>{officer.departments.map((d) => d.name).join(", ")}</td>

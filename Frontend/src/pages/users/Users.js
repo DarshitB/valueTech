@@ -143,7 +143,7 @@ function Users() {
 
     // Password handling: set default "123456" if empty, validate confirm password only if custom password is entered
     let finalPassword = formData.password || "123456";
-    
+
     // Only validate confirm password if user entered a custom password
     if (formData.password && formData.password !== formData.confirm_password) {
       toast.error("Password and Confirm Password do not match.");
@@ -216,8 +216,8 @@ function Users() {
     if (!email) return;
 
     // Add domain if not present
-    if (!email.includes('@')) {
-      email = email + '@valuetechsolutions.in';
+    if (!email.includes("@")) {
+      email = email + "@valuetechsolutions.in";
       setFormData({
         ...formData,
         email,
@@ -276,9 +276,9 @@ function Users() {
                 <th style={{ textAlign: "center", width: "150px" }}>Action</th>
               </tr>
             ),
-            rows: users.map((user) => (
+            rows: users.map((user, index) => (
               <tr key={user.id}>
-                <td>{user.id}</td>
+                <td className="sequential-number">{index + 1}</td>
                 <td>{user.name}</td>
                 <td>{user.email}</td>
                 <td>{user.mobile}</td>
@@ -352,7 +352,7 @@ function Users() {
                         // Remove spaces and symbols, convert to lowercase
                         const email = e.target.value
                           .toLowerCase()
-                          .replace(/[^a-z0-9]/g, '');
+                          .replace(/[^a-z0-9]/g, "");
                         setFormData({
                           ...formData,
                           email,

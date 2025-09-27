@@ -16,3 +16,6 @@ export const addComment = (id, payload) =>
 
 export const updatePaymentStatus = (id, payload) =>
   axios.patch(`${ENDPOINT}/${id}/payment`, payload); // Update payment status of an order
+
+export const updateOrderAttributes = (id, payload) =>
+  axios.patch(`${ENDPOINT}/${id}/attributes`, payload); // Update attributes of an order

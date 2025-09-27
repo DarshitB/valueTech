@@ -148,9 +148,9 @@ function Categories() {
             ),
 
             // 📄 Table Rows
-            rows: categories.map((item) => (
+            rows: categories.map((item, index) => (
               <tr key={item.id}>
-                <td>{item.id}</td>
+                <td className="sequential-number">{index + 1}</td>
                 <td>
                   {hasPermission(allowedPermissions, "view_sub_category") ? (
                     <Link

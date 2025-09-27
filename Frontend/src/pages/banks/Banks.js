@@ -127,9 +127,9 @@ function Banks() {
                 <th style={{ textAlign: "center", width: "150px" }}>Action</th>
               </tr>
             ),
-            rows: banks.map((bank) => (
+            rows: banks.map((bank, index) => (
               <tr key={bank.id}>
-                <td>{bank.id}</td>
+                <td className="sequential-number">{index + 1}</td>
                 <td>
                   {hasPermission(allowedPermissions, "view_bank_branch") ? (
                     <Link

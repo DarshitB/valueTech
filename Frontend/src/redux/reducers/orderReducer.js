@@ -106,6 +106,19 @@ export const updatePaymentStatus = createAsyncThunk(
   }
 );
 
+// Async action: Update order attributes
+export const updateOrderAttributes = createAsyncThunk(
+  "orders/updateAttributes",
+  async ({ id, data }, { rejectWithValue }) => {
+    try {
+      const res = await orderApi.updateOrderAttributes(id, data);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
 
 // Initial state
 const initialState = {
@@ -118,6 +131,8 @@ const initialState = {
   mediaError: null,    // Media error state
   paymentUpdating: false, // Payment update loading
   paymentError: null,     // Payment update error
+  attributesUpdating: false, // Attributes update loading
+  attributesError: null,     // Attributes update error
 };
 
 // Order slice
@@ -264,6 +279,38 @@ const orderSlice = createSlice({
         state.paymentUpdating = false;
         state.paymentError = action.payload;
         toast.error(`Failed to update payment: ${action.payload}`);
+      })
+
+      // Update order attributes
+      .addCase(updateOrderAttributes.pending, (state) => {
+        state.attributesUpdating = true;
+        state.attributesError = null;
+      })
+      .addCase(updateOrderAttributes.fulfilled, (state, action) => {
+        state.attributesUpdating = false;
+        
+        // Handle the nested response structure: { success, message, data, updated_fields }
+        const response = action.payload;
+        const updated = response?.data;
+        
+        if (updated && typeof updated === "object") {
+          // Merge into selected order if it matches
+          if (state.selected && state.selected.id === updated.id) {
+            state.selected = { ...state.selected, ...updated };
+          }
+          // Merge into list if present
+          const listIdx = state.list.findIndex((o) => o.id === updated.id);
+          if (listIdx !== -1) {
+            state.list[listIdx] = { ...state.list[listIdx], ...updated };
+          }
+        }
+        
+        toast.success(response?.message || "Order attributes updated successfully");
+      })
+      .addCase(updateOrderAttributes.rejected, (state, action) => {
+        state.attributesUpdating = false;
+        state.attributesError = action.payload;
+        toast.error(`Failed to update order attributes: ${action.payload}`);
       });
   },
 });

@@ -190,9 +190,9 @@ function Cities() {
               </tr>
             ),
 
-            rows: cities.map((item) => (
+            rows: cities.map((item, index) => (
               <tr key={item.id}>
-                <td>{item.id}</td>
+                <td className="sequential-number">{index + 1}</td>
                 <td>{item.name}</td>
                 <td>{item.created_by}</td>
                 <td>{item.updated_by || "-"}</td>

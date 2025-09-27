@@ -11,7 +11,34 @@
     white-space: nowrap;
   }
 }
-
+.priority-badge {
+  padding: 7px 15px;
+  border-radius: 50rem;
+  &.priority-high {
+    border: 1px solid $color-danger;
+    background-color: $color-danger;
+    color: white;
+  }
+  &.priority-medium {
+    border: 1px solid $color-warning;
+    background-color: $color-warning;
+    color: white;
+  }
+  &.priority-low {
+    border: 1px solid $color-success;
+    background-color: $color-success;
+    color: white;
+  }
+}
+.type-priority-selector {
+  padding: 2px 15px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  min-width: 120px;
+  border-radius: 50rem;
+  outline: none;
+  box-shadow: none;
+}
 /*///////////////// order details  ////////////////////*/
 
 .mention-highlight {
