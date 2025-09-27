@@ -47,8 +47,8 @@ function Dashboard() {
     dispatch(fetchFieldVerifiers());
   }, [dispatch]);
 
-  // Check if current user is TELECALLER (case-insensitive)
-  const isTelecaller = currentUser?.role.name?.toUpperCase() === "TELECALLER";
+  // Check if current user is TELECALLER (case-insensitive) - matches any role containing "TELECALLER"
+  const isTelecaller = currentUser?.role.name?.toUpperCase().includes("TELECALLER");
 
   // Check if current user is Bank Officer (case-insensitive)
   const isBankOfficer =

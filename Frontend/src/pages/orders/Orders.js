@@ -95,8 +95,8 @@ function Orders() {
   // State for priority filter
   const [selectedPriority, setSelectedPriority] = useState("");
 
-  // Check if current user is TELECALLER (case-insensitive)
-  const isTelecaller = currentUser?.role.name?.toUpperCase() === "TELECALLER";
+  // Check if current user is TELECALLER (case-insensitive) - matches any role containing "TELECALLER"
+  const isTelecaller = currentUser?.role.name?.toUpperCase().includes("TELECALLER");
   /* console.log("isTelecaller", currentUser?.role.name); */
 
   // Check if current user is Bank Officer (case-insensitive)
