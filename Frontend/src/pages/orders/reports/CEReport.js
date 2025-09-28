@@ -1722,6 +1722,14 @@ function CEReport() {
                           value: "MARUTI SUZUKI INDIA LTD",
                           label: "MARUTI SUZUKI INDIA LTD",
                         },
+                        {
+                          value: "XCMG CONSTRUCTION MACHINERY CO. LTD., CHINA",
+                          label: "XCMG CONSTRUCTION MACHINERY CO. LTD., CHINA",
+                        },
+                        {
+                          value: "ANE ASSET MAKE OPEN KARI NAKH AME ADD KARI SAKIYE EM",
+                          label: "ANE ASSET MAKE OPEN KARI NAKH AME ADD KARI SAKIYE EM",
+                        },
                       ]}
                       value={reportFormData.asset_make}
                       onChange={(value) =>
