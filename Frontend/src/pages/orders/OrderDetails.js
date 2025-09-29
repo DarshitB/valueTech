@@ -578,7 +578,7 @@ function OrderDetails() {
                   </Link>
                 )}
                 
-                {order?.category_name === "CONSTRUCTION EQUIPMENTS" && (
+                {order?.category_name === "CONSTRUCTION EQUIPMENT" && (
                   <Link
                     to={`/orders/${id}/details/ce-report`}
                     title="CE Report"
