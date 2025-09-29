@@ -141,7 +141,7 @@ function Layout() {
         >
           <aside id="sidebar-wrapper">
             <div className="sidebar-brand">
-              <Link to="/">Valueation</Link>
+              <Link to="/" className="sidebar-brand-link">Valuetech Solutions</Link>
             </div>
             <ul className="sidebar-menu">
               <li className="menu-header">&nbsp;</li>

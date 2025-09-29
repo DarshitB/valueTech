@@ -33,7 +33,7 @@ export default function Login() {
         <div className="container">
           <div className="row">
             <div className="col-12 col-sm-8 offset-sm-2 col-md-6 offset-md-3 col-lg-6 offset-lg-3 col-xl-5 offset-xl-5 remove-grid-margin">
-              <h2 className="login-brand">Valueation</h2>
+              <h2 className="login-brand">Valuetech Solutions</h2>
               <div className="card card-primary">
                 <div className="card-header">
                   <h4>Login to your account</h4>
