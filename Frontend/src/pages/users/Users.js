@@ -402,8 +402,10 @@ function Users() {
                       {roles
                         .filter(
                           (role) =>
-                            role.name.toUpperCase() !== "BANK AUTHORITY" &&
-                            role.name.toUpperCase() !== "BANK OFFICER"
+                            !role.name
+                              .toUpperCase()
+                              .includes("BANK AUTHORITY") &&
+                            !role.name.toUpperCase().includes("BANK OFFICER")
                         )
                         .map((role) => (
                           <label

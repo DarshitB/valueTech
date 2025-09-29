@@ -197,18 +197,25 @@ exports.generateReport = async (req, res, next) => {
         );
     }
 
-    // Update or create report based on type
+    // Check if report already exists for this order
     const existingReport = await ReportModel.findByOrderId(order_id);
     let report;
+    
     if (existingReport) {
+      // Update existing report (whether saved or generated) - NO DUPLICATES
       report = await ReportModel.updateReport(
         existingReport.id,
-        reportData,
+        {
+          ...reportData,
+          updated_by: userId,
+          updated_at: new Date()
+        },
         userId
       );
       // Delete existing flexible fields and add new ones
       await ReportModel.deleteFlexibleFieldsByReportId(report.id);
     } else {
+      // Create new report (no existing data)
       report = await ReportModel.createReport(reportData);
     }
 
@@ -561,6 +568,290 @@ exports.getReportByOrderAndType = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * Save Report Data (step by step, allows partial data)
+ * POST /orders-reports/:order_id/save
+ * Works exactly like generateReport but saves data without creating PDF
+ */
+exports.saveReportData = async (req, res, next) => {
+  try {
+    const { order_id } = req.params;
+    const { report_type: requestedReportType } = req.body;
+    const { id: userId } = req.user;
+    // Get order details with relationships
+    const order = await Order.findById(order_id, req.user);
+    if (!order) {
+      throw new NotFoundError("Order not found");
+    }
+
+    // Get form data from request body
+    const formData = req.body;
+
+    // Handle flexible_fields - parse from request body format for save API
+    let flexibleFields = parseFlexibleFieldsFromRequest(formData);
+
+    // Format insurance period if provided
+    let formattedPeriod = null;
+    if (formData.period_of_insurance) {
+      const parts = formData.period_of_insurance.split(" - ");
+      if (parts.length === 2) {
+        const from = parts[0];
+        const to = parts[1];
+        formattedPeriod = `From ${from} Hrs To Midnight on ${to} Hrs`;
+      }
+    }
+
+    // Prepare report data (same structure as generateReport)
+    const reportData = {
+      order_id: order.id,
+      created_by: userId,
+      created_at: new Date()
+    };
+
+    // Add period_of_insurance only for report types that have this column
+    if (['report_cv'].includes(requestedReportType.toLowerCase())) {
+      reportData.period_of_insurance = formattedPeriod;
+    }
+
+    // Filter form data to only include valid database columns
+    const validFields = filterValidReportFields(formData, requestedReportType);
+    Object.assign(reportData, validFields);
+
+    // Determine which report model to use based on report_type
+    let ReportModel;
+    switch (requestedReportType.toLowerCase()) {
+      case "report_cv":
+        ReportModel = CvReport;
+        break;
+      case "report_avr":
+        ReportModel = AvrReport;
+        break;
+      case "report_machinery":
+        ReportModel = MachineryReport;
+        break;
+      case "report_ce":
+        ReportModel = CeReport;
+        break;
+      default:
+        throw new BadRequestError(
+          `Report type '${requestedReportType}' is not supported`
+        );
+    }
+
+    // Check if report already exists for this order
+    const existingReport = await ReportModel.findByOrderId(order_id);
+    let report;
+    
+    if (existingReport) {
+      // Update existing report with new/partial data
+      report = await ReportModel.updateReport(
+        existingReport.id,
+        reportData,
+        userId
+      );
+      // Delete existing flexible fields and add new ones
+      await ReportModel.deleteFlexibleFieldsByReportId(report.id);
+    } else {
+      // Create new report
+      report = await ReportModel.createReport(reportData);
+    }
+
+    // Save flexible fields if any
+    if (flexibleFields.length > 0) {
+      for (const field of flexibleFields) {
+        await ReportModel.createFlexibleField({
+          report_id: report.id,
+          section_name: field.section_name || null,
+          col_span: field.col_span ? parseInt(field.col_span) : null,
+          field_label: field.field_label || null,
+          field_value: field.field_value || null,
+          field_order: field.field_order ? parseInt(field.field_order) : null,
+          created_by: userId,
+          created_at: new Date(),
+        });
+      }
+    }
+
+    // Get the complete report data with flexible fields for response
+    const completeReport = await ReportModel.findByOrderIdWithFlexibleFields(
+      order_id
+    );
+
+    res.json({
+      success: true,
+      message: "Report data saved successfully",
+      data: {
+        report_id: report.id,
+        report: completeReport,
+        order_id: parseInt(order_id),
+        report_type: requestedReportType
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+/**
+ * Parse flexible fields from request body format
+ * Handles format like: flexible_fields[0][section_name], flexible_fields[0][col_span], etc.
+ * @param {Object} formData - Form data from request
+ * @returns {Array} Array of flexible field objects
+ */
+function parseFlexibleFieldsFromRequest(formData) {
+  const flexibleFields = [];
+  const fieldIndices = new Set();
+
+  // Find all flexible field indices
+  Object.keys(formData).forEach(key => {
+    const match = key.match(/^flexible_fields\[(\d+)\]\[([^\]]+)\]$/);
+    if (match) {
+      fieldIndices.add(parseInt(match[1]));
+    }
+  });
+
+  // Parse each flexible field
+  fieldIndices.forEach(index => {
+    const field = {};
+    const sectionName = formData[`flexible_fields[${index}][section_name]`];
+    const colSpan = formData[`flexible_fields[${index}][col_span]`];
+    const fieldLabel = formData[`flexible_fields[${index}][field_label]`];
+    const fieldValue = formData[`flexible_fields[${index}][field_value]`];
+    const fieldOrder = formData[`flexible_fields[${index}][field_order]`];
+
+    // Only add field if it has at least section_name and field_label
+    if (sectionName && fieldLabel) {
+      field.section_name = sectionName;
+      field.col_span = colSpan ? parseInt(colSpan) : null;
+      field.field_label = fieldLabel;
+      field.field_value = fieldValue || null;
+      field.field_order = fieldOrder ? parseInt(fieldOrder) : null;
+      flexibleFields.push(field);
+    }
+  });
+
+  return flexibleFields;
+}
+
+/**
+ * Filter form data to only include valid database columns for each report type
+ * @param {Object} formData - Form data from request
+ * @param {string} reportType - Type of report
+ * @returns {Object} Filtered data with only valid columns
+ */
+function filterValidReportFields(formData, reportType) {
+  // Define valid columns for each report type based on actual database schema
+  const validColumns = {
+    report_cv: [
+      'ref_no_year', 'ref_no_bank', 'state_name', 'ref_no_code', 'ref_no_id',
+      'report_date', 'valuer_name', 'license_no', 'valuer_contact', 'valuation_purpose',
+      'initiated_by', 'date_of_inspection', 'place_of_inspection',
+      'registered_owner_name', 'registered_owner_address', 'proposed_owner_name', 'proposed_owner_address',
+      'registration_no', 'registration_date', 'registered_location', 'owner_serial_no',
+      'manufacture_year', 'asset_make', 'model', 'engine_no_detail', 'chassis_no',
+      'body_type', 'fuel_type', 'kilometer_reading', 'invoice_no_date',
+      'hyp_with', 'hyp_from_date', 'asset_classification', 'no_of_cylinder',
+      'engine_condition', 'chassis_condition', 'body_condition', 'cabin_condition',
+      'electrical_condition', 'gear_transmission', 'battery_available', 'gross_vehicle_weight',
+      'front_tyre_no', 'front_tyre_condition', 'middle_tyre_no', 'middle_tyre_condition',
+      'rear_tyre_no', 'rear_tyre_condition', 'no_of_tyres', 'stepney',
+      'horse_power', 'mechanical_unit_condition', 'cubic_capacity', 'suspension',
+      'seating_capacity', 'tool_kit_available', 'vehicle_colour', 'color_condition',
+      'damages_if_any', 'rc_book_verified', 'invoice_verified', 'tax_upto',
+      'permit_upto', 'permit_type', 'fitness_upto',
+      'insurance_co_name', 'policy_no', 'period_of_insurance', 'insured_value', 'insurance_verified',
+      'current_invoice_cost', 'depreciation', 'depreciation_value', 'appraiser_value',
+      'fair_market_value', 'amount_in_words',
+      'no_of_photograph', 'no_of_collage', 'valuer_comments_remarks',
+      'declaration', 'disclaimer', 'chassis_no_pencil_impression'
+    ],
+    report_avr: [
+      'ref_no_year', 'ref_no_bank', 'ref_no_code', 'ref_no_id', 'lan_no',
+      'report_date', 'bank_name', 'branch_name', 'state_name',
+      'model_number', 'officer_name', 'officer_designation', 'inspected_item', 'inspected_date',
+      'inspection_address', 'customer_name', 'address_as_per_kyc', 'machinery_locations', 'lan_city_no',
+      'date_of_disbursement', 'date_of_invoice_delivery_no', 'invoice_price', 'lien_of_bank',
+      'chassis_no', 'machine_serial_no', 'engine_no', 'regn_no',
+      'installed_running', 'installed_asset_whether_functional_or_not', 'class_make_of_asset', 'year_of_mfg',
+      'invoice_purchase_order_no', 'pro_owner_address',
+      'insurer_policy_no', 'insurance_validity_insured_value', 'insurance_having_lien_of_bank',
+      'total_crane_weight_capacity', 'material_usefulness', 'colour', 'observation', 'status_of_machine',
+      'visit_done_by', 'place', 'date_time', 'surveyor', 'license_no', 'surveyor_location',
+      'no_of_photograph', 'no_of_collage', 'valuer_comments_remarks',
+      'declaration', 'disclaimer'
+    ],
+    report_machinery: [
+      'ref_no_year', 'ref_no_bank', 'state_name', 'ref_no_code', 'ref_no_id',
+      'report_date', 'valuer_name', 'license_no', 'valuer_contact', 'valuation_purpose',
+      'initiated_by', 'date_of_inspection', 'place_of_inspection',
+      'registered_owner_name', 'registered_owner_address', 'proposed_owner_name', 'proposed_owner_address',
+      'registration_no', 'registration_date', 'registered_location', 'owner_serial_no',
+      'manufacture_year', 'asset_make', 'model', 'engine_no_detail', 'chassis_no',
+      'body_type', 'fuel_type', 'kilometer_reading', 'invoice_no_date',
+      'hyp_with', 'hyp_from_date', 'asset_classification', 'no_of_cylinder',
+      'engine_condition', 'chassis_condition', 'body_condition', 'cabin_condition',
+      'electrical_condition', 'gear_transmission', 'battery_available', 'gross_vehicle_weight',
+      'front_tyre_no', 'front_tyre_condition', 'middle_tyre_no', 'middle_tyre_condition',
+      'rear_tyre_no', 'rear_tyre_condition', 'no_of_tyres', 'stepney',
+      'horse_power', 'mechanical_unit_condition', 'cubic_capacity', 'suspension',
+      'seating_capacity', 'tool_kit_available', 'vehicle_colour', 'color_condition',
+      'damages_if_any', 'rc_book_verified', 'tax_invoice_copy', 'tax_upto_title', 'tax_upto',
+      'permit_upto', 'permit_type', 'fitness_upto_title', 'fitness_upto',
+      'insurance_co_name', 'policy_no', 'insurance_valid_date', 'insured_value', 'insurance_verified',
+      'tax_invoice_cost', 'depreciation', 'depreciation_value', 'appraiser_value',
+      'fair_market_value', 'amount_in_words',
+      'no_of_photograph', 'no_of_collage', 'valuer_comments_remarks',
+      'declaration', 'disclaimer'
+    ],
+    report_ce: [
+      'ref_no_year', 'ref_no_bank', 'state_name', 'ref_no_code', 'ref_no_id', 'rev_report_date',
+      'valuer_name', 'license_no', 'valuer_contact', 'valuation_purpose', 'initiated_by',
+      'date_of_inspection', 'place_of_inspection',
+      'registered_owner_name', 'registered_owner_address', 'proposed_owner_name', 'proposed_owner_address',
+      'registration_no', 'registration_date', 'registered_location', 'owner_serial_no',
+      'manufacture_year', 'asset_make', 'model', 'engine_no_detail', 'crane_chassis_no',
+      'body_type', 'crane_model_code', 'hours_meter_reading', 'invoice_no_date', 'invoice_no', 'invoice_date',
+      'hyp_with', 'hyp_from_date', 'asset_classification', 'no_of_cylinder',
+      'engine_condition', 'chassis_condition', 'body_condition', 'cabin_condition',
+      'electrical_condition', 'gear_transmission', 'battery_available', 'gross_machine_weight',
+      'fix_but_flex_heading_1', 'fix_but_flex_value_1', 'fix_but_flex_heading_2', 'fix_but_flex_value_2',
+      'fix_but_flex_heading_3', 'fix_but_flex_value_3', 'fix_but_flex_title_1', 'fix_but_flex_title_2',
+      'fix_but_flex_title_3', 'fix_but_flex_heading_4', 'fix_but_flex_value_4', 'fix_but_flex_heading_5',
+      'fix_but_flex_value_5', 'fix_but_flex_heading_6', 'fix_but_flex_value_6', 'fix_but_flex_heading_7',
+      'fix_but_flex_value_7', 'fix_but_flex_heading_8', 'fix_but_flex_value_8', 'fix_but_flex_heading_9',
+      'fix_but_flex_value_9', 'fix_but_flex_heading_10', 'fix_but_flex_value_10', 'fix_but_flex_heading_11',
+      'fix_but_flex_value_11', 'fix_but_flex_heading_12', 'fix_but_flex_value_12', 'fix_but_flex_top_heading_13',
+      'fix_but_flex_heading_13', 'fix_but_flex_value_13', 'fix_but_flex_heading_14', 'fix_but_flex_value_14',
+      'fix_but_flex_heading_15', 'fix_but_flex_value_15', 'fix_but_flex_heading_16', 'fix_but_flex_value_16',
+      'fix_but_flex_heading_17', 'fix_but_flex_value_17', 'fix_but_flex_heading_18', 'fix_but_flex_value_18',
+      'fix_but_flex_heading_19', 'fix_but_flex_value_19', 'fix_but_flex_heading_20', 'fix_but_flex_value_20',
+      'fix_but_flex_heading_21', 'fix_but_flex_value_21', 'fix_but_flex_heading_22', 'fix_but_flex_value_22',
+      'fix_but_flex_heading_23', 'fix_but_flex_value_23', 'fix_but_flex_heading_24', 'fix_but_flex_value_24',
+      'fix_but_flex_heading_25', 'fix_but_flex_value_25', 'damages_if_any',
+      'bill_of_entry', 'proforma_invoice_verified', 'tax_upto', 'bill_of_lading',
+      'chartered_engineer_certificate', 'fitness_upto',
+      'insurance_co_name', 'policy_no', 'insurance_valid_date', 'insured_value', 'insurance_verified',
+      'invoice_cost', 'depreciation', 'depreciation_value', 'appraiser_value',
+      'fair_market_value', 'amount_in_words',
+      'no_of_photograph', 'no_of_collage', 'valuer_comments_remarks',
+      'declaration', 'disclaimer', 'chassis_no_pencil_impression'
+    ]
+  };
+
+  const allowedColumns = validColumns[reportType.toLowerCase()] || [];
+  const filteredData = {};
+
+  // Only include fields that exist in the valid columns list
+  Object.keys(formData).forEach(key => {
+    if (allowedColumns.includes(key)) {
+      filteredData[key] = formData[key];
+    }
+  });
+
+  return filteredData;
+}
 
 // Export multer middleware for use in routes
 exports.uploadChassisImage = upload.single("chassis_no_pencil_impression");

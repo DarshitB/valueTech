@@ -92,6 +92,19 @@ export const updateOrderMediaStatus = createAsyncThunk(
   }
 );
 
+// Async action: Upload ZIP file containing images/videos
+export const uploadZipFile = createAsyncThunk(
+  "orders/uploadZip",
+  async (formData, { rejectWithValue }) => {
+    try {
+      const res = await orderMediaApi.uploadZipFile(formData);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
 // Async action: Update payment status/details for an order
 export const updatePaymentStatus = createAsyncThunk(
   "orders/updatePaymentStatus",
@@ -129,6 +142,9 @@ const initialState = {
   media: null,     // Order media data
   mediaLoading: false, // Media loading state
   mediaError: null,    // Media error state
+  zipUploading: false, // ZIP upload loading state
+  zipUploadError: null, // ZIP upload error state
+  zipUploadProgress: 0, // ZIP upload progress
   paymentUpdating: false, // Payment update loading
   paymentError: null,     // Payment update error
   attributesUpdating: false, // Attributes update loading
@@ -252,6 +268,33 @@ const orderSlice = createSlice({
       })
       .addCase(updateOrderMediaStatus.rejected, (state, action) => {
         toast.error(`Failed to update media status: ${action.payload}`);
+      })
+
+      // Upload ZIP file
+      .addCase(uploadZipFile.pending, (state) => {
+        state.zipUploading = true;
+        state.zipUploadError = null;
+        state.zipUploadProgress = 0;
+      })
+      .addCase(uploadZipFile.fulfilled, (state, action) => {
+        state.zipUploading = false;
+        state.zipUploadProgress = 100;
+        
+        // Add the newly uploaded files to the existing media array
+        if (state.media && state.media.media && action.payload && action.payload.data && action.payload.data.uploaded_files) {
+          const uploadedFiles = action.payload.data.uploaded_files;
+          if (Array.isArray(uploadedFiles)) {
+            state.media.media.push(...uploadedFiles);
+          }
+        }
+        
+        toast.success(action.payload?.message || "ZIP file uploaded successfully");
+      })
+      .addCase(uploadZipFile.rejected, (state, action) => {
+        state.zipUploading = false;
+        state.zipUploadError = action.payload;
+        state.zipUploadProgress = 0;
+        toast.error(`Failed to upload ZIP file: ${action.payload}`);
       })
 
       // Update payment status/details for an order

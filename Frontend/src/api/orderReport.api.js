@@ -25,3 +25,11 @@ export const generateCustomReport = (orderId, content) =>
       'Content-Type': 'application/json',
     },
   }); // Generate custom report with JSON payload
+
+// Save order report data
+export const saveOrderReport = (orderId, reportData) => 
+  axios.post(`${ENDPOINT}/${orderId}/save`, reportData, {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  }); // Save order report data with JSON payload

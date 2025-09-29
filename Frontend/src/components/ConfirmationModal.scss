@@ -44,11 +44,11 @@
         &.secondary {
           background-color: $base-hover-color !important;
           border-color: $base-hover-color !important;
-          color: $base-font-color;
+          color: $primary-color !important;
           &:hover {
             background-color: $primary-color !important;
             border-color: $primary-color !important;
-            color: $base-color;
+            color: $primary-font-color !important;
           }
         }
       }

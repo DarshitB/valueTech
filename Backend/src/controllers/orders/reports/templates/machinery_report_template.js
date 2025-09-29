@@ -148,11 +148,7 @@ function generateMachineryReportHTML(formData, extraData, bgImageBase64) {
                 : "NOT APPLICABLE"
             }</td>
             <td>REGISTRATION DATE:</td>
-            <td colspan="2">${
-              formData.registration_date
-                ? formData.registration_date
-                : "NOT APPLICABLE"
-            }</td>
+            <td colspan="2">${formData.registration_date === "00-00-0000" ? "NA" : formData.registration_date}</td>
         </tr>
         <tr>
             <td>LOCATION OF MACHINERY:</td>

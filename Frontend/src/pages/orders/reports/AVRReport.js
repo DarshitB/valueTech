@@ -1,8 +1,13 @@
-import React, { useEffect, useLayoutEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchOrderById } from "../../../redux/reducers/orderReducer";
-import { fetchOrderReport, generateOrderReport } from "../../../redux/reducers/orderReportReducer";
+import {
+  fetchOrderReport,
+  generateOrderReport,
+  saveOrderReport,
+  clearCurrentReport,
+} from "../../../redux/reducers/orderReportReducer";
 import { usePageTitle } from "../../../context/PageTitleContext";
 import SingleSearchSelect from "../../../components/SingleSearchSelect";
 import { toast } from "react-toastify";
@@ -15,29 +20,103 @@ function AVRReport() {
   // Select order data from Redux store
   const order = useSelector((state) => state.orders.selected);
   // Select order report data from Redux store
-  const { currentReport, loading: reportLoading, generating } = useSelector((state) => state.orderReports);
+  const {
+    currentReport,
+    loading: reportLoading,
+    generating,
+    saving,
+  } = useSelector((state) => state.orderReports);
   // Set page title using custom hook
   const { setTitle } = usePageTitle();
-  /* console.log(order); */
+  // Clear report data when component mounts or order changes
+  useEffect(() => {
+    // Clear any existing report data first
+    dispatch(clearCurrentReport());
+  }, [dispatch, id]);
+
   // Fetch order details when component mounts or ID changes
   useEffect(() => {
     if (id) {
       dispatch(fetchOrderById(id));
-      dispatch(fetchOrderReport({ orderId: id, reportType: "report_avr", silent: true }));
+      dispatch(
+        fetchOrderReport({
+          orderId: id,
+          reportType: "report_avr",
+          silent: true,
+        })
+      );
     }
   }, [dispatch, id]);
 
+  // Reset form data when component mounts or order ID changes
+  useEffect(() => {
+    // Reset form data to initial state when order changes
+    setReportFormData({
+      report_type: "report_avr",
+      ref_no_year: new Date().getFullYear().toString(),
+      ref_no_bank: "",
+      ref_no_code: "VKM",
+      ref_no_id: "",
+      lan_no: "",
+      report_date: getCurrentDate(),
+      bank_name: "",
+      branch_name: "",
+      state_name: "",
+      model_number: "",
+      officer_name: "",
+      officer_designation: "",
+      inspected_item: "",
+      inspected_date: "",
+      inspection_address: "",
+      customer_name: "",
+      address_as_per_kyc: "",
+      machinery_locations: "",
+      lan_city_no: "",
+      date_of_disbursement: "",
+      date_of_invoice_delivery_no: "",
+      invoice_price: "",
+      lien_of_bank: "",
+      chassis_no: "",
+      machine_serial_no: "",
+      engine_no: "",
+      regn_no: "",
+      installed_running: "",
+      installed_asset_whether_functional_or_not: "",
+      class_make_of_asset: "",
+      year_of_mfg: "",
+      invoice_purchase_order_no: "",
+      pro_owner_address: "",
+      insurer_policy_no: "",
+      insurance_validity_insured_value: "",
+      insurance_having_lien_of_bank: "",
+      total_crane_weight_capacity: "",
+      material_usefulness: "",
+      colour: "",
+      observation: "",
+      status_of_machine: "",
+      visit_done_by: "",
+      place: "",
+      date_time: "",
+      surveyor: "V.K. ASSOCIATES",
+      license_no: "SLA-60827",
+      surveyor_location: "MUMBAI, MAHARASHTRA",
+    });
+
+    // Reset flexible fields
+    setFlexibleFields([]);
+  }, [id]);
+
   // Get current date in DD-MM-YYYY format
-  const getCurrentDate = () => {
+  const getCurrentDate = useCallback(() => {
     const today = new Date();
     const day = String(today.getDate()).padStart(2, "0");
     const month = String(today.getMonth() + 1).padStart(2, "0");
     const year = today.getFullYear();
     return `${day}-${month}-${year}`;
-  };
+  }, []);
 
   // Function to get license number based on surveyor name
-  const getLicenseNumber = (surveyorName) => {
+  const getLicenseNumber = useCallback((surveyorName) => {
     switch (surveyorName) {
       case "V.K. ASSOCIATES":
         return "SLA-60827";
@@ -48,15 +127,16 @@ function AVRReport() {
       default:
         return "";
     }
-  };
+  }, []);
 
   // Function to parse currency value
-  const parseCurrency = (value) => {
+  const parseCurrency = useCallback((value) => {
+    if (!value || typeof value !== "string") return 0;
     return parseFloat(value.replace(/,/g, "")) || 0;
-  };
+  }, []);
 
   // Function to convert number to words (Indian format)
-  const convertNumberToWordsIndian = (num) => {
+  const convertNumberToWordsIndian = useCallback((num) => {
     const a = [
       "",
       "ONE",
@@ -135,10 +215,10 @@ function AVRReport() {
     }
 
     return words.trim() + " ONLY";
-  };
+  }, []);
 
   // Function to format currency input (Indian number format)
-  const handleCurrencyFormatting = (value) => {
+  const handleCurrencyFormatting = useCallback((value) => {
     // Remove everything except digits and one dot
     let inputVal = value.replace(/[^0-9.]/g, "");
 
@@ -162,7 +242,7 @@ function AVRReport() {
     }
 
     return formattedValue;
-  };
+  }, []);
 
   // Set page title with breadcrumb navigation
   useLayoutEffect(() => {
@@ -256,20 +336,53 @@ function AVRReport() {
     const report = currentReport?.report;
     if (!report) return; // Gracefully do nothing when data is null
 
+    // Validate that the report belongs to the current order
+    if (currentReport?.order_id && currentReport.order_id !== parseInt(id)) {
+      console.warn(
+        `Report data for order ${currentReport.order_id} does not match current order ${id}. Ignoring report data.`
+      );
+      return;
+    }
+
     setReportFormData((prev) => {
       const updated = { ...prev };
+      
+      // More robust field population - try to set all relevant fields
       Object.entries(report).forEach(([key, value]) => {
-        if (Object.prototype.hasOwnProperty.call(prev, key)) {
-          updated[key] = value ?? "";
+        // Skip system fields that shouldn't be in form
+        if (key.startsWith('created_') || key.startsWith('updated_') || key === 'id' || key === 'order_id' || key === 'flexible_fields') {
+          return;
         }
+        
+        // Convert null to empty string
+        const fieldValue = value !== null ? value : "";
+        
+        // Special handling for invoice_no_date - split into separate fields
+        if (key === 'invoice_no_date' && fieldValue) {
+          // Parse "12 Dated 12" format
+          const parts = fieldValue.split(' Dated ');
+          if (parts.length === 2) {
+            updated.invoice_no = parts[0].trim();
+            updated.invoice_date = parts[1].trim();
+          } else {
+            // If format doesn't match, put everything in invoice_no
+            updated.invoice_no = fieldValue;
+            updated.invoice_date = "";
+          }
+          return;
+        }
+        
+        // Try to set the field (both existing and dynamic fields)
+        updated[key] = fieldValue;
       });
+      
       return updated;
     });
 
     if (Array.isArray(report.flexible_fields)) {
       setFlexibleFields(report.flexible_fields);
     }
-  }, [currentReport]);
+  }, [currentReport, id]);
 
   // Handle form input changes
   const handleFormChange = (e) => {
@@ -464,7 +577,7 @@ function AVRReport() {
       formDataIndex++;
     });
 
-   /*  // Debug: Log final FormData contents after flexible fields
+    /*  // Debug: Log final FormData contents after flexible fields
     console.log("Final FormData contents after flexible fields:");
     for (let [key, value] of formData.entries()) {
       console.log(`${key}: ${value}`);
@@ -495,6 +608,75 @@ function AVRReport() {
         }
       }
     });
+  };
+
+  // Handle save report data
+  const handleSaveReport = () => {
+    // Create report data object with only non-empty fields
+    const reportData = {};
+
+    // Add report form data - only include fields with actual values
+    Object.keys(reportFormData).forEach((key) => {
+      const value = reportFormData[key];
+      
+      // Always include important read-only fields even if empty
+      const alwaysIncludeFields = [];  // AVR report may not have many read-only fields
+      
+      if (alwaysIncludeFields.includes(key)) {
+        // Always include these fields, even if empty
+        reportData[key] = value || "";
+      } else {
+        // Only include fields that have meaningful values (not null, undefined, or empty string)
+        if (value !== null && value !== undefined && value !== "") {
+          reportData[key] = value;
+        }
+      }
+    });
+
+    // Add flexible fields in the same format as report generation
+    let formDataIndex = 0;
+    flexibleFields.forEach((field) => {
+      // Only include fields with actual values
+      if (field.field_value && field.field_value.trim() !== "") {
+        reportData[`flexible_fields[${formDataIndex}][section_name]`] = field.section_name;
+        reportData[`flexible_fields[${formDataIndex}][col_span]`] = field.col_span;
+        reportData[`flexible_fields[${formDataIndex}][field_label]`] = field.field_label;
+        reportData[`flexible_fields[${formDataIndex}][field_value]`] = field.field_value;
+        reportData[`flexible_fields[${formDataIndex}][field_order]`] = field.field_order;
+        formDataIndex++;
+
+        // Add second field for "Add Two" functionality
+        if (
+          field.col_span === 2 &&
+          field.field_label_2 !== undefined &&
+          field.field_value_2 &&
+          field.field_value_2.trim() !== ""
+        ) {
+          reportData[`flexible_fields[${formDataIndex}][section_name]`] = field.section_name;
+          reportData[`flexible_fields[${formDataIndex}][col_span]`] = field.col_span;
+          reportData[`flexible_fields[${formDataIndex}][field_label]`] = field.field_label_2;
+          reportData[`flexible_fields[${formDataIndex}][field_value]`] = field.field_value_2;
+          reportData[`flexible_fields[${formDataIndex}][field_order]`] = field.field_order + 1;
+          formDataIndex++;
+        }
+      }
+    });
+
+    // Only proceed if there's actual data to save
+    if (Object.keys(reportData).length === 0) {
+      toast.warning(
+        "No data to save. Please fill in some fields before saving."
+      );
+      return;
+    }
+
+    // Dispatch save action with JSON data
+    dispatch(
+      saveOrderReport({
+        orderId: id,
+        reportData: reportData,
+      })
+    );
   };
 
   // Render flexible fields for a section
@@ -1408,7 +1590,7 @@ function AVRReport() {
                 </div>
               </div>
 
-              {/* Submit Button */}
+              {/* Generate and Save Report Buttons */}
               <div className="row">
                 <div className="col-md-12">
                   <div className="form-buttons">
@@ -1420,6 +1602,15 @@ function AVRReport() {
                       {generating
                         ? "Generating AVR Report..."
                         : "Generate AVR Report"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn save-report"
+                      onClick={handleSaveReport}
+                      disabled={saving}
+                      style={{ marginRight: "10px" }}
+                    >
+                      {saving ? "Saving..." : "Save"}
                     </button>
                   </div>
                 </div>

@@ -561,34 +561,53 @@ function OrderDetails() {
                 <Link title="Folder" className="tooltip-link">
                   <FolderIcon />
                 </Link>
-                <Link
-                  to={`/orders/${id}/details/cv-report`}
-                  title="CV Report"
-                  className="tooltip-link"
-                >
-                  <ReportIcon />
-                </Link>
-                <Link
-                  to={`/orders/${id}/details/avr-report`}
-                  title="AVR Report"
-                  className="tooltip-link"
-                >
-                  <ReportIcon />
-                </Link>
-                <Link
-                  to={`/orders/${id}/details/machinery-report`}
-                  title="Machinery Report"
-                  className="tooltip-link"
-                >
-                  <ReportIcon />
-                </Link>
-                <Link
-                  to={`/orders/${id}/details/ce-report`}
-                  title="CE Report"
-                  className="tooltip-link"
-                >
-                  <ReportIcon />
-                </Link>
+                
+                {/* Conditional Report Buttons based on Category
+                    - "COMMERCIAL VEHICLE" -> CV Report
+                    - "CONSTRUCTION EQUIPMENTS" -> CE Report  
+                    - Categories containing "AVR" -> AVR Report
+                    - "MACHINERY" -> Machinery Report
+                */}
+                {order?.category_name === "COMMERCIAL VEHICLE" && (
+                  <Link
+                    to={`/orders/${id}/details/cv-report`}
+                    title="CV Report"
+                    className="tooltip-link"
+                  >
+                    <ReportIcon />
+                  </Link>
+                )}
+                
+                {order?.category_name === "CONSTRUCTION EQUIPMENTS" && (
+                  <Link
+                    to={`/orders/${id}/details/ce-report`}
+                    title="CE Report"
+                    className="tooltip-link"
+                  >
+                    <ReportIcon />
+                  </Link>
+                )}
+                
+                {order?.category_name && 
+                 order.category_name.toUpperCase().includes("AVR") && (
+                  <Link
+                    to={`/orders/${id}/details/avr-report`}
+                    title="AVR Report"
+                    className="tooltip-link"
+                  >
+                    <ReportIcon />
+                  </Link>
+                )}
+                
+                {order?.category_name === "MACHINERY" && (
+                  <Link
+                    to={`/orders/${id}/details/machinery-report`}
+                    title="Machinery Report"
+                    className="tooltip-link"
+                  >
+                    <ReportIcon />
+                  </Link>
+                )}
                 {/* <Link
                   to={`/orders/${id}/details/custom-report`}
                   title="Custom Report"

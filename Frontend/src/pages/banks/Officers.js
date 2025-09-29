@@ -70,16 +70,18 @@ function Officers() {
 
   /* console.log("users",users); */
 
-  // Check if current user is BANK AUTHORITY
-  const isBankAuthority = users?.role.name?.toUpperCase() === "BANK AUTHORITY";
+  // Check if current user is BANK AUTHORITY - matches any role containing "BANK AUTHORITY"
+  const isBankAuthority = users?.role.name?.toUpperCase().includes("BANK AUTHORITY");
 
   const officerRoles = roles.filter((role) => {
     // If user is BANK AUTHORITY or Bank Officer, allow only Bank Officer to be selected
-    if (["BANK AUTHORITY", "BANK OFFICER"].includes(users?.role.name)) {
-      return role.name === "BANK OFFICER";
+    if (users?.role.name?.toUpperCase().includes("BANK AUTHORITY") || 
+        users?.role.name?.toUpperCase().includes("BANK OFFICER")) {
+      return role.name?.toUpperCase().includes("BANK OFFICER");
     }
     // Otherwise, allow both
-    return ["BANK AUTHORITY", "BANK OFFICER"].includes(role.name);
+    return role.name?.toUpperCase().includes("BANK AUTHORITY") || 
+           role.name?.toUpperCase().includes("BANK OFFICER");
   });
 
   const openAddModal = () => {

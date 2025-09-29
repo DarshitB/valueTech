@@ -40,15 +40,17 @@ const officer = {
       .whereNull("officers.deleted_at")
       .where("officers.is_active", true);
 
-    // Role-based filters
-    if (user.role_name.toUpperCase() === "BANK AUTHORITY") {
+    // Role-based filters - flexible matching using includes()
+    const roleName = user.role_name.toUpperCase();
+    
+    if (roleName.includes("BANK AUTHORITY")) {
       baseQuery.andWhere(function () {
         this.where("officers.created_by", user.id).orWhere(
           "officers.user_id",
           user.id
         );
       });
-    } else if (user.role_name.toUpperCase() === "BANK OFFICER") {
+    } else if (roleName.includes("BANK OFFICER")) {
       baseQuery.andWhere("officers.user_id", user.id);
     }
 

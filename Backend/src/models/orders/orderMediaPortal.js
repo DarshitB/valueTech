@@ -91,6 +91,17 @@ const orderMediaPortal = {
       .select("id", "order_number", "status")
       .where("id", orderId)
       .first(),
+
+  /**
+   * Insert a new media record
+   * payload: Object with media data
+   * Returns: Promise that resolves to the inserted media ID
+   */
+  insertMedia: (mediaData) =>
+    db("order_media_image_video")
+      .insert(mediaData)
+      .returning("id")
+      .then(result => result[0].id),
 };
 
 module.exports = orderMediaPortal;

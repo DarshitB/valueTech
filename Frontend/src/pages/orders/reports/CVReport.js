@@ -1,8 +1,19 @@
-import React, { useEffect, useLayoutEffect, useState, useCallback, useMemo } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useCallback,
+  useMemo,
+} from "react";
 import { useParams, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchOrderById } from "../../../redux/reducers/orderReducer";
-import { fetchOrderReport, generateOrderReport } from "../../../redux/reducers/orderReportReducer";
+import {
+  fetchOrderReport,
+  generateOrderReport,
+  saveOrderReport,
+  clearCurrentReport,
+} from "../../../redux/reducers/orderReportReducer";
 import { usePageTitle } from "../../../context/PageTitleContext";
 import SingleSearchSelect from "../../../components/SingleSearchSelect";
 import { toast } from "react-toastify";
@@ -18,17 +29,123 @@ function CVReport() {
   // Select order data from Redux store
   const order = useSelector((state) => state.orders.selected);
   // Select order report data from Redux store
-  const { currentReport, loading: reportLoading, generating } = useSelector((state) => state.orderReports);
+  const {
+    currentReport,
+    loading: reportLoading,
+    generating,
+    saving,
+  } = useSelector((state) => state.orderReports);
   // Set page title using custom hook
   const { setTitle } = usePageTitle();
+  // Clear report data when component mounts or order changes
+  useEffect(() => {
+    // Clear any existing report data first
+    dispatch(clearCurrentReport());
+  }, [dispatch, id]);
 
   // Fetch order details when component mounts or ID changes
   useEffect(() => {
     if (id) {
       dispatch(fetchOrderById(id));
-      dispatch(fetchOrderReport({ orderId: id, reportType: "report_cv", silent: true }));
+      dispatch(
+        fetchOrderReport({ orderId: id, reportType: "report_cv", silent: true })
+      );
     }
   }, [dispatch, id]);
+
+  // Reset form data when component mounts or order ID changes
+  useEffect(() => {
+    // Get current date in DD-MM-YYYY format
+    const getCurrentDate = () => {
+      const today = new Date();
+      const day = String(today.getDate()).padStart(2, "0");
+      const month = String(today.getMonth() + 1).padStart(2, "0");
+      const year = today.getFullYear();
+      return `${day}-${month}-${year}`;
+    };
+
+    // Reset form data to initial state when order changes
+    setReportFormData({
+      // Report type and reference details
+      report_type: "report_cv",
+      ref_no_year: new Date().getFullYear().toString(), // Current year (2025)
+      ref_no_bank: "",
+      state_name: "", // Default to first option
+      ref_no_code: "", // Default to first option
+      ref_no_id: "",
+      report_date: getCurrentDate(), // Default to today's date
+
+      valuer_name: "V.K. ASSOCIATES", // Default to first option
+      license_no: "SLA-60827",
+      valuer_contact: "99209-88549", // Fixed read-only value
+
+      valuation_purpose: "",
+      initiated_by: "",
+      date_of_inspection: "",
+      place_of_inspection: "",
+
+      registered_owner_name: "",
+      registered_owner_address: "",
+      proposed_owner_name: "",
+      proposed_owner_address: "",
+
+      // INSPECTED EQUIPMENT DETAILS
+      registration_no: "",
+      registration_date: "",
+      registered_location: "",
+
+      owner_serial_no: "",
+      manufacture_year: "",
+      asset_make: "",
+      model: "",
+
+      engine_no_detail: "",
+      chassis_no: "",
+      body_type: "",
+      fuel_type: "",
+
+      kilometer_reading: "",
+      invoice_no_date: "",
+      invoice_no: "",
+      invoice_date: "",
+      hyp_with: "",
+      hyp_from_date: "",
+
+      // COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION
+      no_of_cylinder: "",
+
+      engine_condition: "",
+      chassis_condition: "",
+      body_condition: "",
+      cabin_condition: "",
+      electrical_condition: "",
+      gear_transmission: "",
+
+      battery_available: "YES / TWO LOCAL - 2X12V", // Fixed read-only value
+      gross_vehicle_weight: "",
+
+      front_tyre_no: "",
+      front_tyre_condition: "",
+      middle_tyre_no: "",
+      middle_tyre_condition: "",
+      rear_tyre_no: "",
+      rear_tyre_condition: "",
+      no_of_tyres: "",
+      stepney: "",
+
+      horse_power: "",
+      mechanical_unit_condition: "",
+      cubic_capacity: "",
+
+      suspension: "",
+    });
+
+    // Reset flexible fields
+    setFlexibleFields([]);
+
+    // Reset chassis impression file
+    setChassisImpressionFile(null);
+  }, [id]);
 
   // Function to get license number based on valuer name
   const getLicenseNumber = useCallback((valuerName) => {
@@ -51,6 +168,7 @@ function CVReport() {
 
   // Function to parse currency value (remove commas and convert to number)
   const parseCurrency = useCallback((value) => {
+    if (!value || typeof value !== "string") return 0;
     return parseFloat(value.replace(/,/g, "")) || 0;
   }, []);
 
@@ -190,6 +308,7 @@ function CVReport() {
 
   // Function to format currency input (Indian number format)
   const handleCurrencyFormatting = useCallback((value) => {
+    if (!value || typeof value !== "string") return "";
     // Remove everything except digits and one dot
     let inputVal = value.replace(/[^0-9.]/g, "");
 
@@ -214,8 +333,6 @@ function CVReport() {
 
     return formattedValue;
   }, []);
-
-
 
   // Form data state for CV report generation
   const [reportFormData, setReportFormData] = useState({
@@ -334,7 +451,6 @@ function CVReport() {
 
   // State for flexible fields
   const [flexibleFields, setFlexibleFields] = useState([]);
-  
 
   // Auto-populate form data when order data is available
   useEffect(() => {
@@ -344,12 +460,14 @@ function CVReport() {
         ref_no_bank: order?.bank_initial || "",
         state_name: prev.state_name || "MUM",
         ref_no_code: prev.ref_no_code || "VKM",
-        initiated_by: order?.officer_name && order?.bank_name
-          ? `${order.officer_name}, ${order.bank_name}`
-          : "",
-        model: order?.sub_category_name && order?.child_category_name
-          ? `${order.sub_category_name}, ${order.child_category_name}`
-          : "",
+        initiated_by:
+          order?.officer_name && order?.bank_name
+            ? `${order.officer_name}, ${order.bank_name}`
+            : "",
+        model:
+          order?.sub_category_name && order?.child_category_name
+            ? `${order.sub_category_name}, ${order.child_category_name}`
+            : "",
         hyp_with: order?.bank_name || "",
       }));
     }
@@ -360,13 +478,51 @@ function CVReport() {
     const report = currentReport?.report;
     if (!report) return; // Gracefully do nothing when data is null
 
+    // Validate that the report belongs to the current order
+    if (currentReport?.order_id && currentReport.order_id !== parseInt(id)) {
+      console.warn(
+        `Report data for order ${currentReport.order_id} does not match current order ${id}. Ignoring report data.`
+      );
+      return;
+    }
+
     setReportFormData((prev) => {
       const updated = { ...prev };
+      
+      // Only populate fields that exist in the form structure (editable fields)
       Object.entries(report).forEach(([key, value]) => {
+        // Skip system fields that shouldn't be in form
+        if (key.startsWith('created_') || key.startsWith('updated_') || key === 'id' || key === 'order_id' || key === 'flexible_fields') {
+          return;
+        }
+        
+        // Convert null to empty string
+        const fieldValue = value !== null ? value : "";
+        
+        // Special handling for invoice_no_date - split into separate fields
+        if (key === 'invoice_no_date' && fieldValue) {
+          // Parse "12 Dated 12" format
+          const parts = fieldValue.split(' Dated ');
+          if (parts.length === 2) {
+            updated.invoice_no = parts[0].trim();
+            updated.invoice_date = parts[1].trim();
+          } else {
+            // If format doesn't match, put everything in invoice_no
+            updated.invoice_no = fieldValue;
+            updated.invoice_date = "";
+          }
+          return;
+        }
+        
+        // Try to set the field directly first
         if (Object.prototype.hasOwnProperty.call(prev, key)) {
-          updated[key] = value ?? "";
+          updated[key] = fieldValue;
+        } else {
+          // Field not found in form structure, try to set it anyway for dynamic fields
+          updated[key] = fieldValue;
         }
       });
+      
       return updated;
     });
 
@@ -392,7 +548,8 @@ function CVReport() {
           const first = list[i];
           // For "Add Two" we expect two consecutive rows with col_span === 2
           if (first.col_span === 2) {
-            const second = list[i + 1] && list[i + 1].col_span === 2 ? list[i + 1] : null;
+            const second =
+              list[i + 1] && list[i + 1].col_span === 2 ? list[i + 1] : null;
             combined.push({
               id: `${section}_${first.id || first.field_order || i}_combined`,
               section_name: section,
@@ -401,7 +558,7 @@ function CVReport() {
               field_value: first.field_value || "",
               field_label_2: second?.field_label || "",
               field_value_2: second?.field_value || "",
-              field_order: first.field_order || (i + 1),
+              field_order: first.field_order || i + 1,
             });
             if (second) i++; // skip the paired second item
           } else {
@@ -412,7 +569,7 @@ function CVReport() {
               col_span: 1,
               field_label: first.field_label || "",
               field_value: first.field_value || "",
-              field_order: first.field_order || (i + 1),
+              field_order: first.field_order || i + 1,
             });
           }
         }
@@ -420,7 +577,7 @@ function CVReport() {
 
       setFlexibleFields(combined);
     }
-  }, [currentReport]);
+  }, [currentReport, id]);
 
   // Set page title with breadcrumb navigation
   useLayoutEffect(() => {
@@ -442,82 +599,95 @@ function CVReport() {
   }, [id, order, setTitle]);
 
   // Handle form input changes
-  const handleFormChange = useCallback((e) => {
-    const { name, value } = e.target;
-    setReportFormData((prev) => {
-      let updated = {
-        ...prev,
-        [name]: value,
-      };
+  const handleFormChange = useCallback(
+    (e) => {
+      const { name, value } = e.target;
+      setReportFormData((prev) => {
+        let updated = {
+          ...prev,
+          [name]: value,
+        };
 
-      // Handle currency formatting for currency fields
-      if (
-        name === "fair_market_value" ||
-        name === "current_invoice_cost" ||
-        name === "insured_value" ||
-        name === "depreciation_value" ||
-        name === "appraiser_value"
-      ) {
-        updated[name] = handleCurrencyFormatting(value);
-      }
+        // Handle currency formatting for currency fields
+        if (
+          name === "fair_market_value" ||
+          name === "current_invoice_cost" ||
+          name === "insured_value" ||
+          name === "depreciation_value" ||
+          name === "appraiser_value"
+        ) {
+          updated[name] = handleCurrencyFormatting(value);
+        }
 
-
-      // Auto-calculate depreciation_value when current_invoice_cost or depreciation changes
-      if (name === "current_invoice_cost" || name === "depreciation") {
-        const invoiceCost = parseCurrency(
-          name === "current_invoice_cost" ? value : updated.current_invoice_cost
-        );
-        const depreciationRate = parseFloat(
-          name === "depreciation" ? value : updated.depreciation
-        );
-
-        if (invoiceCost > 0 && depreciationRate >= 0) {
-          const depreciationAmount = (invoiceCost * depreciationRate) / 100;
-          const depreciationValue = invoiceCost - depreciationAmount;
-          updated.depreciation_value = handleCurrencyFormatting(
-            depreciationValue.toString()
+        // Auto-calculate depreciation_value when current_invoice_cost or depreciation changes
+        if (name === "current_invoice_cost" || name === "depreciation") {
+          const invoiceCost = parseCurrency(
+            name === "current_invoice_cost"
+              ? value
+              : updated.current_invoice_cost
           );
-        } else {
-          updated.depreciation_value = "";
-        }
-      }
+          const depreciationRate = parseFloat(
+            name === "depreciation" ? value : updated.depreciation
+          );
 
-      // Auto-combine invoice_no and invoice_date into invoice_no_date
-      if (name === "invoice_no" || name === "invoice_date") {
-        const invoiceNo = name === "invoice_no" ? value : updated.invoice_no;
-        const invoiceDate = name === "invoice_date" ? value : updated.invoice_date;
-        
-        if (invoiceNo && invoiceDate) {
-          updated.invoice_no_date = `${invoiceNo} Dated ${invoiceDate}`;
-        } else if (invoiceNo) {
-          updated.invoice_no_date = invoiceNo;
-        } else if (invoiceDate) {
-          updated.invoice_no_date = `Dated ${invoiceDate}`;
-        } else {
-          updated.invoice_no_date = "";
+          if (invoiceCost > 0 && depreciationRate >= 0) {
+            const depreciationAmount = (invoiceCost * depreciationRate) / 100;
+            const depreciationValue = invoiceCost - depreciationAmount;
+            updated.depreciation_value = handleCurrencyFormatting(
+              depreciationValue.toString()
+            );
+          } else {
+            updated.depreciation_value = "";
+          }
         }
-      }
 
-      return updated;
-    });
-  }, [parseCurrency, handleCurrencyFormatting, numberToWords, convertNumberToWordsIndian]);
+        // Auto-combine invoice_no and invoice_date into invoice_no_date
+        if (name === "invoice_no" || name === "invoice_date") {
+          const invoiceNo = name === "invoice_no" ? value : updated.invoice_no;
+          const invoiceDate =
+            name === "invoice_date" ? value : updated.invoice_date;
+
+          if (invoiceNo && invoiceDate) {
+            updated.invoice_no_date = `${invoiceNo} Dated ${invoiceDate}`;
+          } else if (invoiceNo) {
+            updated.invoice_no_date = invoiceNo;
+          } else if (invoiceDate) {
+            updated.invoice_no_date = `Dated ${invoiceDate}`;
+          } else {
+            updated.invoice_no_date = "";
+          }
+        }
+
+        return updated;
+      });
+    },
+    [
+      parseCurrency,
+      handleCurrencyFormatting,
+      numberToWords,
+      convertNumberToWordsIndian,
+    ]
+  );
 
   // Handle SingleSearchSelect changes
-  const handleSelectChange = useCallback((name, value) => {
-    setReportFormData((prev) => {
-      const updated = {
-        ...prev,
-        [name]: value,
-      };
+  const handleSelectChange = useCallback(
+    (name, value) => {
+      setReportFormData((prev) => {
+        const updated = {
+          ...prev,
+          [name]: value,
+        };
 
-      // Auto-update license_no when valuer_name changes
-      if (name === "valuer_name") {
-        updated.license_no = getLicenseNumber(value);
-      }
+        // Auto-update license_no when valuer_name changes
+        if (name === "valuer_name") {
+          updated.license_no = getLicenseNumber(value);
+        }
 
-      return updated;
-    });
-  }, [getLicenseNumber]);
+        return updated;
+      });
+    },
+    [getLicenseNumber]
+  );
 
   // Handle file input changes
   const handleFileChange = useCallback((e) => {
@@ -528,6 +698,7 @@ function CVReport() {
   // Handle date input formatting (DD-MM-YYYY)
   const handleDateChange = useCallback((e) => {
     const { name, value } = e.target;
+    if (!value || typeof value !== "string") return;
     let numericValue = value.replace(/\D/g, ""); // Remove non-numeric characters
     if (numericValue.length > 8) numericValue = numericValue.substring(0, 8); // Limit to 8 digits (DDMMYYYY)
 
@@ -555,6 +726,7 @@ function CVReport() {
   // Handle currency input formatting (Indian number format)
   const handleCurrencyChange = useCallback((e) => {
     const { name, value } = e.target;
+    if (!value || typeof value !== "string") return;
 
     // Remove everything except digits and one dot
     let inputVal = value.replace(/[^0-9.]/g, "");
@@ -594,36 +766,39 @@ function CVReport() {
   }, []);
 
   // Add flexible fields (Add One - 2 fields, Add Two - 4 fields)
-  const addFlexibleFields = useCallback((sectionName, fieldsCount) => {
-    // Calculate the next order by counting total fields in this section
-    // For Add Two sets, each set contributes 2 to the count
-    // For Add One sets, each set contributes 1 to the count
-    let nextOrder = 1;
-    flexibleFields
-      .filter((f) => f.section_name === sectionName)
-      .forEach((field) => {
-        if (field.col_span === 2) {
-          nextOrder += 2; // Add Two contributes 2 fields
-        } else {
-          nextOrder += 1; // Add One contributes 1 field
-        }
-      });
+  const addFlexibleFields = useCallback(
+    (sectionName, fieldsCount) => {
+      // Calculate the next order by counting total fields in this section
+      // For Add Two sets, each set contributes 2 to the count
+      // For Add One sets, each set contributes 1 to the count
+      let nextOrder = 1;
+      flexibleFields
+        .filter((f) => f.section_name === sectionName)
+        .forEach((field) => {
+          if (field.col_span === 2) {
+            nextOrder += 2; // Add Two contributes 2 fields
+          } else {
+            nextOrder += 1; // Add One contributes 1 field
+          }
+        });
 
-    const fieldId = `${sectionName}_${Date.now()}`;
+      const fieldId = `${sectionName}_${Date.now()}`;
 
-    const newField = {
-      id: fieldId,
-      section_name: sectionName,
-      col_span: fieldsCount === 2 ? 1 : 2, // 1 for Add One (2 fields), 2 for Add Two (4 fields)
-      field_label: "",
-      field_value: "",
-      field_label_2: fieldsCount === 4 ? "" : undefined,
-      field_value_2: fieldsCount === 4 ? "" : undefined,
-      field_order: nextOrder, // This will be the order for the first field
-    };
+      const newField = {
+        id: fieldId,
+        section_name: sectionName,
+        col_span: fieldsCount === 2 ? 1 : 2, // 1 for Add One (2 fields), 2 for Add Two (4 fields)
+        field_label: "",
+        field_value: "",
+        field_label_2: fieldsCount === 4 ? "" : undefined,
+        field_value_2: fieldsCount === 4 ? "" : undefined,
+        field_order: nextOrder, // This will be the order for the first field
+      };
 
-    setFlexibleFields((prev) => [...prev, newField]);
-  }, [flexibleFields]);
+      setFlexibleFields((prev) => [...prev, newField]);
+    },
+    [flexibleFields]
+  );
 
   // Remove flexible field
   const removeFlexibleField = useCallback((fieldId) => {
@@ -655,119 +830,99 @@ function CVReport() {
   }, [flexibleFields]);
 
   // Handle form submission for report generation
-  const handleReportSubmit = useCallback((e) => {
-    e.preventDefault();
+  const handleReportSubmit = useCallback(
+    (e) => {
+      e.preventDefault();
 
-    // Pre-open a tab synchronously to avoid popup blockers
-    const preOpenedTab = window.open("about:blank", "_blank");
-    if (preOpenedTab && !preOpenedTab.closed) {
-      try {
-        const doc = preOpenedTab.document;
-        doc.open();
-        doc.write(
-          `<!doctype html><html><head><meta charset="utf-8"><title>Preparing report…</title><style>html,body{height:100%;margin:0}body{display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}.box{text-align:center}.spinner{width:44px;height:44px;border: 4px solid rgba(88, 100, 189, 0.2);border-top-color: #5864bd;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px}@keyframes spin{to{transform:rotate(360deg)}}small{opacity:.75}</style></head><body><div class="box"><div class="spinner"></div><div>Preparing your Report...</div><small>This tab will update automatically. So don't close the tab.</small></div></body></html>`
-        );
-        doc.close();
-      } catch (err) {
-        // If writing fails, ignore and proceed
-      }
-    }
-
-    // Validate flexible fields
-    const validationErrors = validateFlexibleFields();
-    if (validationErrors.length > 0) {
-      validationErrors.forEach((error) => toast.error(error));
-      // Close the preOpenedTab if validation fails
+      // Pre-open a tab synchronously to avoid popup blockers
+      const preOpenedTab = window.open("about:blank", "_blank");
       if (preOpenedTab && !preOpenedTab.closed) {
-        preOpenedTab.close();
+        try {
+          const doc = preOpenedTab.document;
+          doc.open();
+          doc.write(
+            `<!doctype html><html><head><meta charset="utf-8"><title>Preparing report…</title><style>html,body{height:100%;margin:0}body{display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}.box{text-align:center}.spinner{width:44px;height:44px;border: 4px solid rgba(88, 100, 189, 0.2);border-top-color: #5864bd;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px}@keyframes spin{to{transform:rotate(360deg)}}small{opacity:.75}</style></head><body><div class="box"><div class="spinner"></div><div>Preparing your Report...</div><small>This tab will update automatically. So don't close the tab.</small></div></body></html>`
+          );
+          doc.close();
+        } catch (err) {
+          // If writing fails, ignore and proceed
+        }
       }
-      return;
-    }
 
-    // Create FormData for multipart/form-data submission
-    const formData = new FormData();
-
-    // Ensure invoice_no_date is properly combined before sending
-    const invoiceNo = reportFormData.invoice_no || "";
-    const invoiceDate = reportFormData.invoice_date || "";
-    let combinedInvoiceData = "";
-    
-    if (invoiceNo && invoiceDate) {
-      combinedInvoiceData = `${invoiceNo} Dated ${invoiceDate}`;
-    } else if (invoiceNo) {
-      combinedInvoiceData = invoiceNo;
-    } else if (invoiceDate) {
-      combinedInvoiceData = `Dated ${invoiceDate}`;
-    }
-    
-
-    // Add all form fields to FormData
-    Object.keys(reportFormData).forEach((key) => {
-      let value = reportFormData[key];
-
-      // Skip individual invoice fields and invoice_no_date - we'll add invoice_no_date separately
-      if (key === "invoice_no" || key === "invoice_date" || key === "invoice_no_date") {
+      // Validate flexible fields
+      const validationErrors = validateFlexibleFields();
+      if (validationErrors.length > 0) {
+        validationErrors.forEach((error) => toast.error(error));
+        // Close the preOpenedTab if validation fails
+        if (preOpenedTab && !preOpenedTab.closed) {
+          preOpenedTab.close();
+        }
         return;
       }
 
-      // Special handling for asset_classification - use order data
-      if (key === "asset_classification") {
-        value = order?.child_category_name || "";
+      // Create FormData for multipart/form-data submission
+      const formData = new FormData();
+
+      // Ensure invoice_no_date is properly combined before sending
+      const invoiceNo = reportFormData.invoice_no || "";
+      const invoiceDate = reportFormData.invoice_date || "";
+      let combinedInvoiceData = "";
+
+      if (invoiceNo && invoiceDate) {
+        combinedInvoiceData = `${invoiceNo} Dated ${invoiceDate}`;
+      } else if (invoiceNo) {
+        combinedInvoiceData = invoiceNo;
+      } else if (invoiceDate) {
+        combinedInvoiceData = `Dated ${invoiceDate}`;
       }
 
-      // Special handling for amount_in_words - use memoized value
-      if (key === "amount_in_words") {
-        value = amountInWords;
+      // Add all form fields to FormData
+      Object.keys(reportFormData).forEach((key) => {
+        let value = reportFormData[key];
+
+        // Skip individual invoice fields and invoice_no_date - we'll add invoice_no_date separately
+        if (
+          key === "invoice_no" ||
+          key === "invoice_date" ||
+          key === "invoice_no_date"
+        ) {
+          return;
+        }
+
+        // Special handling for asset_classification - use order data
+        if (key === "asset_classification") {
+          value = order?.child_category_name || "";
+        }
+
+        // Special handling for amount_in_words - use memoized value
+        if (key === "amount_in_words") {
+          value = amountInWords;
+        }
+
+        // Special handling for no_of_tyres - use memoized value
+        if (key === "no_of_tyres") {
+          value = totalTyres;
+        }
+
+        if (value !== null && value !== "") {
+          formData.append(key, value);
+        }
+      });
+
+      // Add the combined invoice data
+      if (combinedInvoiceData) {
+        formData.append("invoice_no_date", combinedInvoiceData);
       }
 
-      // Special handling for no_of_tyres - use memoized value
-      if (key === "no_of_tyres") {
-        value = totalTyres;
+      // Add chassis impression file if selected
+      if (chassisImpressionFile) {
+        formData.append("chassis_no_pencil_impression", chassisImpressionFile);
       }
 
-      if (value !== null && value !== "") {
-        formData.append(key, value);
-      }
-    });
-
-    // Add the combined invoice data
-    if (combinedInvoiceData) {
-      formData.append("invoice_no_date", combinedInvoiceData);
-    }
-
-    // Add chassis impression file if selected
-    if (chassisImpressionFile) {
-      formData.append("chassis_no_pencil_impression", chassisImpressionFile);
-    }
-
-    // Add flexible fields to FormData with proper sequential ordering
-    let formDataIndex = 0;
-    flexibleFields.forEach((field) => {
-      // Add first field (or only field for Add One)
-      formData.append(
-        `flexible_fields[${formDataIndex}][section_name]`,
-        field.section_name
-      );
-      formData.append(
-        `flexible_fields[${formDataIndex}][col_span]`,
-        field.col_span
-      );
-      formData.append(
-        `flexible_fields[${formDataIndex}][field_label]`,
-        field.field_label
-      );
-      formData.append(
-        `flexible_fields[${formDataIndex}][field_value]`,
-        field.field_value
-      );
-      formData.append(
-        `flexible_fields[${formDataIndex}][field_order]`,
-        field.field_order
-      );
-      formDataIndex++;
-
-      // Add second field for "Add Two" functionality
-      if (field.col_span === 2 && field.field_label_2 !== undefined) {
+      // Add flexible fields to FormData with proper sequential ordering
+      let formDataIndex = 0;
+      flexibleFields.forEach((field) => {
+        // Add first field (or only field for Add One)
         formData.append(
           `flexible_fields[${formDataIndex}][section_name]`,
           field.section_name
@@ -778,47 +933,71 @@ function CVReport() {
         );
         formData.append(
           `flexible_fields[${formDataIndex}][field_label]`,
-          field.field_label_2
+          field.field_label
         );
         formData.append(
           `flexible_fields[${formDataIndex}][field_value]`,
-          field.field_value_2
+          field.field_value
         );
         formData.append(
           `flexible_fields[${formDataIndex}][field_order]`,
-          field.field_order + 1 // Sequential order for second field
+          field.field_order
         );
         formDataIndex++;
-      }
-    });
 
-    // Console log flexible fields ordering for debugging
-    const sectionGroups = {};
-    flexibleFields.forEach((field) => {
-      if (!sectionGroups[field.section_name]) {
-        sectionGroups[field.section_name] = [];
-      }
-
-      // Add first field
-      sectionGroups[field.section_name].push({
-        label: field.field_label,
-        value: field.field_value,
-        order: field.field_order,
-        type: field.col_span === 1 ? "Add One" : "Add Two (1st)",
+        // Add second field for "Add Two" functionality
+        if (field.col_span === 2 && field.field_label_2 !== undefined) {
+          formData.append(
+            `flexible_fields[${formDataIndex}][section_name]`,
+            field.section_name
+          );
+          formData.append(
+            `flexible_fields[${formDataIndex}][col_span]`,
+            field.col_span
+          );
+          formData.append(
+            `flexible_fields[${formDataIndex}][field_label]`,
+            field.field_label_2
+          );
+          formData.append(
+            `flexible_fields[${formDataIndex}][field_value]`,
+            field.field_value_2
+          );
+          formData.append(
+            `flexible_fields[${formDataIndex}][field_order]`,
+            field.field_order + 1 // Sequential order for second field
+          );
+          formDataIndex++;
+        }
       });
 
-      // Add second field if exists
-      if (field.col_span === 2 && field.field_label_2) {
-        sectionGroups[field.section_name].push({
-          label: field.field_label_2,
-          value: field.field_value_2,
-          order: field.field_order + 1,
-          type: "Add Two (2nd)",
-        });
-      }
-    });
+      // Console log flexible fields ordering for debugging
+      const sectionGroups = {};
+      flexibleFields.forEach((field) => {
+        if (!sectionGroups[field.section_name]) {
+          sectionGroups[field.section_name] = [];
+        }
 
-    /* Object.keys(sectionGroups).forEach(section => {
+        // Add first field
+        sectionGroups[field.section_name].push({
+          label: field.field_label,
+          value: field.field_value,
+          order: field.field_order,
+          type: field.col_span === 1 ? "Add One" : "Add Two (1st)",
+        });
+
+        // Add second field if exists
+        if (field.col_span === 2 && field.field_label_2) {
+          sectionGroups[field.section_name].push({
+            label: field.field_label_2,
+            value: field.field_value_2,
+            order: field.field_order + 1,
+            type: "Add Two (2nd)",
+          });
+        }
+      });
+
+      /* Object.keys(sectionGroups).forEach(section => {
       console.log(`\n${section}:`);
       sectionGroups[section]
         .sort((a, b) => a.order - b.order)
@@ -828,360 +1007,464 @@ function CVReport() {
     });
     console.log("=== END FLEXIBLE FIELDS ORDERING ===\n"); */
 
-    // Dispatch report generation action
-    dispatch(
-      generateOrderReport({
-        orderId: id,
-        data: formData,
-      })
-    ).then((result) => {
-      if (result.meta.requestStatus === "fulfilled") {
-        // Open PDF in the pre-opened tab
-        const downloadUrl = result.payload.data.download_url;
-        const baseUrl =
-          process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
-        const fullUrl = `${baseUrl}${downloadUrl}`;
-        if (preOpenedTab && !preOpenedTab.closed) {
-          preOpenedTab.location.href = fullUrl;
+      // Dispatch report generation action
+      dispatch(
+        generateOrderReport({
+          orderId: id,
+          data: formData,
+        })
+      ).then((result) => {
+        if (result.meta.requestStatus === "fulfilled") {
+          // Open PDF in the pre-opened tab
+          const downloadUrl = result.payload.data.download_url;
+          const baseUrl =
+            process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
+          const fullUrl = `${baseUrl}${downloadUrl}`;
+          if (preOpenedTab && !preOpenedTab.closed) {
+            preOpenedTab.location.href = fullUrl;
+          } else {
+            window.open(fullUrl, "_blank");
+          }
         } else {
-          window.open(fullUrl, "_blank");
+          // Close the preOpenedTab if generation failed
+          if (preOpenedTab && !preOpenedTab.closed) {
+            preOpenedTab.close();
+          }
         }
+      });
+    },
+    [
+      reportFormData,
+      flexibleFields,
+      validateFlexibleFields,
+      chassisImpressionFile,
+      dispatch,
+      id,
+      order,
+    ]
+  );
+
+  // Handle save report data
+  const handleSaveReport = useCallback(() => {
+    // Validate flexible fields
+    const validationErrors = validateFlexibleFields();
+    if (validationErrors.length > 0) {
+      toast.error("Please fix validation errors before saving");
+      return;
+    }
+
+    // Create report data object with only non-empty fields
+    const reportData = {};
+
+    // Add report form data - only include fields with actual values
+    Object.keys(reportFormData).forEach((key) => {
+      const value = reportFormData[key];
+      
+      // Always include important read-only fields even if empty
+      const alwaysIncludeFields = ['license_no', 'valuer_contact', 'amount_in_words', 'no_of_tyres', 'depreciation_value'];
+      
+      if (alwaysIncludeFields.includes(key)) {
+        // Always include these fields, even if empty
+        reportData[key] = value || "";
       } else {
-        // Close the preOpenedTab if generation failed
-        if (preOpenedTab && !preOpenedTab.closed) {
-          preOpenedTab.close();
+        // Only include fields that have meaningful values (not null, undefined, or empty string)
+        if (value !== null && value !== undefined && value !== "") {
+          reportData[key] = value;
         }
       }
     });
-  }, [reportFormData, flexibleFields, validateFlexibleFields, chassisImpressionFile, dispatch, id, order]);
+
+    // Add flexible fields in the same format as report generation
+    let formDataIndex = 0;
+    flexibleFields.forEach((field) => {
+      // Only include fields with actual values
+      if (field.field_value && field.field_value.trim() !== "") {
+        reportData[`flexible_fields[${formDataIndex}][section_name]`] = field.section_name;
+        reportData[`flexible_fields[${formDataIndex}][col_span]`] = field.col_span;
+        reportData[`flexible_fields[${formDataIndex}][field_label]`] = field.field_label;
+        reportData[`flexible_fields[${formDataIndex}][field_value]`] = field.field_value;
+        reportData[`flexible_fields[${formDataIndex}][field_order]`] = field.field_order;
+        formDataIndex++;
+
+        // Add second field for "Add Two" functionality
+        if (
+          field.col_span === 2 &&
+          field.field_label_2 !== undefined &&
+          field.field_value_2 &&
+          field.field_value_2.trim() !== ""
+        ) {
+          reportData[`flexible_fields[${formDataIndex}][section_name]`] = field.section_name;
+          reportData[`flexible_fields[${formDataIndex}][col_span]`] = field.col_span;
+          reportData[`flexible_fields[${formDataIndex}][field_label]`] = field.field_label_2;
+          reportData[`flexible_fields[${formDataIndex}][field_value]`] = field.field_value_2;
+          reportData[`flexible_fields[${formDataIndex}][field_order]`] = field.field_order + 1;
+          formDataIndex++;
+        }
+      }
+    });
+
+    // Add chassis impression file if available (as base64 or file path)
+    if (chassisImpressionFile) {
+      reportData["chassis_no_pencil_impression"] = chassisImpressionFile;
+    }
+
+    // Only proceed if there's actual data to save
+    if (Object.keys(reportData).length === 0) {
+      toast.warning(
+        "No data to save. Please fill in some fields before saving."
+      );
+      return;
+    }
+
+    // Dispatch save action with JSON data
+    dispatch(
+      saveOrderReport({
+        orderId: id,
+        reportData: reportData,
+      })
+    );
+  }, [
+    reportFormData,
+    flexibleFields,
+    validateFlexibleFields,
+    chassisImpressionFile,
+    dispatch,
+    id,
+  ]);
 
   // Render flexible fields for a section
-  const renderFlexibleFields = useCallback((sectionName) => {
-    const sectionFields = flexibleFields.filter(
-      (field) => field.section_name === sectionName
-    );
+  const renderFlexibleFields = useCallback(
+    (sectionName) => {
+      const sectionFields = flexibleFields.filter(
+        (field) => field.section_name === sectionName
+      );
 
-    return sectionFields.map((field) => (
-      <div
-        key={field.id}
-        className="row mt-3"
-        style={{
-          border: "1px dashed #ccc",
-          padding: "10px",
-          borderRadius: "5px",
-          position: "relative",
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => removeFlexibleField(field.id)}
-          className="flexible-field-remove-button"
+      return sectionFields.map((field) => (
+        <div
+          key={field.id}
+          className="row mt-3"
+          style={{
+            border: "1px dashed #ccc",
+            padding: "10px",
+            borderRadius: "5px",
+            position: "relative",
+          }}
         >
-          <DeleteIcon />
-        </button>
+          <button
+            type="button"
+            onClick={() => removeFlexibleField(field.id)}
+            className="flexible-field-remove-button"
+          >
+            <DeleteIcon />
+          </button>
 
-        {field.col_span === 1 ? (
-          // Add One: 2 fields (1 heading, 1 value)
-          <>
-            <div className="col-md-3">
-              <div className="form-group">
-                <label>
-                  Field Label <span className="text-danger">*</span>
-                </label>
-                <input
-                  type="text"
-                  className="form-field"
-                  value={field.field_label}
-                  onChange={(e) =>
-                    handleFlexibleFieldChange(
-                      field.id,
-                      "field_label",
-                      e.target.value
-                    )
-                  }
-                  placeholder="Enter field label"
-                  required
-                />
+          {field.col_span === 1 ? (
+            // Add One: 2 fields (1 heading, 1 value)
+            <>
+              <div className="col-md-3">
+                <div className="form-group">
+                  <label>
+                    Field Label <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="form-field"
+                    value={field.field_label}
+                    onChange={(e) =>
+                      handleFlexibleFieldChange(
+                        field.id,
+                        "field_label",
+                        e.target.value
+                      )
+                    }
+                    placeholder="Enter field label"
+                    required
+                  />
+                </div>
               </div>
-            </div>
-            <div className="col-md-9">
-              <div className="form-group">
-                <label>
-                  Field Value <span className="text-danger">*</span>
-                </label>
-                <input
-                  type="text"
-                  className="form-field"
-                  value={field.field_value}
-                  onChange={(e) =>
-                    handleFlexibleFieldChange(
-                      field.id,
-                      "field_value",
-                      e.target.value
-                    )
-                  }
-                  placeholder="Enter field value"
-                  required
-                />
+              <div className="col-md-9">
+                <div className="form-group">
+                  <label>
+                    Field Value <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="form-field"
+                    value={field.field_value}
+                    onChange={(e) =>
+                      handleFlexibleFieldChange(
+                        field.id,
+                        "field_value",
+                        e.target.value
+                      )
+                    }
+                    placeholder="Enter field value"
+                    required
+                  />
+                </div>
               </div>
-            </div>
-          </>
-        ) : (
-          // Add Two: 4 fields (2 headings, 2 values)
-          <>
-            <div className="col-md-3">
-              <div className="form-group">
-                <label>
-                  First Label <span className="text-danger">*</span>
-                </label>
-                <input
-                  type="text"
-                  className="form-field"
-                  value={field.field_label}
-                  onChange={(e) =>
-                    handleFlexibleFieldChange(
-                      field.id,
-                      "field_label",
-                      e.target.value
-                    )
-                  }
-                  placeholder="Enter first label"
-                  required
-                />
+            </>
+          ) : (
+            // Add Two: 4 fields (2 headings, 2 values)
+            <>
+              <div className="col-md-3">
+                <div className="form-group">
+                  <label>
+                    First Label <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="form-field"
+                    value={field.field_label}
+                    onChange={(e) =>
+                      handleFlexibleFieldChange(
+                        field.id,
+                        "field_label",
+                        e.target.value
+                      )
+                    }
+                    placeholder="Enter first label"
+                    required
+                  />
+                </div>
               </div>
-            </div>
-            <div className="col-md-3">
-              <div className="form-group">
-                <label>
-                  First Value <span className="text-danger">*</span>
-                </label>
-                <input
-                  type="text"
-                  className="form-field"
-                  value={field.field_value}
-                  onChange={(e) =>
-                    handleFlexibleFieldChange(
-                      field.id,
-                      "field_value",
-                      e.target.value
-                    )
-                  }
-                  placeholder="Enter first value"
-                  required
-                />
+              <div className="col-md-3">
+                <div className="form-group">
+                  <label>
+                    First Value <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="form-field"
+                    value={field.field_value}
+                    onChange={(e) =>
+                      handleFlexibleFieldChange(
+                        field.id,
+                        "field_value",
+                        e.target.value
+                      )
+                    }
+                    placeholder="Enter first value"
+                    required
+                  />
+                </div>
               </div>
-            </div>
-            <div className="col-md-3">
-              <div className="form-group">
-                <label>
-                  Second Label <span className="text-danger">*</span>
-                </label>
-                <input
-                  type="text"
-                  className="form-field"
-                  value={field.field_label_2 || ""}
-                  onChange={(e) =>
-                    handleFlexibleFieldChange(
-                      field.id,
-                      "field_label_2",
-                      e.target.value
-                    )
-                  }
-                  placeholder="Enter second label"
-                  required
-                />
+              <div className="col-md-3">
+                <div className="form-group">
+                  <label>
+                    Second Label <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="form-field"
+                    value={field.field_label_2 || ""}
+                    onChange={(e) =>
+                      handleFlexibleFieldChange(
+                        field.id,
+                        "field_label_2",
+                        e.target.value
+                      )
+                    }
+                    placeholder="Enter second label"
+                    required
+                  />
+                </div>
               </div>
-            </div>
-            <div className="col-md-3">
-              <div className="form-group">
-                <label>
-                  Second Value <span className="text-danger">*</span>
-                </label>
-                <input
-                  type="text"
-                  className="form-field"
-                  value={field.field_value_2 || ""}
-                  onChange={(e) =>
-                    handleFlexibleFieldChange(
-                      field.id,
-                      "field_value_2",
-                      e.target.value
-                    )
-                  }
-                  placeholder="Enter second value"
-                  required
-                />
+              <div className="col-md-3">
+                <div className="form-group">
+                  <label>
+                    Second Value <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="form-field"
+                    value={field.field_value_2 || ""}
+                    onChange={(e) =>
+                      handleFlexibleFieldChange(
+                        field.id,
+                        "field_value_2",
+                        e.target.value
+                      )
+                    }
+                    placeholder="Enter second value"
+                    required
+                  />
+                </div>
               </div>
-            </div>
-          </>
-        )}
-      </div>
-    ));
-  }, [flexibleFields, handleFlexibleFieldChange, removeFlexibleField]);
+            </>
+          )}
+        </div>
+      ));
+    },
+    [flexibleFields, handleFlexibleFieldChange, removeFlexibleField]
+  );
 
   // Render flexible fields with textarea for specific section
-  const renderFlexibleFieldsWithTextarea = useCallback((sectionName) => {
-    const sectionFields = flexibleFields.filter(
-      (field) => field.section_name === sectionName
-    );
+  const renderFlexibleFieldsWithTextarea = useCallback(
+    (sectionName) => {
+      const sectionFields = flexibleFields.filter(
+        (field) => field.section_name === sectionName
+      );
 
-    return sectionFields.map((field) => (
-      <div
-        key={field.id}
-        className="row mb-3"
-        style={{
-          border: "1px dashed #ccc",
-          padding: "10px",
-          borderRadius: "5px",
-          position: "relative",
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => removeFlexibleField(field.id)}
-          className="flexible-field-remove-button"
+      return sectionFields.map((field) => (
+        <div
+          key={field.id}
+          className="row mb-3"
+          style={{
+            border: "1px dashed #ccc",
+            padding: "10px",
+            borderRadius: "5px",
+            position: "relative",
+          }}
         >
-          <DeleteIcon />
-        </button>
+          <button
+            type="button"
+            onClick={() => removeFlexibleField(field.id)}
+            className="flexible-field-remove-button"
+          >
+            <DeleteIcon />
+          </button>
 
-        {field.col_span === 1 ? (
-          // Add One: 2 fields (1 heading, 1 value)
-          <>
-            <div className="col-md-3">
-              <div className="form-group">
-                <label>
-                  Field Label <span className="text-danger">*</span>
-                </label>
-                <input
-                  type="text"
-                  className="form-field"
-                  value={field.field_label}
-                  onChange={(e) =>
-                    handleFlexibleFieldChange(
-                      field.id,
-                      "field_label",
-                      e.target.value
-                    )
-                  }
-                  placeholder="Enter field label"
-                  required
-                />
+          {field.col_span === 1 ? (
+            // Add One: 2 fields (1 heading, 1 value)
+            <>
+              <div className="col-md-3">
+                <div className="form-group">
+                  <label>
+                    Field Label <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="form-field"
+                    value={field.field_label}
+                    onChange={(e) =>
+                      handleFlexibleFieldChange(
+                        field.id,
+                        "field_label",
+                        e.target.value
+                      )
+                    }
+                    placeholder="Enter field label"
+                    required
+                  />
+                </div>
               </div>
-            </div>
-            <div className="col-md-9">
-              <div className="form-group">
-                <label>
-                  Field Value <span className="text-danger">*</span>
-                </label>
-                <textarea
-                  className="form-field"
-                  value={field.field_value}
-                  onChange={(e) =>
-                    handleFlexibleFieldChange(
-                      field.id,
-                      "field_value",
-                      e.target.value
-                    )
-                  }
-                  placeholder="Enter field value"
-                  rows="2"
-                  required
-                />
+              <div className="col-md-9">
+                <div className="form-group">
+                  <label>
+                    Field Value <span className="text-danger">*</span>
+                  </label>
+                  <textarea
+                    className="form-field"
+                    value={field.field_value}
+                    onChange={(e) =>
+                      handleFlexibleFieldChange(
+                        field.id,
+                        "field_value",
+                        e.target.value
+                      )
+                    }
+                    placeholder="Enter field value"
+                    rows="2"
+                    required
+                  />
+                </div>
               </div>
-            </div>
-          </>
-        ) : (
-          // Add Two: 4 fields (2 headings, 2 values)
-          <>
-            <div className="col-md-3">
-              <div className="form-group">
-                <label>
-                  First Label <span className="text-danger">*</span>
-                </label>
-                <input
-                  type="text"
-                  className="form-field"
-                  value={field.field_label}
-                  onChange={(e) =>
-                    handleFlexibleFieldChange(
-                      field.id,
-                      "field_label",
-                      e.target.value
-                    )
-                  }
-                  placeholder="Enter first label"
-                  required
-                />
+            </>
+          ) : (
+            // Add Two: 4 fields (2 headings, 2 values)
+            <>
+              <div className="col-md-3">
+                <div className="form-group">
+                  <label>
+                    First Label <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="form-field"
+                    value={field.field_label}
+                    onChange={(e) =>
+                      handleFlexibleFieldChange(
+                        field.id,
+                        "field_label",
+                        e.target.value
+                      )
+                    }
+                    placeholder="Enter first label"
+                    required
+                  />
+                </div>
               </div>
-            </div>
-            <div className="col-md-3">
-              <div className="form-group">
-                <label>
-                  First Value <span className="text-danger">*</span>
-                </label>
-                <textarea
-                  className="form-field"
-                  value={field.field_value}
-                  onChange={(e) =>
-                    handleFlexibleFieldChange(
-                      field.id,
-                      "field_value",
-                      e.target.value
-                    )
-                  }
-                  placeholder="Enter first value"
-                  rows="2"
-                  required
-                />
+              <div className="col-md-3">
+                <div className="form-group">
+                  <label>
+                    First Value <span className="text-danger">*</span>
+                  </label>
+                  <textarea
+                    className="form-field"
+                    value={field.field_value}
+                    onChange={(e) =>
+                      handleFlexibleFieldChange(
+                        field.id,
+                        "field_value",
+                        e.target.value
+                      )
+                    }
+                    placeholder="Enter first value"
+                    rows="2"
+                    required
+                  />
+                </div>
               </div>
-            </div>
-            <div className="col-md-3">
-              <div className="form-group">
-                <label>
-                  Second Label <span className="text-danger">*</span>
-                </label>
-                <input
-                  type="text"
-                  className="form-field"
-                  value={field.field_label_2 || ""}
-                  onChange={(e) =>
-                    handleFlexibleFieldChange(
-                      field.id,
-                      "field_label_2",
-                      e.target.value
-                    )
-                  }
-                  placeholder="Enter second label"
-                  required
-                />
+              <div className="col-md-3">
+                <div className="form-group">
+                  <label>
+                    Second Label <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="form-field"
+                    value={field.field_label_2 || ""}
+                    onChange={(e) =>
+                      handleFlexibleFieldChange(
+                        field.id,
+                        "field_label_2",
+                        e.target.value
+                      )
+                    }
+                    placeholder="Enter second label"
+                    required
+                  />
+                </div>
               </div>
-            </div>
-            <div className="col-md-3">
-              <div className="form-group">
-                <label>
-                  Second Value <span className="text-danger">*</span>
-                </label>
-                <textarea
-                  className="form-field"
-                  value={field.field_value_2 || ""}
-                  onChange={(e) =>
-                    handleFlexibleFieldChange(
-                      field.id,
-                      "field_value_2",
-                      e.target.value
-                    )
-                  }
-                  placeholder="Enter second value"
-                  rows="2"
-                  required
-                />
+              <div className="col-md-3">
+                <div className="form-group">
+                  <label>
+                    Second Value <span className="text-danger">*</span>
+                  </label>
+                  <textarea
+                    className="form-field"
+                    value={field.field_value_2 || ""}
+                    onChange={(e) =>
+                      handleFlexibleFieldChange(
+                        field.id,
+                        "field_value_2",
+                        e.target.value
+                      )
+                    }
+                    placeholder="Enter second value"
+                    rows="2"
+                    required
+                  />
+                </div>
               </div>
-            </div>
-          </>
-        )}
-      </div>
-    ));
-  }, [flexibleFields, handleFlexibleFieldChange, removeFlexibleField]);
+            </>
+          )}
+        </div>
+      ));
+    },
+    [flexibleFields, handleFlexibleFieldChange, removeFlexibleField]
+  );
 
   // Memoized values for expensive calculations
   const currentDate = useMemo(() => getCurrentDate(), [getCurrentDate]);
@@ -1189,7 +1472,11 @@ function CVReport() {
     const value = reportFormData.fair_market_value;
     const amount = parseCurrency(value);
     return amount > 0 ? convertNumberToWordsIndian(amount) : "";
-  }, [reportFormData.fair_market_value, parseCurrency, convertNumberToWordsIndian]);
+  }, [
+    reportFormData.fair_market_value,
+    parseCurrency,
+    convertNumberToWordsIndian,
+  ]);
 
   const tyreCountInWords = useMemo(() => {
     const count = parseInt(reportFormData.tyre_count) || 0;
@@ -1203,7 +1490,12 @@ function CVReport() {
     const total = front + middle + rear;
     const word = numberToWords(total);
     return `${total} (${word})`;
-  }, [reportFormData.front_tyre_no, reportFormData.middle_tyre_no, reportFormData.rear_tyre_no, numberToWords]);
+  }, [
+    reportFormData.front_tyre_no,
+    reportFormData.middle_tyre_no,
+    reportFormData.rear_tyre_no,
+    numberToWords,
+  ]);
 
   return (
     <section className="order-details-wrapper">
@@ -1760,7 +2052,7 @@ function CVReport() {
                 </div>
                 <div className="col-md-3">
                   <div className="form-group">
-                  <label htmlFor="invoice_no">Invoice No. & Date</label>
+                    <label htmlFor="invoice_no">Invoice No. & Date</label>
                     <input
                       type="text"
                       className="form-field mb-2"
@@ -2850,7 +3142,7 @@ function CVReport() {
                 </div>
               </div>
 
-              {/* Generate Report Button */}
+              {/* Generate and Save Report Buttons */}
               <div className="row">
                 <div className="col-12 text-center">
                   <div className="form-buttons">
@@ -2862,6 +3154,15 @@ function CVReport() {
                       {generating
                         ? "Generating Report..."
                         : "Generate CV Report"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn save-report"
+                      onClick={handleSaveReport}
+                      disabled={saving}
+                      style={{ marginRight: "10px" }}
+                    >
+                      {saving ? "Saving..." : "Save"}
                     </button>
                   </div>
                 </div>

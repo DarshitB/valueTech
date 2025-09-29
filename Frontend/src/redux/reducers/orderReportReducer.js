@@ -41,6 +41,19 @@ export const generateCustomReport = createAsyncThunk(
   }
 );
 
+// Async action: Save order report data
+export const saveOrderReport = createAsyncThunk(
+  "orderReports/saveReport",
+  async ({ orderId, reportData }, { rejectWithValue }) => {
+    try {
+      const res = await orderReportApi.saveOrderReport(orderId, reportData);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
 // Initial state
 const initialState = {
   currentReport: null,     // Currently selected/fetched report data
@@ -52,6 +65,9 @@ const initialState = {
   customReportGenerating: false, // Loading state for custom report generation
   customReportError: null,       // Error state for custom report generation
   customReportData: null,        // Generated custom report data
+  saving: false,          // Loading state for save operations
+  saveError: null,        // Error message for save operations
+  savedReport: null,      // Saved report response
 };
 
 // Order Report slice
@@ -132,6 +148,22 @@ const orderReportSlice = createSlice({
         state.customReportError = action.payload;
         state.customReportData = null;
         toast.error(`Failed to generate custom report: ${action.payload}`);
+      })
+
+      // Save order report
+      .addCase(saveOrderReport.pending, (state) => {
+        state.saving = true;
+        state.saveError = null;
+      })
+      .addCase(saveOrderReport.fulfilled, (state, action) => {
+        state.saving = false;
+        state.savedReport = action.payload.data;
+        toast.success(action.payload.message || "Report saved successfully");
+      })
+      .addCase(saveOrderReport.rejected, (state, action) => {
+        state.saving = false;
+        state.saveError = action.payload;
+        toast.error(`Failed to save report: ${action.payload}`);
       });
   },
 });

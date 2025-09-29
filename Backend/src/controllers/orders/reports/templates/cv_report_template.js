@@ -147,7 +147,7 @@ function generateCVReportHTML(formData, extraData, bgImageBase64) {
             <td>REGISTRATION NO:</td>
             <td colspan="2">${formData.registration_no}</td>
             <td>REGISTRATION DATE:</td>
-            <td colspan="2">${formData.registration_date}</td>
+            <td colspan="2">${formData.registration_date === "00-00-0000" ? "NA" : formData.registration_date}</td>
         </tr>
         <tr>
             <td>REGISTERED LOCATION:</td>

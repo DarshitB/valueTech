@@ -1,6 +1,18 @@
 const orderMediaPortal = require("../../models/orders/orderMediaPortal");
 const Order = require("../../models/orders/order");
 const OrderStatusHistory = require("../../models/orders/orderStatusHistory");
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const yauzl = require('yauzl');
+const { v4: uuidv4 } = require('uuid');
+const {
+  ensureOrderFolders,
+  ensureMediaSubfolders,
+  copyMultipleFilesToFolder,
+  cleanupTempFiles
+} = require('../../utils/localFileHelper');
+const { BadRequestError, NotFoundError, AppError } = require('../../utils/customErrors');
 
 /**
  * Helper: Update order status to 7 (Assets Approved) when images are approved
@@ -33,39 +45,28 @@ async function updateOrderStatusToAssetsApproved(orderId, userId) {
  * GET /api/portal/order-media/:orderId
  * Get all media records for a specific order
  */
-async function getOrderMedia(req, res) {
+async function getOrderMedia(req, res, next) {
   try {
     const { orderId } = req.params;
-    const { id: userId } = req.user; // Assuming you have user info in req.user
 
     if (!orderId) {
-      return res.status(400).json({
-        success: false,
-        message: "Order ID is required",
-      });
+      throw new BadRequestError("Order ID is required");
     }
 
     // Validate order ID is a number
     const orderIdNum = parseInt(orderId);
     if (isNaN(orderIdNum)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid Order ID format",
-      });
+      throw new BadRequestError("Invalid Order ID format");
     }
 
     // Check if order exists
     const order = await Order.findById(orderIdNum, req.user);
     if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: "Order not found",
-      });
+      throw new NotFoundError("Order not found");
     }
 
     // Get all media for the order
     const mediaRecords = await orderMediaPortal.getMediaByOrderId(orderIdNum);
-
 
     res.json({
       success: true,
@@ -79,12 +80,7 @@ async function getOrderMedia(req, res) {
       },
     });
   } catch (error) {
-    console.error("Error in getOrderMedia:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message,
-    });
+    next(error);
   }
 }
 
@@ -93,43 +89,29 @@ async function getOrderMedia(req, res) {
  * Update status for multiple media records
  * Body: { updates: [{ id: 1, status: 1 }, { id: 2, status: 0 }] }
  */
-async function updateMediaStatus(req, res) {
+async function updateMediaStatus(req, res, next) {
   try {
     const { updates } = req.body;
-    const { id: userId } = req.user; // Assuming you have user info in req.user
-
-    /* console.log("updates", updates); */
+    const { id: userId } = req.user;
     
     if (!updates || !Array.isArray(updates) || updates.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Updates array is required and must not be empty",
-      });
+      throw new BadRequestError("Updates array is required and must not be empty");
     }
 
     // Validate each update object
     for (const update of updates) {
       if (!update.id || update.status === undefined) {
-        return res.status(400).json({
-          success: false,
-          message: "Each update must have 'id' and 'status' fields",
-        });
+        throw new BadRequestError("Each update must have 'id' and 'status' fields");
       }
 
-      // Validate status is a number (0 or 1)
+      // Validate status is a number (0, 1, or 2)
       if (![0, 1, 2].includes(update.status)) {
-        return res.status(400).json({
-          success: false,
-          message: "Status must be 0, 1 or 2",
-        });
+        throw new BadRequestError("Status must be 0, 1 or 2");
       }
 
       // Validate id is a number
       if (isNaN(parseInt(update.id))) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid media ID format",
-        });
+        throw new BadRequestError("Invalid media ID format");
       }
     }
 
@@ -160,12 +142,7 @@ async function updateMediaStatus(req, res) {
       },
     });
   } catch (error) {
-    console.error("Error in updateMediaStatus:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message,
-    });
+    next(error);
   }
 }
 
@@ -173,33 +150,24 @@ async function updateMediaStatus(req, res) {
  * GET /api/portal/order-media/:orderId/count
  * Get count of media records for a specific order
  */
-async function getOrderMediaCount(req, res) {
+async function getOrderMediaCount(req, res, next) {
   try {
     const { orderId } = req.params;
 
     if (!orderId) {
-      return res.status(400).json({
-        success: false,
-        message: "Order ID is required",
-      });
+      throw new BadRequestError("Order ID is required");
     }
 
     // Validate order ID is a number
     const orderIdNum = parseInt(orderId);
     if (isNaN(orderIdNum)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid Order ID format",
-      });
+      throw new BadRequestError("Invalid Order ID format");
     }
 
     // Check if order exists
     const order = await Order.findById(orderIdNum, req.user);
     if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: "Order not found",
-      });
+      throw new NotFoundError("Order not found");
     }
 
     // Get media count for the order
@@ -224,12 +192,262 @@ async function getOrderMediaCount(req, res) {
       },
     });
   } catch (error) {
-    console.error("Error in getOrderMediaCount:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message,
+    next(error);
+  }
+}
+
+/**
+ * Helper: Extract ZIP file and return array of extracted file paths
+ */
+function extractZipFile(zipPath, extractDir) {
+  return new Promise((resolve, reject) => {
+    const extractedFiles = [];
+    
+    yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
+      if (err) return reject(err);
+      
+      zipfile.readEntry();
+      zipfile.on('entry', (entry) => {
+        // Skip directories and non-media files
+        if (entry.fileName.endsWith('/') || 
+            (!entry.fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp|mp4|avi|mov|wmv|flv|webm)$/i))) {
+          zipfile.readEntry();
+          return;
+        }
+        
+        zipfile.openReadStream(entry, (err, readStream) => {
+          if (err) {
+            zipfile.readEntry();
+            return;
+          }
+          
+          // Create safe filename
+          const safeFileName = entry.fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const extractPath = path.join(extractDir, safeFileName);
+          
+          // Ensure directory exists
+          const extractDirPath = path.dirname(extractPath);
+          if (!fs.existsSync(extractDirPath)) {
+            fs.mkdirSync(extractDirPath, { recursive: true });
+          }
+          
+          const writeStream = fs.createWriteStream(extractPath);
+          
+          readStream.pipe(writeStream);
+          
+          writeStream.on('close', () => {
+            extractedFiles.push({
+              originalName: entry.fileName,
+              extractedPath: extractPath,
+              size: entry.uncompressedSize
+            });
+            zipfile.readEntry();
+          });
+          
+          writeStream.on('error', (err) => {
+            zipfile.readEntry();
+          });
+        });
+      });
+      
+      zipfile.on('end', () => {
+        resolve(extractedFiles);
+      });
+      
+      zipfile.on('error', reject);
     });
+  });
+}
+
+/**
+ * Helper: Get file type from extension
+ */
+function getFileTypeFromExtension(fileName) {
+  const ext = path.extname(fileName).toLowerCase();
+  const videoExts = ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm'];
+  const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
+  
+  if (videoExts.includes(ext)) return 'video';
+  if (imageExts.includes(ext)) return 'image';
+  return 'unknown';
+}
+
+/**
+ * Helper: Get MIME type from extension
+ */
+function getMimeTypeFromExtension(fileName) {
+  const ext = path.extname(fileName).toLowerCase();
+  const mimeTypes = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.gif': 'image/gif',
+    '.bmp': 'image/bmp',
+    '.webp': 'image/webp',
+    '.mp4': 'video/mp4',
+    '.avi': 'video/x-msvideo',
+    '.mov': 'video/quicktime',
+    '.wmv': 'video/x-ms-wmv',
+    '.flv': 'video/x-flv',
+    '.webm': 'video/webm'
+  };
+  
+  return mimeTypes[ext] || 'application/octet-stream';
+}
+
+/**
+ * POST /api/portal/order-media/upload-zip
+ * Upload ZIP file containing images and videos
+ * Body: multipart form with 'zipFile' field and 'orderId' field
+ */
+async function uploadZip(req, res, next) {
+  let tempPaths = [];
+  let extractDir = null;
+  
+  try {
+    const { orderId } = req.body;
+    const zipFile = req.file; // Single ZIP file
+    const { id: userId } = req.user;
+
+    // Validation using custom error classes
+    if (!orderId) {
+      throw new BadRequestError("Order ID is required");
+    }
+
+    if (!zipFile) {
+      throw new BadRequestError("ZIP file is required");
+    }
+
+    // Validate order ID is a number
+    const orderIdNum = parseInt(orderId);
+    if (isNaN(orderIdNum)) {
+      throw new BadRequestError("Invalid Order ID format");
+    }
+
+    // Check if order exists
+    const order = await Order.findById(orderIdNum, req.user);
+    if (!order) {
+      throw new NotFoundError("Order not found");
+    }
+
+    // Create temporary extraction directory
+    extractDir = path.join(os.tmpdir(), `zip_extract_${uuidv4()}`);
+    fs.mkdirSync(extractDir, { recursive: true });
+    tempPaths.push(extractDir);
+
+    // Extract ZIP file
+    console.log(`📦 Extracting ZIP file: ${zipFile.originalname}`);
+    const extractedFiles = await extractZipFile(zipFile.path, extractDir);
+    
+    if (extractedFiles.length === 0) {
+      throw new BadRequestError("No valid image or video files found in the ZIP");
+    }
+
+    console.log(`📁 Extracted ${extractedFiles.length} files from ZIP`);
+
+    // Ensure order folders
+    const { orderPath } = await ensureOrderFolders(order.order_number);
+    const { imagesPath, videosPath } = await ensureMediaSubfolders(orderPath);
+
+    // Prepare files for upload
+    const filesToUpload = [];
+    const mediaRecords = [];
+
+    for (const extractedFile of extractedFiles) {
+      const fileType = getFileTypeFromExtension(extractedFile.originalName);
+      
+      if (fileType === 'unknown') continue;
+
+      // Generate filename: orderNumber_fileType_timestamp_uuid.extension (prevents conflicts)
+      const timestamp = Date.now();
+      const uniqueId = uuidv4().substring(0, 8);
+      const extension = path.extname(extractedFile.originalName);
+      const generatedFilename = `${order.order_number}_${fileType}_${timestamp}_${uniqueId}${extension}`;
+
+      // Choose target folder path
+      const targetFolderPath = fileType === 'video' ? videosPath : imagesPath;
+
+      filesToUpload.push({
+        path: extractedFile.extractedPath,
+        name: generatedFilename,
+        mimeType: getMimeTypeFromExtension(extractedFile.originalName),
+        targetFolderPath: targetFolderPath,
+        fileType: fileType
+      });
+
+      // Prepare database record
+      mediaRecords.push({
+        order_id: orderIdNum,
+        uploader_type: 'portal_users',
+        uploader_id: userId,
+        media_type: fileType,
+        status: 0, // Pending approval
+      });
+    }
+
+    if (filesToUpload.length === 0) {
+      throw new BadRequestError("No valid image or video files found in the ZIP");
+    }
+
+    // Copy all files to target folders
+    console.log(`📤 Uploading ${filesToUpload.length} files to order folders`);
+    const uploadedFiles = await copyMultipleFilesToFolder(filesToUpload);
+
+    // Update media records with file paths and insert into database
+    const savedMedia = [];
+    for (let i = 0; i < mediaRecords.length; i++) {
+      const mediaRecord = {
+        ...mediaRecords[i],
+        media_url: uploadedFiles[i].webContentLink,
+      };
+      
+      const mediaId = await orderMediaPortal.insertMedia(mediaRecord);
+      savedMedia.push({
+        id: mediaId,
+        filename: filesToUpload[i].name,
+        media_type: mediaRecord.media_type,
+        media_url: mediaRecord.media_url,
+        status: mediaRecord.status
+      });
+    }
+
+    // Cleanup temporary files
+    console.log(`🧹 Cleaning up temporary files...`);
+    cleanupTempFiles(tempPaths);
+    cleanupTempFiles([zipFile.path]); // Clean up the uploaded ZIP file
+
+    console.log(`✅ Successfully uploaded ${savedMedia.length} files from ZIP`);
+
+    res.json({
+      success: true,
+      message: `Successfully uploaded ${savedMedia.length} files from ZIP`,
+      data: {
+        order: {
+          id: order.id,
+          order_number: order.order_number,
+        },
+        uploaded_files: savedMedia,
+        total_count: savedMedia.length,
+        summary: {
+          images: savedMedia.filter(f => f.media_type === 'image').length,
+          videos: savedMedia.filter(f => f.media_type === 'video').length
+        }
+      },
+    });
+
+  } catch (error) {
+    console.error("Error in uploadZip:", error);
+    
+    // Cleanup on error
+    if (tempPaths && tempPaths.length > 0) {
+      cleanupTempFiles(tempPaths);
+    }
+    if (req.file && req.file.path) {
+      cleanupTempFiles([req.file.path]);
+    }
+    
+    // Let the error handler middleware handle the error
+    next(error);
   }
 }
 
@@ -237,4 +455,5 @@ module.exports = {
   getOrderMedia,
   updateMediaStatus,
   getOrderMediaCount,
+  uploadZip,
 };

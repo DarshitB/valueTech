@@ -23,13 +23,16 @@ import {
   fetchOrderById,
   fetchOrderMedia,
   updateOrderMediaStatus,
+  uploadZipFile,
 } from "../../redux/reducers/orderReducer";
 import { generateCollage } from "../../redux/reducers/collageReducer";
 import {
   ApprovedIcon,
+  FolderIcon,
   ImageCollageIcon,
   RevalidateIcon,
   SelectedIcon,
+  UploadImageIcon,
   ValidateIcon,
 } from "../../components/icons";
 import { ZoomIn } from "lucide-react";
@@ -38,6 +41,7 @@ import "yet-another-react-lightbox/styles.css";
 import { toast } from "react-toastify";
 import { hasPermission } from "../../utils/permissionUtils";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
+import ZipUploadModal from "../../components/ZipUploadModal";
 
 function OrderImages() {
   // Extract order ID from route parameters
@@ -64,6 +68,7 @@ function OrderImages() {
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxApprovals, setLightboxApprovals] = useState({}); // Track approvals in lightbox
   const [remarks, setRemarks] = useState("");
+  const [zipUploadModalOpen, setZipUploadModalOpen] = useState(false);
 
   // Global ResizeObserver error suppression - runs once when component mounts
   React.useEffect(() => {
@@ -640,11 +645,25 @@ function OrderImages() {
               <div className="order-images-buttons">
                 {hasPermission(
                   allowedPermissions,
+                  "upload_order_media_files"
+                ) && (
+                  <button
+                    onClick={() => setZipUploadModalOpen(true)}
+                    title="Upload ZIP file"
+                    className="tooltip-link"
+                  >
+                    <UploadImageIcon />
+                  </button>
+                )}
+                {hasPermission(
+                  allowedPermissions,
                   "approve_reject_order_media_files"
                 ) && (
                   <button
                     onClick={handleApprove}
                     disabled={selectedImageSequence.length === 0}
+                    title="Approve Selected Images"
+                    className="tooltip-link"
                   >
                     <ApprovedIcon />
                   </button>
@@ -656,6 +675,8 @@ function OrderImages() {
                   <button
                     onClick={handleReject}
                     disabled={selectedImageSequence.length === 0}
+                    title="Reject Selected Images"
+                    className="tooltip-link"
                   >
                     <RevalidateIcon />
                   </button>
@@ -669,6 +690,8 @@ function OrderImages() {
                     disabled={
                       selectedImageSequence.length === 0 || collageGenerating
                     }
+                    title="Generate Image Collage"
+                    className="tooltip-link"
                   >
                     <ImageCollageIcon />
                   </button>
@@ -899,6 +922,13 @@ function OrderImages() {
         on={{
           view: handleSlideTransition,
         }}
+      />
+
+      {/* ZIP Upload Modal */}
+      <ZipUploadModal
+        isOpen={zipUploadModalOpen}
+        onClose={() => setZipUploadModalOpen(false)}
+        orderId={id}
       />
     </section>
   );

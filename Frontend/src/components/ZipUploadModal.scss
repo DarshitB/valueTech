@@ -1,0 +1,218 @@
+/* ZIP Upload Modal Styles */
+@use "../assets/styles/variables" as *;
+
+.zip-upload-modal-content {
+  width: 100%;
+  margin: 0 auto;
+}
+
+.zip-upload-area {
+  margin-bottom: 20px;
+}
+
+.zip-upload-dropzone {
+  border: 2px dashed #ccc;
+  border-radius: 10px;
+  padding: 30px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background-color: $base-color;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 20px $box-shadow-color;
+
+  &:hover {
+    border-color: $primary-color;
+    background-color: #f9f9f9;
+  }
+
+  &.drag-active {
+    border-color: $primary-color;
+    background-color: #f9f9f9;
+    transform: scale(1.02);
+  }
+
+  &.file-selected {
+    border-color: #28a745;
+    background-color: #d4edda;
+  }
+}
+
+.zip-upload-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  .upload-icon {
+    color: #6777ef;
+    background: #dee0f2;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 20px;
+    svg {
+      width: 35px;
+      height: 35px;
+    }
+  }
+  h4 {
+    margin-bottom: 10px;
+    color: $base-font-color;
+    font-size: 18px;
+    span {
+      color: $primary-color;
+      text-decoration: underline;
+    }
+    margin-bottom: 0;
+    font-weight: 600;
+  }
+}
+
+.zip-upload-file-info {
+  h4 {
+    margin-bottom: 10px;
+    color: #28a745;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .file-name {
+    font-weight: 600;
+    color: $base-font-color;
+    margin-bottom: 5px;
+    word-break: break-all;
+  }
+
+  .file-size {
+    color: $base-font-color-light;
+    font-size: 14px;
+    margin-bottom: 15px;
+  }
+}
+
+.zip-upload-progress {
+  margin-bottom: 20px;
+
+  .progress {
+    height: 20px;
+    border-radius: 10px;
+    background-color: #e9ecef;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+
+  .progress-bar {
+    background-color: $primary-color;
+    transition: width 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .progress-text {
+    text-align: center;
+    color: $base-font-color-light;
+    font-size: 14px;
+    margin-bottom: 0;
+  }
+}
+
+.zip-upload-error {
+  margin-bottom: 20px;
+  padding: 10px;
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+
+  p {
+    margin-bottom: 0;
+    font-size: 14px;
+  }
+}
+
+.zip-upload-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.btn {
+  &.btn-extra {
+    width: 100%;
+    height: 40px;
+    border-radius: 5px;
+    border: 1px solid $color-danger !important;
+    background-color: $color-danger;
+    &:hover {
+      background-color: transparent !important;
+      color: $color-danger !important;
+    }
+  }
+  &.btn-cancle-modal {
+    width: 50%;
+    height: 50px;
+    border-radius: 5px;
+    border: 1px solid $color-danger;
+    background-color: transparent;
+    color: $color-danger !important;
+    font-size: 16px;
+    font-weight: 500;
+    box-shadow: none;
+    &:hover {
+      background-color: $color-danger !important;
+      color: $base-color !important;
+    }
+  }
+  &.btn-save-modal {
+    width: 50%;
+    height: 50px;
+    border-radius: 5px;
+    border: 1px solid $color-success;
+    background-color: $color-success !important;
+    font-size: 16px;
+    font-weight: 500;
+    box-shadow: none;
+    &:hover {
+      background-color: $color-success !important;
+      color: $base-color !important;
+    }
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 576px) {
+  .zip-upload-modal-content {
+    padding: 15px;
+  }
+
+  .zip-upload-dropzone {
+    padding: 30px 15px;
+    min-height: 150px;
+  }
+
+  .zip-upload-icon .icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .zip-upload-text h4 {
+    font-size: 16px;
+  }
+
+  .zip-upload-actions {
+    flex-direction: column;
+
+    .btn {
+      width: 100%;
+    }
+  }
+}

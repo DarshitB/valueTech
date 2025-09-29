@@ -50,25 +50,25 @@ function Dashboard() {
   // Check if current user is TELECALLER (case-insensitive) - matches any role containing "TELECALLER"
   const isTelecaller = currentUser?.role.name?.toUpperCase().includes("TELECALLER");
 
-  // Check if current user is Bank Officer (case-insensitive)
+  // Check if current user is Bank Officer (case-insensitive) - matches any role containing "BANK OFFICER"
   const isBankOfficer =
-    currentUser?.role.name?.toUpperCase() === "BANK OFFICER";
+    currentUser?.role.name?.toUpperCase().includes("BANK OFFICER");
 
-  // Check if current user is MANAGER (case-insensitive)
-  const isManager = currentUser?.role.name?.toUpperCase() === "MANAGER";
+  // Check if current user is MANAGER (case-insensitive) - matches any role containing "MANAGER"
+  const isManager = currentUser?.role.name?.toUpperCase().includes("MANAGER");
 
-  // Check if current user is Super Admin (case-insensitive)
-  const isSuperAdmin = currentUser?.role.name?.toUpperCase() === "SUPER ADMIN";
+  // Check if current user is Super Admin (case-insensitive) - matches any role containing "SUPER ADMIN"
+  const isSuperAdmin = currentUser?.role.name?.toUpperCase().includes("SUPER ADMIN");
 
   // Filter users by role for officer and manager selection
   const bankOfficers = officers.filter(
     (officer) =>
-      officer.role_name.toUpperCase() === "BANK OFFICER" ||
-      officer.role_name.toUpperCase() === "BANK AUTHORITY"
+      officer.role_name.toUpperCase().includes("BANK OFFICER") ||
+      officer.role_name.toUpperCase().includes("BANK AUTHORITY")
   );
 
   const managers = users.filter(
-    (user) => user.role_name.toUpperCase() === "MANAGER"
+    (user) => user.role_name.toUpperCase().includes("MANAGER")
   );
 
   // Fields allowed for TELECALLER role

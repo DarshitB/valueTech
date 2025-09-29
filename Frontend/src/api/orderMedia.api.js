@@ -7,3 +7,10 @@ export const getOrderMedia = (orderId) => axios.get(`${ENDPOINT}/${orderId}`);
 
 // Update order media status
 export const updateOrderMediaStatus = (payload) => axios.patch(`${ENDPOINT}/status`, payload);
+
+// Upload ZIP file containing images/videos
+export const uploadZipFile = (formData) => axios.post(`${ENDPOINT}/upload-zip`, formData, {
+  headers: {
+    'Content-Type': 'multipart/form-data',
+  },
+});

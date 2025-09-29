@@ -1,11 +1,31 @@
 const express = require("express");
 const router = express.Router();
+const multer = require("multer");
+const path = require("path");
 const orderMediaPortalController = require("../../controllers/orders/orderMediaPortalController");
 const auth = require("../../middleware/auth"); // Assuming you have auth middleware for portal
 const beforeUpdateLogger = require("../../middleware/beforeUpdateLogger"); // Assuming you have before update logger middleware
 const checkPermission = require("../../middleware/permission"); // Assuming you have permission middleware
 const activityLogger = require("../../middleware/activityLogger"); // Assuming you have activity logger middleware
 const permission = require("../../middleware/permission"); // Assuming you have permission middleware
+
+// Configure multer for ZIP file uploads
+const upload = multer({
+  dest: path.join(__dirname, "..", "..", "tmp_uploads"),
+  limits: { 
+    fileSize: 100 * 1024 * 1024 // 100MB limit for ZIP files
+  },
+  fileFilter: (req, file, cb) => {
+    // Only allow ZIP files
+    if (file.mimetype === 'application/zip' || 
+        file.mimetype === 'application/x-zip-compressed' ||
+        file.originalname.toLowerCase().endsWith('.zip')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only ZIP files are allowed'), false);
+    }
+  },
+});
 
 // Apply authentication middleware to all routes
 router.use(auth);
@@ -44,6 +64,19 @@ router.patch(
   beforeUpdateLogger("order_media_image_video", (req) => req.params.id),
   activityLogger("order_media_image_video", (req) => req.params.id),
   orderMediaPortalController.updateMediaStatus
+);
+
+/**
+ * POST /api/portal/order-media/upload-zip
+ * Upload ZIP file containing images and videos
+ * Body: multipart form with 'zipFile' field and 'orderId' field
+ */
+router.post(
+  "/upload-zip",
+  checkPermission("upload_order_media_files"),
+  upload.single('zipFile'), // Single ZIP file upload
+  activityLogger("order_media_image_video", (req, res) => res.locals.id),
+  orderMediaPortalController.uploadZip
 );
 
 module.exports = router;
