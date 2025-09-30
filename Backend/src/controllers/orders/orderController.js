@@ -159,6 +159,7 @@ exports.create = async (req, res, next) => {
       place_of_inspection: place_of_inspection || null,
       date_of_inspection: date_of_inspection || null,
       current_status_id: orderStatusId,
+      order_type: "VKA1",
       created_by: req.user?.id,
       created_at: new Date(),
     };

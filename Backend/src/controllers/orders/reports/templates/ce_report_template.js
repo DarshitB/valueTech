@@ -5,9 +5,10 @@
  * @param {Object} formData - Form data for the report
  * @param {Object} extraData - Extra data (bank info, categories, etc.)
  * @param {string} bgImageBase64 - Background image as base64
+ * @param {string|null} stampImageBase64 - Optional stamp overlay as base64
  * @returns {string} HTML content
  */
-function generateCEReportHTML(formData, extraData, bgImageBase64) {
+function generateCEReportHTML(formData, extraData, bgImageBase64, stampImageBase64) {
   return `
 <!DOCTYPE html>
 <html>
@@ -530,16 +531,19 @@ function generateCEReportHTML(formData, extraData, bgImageBase64) {
             </td>
         </tr>
         <tr>
-            <td colspan="6" style="height: 58px;">
+            <td colspan="6" style="height: 58px; position: relative;">
                 ${
                   formData.tyre_image_base64
-                    ? `<img src="${formData.tyre_image_base64}" style="height: 70px;" alt="">`
+                    ? `<img src="${formData.tyre_image_base64}" style="height: 70px; position: relative; z-index:1;" alt="">`
                     : ""
                 }
             </td>
         </tr>
         <tr>
-            <td colspan="6" style="height: 48px;">SIGNATURE WITH SEAL & STAMP</td>
+            <td colspan="6" style="height: 48px; position: relative;">
+                ${stampImageBase64 ? `<img src="${stampImageBase64}" alt="stamp" style="position:absolute; left:50%; bottom: -15px; transform:translateX(calc(-50% - 170px)); height: 150px; z-index:2; pointer-events:none;" />` : ""}
+                SIGNATURE WITH SEAL & STAMP
+            </td>
         </tr>
     </table>
     </div>

@@ -388,6 +388,7 @@ function Orders() {
                   <option value="">All Types</option>
                   <option value="VKA1">VKA1</option>
                   <option value="VKA2">VKA2</option>
+                  <option value="VKA3">VKA3</option>
                 </select>
                 <select
                   className="form-field type-priority-selector"
@@ -396,7 +397,7 @@ function Orders() {
                 >
                   <option value="">All Priorities</option>
                   <option value="High">High</option>
-                  <option value="Medium">Medium</option>
+                  <option value="Average">Average</option>
                   <option value="Low">Low</option>
                 </select>
                 {hasPermission(allowedPermissions, "add_order") && (
@@ -890,13 +891,13 @@ function Orders() {
                 }}
               >
                 <div className="body-form-box">
-                  <div className="form-group">
+                  <div className="form-group order-priority-radio-group">
                     <label>Order Priority</label>
-                    <div className="radio-group">
-                      {["High", "Medium", "Low"].map((priority) => (
+                    <div className="radio-group three-items">
+                      {["Low", "Average", "High"].map((priority) => (
                         <label
                           key={priority}
-                          className={`radio-label ${
+                          className={`radio-label ${priority.toLowerCase()} ${
                             attributesFormData.order_priority === priority
                               ? "selected"
                               : ""
@@ -923,23 +924,35 @@ function Orders() {
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="orderType">Order Type</label>
-                    <SingleSearchSelect
-                      id="orderType"
-                      className="search-selector"
-                      options={[
-                        { value: "VKA1", label: "VKA1" },
-                        { value: "VKA2", label: "VKA2" },
-                      ]}
-                      value={attributesFormData.order_type}
-                      onChange={(val) =>
-                        setAttributesFormData({
-                          ...attributesFormData,
-                          order_type: val,
-                        })
-                      }
-                      placeholder="Select Type"
-                    />
+                    <label>Order Type</label>
+                    <div className="radio-group three-items">
+                      {["VKA1", "VKA2", "VKA3"].map((type) => (
+                        <label
+                          key={type}
+                          className={`radio-label ${
+                            attributesFormData.order_type === type
+                              ? "selected"
+                              : ""
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="order_type"
+                            value={type}
+                            checked={
+                              attributesFormData.order_type === type
+                            }
+                            onChange={(e) =>
+                              setAttributesFormData({
+                                ...attributesFormData,
+                                order_type: e.target.value,
+                              })
+                            }
+                          />
+                          {type}
+                        </label>
+                      ))}
+                    </div>
                   </div>
                   <div className="form-buttons">
                     <button className="submit-button" type="submit">

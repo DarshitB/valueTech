@@ -35,6 +35,24 @@ const orderMediaDocument = {
     return documents;
   },
 
+  // Find approved documents by order ID
+  findApprovedByOrderId: async (orderId) => {
+    const documents = await db("order_media_documents")
+      .leftJoin("users as created_user", "order_media_documents.created_by", "created_user.id")
+      .leftJoin("users as deleted_user", "order_media_documents.deleted_by", "deleted_user.id")
+      .where({ order_id: orderId })
+      .andWhere({ status: "approved" })
+      .whereNull("order_media_documents.deleted_at")
+      .orderBy("order_media_documents.created_at", "desc")
+      .select(
+        "order_media_documents.*",
+        "created_user.name as created_by_name",
+        "deleted_user.name as deleted_by_name"
+      );
+
+    return documents;
+  },
+
   // Find documents by type
   findByType: async (documentType) => {
     const documents = await db("order_media_documents")
@@ -85,6 +103,23 @@ const orderMediaDocument = {
       });
 
     return result > 0;
+  },
+
+  // Approve documents by IDs for a given order
+  approveByIdsForOrder: async (orderId, documentIds, approvedBy) => {
+    if (!Array.isArray(documentIds) || documentIds.length === 0) {
+      return { updated: 0 };
+    }
+
+    const result = await db("order_media_documents")
+      .where({ order_id: orderId })
+      .whereIn("id", documentIds)
+      .whereNull("deleted_at")
+      .update({
+        status: "approved",
+      });
+
+    return { updated: result };
   },
 
   // Get document count by order ID

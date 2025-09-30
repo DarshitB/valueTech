@@ -12,16 +12,17 @@
   }
 }
 .priority-badge {
-  padding: 7px 15px;
+  padding: 4px 15px;
   border-radius: 50rem;
+  font-weight: 600;
   &.priority-high {
     border: 1px solid $color-danger;
     background-color: $color-danger;
     color: white;
   }
-  &.priority-medium {
-    border: 1px solid $color-warning;
-    background-color: $color-warning;
+  &.priority-average {
+    border: 1px solid $color-average;
+    background-color: $color-average;
     color: white;
   }
   &.priority-low {
@@ -361,13 +362,13 @@
   }
 
   /* some button specific css  */
-  .form-buttons{
+  .form-buttons {
     display: flex;
     gap: 10px;
     align-items: center;
     justify-content: center;
   }
-  .save-report{
+  .save-report {
     width: 150px;
     height: 50px;
     border-radius: 5px;
@@ -376,9 +377,71 @@
     background-color: transparent;
     border: 1px solid $color-success;
     color: $color-success !important;
-    &:hover{
+    &:hover {
       background-color: $color-success !important;
       color: $base-color !important;
+    }
+  }
+}
+.order-priority-radio-group {
+  .radio-group {
+    display: flex !important;
+    gap: 20px;
+    .radio-label {
+      border-radius: 50rem;
+      &.low {
+        border: 1px solid $color-success;
+        color: $color-success;
+        &.selected {
+          background-color: $color-success;
+          color: $base-color;
+        }
+      }
+      &.average {
+        border: 1px solid $color-average;
+        color: $color-average;
+        &.selected {
+          background-color: $color-average;
+          color: $base-color;
+        }
+      }
+      &.high {
+        border: 1px solid $color-danger;
+        color: $color-danger;
+        &.selected {
+          background-color: $color-danger;
+          color: $base-color;
+        }
+      }
+    }
+  }
+}
+.selected-documents-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0;
+  .approved-document-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 20px;
+    justify-content: space-between;
+    background-color: $base-color;
+    border: 1px solid $base-font-color-light;
+    border-radius: 5px;
+    padding: 6px 12px;
+    font-size: 13px;
+    color: $base-font-color-light;
+    position: relative;
+    width: 100%;
+    .remove-document-tag {
+      background: none;
+      border: none;
+      color: $base-font-color-light;
+      font-size: 14px;
+      cursor: pointer;
+      padding: 0;
+      margin-left: 4px;
     }
   }
 }
@@ -1009,17 +1072,32 @@
       }
     }
     .btn {
+      margin-top: 10px;
       &.download-all {
-        width: 100%;
-        margin-top: 10px;
+        width: 50%;
+        height: 50px;
         border-radius: 5px;
-        font-size: 18px;
+        font-size: 16px;
         line-height: 1.5;
         padding: 10px 10px;
         background-color: #54ca68;
         border-color: #54ca68;
         &:hover {
           color: #54ca68 !important;
+        }
+      }
+      &.approve-report {
+        width: 50%;
+        height: 50px;
+        border-radius: 5px;
+        font-size: 16px;
+        font-weight: 500;
+        background-color: transparent;
+        border: 1px solid $color-success;
+        color: $color-success !important;
+        &:hover {
+          background-color: $color-success !important;
+          color: $base-color !important;
         }
       }
     }

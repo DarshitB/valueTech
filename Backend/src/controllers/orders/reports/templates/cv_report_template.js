@@ -5,9 +5,15 @@
  * @param {Object} formData - Form data for the report
  * @param {Object} extraData - Extra data (bank info, categories, etc.)
  * @param {string} bgImageBase64 - Background image as base64
+ * @param {string|null} stampImageBase64 - Optional stamp image (base64)
  * @returns {string} HTML content
  */
-function generateCVReportHTML(formData, extraData, bgImageBase64) {
+function generateCVReportHTML(
+  formData,
+  extraData,
+  bgImageBase64,
+  stampImageBase64
+) {
   return `
 <!DOCTYPE html>
 <html>
@@ -147,7 +153,11 @@ function generateCVReportHTML(formData, extraData, bgImageBase64) {
             <td>REGISTRATION NO:</td>
             <td colspan="2">${formData.registration_no}</td>
             <td>REGISTRATION DATE:</td>
-            <td colspan="2">${formData.registration_date === "00-00-0000" ? "NA" : formData.registration_date}</td>
+            <td colspan="2">${
+              formData.registration_date === "00-00-0000"
+                ? "NA"
+                : formData.registration_date
+            }</td>
         </tr>
         <tr>
             <td>REGISTERED LOCATION:</td>
@@ -202,7 +212,10 @@ function generateCVReportHTML(formData, extraData, bgImageBase64) {
             </td>
         </tr>
         ${generateAdditionalRows(formData, "inspected")}
-        ${generateFlexibleFieldsForSection(formData.flexible_fields || [], "INSPECTED_EQUIPMENT_DETAILS")}
+        ${generateFlexibleFieldsForSection(
+          formData.flexible_fields || [],
+          "INSPECTED_EQUIPMENT_DETAILS"
+        )}
         <tr>
             <th colspan="6">COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION ${
               extraData.cat
@@ -296,7 +309,10 @@ function generateCVReportHTML(formData, extraData, bgImageBase64) {
             <td colspan="2">${formData.color_condition}</td>
         </tr>
         ${generateAdditionalRows(formData, "comments")}
-        ${generateFlexibleFieldsForSection(formData.flexible_fields || [], "COMMENTS_ON_EQUIPMENT_AT_THE_TIME_OF_INSPECTION")}
+        ${generateFlexibleFieldsForSection(
+          formData.flexible_fields || [],
+          "COMMENTS_ON_EQUIPMENT_AT_THE_TIME_OF_INSPECTION"
+        )}
         <tr>
             <th>DAMAGES IF ANY:</th>
             <td colspan="5">
@@ -421,7 +437,10 @@ function generateCVReportHTML(formData, extraData, bgImageBase64) {
             <td>VALUER COMMENTS/REMARKS:</td>
             <td colspan="5">${formData.valuer_comments_remarks}</td>
         </tr>
-        ${generateFlexibleFieldsForSection(formData.flexible_fields || [], "OVER_ALL_FEED_BACK_OF_THE_INSPECTED")}
+        ${generateFlexibleFieldsForSection(
+          formData.flexible_fields || [],
+          "OVER_ALL_FEED_BACK_OF_THE_INSPECTED"
+        )}
         <tr>
             <td>DECLARATION:</td>
             <td colspan="5" style="text-transform: none;">
@@ -446,16 +465,24 @@ the genuineness of the vehicle documents. To give loan to the applicant is the r
 responsible or concerned for the same.</td>
         </tr>
         <tr>
-            <td colspan="6" style="height: 58px;">
+            <td colspan="6" style="height: 58px; position: relative;">
+               
                 ${
                   formData.tyre_image_base64
-                    ? `<img src="${formData.tyre_image_base64}" style="height: 70px;" alt="">`
+                    ? `<img src="${formData.tyre_image_base64}" style="height: 70px; position: relative; z-index:1;" alt="">`
                     : ""
                 }
             </td>
         </tr>
         <tr>
-            <td colspan="6" style="height: 48px;">SIGNATURE WITH SEAL & STAMP</td>
+            <td colspan="6" style="height: 48px;position: relative;">
+              ${
+                stampImageBase64
+                  ? `<img src="${stampImageBase64}" alt="stamp" style="position:absolute; left:50%; bottom: -15px; transform:translateX(calc(-50% - 170px)); height: 150px;  z-index:2; pointer-events:none;" />`
+                  : ""
+              }
+              SIGNATURE WITH SEAL & STAMP
+            </td>
         </tr>
     </table>
     </div>
@@ -515,35 +542,35 @@ function generateAdditionalRows(formData, type) {
  */
 function generateFlexibleFieldsForSection(flexibleFields, sectionName) {
   if (!flexibleFields || flexibleFields.length === 0) {
-    return '';
+    return "";
   }
 
   // Filter fields for the specific section
-  const sectionFields = flexibleFields.filter(field => 
-    field.section_name === sectionName
+  const sectionFields = flexibleFields.filter(
+    (field) => field.section_name === sectionName
   );
 
   if (sectionFields.length === 0) {
-    return '';
+    return "";
   }
 
-  let html = '';
-  
+  let html = "";
+
   // Process fields row by row, ensuring total columns don't exceed 6
   let i = 0;
   while (i < sectionFields.length) {
-    html += '<tr>';
+    html += "<tr>";
     let currentRowColumns = 0;
-    
+
     // Add fields to current row until we reach 6 columns or run out of fields
     while (i < sectionFields.length && currentRowColumns < 6) {
       const field = sectionFields[i];
       const colSpan = field.col_span ? parseInt(field.col_span) : 2;
-      
+
       // Calculate how many columns this field will take
       let fieldColumns;
       let valueColSpan;
-      
+
       if (colSpan === 1) {
         // col_span 1: label (1 col) + value (5 cols) = 6 total columns
         fieldColumns = 6;
@@ -553,12 +580,12 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName) {
         fieldColumns = 3;
         valueColSpan = 2;
       }
-      
+
       // Check if this field fits in the current row
       if (currentRowColumns + fieldColumns <= 6) {
         html += `
-          <td style="font-weight: bold;">${field.field_label || ''}</td>
-          <td colspan="${valueColSpan}">${field.field_value || ''}</td>
+          <td style="font-weight: bold;">${field.field_label || ""}</td>
+          <td colspan="${valueColSpan}">${field.field_value || ""}</td>
         `;
         currentRowColumns += fieldColumns;
         i++;
@@ -567,14 +594,14 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName) {
         break;
       }
     }
-    
+
     // Fill remaining columns in the row if needed
     if (currentRowColumns < 6) {
       const remainingColumns = 6 - currentRowColumns;
       html += `<td colspan="${remainingColumns}"></td>`;
     }
-    
-    html += '</tr>';
+
+    html += "</tr>";
   }
 
   return html;

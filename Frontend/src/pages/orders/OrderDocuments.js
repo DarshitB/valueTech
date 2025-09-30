@@ -1,4 +1,11 @@
-import React, { useEffect, useLayoutEffect, useState } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import { Link, useParams } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { usePageTitle } from "../../context/PageTitleContext";
@@ -7,12 +14,14 @@ import {
   fetchOrderMediaDocuments,
   uploadOrderMediaDocuments,
   deleteOrderMediaDocuments,
+  approveOrderMediaDocuments,
 } from "../../redux/reducers/orderMediaDocumentsReducer";
 import CustomDataTable from "../../components/CustomDataTable";
 import {
   DeleteIcon,
   DownloadDocumentIcon,
   ViewIcon,
+  ApprovedIcon,
 } from "../../components/icons";
 import { PlusIcon } from "lucide-react";
 import ConfirmationModal from "../../components/ConfirmationModal";
@@ -20,534 +29,871 @@ import { toast } from "react-toastify";
 import { hasPermission } from "../../utils/permissionUtils";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
 
-function OrderDocuments() {
-  // Extract order ID from route parameters
-  const { id } = useParams();
+// Constants for security and configuration
+const ALLOWED_FILE_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/plain",
+  "text/csv",
+];
 
-  // Initialize Redux dispatch function
-  const dispatch = useDispatch();
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_FILES_COUNT = 20;
+const DOCUMENT_TYPES = ["collage", "report", "documents"];
 
-  /* get logged user permission */
-  const allowedPermissions = useSelector(selectPermissions);
-
-  // Set page title using custom hook
-  const { setTitle } = usePageTitle();
-
-  const order = useSelector((state) => state.orders.selected);
-  const { documents, loading, uploadLoading } = useSelector(
-    (state) => state.orderMediaDocuments
+// Security utilities
+const sanitizeFilename = (filename) => {
+  if (!filename || typeof filename !== "string") return "document";
+  // Remove path traversal attempts and dangerous characters
+  return (
+    filename
+      .replace(/[\/\\:*?"<>|]/g, "_")
+      .replace(/\.\./g, "_")
+      .substring(0, 255)
+      .trim() || "document"
   );
+};
 
-  // Local state for document selections and file upload
+const validateUrl = (url) => {
+  if (!url || typeof url !== "string") return false;
+  try {
+    const parsed = new URL(url);
+    // Only allow http/https protocols
+    return ["http:", "https:"].includes(parsed.protocol);
+  } catch {
+    return false;
+  }
+};
+
+const validateFileType = (file) => {
+  return ALLOWED_FILE_TYPES.includes(file.type) && file.size <= MAX_FILE_SIZE;
+};
+
+// Custom hooks for better organization
+const useDocumentState = () => {
   const [selectedCollages, setSelectedCollages] = useState([]);
   const [selectedReports, setSelectedReports] = useState([]);
   const [selectedDocuments, setSelectedDocuments] = useState([]);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
-
-  // Confirmation modal state
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [confirmDeleteName, setConfirmDeleteName] = useState("");
 
-  // Fetch order details and documents
-  useEffect(() => {
-    if (id && (!order || order.id !== Number(id))) {
-      dispatch(fetchOrderById(id));
-    }
-    if (id) {
-      dispatch(fetchOrderMediaDocuments(id));
-    }
-  }, [dispatch, id, order]);
+  const clearSelections = useCallback(() => {
+    setSelectedCollages([]);
+    setSelectedReports([]);
+    setSelectedDocuments([]);
+  }, []);
 
-  // Segregate documents by type
-  // Try both possible data structures
-  const documentsArray = documents?.documents || documents || [];
-
-  const segregatedDocuments = {
-    collage:
-      documentsArray.filter((doc) => doc.document_type === "collage") || [],
-    report:
-      documentsArray.filter((doc) => doc.document_type === "report") || [],
-    documents:
-      documentsArray.filter((doc) => doc.document_type === "documents") || [],
+  return {
+    selectedCollages,
+    setSelectedCollages,
+    selectedReports,
+    setSelectedReports,
+    selectedDocuments,
+    setSelectedDocuments,
+    uploadProgress,
+    setUploadProgress,
+    isUploading,
+    setIsUploading,
+    confirmDeleteId,
+    setConfirmDeleteId,
+    confirmDeleteName,
+    setConfirmDeleteName,
+    clearSelections,
   };
+};
 
-  // Debug logging to see the data structure
-  /* console.log("Raw documents data:", documents);
-  console.log("Segregated documents:", segregatedDocuments);
-  console.log("Loading state:", loading); */
+function OrderDocuments() {
+  const { id } = useParams();
+  const dispatch = useDispatch();
+  const allowedPermissions = useSelector(selectPermissions);
+  const { setTitle } = usePageTitle();
+  const abortControllerRef = useRef(null);
 
-  // Helper function to format date
-  const formatDate = (dateString) => {
-    if (!dateString) return "-";
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "-";
+  // Validate order ID
+  const orderId = useMemo(() => {
+    const parsed = parseInt(id, 10);
+    if (isNaN(parsed) || parsed <= 0) {
+      toast.error("Invalid order ID");
+      return null;
+    }
+    return parsed;
+  }, [id]);
 
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
+  const order = useSelector((state) => state.orders.selected);
+  const { documents, loading, uploadLoading, approveLoading, error } =
+    useSelector((state) => state.orderMediaDocuments);
 
-    return `${year}-${month}-${day} ${hours}:${minutes}`;
-  };
+  const documentState = useDocumentState();
 
-  // Helper function to extract filename from media_url
-  const getFilenameFromMediaUrl = (media_url) => {
-    if (!media_url) return "-";
+  // Memoized document segregation for performance
+  const segregatedDocuments = useMemo(() => {
+    const documentsArray = documents?.documents || documents || [];
+
+    if (!Array.isArray(documentsArray)) {
+      console.warn("Documents data is not an array:", documentsArray);
+      return { collage: [], report: [], documents: [] };
+    }
+
+    return {
+      collage: documentsArray.filter((doc) => doc?.document_type === "collage"),
+      report: documentsArray.filter((doc) => doc?.document_type === "report"),
+      documents: documentsArray.filter(
+        (doc) => doc?.document_type === "documents"
+      ),
+    };
+  }, [documents]);
+
+  // Secure URL parsing utility
+  const parseMediaUrl = useCallback((mediaUrl) => {
+    if (!mediaUrl) return null;
+
+    const baseUrl =
+      process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
 
     try {
-      // Try to parse as JSON first (for cases where it's a JSON string)
-      const parsed = JSON.parse(media_url);
-      if (parsed.path) {
-        // Extract filename from path
-        return parsed.path.split("/").pop() || parsed.path;
+      // Try to parse as JSON first
+      const parsed = JSON.parse(mediaUrl);
+      if (parsed.path && typeof parsed.path === "string") {
+        const cleanPath = parsed.path.startsWith("/")
+          ? parsed.path
+          : `/${parsed.path}`;
+        return `${baseUrl}${cleanPath}`;
       }
-      if (parsed.filename) {
-        return parsed.filename;
+      if (parsed.link && validateUrl(parsed.link)) {
+        return parsed.link;
       }
-      return parsed.name || "-";
+    } catch {
+      // If not JSON, treat as direct path
+      if (typeof mediaUrl === "string") {
+        const cleanPath = mediaUrl.startsWith("/") ? mediaUrl : `/${mediaUrl}`;
+        return `${baseUrl}${cleanPath}`;
+      }
+    }
+
+    return null;
+  }, []);
+
+  // Enhanced date formatting with error handling
+  const formatDate = useCallback((dateString) => {
+    if (!dateString) return "-";
+
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "-";
+
+      return new Intl.DateTimeFormat("en-US", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).format(date);
     } catch (error) {
-      // If not JSON, treat as direct path/URL
-      if (typeof media_url === "string") {
-        // Extract filename from URL/path
-        return media_url.split("/").pop() || media_url;
-      }
+      console.warn("Date formatting error:", error);
       return "-";
     }
-  };
+  }, []);
 
-  // Helper functions
-  const handleCheckboxChange = (documentId, type) => {
-    const setters = {
-      collage: setSelectedCollages,
-      report: setSelectedReports,
-      documents: setSelectedDocuments,
+  // Secure filename extraction
+  const getFilenameFromMediaUrl = useCallback((mediaUrl) => {
+    if (!mediaUrl) return "document";
+
+    try {
+      const parsed = JSON.parse(mediaUrl);
+      if (parsed.filename) return sanitizeFilename(parsed.filename);
+      if (parsed.path) return sanitizeFilename(parsed.path.split("/").pop());
+      if (parsed.name) return sanitizeFilename(parsed.name);
+    } catch {
+      if (typeof mediaUrl === "string") {
+        return sanitizeFilename(mediaUrl.split("/").pop());
+      }
+    }
+
+    return "document";
+  }, []);
+
+  // Fetch data with proper cleanup
+  useEffect(() => {
+    if (!orderId) return;
+
+    // Cancel previous requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    abortControllerRef.current = new AbortController();
+
+    const fetchData = async () => {
+      try {
+        if (!order || order.id !== orderId) {
+          await dispatch(fetchOrderById(orderId));
+        }
+        await dispatch(fetchOrderMediaDocuments(orderId));
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          console.error("Failed to fetch order data:", error);
+          toast.error("Failed to load order documents");
+        }
+      }
     };
 
-    const setter = setters[type];
-    setter((prev) =>
-      prev.includes(documentId)
-        ? prev.filter((id) => id !== documentId)
-        : [...prev, documentId]
-    );
-  };
+    fetchData();
 
-  const handleViewDocument = (document) => {
-    const baseUrl =
-      process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
-
-    let fileUrl;
-    try {
-      // Try to parse media_url as JSON first
-      const parsed = JSON.parse(document.media_url);
-      if (parsed.path) {
-        fileUrl = `${baseUrl}/${parsed.path}`;
-      } else if (parsed.link) {
-        fileUrl = parsed.link;
-      } else {
-        fileUrl = `${baseUrl}/${document.media_url}`;
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
-    } catch (error) {
-      // If not JSON, treat as direct path
-      if (document.media_url) {
-        if (document.media_url.startsWith("/")) {
-          fileUrl = `${baseUrl}${document.media_url}`;
-        } else {
-          fileUrl = `${baseUrl}/${document.media_url}`;
+    };
+  }, [dispatch, orderId, order]);
+
+  // Enhanced checkbox handling with validation
+  const handleCheckboxChange = useCallback(
+    (documentId, type) => {
+      if (!DOCUMENT_TYPES.includes(type)) {
+        console.warn("Invalid document type:", type);
+        return;
+      }
+
+      const setters = {
+        collage: documentState.setSelectedCollages,
+        report: documentState.setSelectedReports,
+        documents: documentState.setSelectedDocuments,
+      };
+
+      const setter = setters[type];
+      if (setter) {
+        setter((prev) =>
+          prev.includes(documentId)
+            ? prev.filter((id) => id !== documentId)
+            : [...prev, documentId]
+        );
+      }
+    },
+    [documentState]
+  );
+
+  // Secure document viewing
+  const handleViewDocument = useCallback(
+    (document) => {
+      if (!document?.media_url) {
+        toast.error("Document URL not available");
+        return;
+      }
+
+      const fileUrl = parseMediaUrl(document.media_url);
+      if (!fileUrl || !validateUrl(fileUrl)) {
+        toast.error("Invalid document URL");
+        return;
+      }
+
+      // Open in new tab with security measures
+      const newWindow = window.open();
+      if (newWindow) {
+        newWindow.opener = null; // Security: prevent access to parent window
+        newWindow.location = fileUrl;
+      } else {
+        toast.error("Popup blocked. Please allow popups for this site.");
+      }
+    },
+    [parseMediaUrl]
+  );
+
+  // Enhanced download with better error handling
+  const handleDownloadDocument = useCallback(
+    async (doc) => {
+      if (!doc?.media_url) {
+        toast.error("Document not available for download");
+        return;
+      }
+
+      const downloadUrl = parseMediaUrl(doc.media_url);
+      if (!downloadUrl || !validateUrl(downloadUrl)) {
+        toast.error("Invalid download URL");
+        return;
+      }
+
+      const filename = getFilenameFromMediaUrl(doc.media_url);
+
+      try {
+        const response = await fetch(downloadUrl, {
+          method: "GET",
+          headers: {
+            "Cache-Control": "no-cache",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-      } else {
-        // Fallback to file_path if media_url is not available
-        fileUrl = `${baseUrl}/${document.file_path}`;
+
+        const blob = await response.blob();
+
+        // Create secure download
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.href = url;
+        link.download = filename;
+        link.style.display = "none";
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        // Cleanup
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+        toast.success("Download started");
+      } catch (error) {
+        console.error("Download failed:", error);
+        toast.error(`Download failed: ${error.message}`);
       }
-    }
+    },
+    [parseMediaUrl, getFilenameFromMediaUrl]
+  );
 
-    window.open(fileUrl, "_blank");
-  };
+  // Enhanced delete with proper validation
+  const handleDeleteDocument = useCallback(
+    (doc) => {
+      if (!doc?.id) {
+        toast.error("Invalid document");
+        return;
+      }
 
-  const handleDownloadDocument = async (doc) => {
-    const baseUrl =
-      process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
+      const filename = getFilenameFromMediaUrl(doc.media_url);
+      documentState.setConfirmDeleteId(doc.id);
+      documentState.setConfirmDeleteName(filename);
+    },
+    [getFilenameFromMediaUrl, documentState]
+  );
 
-    let downloadUrl;
+  const handleConfirmDelete = useCallback(async () => {
+    if (!documentState.confirmDeleteId) return;
+
     try {
-      // Try to parse media_url as JSON first
-      const parsed = JSON.parse(doc.media_url);
-      if (parsed.path) {
-        downloadUrl = `${baseUrl}/${parsed.path}`;
-      } else if (parsed.link) {
-        downloadUrl = parsed.link;
-      } else {
-        downloadUrl = `${baseUrl}/${doc.media_url}`;
-      }
+      await dispatch(
+        deleteOrderMediaDocuments(documentState.confirmDeleteId)
+      ).unwrap();
+      await dispatch(fetchOrderMediaDocuments(orderId));
+      toast.success("Document deleted successfully");
     } catch (error) {
-      // If not JSON, treat as direct path
-      if (doc.media_url) {
-        if (doc.media_url.startsWith("/")) {
-          downloadUrl = `${baseUrl}${doc.media_url}`;
-        } else {
-          downloadUrl = `${baseUrl}/${doc.media_url}`;
+      console.error("Delete failed:", error);
+      toast.error("Failed to delete document");
+    } finally {
+      documentState.setConfirmDeleteId(null);
+      documentState.setConfirmDeleteName("");
+    }
+  }, [dispatch, orderId, documentState]);
+
+  // Enhanced ZIP download with progress tracking
+  const handleDownloadSelected = useCallback(
+    async (selectedIds, documentType) => {
+      if (!selectedIds?.length) {
+        toast.error("Please select documents to download");
+        return;
+      }
+
+      if (!DOCUMENT_TYPES.includes(documentType)) {
+        toast.error("Invalid document type");
+        return;
+      }
+
+      try {
+        const JSZip = await import("jszip");
+        const zip = new JSZip.default();
+
+        const documentsArray = documents?.documents || documents || [];
+        const selectedDocs = documentsArray.filter(
+          (doc) => selectedIds.includes(doc.id) && doc.media_url
+        );
+
+        if (!selectedDocs.length) {
+          toast.error("No valid documents found");
+          return;
         }
-      } else {
-        // Fallback to file_path if media_url is not available
-        downloadUrl = `${baseUrl}/${doc.file_path}`;
+
+        let successCount = 0;
+
+        for (const doc of selectedDocs) {
+          try {
+            const fileUrl = parseMediaUrl(doc.media_url);
+            if (!fileUrl || !validateUrl(fileUrl)) continue;
+
+            const response = await fetch(fileUrl);
+            if (!response.ok) continue;
+
+            const blob = await response.blob();
+            const filename = getFilenameFromMediaUrl(doc.media_url);
+
+            zip.file(filename, blob);
+            successCount++;
+          } catch (error) {
+            console.warn(`Failed to download file ${doc.id}:`, error);
+          }
+        }
+
+        if (successCount === 0) {
+          toast.error("No documents could be downloaded");
+          return;
+        }
+
+        const zipBlob = await zip.generateAsync({ type: "blob" });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(zipBlob);
+
+        link.href = url;
+        link.download = `${order?.order_number || "order"}_${documentType}_${
+          new Date().toISOString().split("T")[0]
+        }.zip`;
+        link.style.display = "none";
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+        toast.success(`Downloaded ${successCount} document(s)`);
+      } catch (error) {
+        console.error("ZIP creation failed:", error);
+        toast.error("Failed to create download archive");
       }
-    }
+    },
+    [documents, parseMediaUrl, getFilenameFromMediaUrl, order]
+  );
 
-    try {
-      // Fetch the file and force download
-      const response = await fetch(downloadUrl);
-      const blob = await response.blob();
+  // Enhanced verification with proper error handling
+  const handleVerifySelected = useCallback(
+    async (selectedIds, documentType) => {
+      if (!selectedIds?.length) {
+        toast.error("Please select documents to verify");
+        return;
+      }
 
-      // Create download link
-      const link = window.document.createElement("a");
-      const url = window.URL.createObjectURL(blob);
-      link.href = url;
-      link.download = getFilenameFromMediaUrl(doc.media_url) || "document";
-      window.document.body.appendChild(link);
-      link.click();
-      window.document.body.removeChild(link);
+      if (!["collage", "report"].includes(documentType)) {
+        toast.error("Only reports and collages can be verified");
+        return;
+      }
 
-      // Clean up the object URL
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Download failed:", error);
-      // Fallback to simple link method if fetch fails
-      const link = window.document.createElement("a");
-      link.href = downloadUrl;
-      link.download = getFilenameFromMediaUrl(doc.media_url) || "document";
-      link.target = "_blank";
-      window.document.body.appendChild(link);
-      link.click();
-      window.document.body.removeChild(link);
-    }
-  };
+      try {
+        await dispatch(
+          approveOrderMediaDocuments({
+            orderId,
+            documentIds: selectedIds,
+          })
+        ).unwrap();
 
-  const handleDeleteDocument = (doc) => {
-    const filename = getFilenameFromMediaUrl(doc.media_url) || "document";
-    setConfirmDeleteId(doc.id);
-    setConfirmDeleteName(filename);
-  };
+        await dispatch(fetchOrderMediaDocuments(orderId));
 
-  const handleConfirmDelete = () => {
-    if (confirmDeleteId) {
-      dispatch(deleteOrderMediaDocuments(confirmDeleteId)).then(() => {
-        dispatch(fetchOrderMediaDocuments(id));
-        setConfirmDeleteId(null);
-        setConfirmDeleteName("");
+        // Clear selections
+        if (documentType === "collage") {
+          documentState.setSelectedCollages([]);
+        } else if (documentType === "report") {
+          documentState.setSelectedReports([]);
+        }
+
+        toast.success(
+          `${selectedIds.length} document(s) verified successfully`
+        );
+      } catch (error) {
+        console.error("Verification failed:", error);
+        toast.error("Failed to verify documents");
+      }
+    },
+    [dispatch, orderId, documentState]
+  );
+
+  // Enhanced file upload with validation
+  const handleFileUpload = useCallback(
+    (files) => {
+      if (!files?.length) return;
+
+      // Validate files
+      const validFiles = Array.from(files).filter((file) => {
+        if (!validateFileType(file)) {
+          toast.error(`Invalid file: ${file.name}`);
+          return false;
+        }
+        return true;
       });
-    }
-  };
 
-  // Download selected documents as ZIP
-  const handleDownloadSelected = async (selectedIds, documentType) => {
-    if (!selectedIds || selectedIds.length === 0) {
-      toast.error("Please select documents to download");
-      return;
-    }
-
-    const baseUrl =
-      process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
-
-    try {
-      // Create ZIP file using JSZip (you'll need to install jszip)
-      const JSZip = await import("jszip");
-      const zip = new JSZip.default();
-
-      // Get selected documents
-      const documentsArray = documents?.documents || documents || [];
-      const selectedDocs = documentsArray.filter((doc) =>
-        selectedIds.includes(doc.id)
-      );
-
-      // Download each file and add to ZIP
-      for (let i = 0; i < selectedDocs.length; i++) {
-        const doc = selectedDocs[i];
-
-        let fileUrl;
-        try {
-          const parsed = JSON.parse(doc.media_url);
-          if (parsed.path) {
-            fileUrl = `${baseUrl}/${parsed.path}`;
-          } else if (parsed.link) {
-            fileUrl = parsed.link;
-          } else {
-            fileUrl = `${baseUrl}/${doc.media_url}`;
-          }
-        } catch (error) {
-          if (doc.media_url) {
-            if (doc.media_url.startsWith("/")) {
-              fileUrl = `${baseUrl}${doc.media_url}`;
-            } else {
-              fileUrl = `${baseUrl}/${doc.media_url}`;
-            }
-          } else {
-            fileUrl = `${baseUrl}/${doc.file_path}`;
-          }
-        }
-
-        try {
-          const response = await fetch(fileUrl);
-          const blob = await response.blob();
-          const filename =
-            getFilenameFromMediaUrl(doc.media_url) || `document_${doc.id}`;
-          zip.file(filename, blob);
-        } catch (error) {
-          console.error(`Failed to download file ${doc.id}:`, error);
-        }
+      if (!validFiles.length) {
+        toast.error("No valid files selected");
+        return;
       }
 
-      // Generate ZIP and download
-      const zipBlob = await zip.generateAsync({ type: "blob" });
-      const link = window.document.createElement("a");
-      const url = window.URL.createObjectURL(zipBlob);
-      link.href = url;
-      link.download = `${
-        order && order.order_number ? order.order_number + "_" : ""
-      }${documentType}_${new Date().toISOString().split("T")[0]}.zip`;
-      window.document.body.appendChild(link);
-      link.click();
-      window.document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Failed to create ZIP:", error);
-      toast.error("Failed to download selected documents");
-    }
-  };
-
-  // File upload functions
-  const handleFileUpload = (files) => {
-    if (!files || files.length === 0) return;
-
-    const formData = new FormData();
-    formData.append("order_id", id);
-
-    Array.from(files).forEach((file) => {
-      formData.append("files", file);
-    });
-
-    setIsUploading(true);
-    setUploadProgress(0);
-
-    dispatch(uploadOrderMediaDocuments(formData)).then((result) => {
-      setIsUploading(false);
-      setUploadProgress(0);
-      if (result.meta.requestStatus === "fulfilled") {
-        dispatch(fetchOrderMediaDocuments(id));
+      if (validFiles.length > MAX_FILES_COUNT) {
+        toast.error(`Maximum ${MAX_FILES_COUNT} files allowed`);
+        return;
       }
-    });
-  };
 
-  const handleFileInputChange = (e) => {
-    handleFileUpload(e.target.files);
-    e.target.value = ""; // Reset input
-  };
+      const formData = new FormData();
+      formData.append("order_id", orderId.toString());
 
-  const handleDragOver = (e) => {
+      validFiles.forEach((file) => {
+        formData.append("files", file);
+      });
+
+      documentState.setIsUploading(true);
+      documentState.setUploadProgress(0);
+
+      dispatch(uploadOrderMediaDocuments(formData))
+        .unwrap()
+        .then(() => {
+          dispatch(fetchOrderMediaDocuments(orderId));
+          toast.success(`${validFiles.length} file(s) uploaded successfully`);
+        })
+        .catch((error) => {
+          console.error("Upload failed:", error);
+          toast.error("Upload failed");
+        })
+        .finally(() => {
+          documentState.setIsUploading(false);
+          documentState.setUploadProgress(0);
+        });
+    },
+    [dispatch, orderId, documentState]
+  );
+
+  const handleFileInputChange = useCallback(
+    (e) => {
+      handleFileUpload(e.target.files);
+      e.target.value = ""; // Reset input
+    },
+    [handleFileUpload]
+  );
+
+  // Drag and drop handlers
+  const handleDragOver = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
-  };
+  }, []);
 
-  const handleDragEnter = (e) => {
+  const handleDragEnter = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
-  };
+  }, []);
 
-  const handleDragLeave = (e) => {
+  const handleDragLeave = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
-  };
+  }, []);
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleDrop = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      handleFileUpload(e.dataTransfer.files);
+    },
+    [handleFileUpload]
+  );
 
-    const files = e.dataTransfer.files;
-    handleFileUpload(files);
-  };
+  // Memoized approval badge component
+  const ApprovalBadge = useMemo(
+    () =>
+      ({ status }) => {
+        if (status !== "approved") return null;
 
-  // Helper function to render document table
-  const renderDocumentTable = (docs, type, selectedItems, emptyMessage) => {
-    /* console.log(
-      `Rendering ${type} table with docs:`,
-      docs,
-      `Loading: ${loading}`
-    ); */
+        return (
+          <span
+            style={{
+              backgroundColor: "#28a745",
+              color: "white",
+              padding: "4px 6px",
+              borderRadius: "50%",
+              fontSize: "11px",
+              fontWeight: "bold",
+              display: "inline-block",
+              lineHeight: "1",
+              width: "20px",
+              height: "20px",
+              textAlign: "center",
+            }}
+          >
+            ✓
+          </span>
+        );
+      },
+    []
+  );
 
-    if (loading) {
-      return (
-        <div style={{ textAlign: "center", padding: "20px" }}>
-          <div className="spinner-border" role="status">
-            {/* <span className="visually-hidden">Loading...</span> */}
+  // Enhanced document table rendering
+  const renderDocumentTable = useCallback(
+    (docs, type, selectedItems, emptyMessage) => {
+      if (loading) {
+        return (
+          <div style={{ textAlign: "center", padding: "20px" }}>
+            <div className="spinner-border" role="status" aria-label="Loading">
+              {/* <span className="visually-hidden">Loading...</span> */}
+            </div>
           </div>
-        </div>
-      );
-    }
+        );
+      }
 
-    if (!docs || docs.length === 0) {
-      return <div className="no-documents">{emptyMessage}</div>;
-    }
+      if (!docs?.length) {
+        return <div className="no-documents">{emptyMessage}</div>;
+      }
 
-    return (
-      <table width="100%">
-        <thead>
-          <tr>
-            <th width="50px"></th>
-            <th width="200px">Name</th>
-            <th>Created By</th>
-            <th>Created At</th>
-            <th width="150px" style={{ textAlign: "center" }}>
-              Action
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {docs.map((doc) => (
-            <tr key={doc.id}>
-              <td>
-                <div className="selection-check">
-                  <input
-                    type="checkbox"
-                    className="selection-check-input"
-                    checked={selectedItems.includes(doc.id)}
-                    onChange={() => handleCheckboxChange(doc.id, type)}
-                  />
-                </div>
-              </td>
-              <td>{getFilenameFromMediaUrl(doc.media_url)}</td>
-              <td>{doc.created_by_name || "-"}</td>
-              <td>{formatDate(doc.created_at)}</td>
-              <td style={{ textAlign: "center" }}>
-                <button
-                  onClick={() => handleViewDocument(doc)}
-                  style={{ background: "none", border: "none" }}
-                >
-                  <ViewIcon />
-                </button>
-                {hasPermission(
-                  allowedPermissions,
-                  "download_order_media_documents"
-                ) && (
-                  <button
-                    onClick={() => handleDownloadDocument(doc)}
-                    style={{ background: "none", border: "none" }}
-                  >
-                    <DownloadDocumentIcon />
-                  </button>
-                )}
-                {hasPermission(
-                  allowedPermissions,
-                  "delete_order_media_documents"
-                ) && (
-                  <button
-                    onClick={() => handleDeleteDocument(doc)}
-                    style={{ background: "none", border: "none" }}
-                  >
-                    <DeleteIcon />
-                  </button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    );
-  };
-
-  // Helper function to render uploaded documents table (with media_type column)
-  const renderUploadedDocumentsTable = (
-    docs,
-    type,
-    selectedItems,
-    emptyMessage
-  ) => {
-    /* console.log(
-      `Rendering ${type} table with docs:`,
-      docs,
-      `Loading: ${loading}`
-    ); */
-
-    if (loading) {
       return (
-        <div style={{ textAlign: "center", padding: "20px" }}>
-          <div className="spinner-border" role="status">
-            {/* <span className="visually-hidden">Loading...</span> */}
-          </div>
-        </div>
-      );
-    }
-
-    if (!docs || docs.length === 0) {
-      return <div className="no-documents">{emptyMessage}</div>;
-    }
-
-    return (
-      <table width="100%">
-        <thead>
-          <tr>
-            <th width="50px"></th>
-            <th width="200px">Name</th>
-            <th>Type</th>
-            <th>Uploaded By</th>
-            <th>Uploaded At</th>
-            <th width="150px" style={{ textAlign: "center" }}>
-              Action
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {docs.map((doc) => (
-            <tr key={doc.id}>
-              <td>
-                <div className="selection-check">
-                  <input
-                    type="checkbox"
-                    className="selection-check-input"
-                    checked={selectedItems.includes(doc.id)}
-                    onChange={() => handleCheckboxChange(doc.id, type)}
-                  />
-                </div>
-              </td>
-              <td>{getFilenameFromMediaUrl(doc.media_url)}</td>
-              <td>{doc.media_type || doc.file_type || "-"}</td>
-              <td>{doc.created_by_name || doc.uploaded_by_name || "-"}</td>
-              <td>{formatDate(doc.created_at)}</td>
-              <td style={{ textAlign: "center" }}>
-                <button
-                  onClick={() => handleViewDocument(doc)}
-                  style={{ background: "none", border: "none" }}
-                >
-                  <ViewIcon />
-                </button>
-                {hasPermission(
-                  allowedPermissions,
-                  "download_order_media_documents"
-                ) && (
-                  <button
-                    onClick={() => handleDownloadDocument(doc)}
-                    style={{ background: "none", border: "none" }}
-                  >
-                    <DownloadDocumentIcon />
-                  </button>
-                )}
-                {hasPermission(
-                  allowedPermissions,
-                  "delete_order_media_documents"
-                ) && (
-                  <button
-                    onClick={() => handleDeleteDocument(doc)}
-                    style={{ background: "none", border: "none" }}
-                  >
-                    <DeleteIcon />
-                  </button>
-                )}
-              </td>
+        <table width="100%" role="table">
+          <thead>
+            <tr>
+              <th width="50px" scope="col">
+                Select
+              </th>
+              <th width="200px" scope="col">
+                Name
+              </th>
+              <th scope="col">Created By</th>
+              <th scope="col">Created At</th>
+              <th width="150px" style={{ textAlign: "center" }} scope="col">
+                Actions
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    );
-  };
+          </thead>
+          <tbody>
+            {docs.map((doc) => (
+              <tr key={doc.id}>
+                <td>
+                  <div className="selection-check">
+                    <input
+                      type="checkbox"
+                      className="selection-check-input"
+                      checked={selectedItems.includes(doc.id)}
+                      onChange={() => handleCheckboxChange(doc.id, type)}
+                      aria-label={`Select ${getFilenameFromMediaUrl(
+                        doc.media_url
+                      )}`}
+                    />
+                  </div>
+                </td>
+                <td>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    <span title={getFilenameFromMediaUrl(doc.media_url)}>
+                      {getFilenameFromMediaUrl(doc.media_url)}
+                    </span>
+                    <ApprovalBadge status={doc.status} />
+                  </div>
+                </td>
+                <td>{doc.created_by_name || "-"}</td>
+                <td>{formatDate(doc.created_at)}</td>
+                <td style={{ textAlign: "center" }}>
+                  <button
+                    onClick={() => handleViewDocument(doc)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                    aria-label="View document"
+                    title="View document"
+                  >
+                    <ViewIcon />
+                  </button>
+                  {hasPermission(
+                    allowedPermissions,
+                    "download_order_media_documents"
+                  ) && (
+                    <button
+                      onClick={() => handleDownloadDocument(doc)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                      }}
+                      aria-label="Download document"
+                      title="Download document"
+                    >
+                      <DownloadDocumentIcon />
+                    </button>
+                  )}
+                  {hasPermission(
+                    allowedPermissions,
+                    "delete_order_media_documents"
+                  ) && (
+                    <button
+                      onClick={() => handleDeleteDocument(doc)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                      }}
+                      aria-label="Delete document"
+                      title="Delete document"
+                    >
+                      <DeleteIcon />
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      );
+    },
+    [
+      loading,
+      handleCheckboxChange,
+      getFilenameFromMediaUrl,
+      ApprovalBadge,
+      formatDate,
+      handleViewDocument,
+      handleDownloadDocument,
+      handleDeleteDocument,
+      allowedPermissions,
+    ]
+  );
+
+  // Enhanced uploaded documents table
+  const renderUploadedDocumentsTable = useCallback(
+    (docs, type, selectedItems, emptyMessage) => {
+      if (loading) {
+        return (
+          <div style={{ textAlign: "center", padding: "20px" }}>
+            <div className="spinner-border" role="status" aria-label="Loading">
+              {/* <span className="visually-hidden">Loading...</span> */}
+            </div>
+          </div>
+        );
+      }
+
+      if (!docs?.length) {
+        return <div className="no-documents">{emptyMessage}</div>;
+      }
+
+      return (
+        <table width="100%" role="table">
+          <thead>
+            <tr>
+              <th width="50px" scope="col">
+                Select
+              </th>
+              <th width="200px" scope="col">
+                Name
+              </th>
+              <th scope="col">Type</th>
+              <th scope="col">Uploaded By</th>
+              <th scope="col">Uploaded At</th>
+              <th width="150px" style={{ textAlign: "center" }} scope="col">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {docs.map((doc) => (
+              <tr key={doc.id}>
+                <td>
+                  <div className="selection-check">
+                    <input
+                      type="checkbox"
+                      className="selection-check-input"
+                      checked={selectedItems.includes(doc.id)}
+                      onChange={() => handleCheckboxChange(doc.id, type)}
+                      aria-label={`Select ${getFilenameFromMediaUrl(
+                        doc.media_url
+                      )}`}
+                    />
+                  </div>
+                </td>
+                <td>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    <span title={getFilenameFromMediaUrl(doc.media_url)}>
+                      {getFilenameFromMediaUrl(doc.media_url)}
+                    </span>
+                    <ApprovalBadge status={doc.status} />
+                  </div>
+                </td>
+                <td>{doc.media_type || doc.file_type || "-"}</td>
+                <td>{doc.created_by_name || doc.uploaded_by_name || "-"}</td>
+                <td>{formatDate(doc.created_at)}</td>
+                <td style={{ textAlign: "center" }}>
+                  <button
+                    onClick={() => handleViewDocument(doc)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                    aria-label="View document"
+                    title="View document"
+                  >
+                    <ViewIcon />
+                  </button>
+                  {hasPermission(
+                    allowedPermissions,
+                    "download_order_media_documents"
+                  ) && (
+                    <button
+                      onClick={() => handleDownloadDocument(doc)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                      }}
+                      aria-label="Download document"
+                      title="Download document"
+                    >
+                      <DownloadDocumentIcon />
+                    </button>
+                  )}
+                  {hasPermission(
+                    allowedPermissions,
+                    "delete_order_media_documents"
+                  ) && (
+                    <button
+                      onClick={() => handleDeleteDocument(doc)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                      }}
+                      aria-label="Delete document"
+                      title="Delete document"
+                    >
+                      <DeleteIcon />
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      );
+    },
+    [
+      loading,
+      handleCheckboxChange,
+      getFilenameFromMediaUrl,
+      ApprovalBadge,
+      formatDate,
+      handleViewDocument,
+      handleDownloadDocument,
+      handleDeleteDocument,
+      allowedPermissions,
+    ]
+  );
 
   // Set page title with breadcrumb navigation
   useLayoutEffect(() => {
@@ -561,12 +907,47 @@ function OrderDocuments() {
           to={`/orders/${id}/details`}
           className="text-blue-600 hover:underline"
         >
-          {order && order.order_number ? order.order_number : "-"}
+          {order?.order_number || "-"}
         </Link>{" "}
         &gt; Documents
       </>
     );
   }, [id, order, setTitle]);
+
+  // Show error state
+  if (error) {
+    return (
+      <div
+        className="error-container"
+        style={{ padding: "20px", textAlign: "center" }}
+      >
+        <h3>Error Loading Documents</h3>
+        <p>{error}</p>
+        <button
+          className="btn primary"
+          onClick={() => dispatch(fetchOrderMediaDocuments(orderId))}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  // Show invalid order ID
+  if (!orderId) {
+    return (
+      <div
+        className="error-container"
+        style={{ padding: "20px", textAlign: "center" }}
+      >
+        <h3>Invalid Order</h3>
+        <p>The order ID provided is not valid.</p>
+        <Link to="/orders" className="btn primary">
+          Back to Orders
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <section className="order-documents-wrapper">
@@ -598,18 +979,38 @@ function OrderDocuments() {
                     {renderDocumentTable(
                       segregatedDocuments.collage,
                       "collage",
-                      selectedCollages,
+                      documentState.selectedCollages,
                       "No collages generated yet"
                     )}
-                    {selectedCollages.length > 0 && (
-                      <button
-                        className="btn download-all"
-                        onClick={() =>
-                          handleDownloadSelected(selectedCollages, "collage")
-                        }
-                      >
-                        Download selected collages
-                      </button>
+                    {documentState.selectedCollages.length > 0 && (
+                      <div style={{ display: "flex", gap: "10px" }}>
+                        <button
+                          className="btn download-all"
+                          onClick={() =>
+                            handleDownloadSelected(
+                              documentState.selectedCollages,
+                              "collage"
+                            )
+                          }
+                          disabled={loading}
+                        >
+                          Download selected collages
+                        </button>
+                        <button
+                          className="btn approve-report"
+                          onClick={() =>
+                            handleVerifySelected(
+                              documentState.selectedCollages,
+                              "collage"
+                            )
+                          }
+                          disabled={approveLoading || loading}
+                        >
+                          {approveLoading
+                            ? "Verifying..."
+                            : "Verify selected collages"}
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -624,18 +1025,43 @@ function OrderDocuments() {
                     {renderDocumentTable(
                       segregatedDocuments.report,
                       "report",
-                      selectedReports,
+                      documentState.selectedReports,
                       "No reports generated yet"
                     )}
-                    {selectedReports.length > 0 && (
-                      <button
-                        className="btn download-all"
-                        onClick={() =>
-                          handleDownloadSelected(selectedReports, "report")
-                        }
+                    {documentState.selectedReports.length > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "10px",
+                        }}
                       >
-                        Download selected reports
-                      </button>
+                        <button
+                          className="btn download-all"
+                          onClick={() =>
+                            handleDownloadSelected(
+                              documentState.selectedReports,
+                              "report"
+                            )
+                          }
+                          disabled={loading}
+                        >
+                          Download selected reports
+                        </button>
+                        <button
+                          className="btn approve-report"
+                          onClick={() =>
+                            handleVerifySelected(
+                              documentState.selectedReports,
+                              "report"
+                            )
+                          }
+                          disabled={approveLoading || loading}
+                        >
+                          {approveLoading
+                            ? "Verifying..."
+                            : "Verify selected reports"}
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -661,6 +1087,7 @@ function OrderDocuments() {
                       multiple
                       hidden
                       onChange={handleFileInputChange}
+                      accept={ALLOWED_FILE_TYPES.join(",")}
                     />
                     <label
                       htmlFor="fileInput"
@@ -676,16 +1103,25 @@ function OrderDocuments() {
                       <p>
                         Drop documents here or <span>click to browse</span>
                       </p>
+                      <small>
+                        Max file size: {MAX_FILE_SIZE / (1024 * 1024)}MB, Max
+                        files: {MAX_FILES_COUNT}
+                      </small>
                     </label>
-                    {isUploading && (
+                    {documentState.isUploading && (
                       <div className="upload-progress-container">
                         <div className="progress">
                           <div
                             className="progress-bar"
                             role="progressbar"
-                            style={{ width: `${uploadProgress}%` }}
+                            style={{
+                              width: `${documentState.uploadProgress}%`,
+                            }}
+                            aria-valuenow={documentState.uploadProgress}
+                            aria-valuemin="0"
+                            aria-valuemax="100"
                           >
-                            Uploading...
+                            Uploading... {documentState.uploadProgress}%
                           </div>
                         </div>
                       </div>
@@ -698,15 +1134,19 @@ function OrderDocuments() {
                   {renderUploadedDocumentsTable(
                     segregatedDocuments.documents,
                     "documents",
-                    selectedDocuments,
+                    documentState.selectedDocuments,
                     "No documents uploaded yet"
                   )}
-                  {selectedDocuments.length > 0 && (
+                  {documentState.selectedDocuments.length > 0 && (
                     <button
                       className="btn download-all"
                       onClick={() =>
-                        handleDownloadSelected(selectedDocuments, "documents")
+                        handleDownloadSelected(
+                          documentState.selectedDocuments,
+                          "documents"
+                        )
                       }
+                      disabled={loading}
                     >
                       Download selected documents
                     </button>
@@ -718,13 +1158,16 @@ function OrderDocuments() {
         </div>
       </div>
 
-      {/* ❗ Delete Confirmation Modal */}
-      {confirmDeleteId && (
+      {/* Delete Confirmation Modal - XSS Safe */}
+      {documentState.confirmDeleteId && (
         <ConfirmationModal
           title="Confirm Deletion"
-          message={`Are you sure you want to delete <span class="danger">${confirmDeleteName}</span>?`}
+          message={`Are you sure you want to delete "${documentState.confirmDeleteName}"?`}
           onConfirm={handleConfirmDelete}
-          onCancel={() => setConfirmDeleteId(null)}
+          onCancel={() => {
+            documentState.setConfirmDeleteId(null);
+            documentState.setConfirmDeleteName("");
+          }}
         />
       )}
     </section>

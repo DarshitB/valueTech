@@ -13,3 +13,11 @@ export const uploadOrderMediaDocuments = (payload) =>
 // Delete order media documents
 export const deleteOrderMediaDocuments = (documentId) =>
   axios.delete(`${ENDPOINT}/${documentId}`);
+
+// Get approved order media documents by order ID
+export const getApprovedOrderMediaDocuments = (orderId) =>
+  axios.get(`${ENDPOINT}/${orderId}/approved`);
+
+// Approve order media documents
+export const approveOrderMediaDocuments = (orderId, payload) =>
+  axios.post(`${ENDPOINT}/${orderId}/approve`, payload);

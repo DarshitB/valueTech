@@ -220,6 +220,28 @@ exports.getCollagesByOrderId = async (req, res, next) => {
 };
 
 /**
+ * Get approved documents for a specific order
+ * GET /api/order-media-document/:orderId/approved
+ */
+exports.getApprovedByOrderId = async (req, res, next) => {
+  try {
+    const { orderId } = req.params;
+    if (!orderId) {
+      throw new BadRequestError("orderId is required");
+    }
+
+    const result = await orderMediaDocument.findApprovedByOrderId(parseInt(orderId));
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * Soft delete document
  * DELETE /api/order-media-document/:id
  */
@@ -237,6 +259,40 @@ exports.delete = async (req, res, next) => {
     res.json({
       success: true,
       message: "Document deleted successfully",
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Approve multiple documents for an order
+ * POST /api/order-media-document/:orderId/approve
+ * Body: { document_ids: number[] }
+ */
+exports.approveByOrderId = async (req, res, next) => {
+  try {
+    const { orderId } = req.params;
+    const { document_ids } = req.body;
+
+    if (!orderId) {
+      throw new BadRequestError("orderId is required");
+    }
+
+    if (!Array.isArray(document_ids) || document_ids.length === 0) {
+      throw new BadRequestError("document_ids must be a non-empty array");
+    }
+
+    const { updated } = await orderMediaDocument.approveByIdsForOrder(
+      parseInt(orderId),
+      document_ids.map((id) => parseInt(id)),
+      req.user?.id
+    );
+
+    res.json({
+      success: true,
+      message: `${updated} document(s) approved`,
+      data: { updated },
     });
   } catch (err) {
     next(err);

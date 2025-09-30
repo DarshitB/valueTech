@@ -428,6 +428,7 @@ function Dashboard() {
                               <option value="">All Types</option>
                               <option value="VKA1">VKA1</option>
                               <option value="VKA2">VKA2</option>
+                              <option value="VKA3">VKA3</option>
                             </select>
                             <select
                               className="form-field type-priority-selector"
@@ -436,7 +437,7 @@ function Dashboard() {
                             >
                               <option value="">All Priorities</option>
                               <option value="High">High</option>
-                              <option value="Medium">Medium</option>
+                              <option value="Average">Average</option>
                               <option value="Low">Low</option>
                             </select>
                             {hasPermission(

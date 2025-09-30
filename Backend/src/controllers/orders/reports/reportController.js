@@ -332,6 +332,7 @@ async function generateReportFileName(orderId, orderNumber) {
 async function generateReportPDF(reportType, formData, extraData, outputPath) {
   // Determine background image based on valuer_name (CV) or surveyor (AVR)
   let bgImageFileName = "vkassociate_letter_head.jpg"; // Default image
+  let stampPngFile = null; // Optional stamp overlay
 
   // Check for valuer_name (CV reports) or surveyor (AVR reports)
   const nameField = formData.valuer_name || formData.surveyor;
@@ -341,10 +342,13 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
     
     if (name === "V.K. ASSOCIATES") {
       bgImageFileName = "vkassociate_letter_head.jpg";
+      stampPngFile = "vka.png";
     } else if (name === "VALUETECH SOLUTIONS") {
       bgImageFileName = "valuetech-solutions.png";
+      stampPngFile = "vts.png";
     } else if (name === "VISHAL D. KOTHARI") {
       bgImageFileName = "vishal-d-kothri.png";
+      stampPngFile = "vdk.png";
     }
   }
   
@@ -354,6 +358,7 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
 
   // Convert background image to base64 (optimized)
   let bgImageBase64 = null;
+  let stampImageBase64 = null;
   try {
     if (fs.existsSync(bgPath)) {
       const imageBuffer = fs.readFileSync(bgPath);
@@ -363,6 +368,15 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
       )}`;
     } else {
       console.warn(`Background image not found: ${bgPath}`);
+    }
+
+    if (stampPngFile) {
+      const stampPath = path.join(process.cwd(), "public", "img", stampPngFile);
+      if (fs.existsSync(stampPath)) {
+        const stampBuffer = fs.readFileSync(stampPath);
+        const stampMime = "image/png";
+        stampImageBase64 = `data:${stampMime};base64,${stampBuffer.toString("base64")}`;
+      }
     }
   } catch (error) {
     console.warn("Could not load background image:", error.message);
@@ -374,7 +388,8 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
     reportType,
     formData,
     extraData,
-    bgImageBase64
+    bgImageBase64,
+    stampImageBase64
   );
 
   // Launch Puppeteer with optimized settings
@@ -450,23 +465,26 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
  * @param {Object} formData - Form data
  * @param {Object} extraData - Extra data
  * @param {string} bgImageBase64 - Background image as base64
+ * @param {string|null} stampImageBase64 - Optional stamp image as base64
  * @returns {string} HTML content
  */
-function generateReportHTML(reportType, formData, extraData, bgImageBase64) {
+function generateReportHTML(reportType, formData, extraData, bgImageBase64, stampImageBase64) {
   // Route to appropriate template based on report type
   switch (reportType.toLowerCase()) {
     case "report_cv":
       return cvReportTemplate.generateCVReportHTML(
         formData,
         extraData,
-        bgImageBase64
+        bgImageBase64,
+        stampImageBase64
       );
 
     case "report_avr":
       return avrReportTemplate.generateAVRReportHTML(
         formData,
         extraData,
-        bgImageBase64
+        bgImageBase64,
+        stampImageBase64
       );
 
     case "report_machinery":
@@ -480,7 +498,8 @@ function generateReportHTML(reportType, formData, extraData, bgImageBase64) {
         return ceReportTemplate.generateCEReportHTML(
           formData,
           extraData,
-          bgImageBase64
+          bgImageBase64,
+          stampImageBase64
         );
 
     // Future report types can be added here

@@ -27,6 +27,25 @@ router.get(
   orderMediaDocumentController.getCollagesByOrderId
 );
 
+// Get approved documents by order ID
+router.get(
+  "/:orderId/approved",
+  checkPermission("view_order_media_documents"),
+  orderMediaDocumentController.getApprovedByOrderId
+);
+
+// Approve multiple documents for an order
+router.post(
+  "/:orderId/approve",
+  checkPermission("edit_order_media_documents"),
+  activityLogger(
+    "order_media_documents",
+    (req) => req.params.orderId,
+    "Approve Media Documents"
+  ),
+  orderMediaDocumentController.approveByOrderId
+);
+
 // Delete document (soft delete with activity log)
 router.delete(
   "/:id",
