@@ -1169,7 +1169,7 @@ function OrderDetails() {
                   >
                     <ReportIcon />
                   </Link>
-                    <Link
+                    {/* <Link
                       to={`/orders/${id}/details/ce-report`}
                       title="CE Report"
                       className="tooltip-link"
@@ -1189,7 +1189,7 @@ function OrderDetails() {
                       className="tooltip-link"
                     >
                       <ReportIcon />
-                    </Link>
+                    </Link> */}
                   </>
                 )}
                 
