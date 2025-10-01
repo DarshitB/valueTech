@@ -359,6 +359,7 @@ function OrderImages() {
       order_id: id.toString(),
       text: remarks.trim() || "",
       image_ids: selectedImageSequence.map((id) => id.toString()), // Use sequence order
+      valuer_name: order?.valuer_name || "",
     };
     console.log("image collage payload", payload);
     dispatch(generateCollage(payload)).then((result) => {

@@ -420,26 +420,30 @@ function Dashboard() {
                           <div
                             style={{ display: "flex", gap: "10px", alignItems: "center" }}
                           >
-                            <select
-                              className="form-field type-priority-selector"
-                              value={selectedOrderType}
-                              onChange={(e) => setSelectedOrderType(e.target.value)}
-                            >
-                              <option value="">All Types</option>
-                              <option value="VKA1">VKA1</option>
-                              <option value="VKA2">VKA2</option>
-                              <option value="VKA3">VKA3</option>
-                            </select>
-                            <select
-                              className="form-field type-priority-selector"
-                              value={selectedPriority}
-                              onChange={(e) => setSelectedPriority(e.target.value)}
-                            >
-                              <option value="">All Priorities</option>
-                              <option value="High">High</option>
-                              <option value="Average">Average</option>
-                              <option value="Low">Low</option>
-                            </select>
+                            {hasPermission(allowedPermissions, "view_order_type_filter") && (
+                              <select
+                                className="form-field type-priority-selector"
+                                value={selectedOrderType}
+                                onChange={(e) => setSelectedOrderType(e.target.value)}
+                              >
+                                <option value="">All Types</option>
+                                <option value="VKA1">VKA1</option>
+                                <option value="VKA2">VKA2</option>
+                                <option value="VKA3">VKA3</option>
+                              </select>
+                            )}
+                            {hasPermission(allowedPermissions, "view_order_priority_filter") && (
+                              <select
+                                className="form-field type-priority-selector"
+                                value={selectedPriority}
+                                onChange={(e) => setSelectedPriority(e.target.value)}
+                              >
+                                <option value="">All Priorities</option>
+                                <option value="High">High</option>
+                                <option value="Average">Average</option>
+                                <option value="Low">Low</option>
+                              </select>
+                            )}
                             {hasPermission(
                               allowedPermissions,
                               "add_order"

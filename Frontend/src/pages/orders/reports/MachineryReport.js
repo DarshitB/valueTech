@@ -420,9 +420,12 @@ function MachineryReport() {
             ? `${order.sub_category_name}, ${order.child_category_name}`
             : "",
         hyp_with: order?.bank_name || "",
+        // ALWAYS use valuer_name from order (never from report or previous state)
+        valuer_name: order?.valuer_name || "",
+        license_no: order?.valuer_name ? getLicenseNumber(order.valuer_name) : "",
       }));
     }
-  }, [order]);
+  }, [order, getLicenseNumber]);
 
   // Populate form data from fetched Machinery report (if available)
   useEffect(() => {
@@ -442,8 +445,8 @@ function MachineryReport() {
       
       // More robust field population - try to set all relevant fields
       Object.entries(report).forEach(([key, value]) => {
-        // Skip system fields that shouldn't be in form
-        if (key.startsWith('created_') || key.startsWith('updated_') || key === 'id' || key === 'order_id' || key === 'flexible_fields') {
+        // Skip system fields and valuer-related fields (those come from order only)
+        if (key.startsWith('created_') || key.startsWith('updated_') || key === 'id' || key === 'order_id' || key === 'flexible_fields' || key === 'valuer_name' || key === 'license_no') {
           return;
         }
         
@@ -1500,23 +1503,16 @@ function MachineryReport() {
                     <label htmlFor="valuer_name">
                       Valuer Name <span class="text-danger">*</span>
                     </label>
-                    <SingleSearchSelect
-                      options={[
-                        { value: "V.K. ASSOCIATES", label: "V.K. ASSOCIATES" },
-                        {
-                          value: "VALUETECH SOLUTIONS",
-                          label: "VALUETECH SOLUTIONS",
-                        },
-                        {
-                          value: "VISHAL D. KOTHARI",
-                          label: "VISHAL D. KOTHARI",
-                        },
-                      ]}
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="valuer_name"
+                      name="valuer_name"
                       value={reportFormData.valuer_name}
-                      onChange={(value) =>
-                        handleSelectChange("valuer_name", value)
-                      }
+                      readOnly
+                      placeholder="Set from order attributes"
                       required
+                      style={{ backgroundColor: "#f5f5f5", cursor: "not-allowed" }}
                     />
                   </div>
                 </div>

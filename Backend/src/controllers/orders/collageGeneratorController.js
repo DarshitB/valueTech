@@ -4,6 +4,15 @@ const { v4: uuidv4 } = require("uuid");
 const sharp = require("sharp");
 const PDFDocument = require("pdfkit");
 
+// Manual stamp offsets per valuer name (backend-configurable)
+// Positive x => right, negative x => left; Positive y => down, negative y => up
+// Tweak these values as desired; unlisted names default to { x: 0, y: 0 }
+const STAMP_OFFSETS = {
+  "V.K. ASSOCIATES": { x: -125, y: 40 },
+  "VALUETECH SOLUTIONS": { x: -125, y: 40 },
+  "VISHAL D. KOTHARI": { x: -125, y: 40 },
+};
+
 // Import models and utilities
 const Order = require("../../models/orders/order");
 const orderMediaPortal = require("../../models/orders/orderMediaPortal");
@@ -113,7 +122,40 @@ exports.generateCollage = async (req, res, next) => {
 
     // Generate collage image with simple naming: "collage 1", "collage 2", etc.
     const collageImagePath = path.join(uploadDir, `collage_${nextCollageNumber}.jpg`);
-    await generateCollageImage(imagePaths, collageImagePath, text);
+    // Determine stamp overlay based on order.valuer_name (same logic as reports)
+    let stampBuffer = null;
+    let stampOffset = { x: 0, y: 0 };
+    try {
+      const nameField = order.valuer_name;
+      if (nameField) {
+        const name = String(nameField).toUpperCase().trim();
+        let stampPngFile = null;
+
+        if (name === "V.K. ASSOCIATES") {
+          stampPngFile = "vka.png";
+        } else if (name === "VALUETECH SOLUTIONS") {
+          stampPngFile = "vts.png";
+        } else if (name === "VISHAL D. KOTHARI") {
+          stampPngFile = "vdk.png"; // keep parity with reports assets
+        }
+
+        if (stampPngFile) {
+          const stampPath = path.join(process.cwd(), "public", "img", stampPngFile);
+          if (fs.existsSync(stampPath)) {
+            stampBuffer = fs.readFileSync(stampPath);
+          }
+        }
+
+        // Apply backend-configured offsets for this valuer (if present)
+        if (STAMP_OFFSETS[name]) {
+          stampOffset = STAMP_OFFSETS[name];
+        }
+      }
+    } catch (_) {
+      // Non-fatal: continue without stamp if any issue
+    }
+
+    await generateCollageImage(imagePaths, collageImagePath, text, stampBuffer, stampOffset);
 
     // Generate PDF from collage with simple naming: "collage 1", "collage 2", etc.
     const pdfFileName = `collage_${nextCollageNumber}.pdf`;
@@ -162,8 +204,10 @@ exports.generateCollage = async (req, res, next) => {
  * @param {string[]} imagePaths - Array of local image file paths
  * @param {string} outputPath - Output path for generated collage
  * @param {string} text - Optional text to overlay on collage
+ * @param {Buffer|null} stampBuffer - Optional PNG buffer to overlay as centered stamp
+ * @param {{x:number,y:number}} stampOffset - Optional pixel offsets from center (x: right+, y: down+)
  */
-async function generateCollageImage(imagePaths, outputPath, text = "") {
+async function generateCollageImage(imagePaths, outputPath, text = "", stampBuffer = null, stampOffset = { x: 0, y: 0 }) {
   const imageCount = imagePaths.length;
 
   // Canvas dimensions (A4 size at 300 DPI)
@@ -230,11 +274,35 @@ async function generateCollageImage(imagePaths, outputPath, text = "") {
     }
   }
 
+  // Add centered stamp overlay if provided
+  if (stampBuffer) {
+    try {
+      // Resize stamp to fit nicely on page (approx 25% of min dimension)
+      const targetHeight = Math.floor(Math.min(canvasWidth, canvasHeight) * 0.25);
+      const resizedStamp = await sharp(stampBuffer)
+        .resize({ height: targetHeight, fit: "inside" })
+        .png()
+        .toBuffer();
+
+      // Compute explicit top/left so we can apply offsets relative to center
+      const stampMeta = await sharp(resizedStamp).metadata();
+      const stampW = stampMeta.width || targetHeight; // approximate if missing
+      const stampH = stampMeta.height || targetHeight;
+      const centerLeft = Math.floor((canvasWidth - stampW) / 2);
+      const centerTop = Math.floor((canvasHeight - stampH) / 2);
+
+      compositeOperations.push({
+        input: resizedStamp,
+        left: centerLeft + (stampOffset?.x || 0),
+        top: centerTop + (stampOffset?.y || 0),
+      });
+    } catch (_) {
+      // Ignore stamp errors silently
+    }
+  }
+
   // Generate final collage
-  await canvas
-    .composite(compositeOperations)
-    .jpeg({ quality: 100 })
-    .toFile(outputPath);
+  await canvas.composite(compositeOperations).jpeg({ quality: 100 }).toFile(outputPath);
 }
 
 /**

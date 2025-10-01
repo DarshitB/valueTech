@@ -494,6 +494,7 @@ exports.softDelete = async (req, res, next) => {
 /**
  * PATCH /orders/:id/attributes
  * Update specific order attributes (flexible partial update)
+ * Supports assigning multiple users to an order via user_ids array
  * 
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
@@ -516,46 +517,108 @@ exports.updateOrderAttributes = async (req, res, next) => {
       throw new BadRequestError("At least one attribute must be provided for update");
     }
 
+    // Extract user_ids from updateData (handle separately like officer categories)
+    const { user_ids, ...otherUpdateData } = updateData;
+
     // Remove any system fields that shouldn't be updated directly
     const restrictedFields = ['id', 'order_number', 'created_at', 'created_by', 'updated_by', 'updated_at', 'deleted_at'];
     const filteredUpdateData = {};
 
-    for (const [key, value] of Object.entries(updateData)) {
+    for (const [key, value] of Object.entries(otherUpdateData)) {
       if (restrictedFields.includes(key)) {
         throw new BadRequestError(`Field '${key}' cannot be updated through this endpoint`);
       }
-      // Only include fields that have actual values (not undefined)
+      // Include fields with actual values (allow null, empty string, 0, false)
+      // Only exclude undefined values
       if (value !== undefined) {
         filteredUpdateData[key] = value;
       }
     }
 
-    // Validate that we have at least one valid field to update
-    if (Object.keys(filteredUpdateData).length === 0) {
+    // Validate that we have at least one valid field to update (either regular fields or user_ids)
+    if (Object.keys(filteredUpdateData).length === 0 && user_ids === undefined) {
       throw new BadRequestError("No valid fields provided for update");
     }
 
-    // Update the order attributes
-    const updatedOrder = await Order.updateOrderAttributes(orderId, filteredUpdateData, userId);
+    // Track changes for detailed activity log
+    const changes = [];
+
+    // Update the order attributes (if any regular fields exist)
+    if (Object.keys(filteredUpdateData).length > 0) {
+      // Build detailed change descriptions
+      for (const [key, newValue] of Object.entries(filteredUpdateData)) {
+        const oldValue = existingOrder[key];
+        const displayOldValue = oldValue === null ? 'null' : oldValue === '' ? 'empty' : oldValue;
+        const displayNewValue = newValue === null ? 'null' : newValue === '' ? 'empty' : newValue;
+        
+        if (oldValue !== newValue) {
+          changes.push(`${key} changed from "${displayOldValue}" to "${displayNewValue}"`);
+        }
+      }
+      
+      await Order.updateOrderAttributes(orderId, filteredUpdateData, userId);
+    }
+
+    // Handle user assignments if user_ids is provided
+    if (user_ids !== undefined) {
+      // Validate that user_ids is an array
+      if (!Array.isArray(user_ids)) {
+        throw new BadRequestError("user_ids must be an array");
+      }
+
+      // Validate all user IDs exist (only if array is not empty)
+      if (user_ids.length > 0) {
+        const users = await User.findManyByIds(user_ids);
+        if (users.length !== user_ids.length) {
+          throw new BadRequestError("One or more invalid user IDs provided");
+        }
+      }
+
+      // Get old assigned users for comparison
+      const oldAssignedUsers = existingOrder.assigned_users || [];
+      const oldUserIds = oldAssignedUsers.map(u => u.id);
+      
+      // Prepare user assignments data
+      const usersToInsert = user_ids.map((uid) => ({
+        order_id: orderId,
+        user_id: uid,
+        created_by: userId,
+        created_at: new Date(),
+      }));
+
+      // Replace existing user assignments
+      await Order.replaceOrderUsers(orderId, usersToInsert);
+      
+      // Build user assignment change description
+      if (user_ids.length === 0 && oldUserIds.length > 0) {
+        changes.push(`All user assignments removed`);
+      } else if (oldUserIds.length === 0 && user_ids.length > 0) {
+        changes.push(`${user_ids.length} user(s) assigned`);
+      } else if (JSON.stringify(oldUserIds.sort()) !== JSON.stringify(user_ids.sort())) {
+        changes.push(`User assignments updated (${user_ids.length} user(s) assigned)`);
+      }
+    }
 
     // Get the complete updated order with all relationships for response
     const enrichedOrder = await Order.findById(orderId, req.user);
 
-    // Log the activity
-    const statusHistoryData = {
-      order_id: orderId,
-      activity_extra: `Order attributes updated: ${Object.keys(filteredUpdateData).join(', ')}`,
-      changed_by: userId,
-      changed_at: new Date(),
-    };
+    // Log the activity with detailed changes
+    if (changes.length > 0) {
+      const statusHistoryData = {
+        order_id: orderId,
+        activity_extra: changes.join('; '),
+        changed_by: userId,
+        changed_at: new Date(),
+      };
 
-    await OrderStatusHistory.createStatusHistory(statusHistoryData);
+      await OrderStatusHistory.createStatusHistory(statusHistoryData);
+    }
 
     res.status(200).json({
       success: true,
       message: "Order attributes updated successfully",
       data: enrichedOrder,
-      updated_fields: Object.keys(filteredUpdateData)
+      changes: changes
     });
 
   } catch (err) {

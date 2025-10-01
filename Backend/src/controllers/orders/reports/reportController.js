@@ -491,7 +491,8 @@ function generateReportHTML(reportType, formData, extraData, bgImageBase64, stam
       return machineryReportTemplate.generateMachineryReportHTML(
         formData,
         extraData,
-        bgImageBase64
+        bgImageBase64,
+        stampImageBase64
       );
 
       case "report_ce":

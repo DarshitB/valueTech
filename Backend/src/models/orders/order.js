@@ -79,14 +79,31 @@ const order = {
         "sub_category.id as sub_category_id",
         "sub_category.name as sub_category_name",
         "category.id as category_id",
-        "category.name as category_name"
+        "category.name as category_name",
+        "orders.valuer_name"
       )
       .whereNull("orders.deleted_at");
 
     // Role-based filters - flexible matching using includes()
     const roleName = user.role_name.toUpperCase();
     
-    if (roleName.includes("BANK AUTHORITY")) {
+    if (roleName.includes("ADMIN") && roleName !== "DEVELOPER_ADMIN") {
+      // Admin users can only see orders assigned to them through order_users mapping
+      // Exclude DEVELOPER_ADMIN (owner role) who should see everything
+      const assignedOrderIds = await db("order_users")
+        .select("order_id")
+        .where("user_id", user.id)
+        .whereNull("deleted_at");
+      
+      const orderIds = assignedOrderIds.map(o => o.order_id);
+      
+      if (orderIds.length > 0) {
+        baseQuery.whereIn("orders.id", orderIds);
+      } else {
+        // If no orders assigned, return empty array by adding impossible condition
+        baseQuery.where("orders.id", -1);
+      }
+    } else if (roleName.includes("BANK AUTHORITY")) {
       baseQuery.andWhere(function () {
         this.where("orders.created_by", user.id)
           .orWhere("officers.user_id", user.id)
@@ -190,7 +207,8 @@ const order = {
         "sub_category.id as sub_category_id",
         "sub_category.name as sub_category_name",
         "category.id as category_id",
-        "category.name as category_name"
+        "category.name as category_name",
+        "orders.valuer_name"
       )
       .whereNull("orders.deleted_at")
       .where("orders.field_verifier_id", fieldVerifierId);
@@ -281,7 +299,8 @@ const order = {
         "sub_category.id as sub_category_id",
         "sub_category.name as sub_category_name",
         "category.id as category_id",
-        "category.name as category_name"
+        "category.name as category_name",
+        "orders.valuer_name"
       )
       .whereNull("orders.deleted_at")
       .where("orders.id", id)
@@ -292,7 +311,18 @@ const order = {
     // Check user access permissions - now we have officer_user_id in the order data
     const roleName = user.role_name.toUpperCase();
     
-    if (roleName.includes("BANK OFFICER")) {
+    if (roleName.includes("ADMIN") && roleName !== "DEVELOPER_ADMIN") {
+      // Admin users can only see orders assigned to them through order_users mapping
+      // Exclude DEVELOPER_ADMIN (owner role) who should see everything
+      const isAssigned = await db("order_users")
+        .where({ order_id: id, user_id: user.id })
+        .whereNull("deleted_at")
+        .first();
+      
+      if (!isAssigned) {
+        return null; // Admin can only see orders assigned to them
+      }
+    } else if (roleName.includes("BANK OFFICER")) {
       if (order.officer_user_id !== user.id) {
         return null; // Officer can only see orders assigned to them
       }
@@ -329,7 +359,21 @@ const order = {
       .where("order_status_history.order_id", id)
       .orderBy("order_status_history.id", "desc");
 
-    return { ...order, status_history: statusHistory };
+    // Get assigned users for this order
+    const assignedUsers = await db("order_users")
+      .leftJoin("users", "order_users.user_id", "users.id")
+      .leftJoin("roles", "users.role_id", "roles.id")
+      .select(
+        "users.id",
+        "users.name",
+        "users.email",
+        "users.mobile",
+        "roles.name as role_name"
+      )
+      .where("order_users.order_id", id)
+      .whereNull("order_users.deleted_at");
+
+    return { ...order, status_history: statusHistory, assigned_users: assignedUsers };
   },
 
   // Get orders by officer ID
@@ -474,6 +518,49 @@ const order = {
       .returning("*");
 
     return updatedOrder;
+  },
+
+  // Create order-user assignments (bulk insert)
+  createOrderUsers: async (data, trx = db) => {
+    // Guard clause
+    if (!Array.isArray(data) || data.length === 0) return [];
+    return await trx("order_users").insert(data).returning("*");
+  },
+
+  // Replace order-user assignments (delete old, insert new)
+  replaceOrderUsers: async (order_id, newUserData, trx = db) => {
+    // Guard clause
+    if (!Array.isArray(newUserData)) return [];
+    // Soft delete old assignments
+    await trx("order_users")
+      .where({ order_id })
+      .whereNull("deleted_at")
+      .update({
+        deleted_at: new Date(),
+        deleted_by: newUserData[0]?.created_by || null
+      });
+    // Insert new assignments if any
+    if (newUserData.length === 0) return [];
+    return await trx("order_users")
+      .insert(newUserData)
+      .returning("*");
+  },
+
+  // Get assigned users for an order
+  getOrderUsers: async (orderId) => {
+    const users = await db("order_users")
+      .leftJoin("users", "order_users.user_id", "users.id")
+      .leftJoin("roles", "users.role_id", "roles.id")
+      .select(
+        "users.id",
+        "users.name",
+        "users.email",
+        "users.mobile",
+        "roles.name as role_name"
+      )
+      .where("order_users.order_id", orderId)
+      .whereNull("order_users.deleted_at");
+    return users;
   },
 };
 

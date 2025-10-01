@@ -327,9 +327,12 @@ function AVRReport() {
         bank_name: order?.bank_name || "",
         branch_name: order?.branch_name || "",
         state_name: order?.state_name || "",
+        // ALWAYS use surveyor from order's valuer_name (never from report or previous state)
+        surveyor: order?.valuer_name || "",
+        license_no: order?.valuer_name ? getLicenseNumber(order.valuer_name) : "",
       }));
     }
-  }, [order]);
+  }, [order, getLicenseNumber]);
 
   // Populate form data from fetched AVR report (if available)
   useEffect(() => {
@@ -349,8 +352,8 @@ function AVRReport() {
       
       // More robust field population - try to set all relevant fields
       Object.entries(report).forEach(([key, value]) => {
-        // Skip system fields that shouldn't be in form
-        if (key.startsWith('created_') || key.startsWith('updated_') || key === 'id' || key === 'order_id' || key === 'flexible_fields') {
+        // Skip system fields and valuer-related fields (those come from order only)
+        if (key.startsWith('created_') || key.startsWith('updated_') || key === 'id' || key === 'order_id' || key === 'flexible_fields' || key === 'surveyor' || key === 'license_no') {
           return;
         }
         
@@ -1535,24 +1538,15 @@ function AVRReport() {
                     <label>
                       Surveyor <span className="text-danger">*</span>
                     </label>
-                    <SingleSearchSelect
-                      options={[
-                        { value: "V.K. ASSOCIATES", label: "V.K. ASSOCIATES" },
-                        {
-                          value: "VALUETECH SOLUTIONS",
-                          label: "VALUETECH SOLUTIONS",
-                        },
-                        {
-                          value: "VISHAL D. KOTHARI",
-                          label: "VISHAL D. KOTHARI",
-                        },
-                      ]}
+                    <input
+                      type="text"
+                      className="form-field"
                       name="surveyor"
                       value={reportFormData.surveyor}
-                      onChange={(value) =>
-                        handleSelectChange("surveyor", value)
-                      }
+                      readOnly
+                      placeholder="Set from order attributes"
                       required
+                      style={{ backgroundColor: "#f5f5f5", cursor: "not-allowed" }}
                     />
                   </div>
                 </div>

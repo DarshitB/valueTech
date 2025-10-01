@@ -242,44 +242,94 @@ function generateCEReportHTML(formData, extraData, bgImageBase64, stampImageBase
             <td>GROSS MACHINE WEIGHT:</td>
             <td colspan="2">${formData.gross_machine_weight}</td>
         </tr>
-        <tr>
+        ${
+          formData.fix_but_flex_heading_1 &&
+          formData.fix_but_flex_value_1 &&
+          formData.fix_but_flex_heading_2 &&
+          formData.fix_but_flex_value_2 &&
+          formData.fix_but_flex_heading_3 &&
+          formData.fix_but_flex_value_3
+            ? `<tr>
             <td>${formData.fix_but_flex_heading_1}</td>
             <td>${formData.fix_but_flex_value_1}</td>
             <td>${formData.fix_but_flex_heading_2}</td>
             <td>${formData.fix_but_flex_value_2}</td>
             <td>${formData.fix_but_flex_heading_3}</td>
             <td>${formData.fix_but_flex_value_3}</td>
-        </tr>
-        <tr>
+        </tr>`
+            : ""
+        }
+        ${
+          formData.fix_but_flex_title_1 &&
+          formData.fix_but_flex_title_2 &&
+          formData.fix_but_flex_title_3
+            ? `<tr>
             <td colspan="2">${formData.fix_but_flex_title_1}</td>
             <td colspan="2">${formData.fix_but_flex_title_2}</td>
             <td colspan="2">${formData.fix_but_flex_title_3}</td>
-        </tr>
-        <tr>
+        </tr>`
+            : ""
+        }
+        ${
+          formData.fix_but_flex_heading_4 &&
+          formData.fix_but_flex_value_4 &&
+          formData.fix_but_flex_heading_5 &&
+          formData.fix_but_flex_value_5 &&
+          formData.fix_but_flex_heading_6 &&
+          formData.fix_but_flex_value_6
+            ? `<tr>
             <td>${formData.fix_but_flex_heading_4}</td>
             <td>${formData.fix_but_flex_value_4}</td>
             <td>${formData.fix_but_flex_heading_5}</td>
             <td>${formData.fix_but_flex_value_5}</td>
             <td>${formData.fix_but_flex_heading_6}</td>
             <td>${formData.fix_but_flex_value_6}</td>
-        </tr>
-        <tr>
+        </tr>`
+            : ""
+        }
+        ${
+          formData.fix_but_flex_heading_7 &&
+          formData.fix_but_flex_value_7 &&
+          formData.fix_but_flex_heading_8 &&
+          formData.fix_but_flex_value_8 &&
+          formData.fix_but_flex_heading_9 &&
+          formData.fix_but_flex_value_9
+            ? `<tr>
             <td>${formData.fix_but_flex_heading_7}</td>
             <td>${formData.fix_but_flex_value_7}</td>
             <td>${formData.fix_but_flex_heading_8}</td>
             <td>${formData.fix_but_flex_value_8}</td>
             <td>${formData.fix_but_flex_heading_9}</td>
             <td>${formData.fix_but_flex_value_9}</td>
-        </tr>
-        <tr>
+        </tr>`
+            : ""
+        }
+        ${
+          formData.fix_but_flex_heading_10 &&
+          formData.fix_but_flex_value_10 &&
+          formData.fix_but_flex_heading_11 &&
+          formData.fix_but_flex_value_11 &&
+          formData.fix_but_flex_heading_12 &&
+          formData.fix_but_flex_value_12
+            ? `<tr>
             <td>${formData.fix_but_flex_heading_10}</td>
             <td>${formData.fix_but_flex_value_10}</td>
             <td>${formData.fix_but_flex_heading_11}</td>
             <td>${formData.fix_but_flex_value_11}</td>
             <td>${formData.fix_but_flex_heading_12}</td>
             <td>${formData.fix_but_flex_value_12}</td>
-        </tr>
-        <tr>
+        </tr>`
+            : ""
+        }
+        ${
+          formData.fix_but_flex_top_heading_13 &&
+          formData.fix_but_flex_heading_13 &&
+          formData.fix_but_flex_value_13 &&
+          formData.fix_but_flex_heading_14 &&
+          formData.fix_but_flex_value_14 &&
+          formData.fix_but_flex_heading_15 &&
+          formData.fix_but_flex_value_15
+            ? `<tr>
             <td>${formData.fix_but_flex_top_heading_13}</td>
             <td colspan="5">
                 <table style="margin: 0;border-collapse: collapse;width: 100%;">
@@ -305,24 +355,36 @@ function generateCEReportHTML(formData, extraData, bgImageBase64, stampImageBase
                     </tr>
                 </table>
             </td>
-        </tr>
-        <tr>
+        </tr>`
+            : ""
+        }
+        ${
+          formData.fix_but_flex_heading_16 &&
+          formData.fix_but_flex_value_16 &&
+          formData.fix_but_flex_heading_17 &&
+          formData.fix_but_flex_value_17
+            ? `<tr>
             <td>${formData.fix_but_flex_heading_16}</td>
             <td colspan="2">${formData.fix_but_flex_value_16}</td>
             <td>${formData.fix_but_flex_heading_17}</td>
             <td colspan="2">${formData.fix_but_flex_value_17}</td>
-        </tr>
-        <tr>
+        </tr>`
+            : ""
+        }
+        ${
+          formData.fix_but_flex_heading_18 &&
+          formData.fix_but_flex_value_18 &&
+          formData.fix_but_flex_heading_19 &&
+          formData.fix_but_flex_value_19 &&
+          formData.fix_but_flex_heading_20 &&
+          formData.fix_but_flex_value_20
+            ? `<tr>
             <td>${formData.fix_but_flex_heading_18}</td>
             <td colspan="2">
                 <table style="margin: 0;border-collapse: collapse;width: 100%;">
                     <tr>
-                        <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${
-                          formData.fix_but_flex_value_18
-                        }</td>
-                        <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${
-                          formData.fix_but_flex_heading_19
-                        }</td>
+                        <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${formData.fix_but_flex_value_18}</td>
+                        <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${formData.fix_but_flex_heading_19}</td>
                     </tr>
                 </table>
             </td>
@@ -330,27 +392,28 @@ function generateCEReportHTML(formData, extraData, bgImageBase64, stampImageBase
             <td colspan="2">
                 <table style="margin: 0;border-collapse: collapse;width: 100%;">
                     <tr>
-                        <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${
-                          formData.fix_but_flex_heading_20
-                        }</td>
-                        <td style="border-top: 0px;border-bottom: 0px;border-left:0px;border-right:0px;">${
-                          formData.fix_but_flex_value_20
-                        }</td>
+                        <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${formData.fix_but_flex_heading_20}</td>
+                        <td style="border-top: 0px;border-bottom: 0px;border-left:0px;border-right:0px;">${formData.fix_but_flex_value_20}</td>
                     </tr>
                 </table>
             </td>
-        </tr>
-         <tr>
+        </tr>`
+            : ""
+        }
+        ${
+          formData.fix_but_flex_heading_21 &&
+          formData.fix_but_flex_value_21 &&
+          formData.fix_but_flex_heading_22 &&
+          formData.fix_but_flex_value_22 &&
+          formData.fix_but_flex_heading_23 &&
+          formData.fix_but_flex_value_23
+            ? `<tr>
             <td>${formData.fix_but_flex_heading_21}</td>
             <td colspan="2">
                 <table style="margin: 0;border-collapse: collapse;width: 100%;">
                     <tr>
-                        <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${
-                          formData.fix_but_flex_value_21
-                        }</td>
-                        <td style="border-top: 0px;border-bottom: 0px;border-left:0px;border-right:0px;">${
-                          formData.fix_but_flex_heading_22
-                        }</td>
+                        <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${formData.fix_but_flex_value_21}</td>
+                        <td style="border-top: 0px;border-bottom: 0px;border-left:0px;border-right:0px;">${formData.fix_but_flex_heading_22}</td>
                     </tr>
                 </table>
             </td>
@@ -358,22 +421,27 @@ function generateCEReportHTML(formData, extraData, bgImageBase64, stampImageBase
             <td colspan="2">
                 <table style="margin: 0;border-collapse: collapse;width: 100%;">
                     <tr>
-                        <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${
-                          formData.fix_but_flex_heading_23
-                        }</td>
-                        <td style="border-top: 0px;border-bottom: 0px;border-left:0px;border-right:0px;">${
-                          formData.fix_but_flex_value_23
-                        }</td>
+                        <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${formData.fix_but_flex_heading_23}</td>
+                        <td style="border-top: 0px;border-bottom: 0px;border-left:0px;border-right:0px;">${formData.fix_but_flex_value_23}</td>
                     </tr>
                 </table>
             </td>
-        </tr>
-         <tr>
+        </tr>`
+            : ""
+        }
+        ${
+          formData.fix_but_flex_heading_24 &&
+          formData.fix_but_flex_value_24 &&
+          formData.fix_but_flex_heading_25 &&
+          formData.fix_but_flex_value_25
+            ? `<tr>
             <td>${formData.fix_but_flex_heading_24}</td>
             <td colspan="2">${formData.fix_but_flex_value_24}</td>
             <td>${formData.fix_but_flex_heading_25}</td>
             <td colspan="2">${formData.fix_but_flex_value_25}</td>
-        </tr>
+        </tr>`
+            : ""
+        }
         ${generateAdditionalRows(formData, "comments")}
         ${generateFlexibleFieldsForSection(
           formData.flexible_fields || [],

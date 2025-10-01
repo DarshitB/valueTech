@@ -1,9 +1,9 @@
 const db = require("../../../db");
 
 const portal_operations = {
-  // Get all active field verifiers (not soft-deleted)
-  findAll: () =>
-    db("field_verifiers")
+  // Get all active field verifiers (not soft-deleted) with role-based filtering
+  findAll: async (user) => {
+    const baseQuery = db("field_verifiers")
       .leftJoin(
         "users as created_user",
         "field_verifiers.created_by",
@@ -29,11 +29,25 @@ const portal_operations = {
         "field_verifiers.updated_at",
         "updated_user.name as updated_by"
       )
-      .whereNull("field_verifiers.deleted_at"),
+      .whereNull("field_verifiers.deleted_at");
 
-  // Get a single field verifier by ID
-  findById: (id) =>
-    db("field_verifiers")
+    // Role-based filtering (only for portal, not mobile)
+    if (user) {
+      const roleName = user.role_name.toUpperCase();
+      
+      // Manager can only see field verifiers they created
+      if (roleName.includes("MANAGER")) {
+        baseQuery.where("field_verifiers.created_by", user.id);
+      }
+      // Other roles can see all (DEVELOPER_ADMIN, TELECALLER, etc.)
+    }
+
+    return await baseQuery;
+  },
+
+  // Get a single field verifier by ID with role-based filtering
+  findById: async (id, user) => {
+    const query = db("field_verifiers")
       .leftJoin(
         "users as created_user",
         "field_verifiers.created_by",
@@ -56,12 +70,25 @@ const portal_operations = {
         "field_verifiers.is_active",
         "field_verifiers.created_at",
         "created_user.name as created_by",
+        "field_verifiers.created_by as created_by_id",
         "field_verifiers.updated_at",
         "updated_user.name as updated_by"
       )
       .where("field_verifiers.id", id)
-      .whereNull("field_verifiers.deleted_at")
-      .first(),
+      .whereNull("field_verifiers.deleted_at");
+
+    // Role-based filtering
+    if (user) {
+      const roleName = user.role_name.toUpperCase();
+      
+      // Manager can only see field verifiers they created
+      if (roleName.includes("MANAGER")) {
+        query.where("field_verifiers.created_by", user.id);
+      }
+    }
+
+    return await query.first();
+  },
 
   // Check for duplicate username (if any)
   findByUsername: (username) =>

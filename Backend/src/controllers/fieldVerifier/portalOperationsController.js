@@ -8,21 +8,21 @@ const {
   BadRequestError,
 } = require("../../utils/customErrors");
 
-// Get all field verifiers (not soft-deleted)
+// Get all field verifiers (not soft-deleted) with role-based filtering
 exports.getAll = async (req, res, next) => {
   try {
-    const verifiers = await FieldVerifier.findAll();
+    const verifiers = await FieldVerifier.findAll(req.user);
     res.json(verifiers);
   } catch (err) {
     next(err);
   }
 };
 
-// Get field verifier by ID
+// Get field verifier by ID with role-based filtering
 exports.getById = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const verifier = await FieldVerifier.findById(id);
+    const verifier = await FieldVerifier.findById(id, req.user);
     if (!verifier) throw new NotFoundError("Field Verifier not found");
     res.json(verifier);
   } catch (err) {
@@ -172,7 +172,7 @@ exports.update = async (req, res, next) => {
       bank_IFSC_code,
     } = req.body;
 
-    const existing = await FieldVerifier.findById(id);
+    const existing = await FieldVerifier.findById(id, req.user);
     if (!existing) throw new NotFoundError("Field Verifier not found");
 
     // Check if username is being changed and if the new username already exists
@@ -242,7 +242,7 @@ exports.toggleActiveStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
     /* console.log("it is in this"); */
-    const existing = await FieldVerifier.findById(id);
+    const existing = await FieldVerifier.findById(id, req.user);
     if (!existing) throw new NotFoundError("Field Verifier not found");
 
     const [updated] = await FieldVerifier.toggleActiveStatus(id);
@@ -271,7 +271,7 @@ exports.softDelete = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const existing = await FieldVerifier.findById(id);
+    const existing = await FieldVerifier.findById(id, req.user);
     if (!existing) throw new NotFoundError("Field Verifier not found");
 
     await FieldVerifier.softDelete(id, req.user.id);

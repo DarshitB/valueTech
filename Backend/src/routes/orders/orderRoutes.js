@@ -36,7 +36,6 @@ router.patch(
 );
 router.patch(
   "/:id/attributes",
-  checkPermission("edit_order"), // Check permission to edit order
   beforeUpdateLogger("orders", (req) => req.params.id), // Store pre-update data
   activityLogger("orders", (req) => req.params.id), // Log update
   orderController.updateOrderAttributes

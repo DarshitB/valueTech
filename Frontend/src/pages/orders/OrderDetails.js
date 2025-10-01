@@ -132,8 +132,10 @@ function OrderDetails() {
 
   // Form data state for mail details
   const [mailFormData, setMailFormData] = useState({
-    to: "",
+    to: [],
     cc: [],
+    bcc: [],
+    subject: "",
     comments: "",
   });
 
@@ -294,7 +296,7 @@ function OrderDetails() {
         return;
       }
 
-      setComment(newValue);
+    setComment(newValue);
       setTaggedUserIds(validMentions.map((m) => Number(m.id)));
     },
     []
@@ -745,11 +747,11 @@ function OrderDetails() {
     }));
   };
 
-  // Handle TO field selection (single selection)
-  const handleToFieldChange = (value) => {
+  // Handle TO field selection (multiple selection)
+  const handleToFieldChange = (selectedEmails) => {
     setMailFormData((prev) => ({
       ...prev,
-      to: value,
+      to: selectedEmails || [],
     }));
   };
 
@@ -761,20 +763,39 @@ function OrderDetails() {
     }));
   };
 
+  // Handle BCC field selection (multiple selection)
+  const handleBccFieldChange = (selectedEmails) => {
+    setMailFormData((prev) => ({
+      ...prev,
+      bcc: selectedEmails || [],
+    }));
+  };
+
   // Handle mail form submission with enhanced validation
   const handleMailFormSubmit = (e) => {
     e.preventDefault();
 
-    // Validate recipient
-    if (!mailFormData.to?.trim()) {
-      toast.error("Please select a recipient");
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    // Validate TO recipients
+    if (!mailFormData.to || !Array.isArray(mailFormData.to) || mailFormData.to.length === 0) {
+      toast.error("Please select at least one recipient");
       return;
     }
 
-    // Validate email format for TO field
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(mailFormData.to)) {
-      toast.error("Please select a valid recipient email");
+    // Validate TO email format
+    const invalidToEmails = mailFormData.to.filter(
+      (email) => !email || typeof email !== "string" || !emailRegex.test(email)
+    );
+
+    if (invalidToEmails.length > 0) {
+      toast.error("Please ensure all TO emails are valid");
+      return;
+    }
+
+    // Limit TO recipients
+    if (mailFormData.to.length > 10) {
+      toast.error("Maximum 10 TO recipients allowed");
       return;
     }
 
@@ -793,6 +814,25 @@ function OrderDetails() {
       // Limit CC recipients to prevent spam
       if (mailFormData.cc.length > 10) {
         toast.error("Maximum 10 CC recipients allowed");
+        return;
+      }
+    }
+
+    // Validate BCC emails if provided
+    if (mailFormData.bcc && Array.isArray(mailFormData.bcc)) {
+      const invalidBccEmails = mailFormData.bcc.filter(
+        (email) =>
+          !email || typeof email !== "string" || !emailRegex.test(email)
+      );
+
+      if (invalidBccEmails.length > 0) {
+        toast.error("Please ensure all BCC emails are valid");
+        return;
+      }
+
+      // Limit BCC recipients to prevent spam
+      if (mailFormData.bcc.length > 10) {
+        toast.error("Maximum 10 BCC recipients allowed");
         return;
       }
     }
@@ -821,10 +861,16 @@ function OrderDetails() {
     }
 
     const sanitizedMailData = {
-      to: mailFormData.to.trim().toLowerCase(),
+      to: Array.isArray(mailFormData.to)
+        ? mailFormData.to.map((email) => email.trim().toLowerCase())
+        : [],
       cc: Array.isArray(mailFormData.cc)
         ? mailFormData.cc.map((email) => email.trim().toLowerCase())
         : [],
+      bcc: Array.isArray(mailFormData.bcc)
+        ? mailFormData.bcc.map((email) => email.trim().toLowerCase())
+        : [],
+      subject: mailFormData.subject?.trim() || "",
       comments: comments,
       orderId: Number(id),
       approvedDocuments: approvedDocuments.filter(
@@ -843,8 +889,10 @@ function OrderDetails() {
 
     // Reset form data
     setMailFormData({
-      to: "",
+      to: [],
       cc: [],
+      bcc: [],
+      subject: "",
       comments: "",
     });
   };
@@ -1059,11 +1107,11 @@ function OrderDetails() {
                           <span>Manager</span>
                           <span>:</span>
                         </p>
-                      </div>
+                  </div>
                       <div className="order-details-info-set-details">
                         <p>{showValue(order?.manager_name)}</p>
-                      </div>
-                    </div>
+                </div>
+              </div>
                     <div className="order-details-info-set">
                       <div className="order-details-info-set-heading">
                         <p>
@@ -1101,11 +1149,11 @@ function OrderDetails() {
                     title="Documents"
                     className="tooltip-link"
                   >
-                    <FolderIcon />
+                  <FolderIcon />
                     {/*  <DocumentsIcon /> */}
-                  </Link>
+                </Link>
                 )}
-
+                
                 {/* Conditional Report Buttons based on Category
                     - "COMMERCIAL VEHICLE" -> CV Report
                     - "CONSTRUCTION EQUIPMENTS" -> CE Report  
@@ -1114,14 +1162,14 @@ function OrderDetails() {
                 */}
                 {order?.category_name === "COMMERCIAL VEHICLE" && (
                   <>
+                  <Link
+                    to={`/orders/${id}/details/cv-report`}
+                    title="CV Report"
+                    className="tooltip-link"
+                  >
+                    <ReportIcon />
+                  </Link>
                     <Link
-                      to={`/orders/${id}/details/cv-report`}
-                      title="CV Report"
-                      className="tooltip-link"
-                    >
-                      <ReportIcon />
-                    </Link>
-                    {/* <Link
                       to={`/orders/${id}/details/ce-report`}
                       title="CE Report"
                       className="tooltip-link"
@@ -1141,10 +1189,10 @@ function OrderDetails() {
                       className="tooltip-link"
                     >
                       <ReportIcon />
-                    </Link> */}
+                    </Link>
                   </>
                 )}
-
+                
                 {order?.category_name === "CONSTRUCTION EQUIPMENT" && (
                   <Link
                     to={`/orders/${id}/details/ce-report`}
@@ -1154,18 +1202,18 @@ function OrderDetails() {
                     <ReportIcon />
                   </Link>
                 )}
-
-                {order?.category_name &&
-                  order.category_name.toUpperCase().includes("AVR") && (
-                    <Link
-                      to={`/orders/${id}/details/avr-report`}
-                      title="AVR Report"
-                      className="tooltip-link"
-                    >
-                      <ReportIcon />
-                    </Link>
-                  )}
-
+                
+                {order?.category_name && 
+                 order.category_name.toUpperCase().includes("AVR") && (
+                  <Link
+                    to={`/orders/${id}/details/avr-report`}
+                    title="AVR Report"
+                    className="tooltip-link"
+                  >
+                    <ReportIcon />
+                  </Link>
+                )}
+                
                 {order?.category_name === "MACHINERY" && (
                   <Link
                     to={`/orders/${id}/details/machinery-report`}
@@ -1594,31 +1642,17 @@ function OrderDetails() {
               <form className="body-form-box" onSubmit={handleMailFormSubmit}>
                 <div className="body-form-box">
                   <div className="form-group">
-                    <label htmlFor="to">To</label>
-                    <div style={{ position: "relative" }}>
-                      <span
-                        style={{
-                          position: "absolute",
-                          left: "12px",
-                          top: "50%",
-                          transform: "translateY(-50%)",
-                          color: "#666",
-                          fontSize: "14px",
-                        }}
-                      >
-                        ✉
-                      </span>
-                      <SingleSearchSelect
+                    <label htmlFor="to">To*</label>
+                    <SingleSearchSelect
                         id="to"
-                        className="search-selector"
-                        options={bankOfficersOptions}
+                      className="search-selector"
+                      options={bankOfficersOptions}
                         value={mailFormData.to}
-                        onChange={handleToFieldChange}
-                        placeholder="Select bank officer email"
-                        style={{ paddingLeft: "35px" }}
+                      onChange={handleToFieldChange}
+                      placeholder="Select recipients..."
+                      isMulti={true}
                       />
                     </div>
-                  </div>
 
                   <div className="form-group">
                     <label>CC</label>
@@ -1626,8 +1660,34 @@ function OrderDetails() {
                       options={allOfficersEmails}
                       value={mailFormData.cc}
                       onChange={handleCcFieldChange}
-                      placeholder=""
+                      placeholder="Select CC recipients..."
                       isMulti={true}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>BCC</label>
+                    <SingleSearchSelect
+                      options={allOfficersEmails}
+                      value={mailFormData.bcc}
+                      onChange={handleBccFieldChange}
+                      placeholder="Select BCC recipients..."
+                      isMulti={true}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="subject">Subject</label>
+                    <input
+                      className="form-field"
+                      id="subject"
+                      name="subject"
+                      type="text"
+                      value={mailFormData.subject}
+                      onChange={handleMailFormChange}
+                      placeholder="Enter email subject"
+                      maxLength="200"
+                      aria-label="Subject"
                     />
                   </div>
 

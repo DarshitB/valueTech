@@ -115,6 +115,12 @@ const user = {
   findByUsername: (email) =>
     db("users").where({ email }).whereNull("deleted_at").first(), // Find user by email that is not soft-deleted
 
+  findManyByIds: (ids) =>
+    db("users")
+      .select("id", "name", "email", "mobile", "role_id")
+      .whereIn("id", ids)
+      .whereNull("deleted_at"), // Find multiple users by IDs
+
   create: (data) => db("users").insert(data).returning("*"), // Create a new user
 
   update: (id, data) => db("users").where({ id }).update(data).returning("*"), // Update a user by ID

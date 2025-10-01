@@ -87,6 +87,7 @@ function Orders() {
   const [attributesFormData, setAttributesFormData] = useState({
     order_priority: "",
     order_type: "",
+    valuer_name: "",
   });
 
   // State for order type filter
@@ -336,25 +337,41 @@ function Orders() {
     setAttributesFormData({
       order_priority: order.order_priority || "",
       order_type: order.order_type || "",
+      valuer_name: order.valuer_name || "",
     });
     setShowAttributesModal(true);
   };
 
   // Handle Order Attributes Submit
   const handleAttributesSubmit = async () => {
-    // Check if at least one field has a value
-    if (!attributesFormData.order_priority && !attributesFormData.order_type) {
-      toast.error("Please select at least one attribute to update.");
-      return;
-    }
+    const canEditPriority = hasPermission(allowedPermissions, "edit_order_priority");
+    const canEditType = hasPermission(allowedPermissions, "edit_order_type");
+    const canEditValuerName = hasPermission(allowedPermissions, "edit_valuer_name_to_order");
 
-    // Build payload with only the fields that have values
+    // Build payload with only the fields that user has permission to edit and have values
     const payload = {};
-    if (attributesFormData.order_priority) {
+    
+    if (canEditPriority && attributesFormData.order_priority) {
       payload.order_priority = attributesFormData.order_priority;
     }
-    if (attributesFormData.order_type) {
+    
+    if (canEditType && attributesFormData.order_type) {
       payload.order_type = attributesFormData.order_type;
+    }
+
+    if (canEditValuerName && attributesFormData.valuer_name) {
+      payload.valuer_name = attributesFormData.valuer_name;
+    }
+
+    // Check if at least one field has a value that user can edit
+    if (Object.keys(payload).length === 0) {
+      const availableFields = [];
+      if (canEditPriority) availableFields.push("priority");
+      if (canEditType) availableFields.push("type");
+      if (canEditValuerName) availableFields.push("valuer name");
+      
+      toast.error(`Please select ${availableFields.join(" or ")} to update.`);
+      return;
     }
 
     try {
@@ -380,26 +397,30 @@ function Orders() {
               <div
                 style={{ display: "flex", gap: "10px", alignItems: "center" }}
               >
-                <select
-                  className="form-field type-priority-selector"
-                  value={selectedOrderType}
-                  onChange={(e) => setSelectedOrderType(e.target.value)}
-                >
-                  <option value="">All Types</option>
-                  <option value="VKA1">VKA1</option>
-                  <option value="VKA2">VKA2</option>
-                  <option value="VKA3">VKA3</option>
-                </select>
-                <select
-                  className="form-field type-priority-selector"
-                  value={selectedPriority}
-                  onChange={(e) => setSelectedPriority(e.target.value)}
-                >
-                  <option value="">All Priorities</option>
-                  <option value="High">High</option>
-                  <option value="Average">Average</option>
-                  <option value="Low">Low</option>
-                </select>
+                {hasPermission(allowedPermissions, "view_order_type_filter") && (
+                  <select
+                    className="form-field type-priority-selector"
+                    value={selectedOrderType}
+                    onChange={(e) => setSelectedOrderType(e.target.value)}
+                  >
+                    <option value="">All Types</option>
+                    <option value="VKA1">VKA1</option>
+                    <option value="VKA2">VKA2</option>
+                    <option value="VKA3">VKA3</option>
+                  </select>
+                )}
+                {hasPermission(allowedPermissions, "view_order_priority_filter") && (
+                  <select
+                    className="form-field type-priority-selector"
+                    value={selectedPriority}
+                    onChange={(e) => setSelectedPriority(e.target.value)}
+                  >
+                    <option value="">All Priorities</option>
+                    <option value="High">High</option>
+                    <option value="Average">Average</option>
+                    <option value="Low">Low</option>
+                  </select>
+                )}
                 {hasPermission(allowedPermissions, "add_order") && (
                   <button className="btn" onClick={openAddModal}>
                     Add Order
@@ -512,10 +533,9 @@ function Orders() {
                         <DeleteIcon />
                       </button>
                     )}
-                    {hasPermission(
-                      allowedPermissions,
-                      "edit_order_priority_and_type"
-                    ) && (
+                    {(hasPermission(allowedPermissions, "edit_order_priority") ||
+                      hasPermission(allowedPermissions, "edit_order_type") ||
+                      hasPermission(allowedPermissions, "edit_valuer_name_to_order")) && (
                       <button
                         className="action-icons"
                         onClick={(e) => {
@@ -891,69 +911,95 @@ function Orders() {
                 }}
               >
                 <div className="body-form-box">
-                  <div className="form-group order-priority-radio-group">
-                    <label>Order Priority</label>
-                    <div className="radio-group three-items">
-                      {["Low", "Average", "High"].map((priority) => (
-                        <label
-                          key={priority}
-                          className={`radio-label ${priority.toLowerCase()} ${
-                            attributesFormData.order_priority === priority
-                              ? "selected"
-                              : ""
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="order_priority"
-                            value={priority}
-                            checked={
+                  {hasPermission(allowedPermissions, "edit_order_priority") && (
+                    <div className="form-group order-priority-radio-group">
+                      <label>Order Priority</label>
+                      <div className="radio-group three-items">
+                        {["Low", "Average", "High"].map((priority) => (
+                          <label
+                            key={priority}
+                            className={`radio-label ${priority.toLowerCase()} ${
                               attributesFormData.order_priority === priority
-                            }
-                            onChange={(e) =>
-                              setAttributesFormData({
-                                ...attributesFormData,
-                                order_priority: e.target.value,
-                              })
-                            }
-                          />
-                          {priority}
-                        </label>
-                      ))}
+                                ? "selected"
+                                : ""
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="order_priority"
+                              value={priority}
+                              checked={
+                                attributesFormData.order_priority === priority
+                              }
+                              onChange={(e) =>
+                                setAttributesFormData({
+                                  ...attributesFormData,
+                                  order_priority: e.target.value,
+                                })
+                              }
+                            />
+                            {priority}
+                          </label>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  <div className="form-group">
-                    <label>Order Type</label>
-                    <div className="radio-group three-items">
-                      {["VKA1", "VKA2", "VKA3"].map((type) => (
-                        <label
-                          key={type}
-                          className={`radio-label ${
-                            attributesFormData.order_type === type
-                              ? "selected"
-                              : ""
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="order_type"
-                            value={type}
-                            checked={
+                  {hasPermission(allowedPermissions, "edit_order_type") && (
+                    <div className="form-group">
+                      <label>Order Type</label>
+                      <div className="radio-group three-items">
+                        {["VKA1", "VKA2", "VKA3"].map((type) => (
+                          <label
+                            key={type}
+                            className={`radio-label ${
                               attributesFormData.order_type === type
-                            }
-                            onChange={(e) =>
-                              setAttributesFormData({
-                                ...attributesFormData,
-                                order_type: e.target.value,
-                              })
-                            }
-                          />
-                          {type}
-                        </label>
-                      ))}
+                                ? "selected"
+                                : ""
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="order_type"
+                              value={type}
+                              checked={
+                                attributesFormData.order_type === type
+                              }
+                              onChange={(e) =>
+                                setAttributesFormData({
+                                  ...attributesFormData,
+                                  order_type: e.target.value,
+                                })
+                              }
+                            />
+                            {type}
+                          </label>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {hasPermission(allowedPermissions, "edit_valuer_name_to_order") && (
+                    <div className="form-group">
+                      <label>Valuer Name</label>
+                      <SingleSearchSelect
+                        className="search-selector"
+                        options={[
+                          { value: "V.K. ASSOCIATES", label: "V.K. ASSOCIATES" },
+                          { value: "VALUETECH SOLUTIONS", label: "VALUETECH SOLUTIONS" },
+                          { value: "VISHAL D. KOTHARI", label: "VISHAL D. KOTHARI" },
+                        ]}
+                        value={attributesFormData.valuer_name}
+                        onChange={(value) =>
+                          setAttributesFormData({
+                            ...attributesFormData,
+                            valuer_name: value,
+                          })
+                        }
+                        placeholder="Select valuer name"
+                      />
+                    </div>
+                  )}
                   <div className="form-buttons">
                     <button className="submit-button" type="submit">
                       Update Attributes
@@ -968,6 +1014,7 @@ function Orders() {
               setAttributesFormData({
                 order_priority: "",
                 order_type: "",
+                valuer_name: "",
               });
             },
           }}

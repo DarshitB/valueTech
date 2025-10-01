@@ -68,7 +68,13 @@ exports.seed = async function (knex) {
     "edit_order",
     "delete_order",
     "view_order_details",
-    "edit_order_priority_and_type",
+    "view_order_priority_filter",
+    "edit_order_priority",
+    "view_order_type_filter",
+    "edit_order_type",
+    "assign_user_to_order",
+    "add_valuer_name_to_order",
+    "edit_valuer_name_to_order",
 
     "view_order_recent_activity",
 
@@ -80,6 +86,9 @@ exports.seed = async function (knex) {
     "approve_reject_order_media_files",
 
     "generate_order_collage",
+    "approve_order_collage",
+    "generate_order_report",
+    "approve_order_report",
 
     "view_order_media_documents",
     "add_order_media_documents",

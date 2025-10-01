@@ -5,9 +5,10 @@
  * @param {Object} formData - Form data for the report
  * @param {Object} extraData - Extra data (bank info, categories, etc.)
  * @param {string} bgImageBase64 - Background image as base64
+ * @param {string} stampImageBase64 - Stamp image as base64
  * @returns {string} HTML content
  */
-function generateMachineryReportHTML(formData, extraData, bgImageBase64) {
+function generateMachineryReportHTML(formData, extraData, bgImageBase64, stampImageBase64) {
   return `
 <!DOCTYPE html>
 <html>
@@ -226,72 +227,97 @@ function generateMachineryReportHTML(formData, extraData, bgImageBase64) {
             <td>MECHANICAL CONDITION:</td>
             <td colspan="2">${formData.mechanical_condition}</td>
         </tr>
-        <tr>
+        ${
+          formData.fix_but_flex_heading_1 &&
+          formData.fix_but_flex_value_1 &&
+          formData.fix_but_flex_heading_2 &&
+          formData.fix_but_flex_value_2
+            ? `<tr>
             <td>${formData.fix_but_flex_heading_1}:</td>
             <td colspan="2">${formData.fix_but_flex_value_1}</td>
             <td>${formData.fix_but_flex_heading_2}:</td>
             <td colspan="2">${formData.fix_but_flex_value_2}</td>
-        </tr>
-        <tr>
+        </tr>`
+            : ""
+        }
+        ${
+          formData.fix_but_flex_heading_3 &&
+          formData.fix_but_flex_value_3 &&
+          formData.fix_but_flex_heading_4 &&
+          formData.fix_but_flex_value_4
+            ? `<tr>
             <td>${formData.fix_but_flex_heading_3}:</td>
             <td colspan="2">${formData.fix_but_flex_value_3}</td>
             <td>${formData.fix_but_flex_heading_4}:</td>
             <td colspan="2">${formData.fix_but_flex_value_4}</td>
-        </tr>
-        <tr>
+        </tr>`
+            : ""
+        }
+        ${
+          formData.fix_but_flex_heading_5 &&
+          formData.fix_but_flex_value_5 &&
+          formData.fix_but_flex_heading_6 &&
+          formData.fix_but_flex_value_6 &&
+          formData.fix_but_flex_heading_7 &&
+          formData.fix_but_flex_value_7
+            ? `<tr>
             <td>${formData.fix_but_flex_heading_5}:</td>
             <td colspan="2">
               <table style="margin: 0;border-collapse: collapse;width: 100%;">
                   <tr>
-                      <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${
-                        formData.fix_but_flex_value_5
-                      }</td>
-                      <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${
-                        formData.fix_but_flex_heading_6
-                      }</td>
-                      <td style="border-top: 0px;border-bottom: 0px;border-left:0px;border-right:0px;">${
-                        formData.fix_but_flex_value_6
-                      }</td>
+                      <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${formData.fix_but_flex_value_5}</td>
+                      <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${formData.fix_but_flex_heading_6}</td>
+                      <td style="border-top: 0px;border-bottom: 0px;border-left:0px;border-right:0px;">${formData.fix_but_flex_value_6}</td>
                   </tr>
               </table>
             </td>
             <td>${formData.fix_but_flex_heading_7}:</td>
             <td colspan="2">${formData.fix_but_flex_value_7}</td>
-        </tr>
-        <tr>
+        </tr>`
+            : ""
+        }
+        ${
+          formData.fix_but_flex_heading_8 &&
+          formData.fix_but_flex_value_8 &&
+          formData.fix_but_flex_heading_9 &&
+          formData.fix_but_flex_value_9 &&
+          formData.fix_but_flex_heading_10 &&
+          formData.fix_but_flex_value_10
+            ? `<tr>
             <td>${formData.fix_but_flex_heading_8}:</td>
             <td colspan="2">
               <table style="margin: 0;border-collapse: collapse;width: 100%;">
                   <tr>
-                      <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${
-                        formData.fix_but_flex_value_8
-                      }</td>
-                      <td colspan="2" style="border-top: 0px;border-bottom: 0px;border-left:0px;border-right:0px;">${
-                        formData.fix_but_flex_heading_9
-                      }</td>
+                      <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${formData.fix_but_flex_value_8}</td>
+                      <td colspan="2" style="border-top: 0px;border-bottom: 0px;border-left:0px;border-right:0px;">${formData.fix_but_flex_heading_9}</td>
                   </tr>
               </table>
             </td>
             <td>
               <table style="margin: 0;border-collapse: collapse;width: 100%;">
                   <tr>
-                      <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${
-                        formData.fix_but_flex_value_9
-                      }</td>
-                      <td style="border-top: 0px;border-bottom: 0px;border-left:0px; border-right:0px;">${
-                        formData.fix_but_flex_heading_10
-                      }</td>
+                      <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${formData.fix_but_flex_value_9}</td>
+                      <td style="border-top: 0px;border-bottom: 0px;border-left:0px; border-right:0px;">${formData.fix_but_flex_heading_10}</td>
                   </tr>
               </table>
             </td>
             <td colspan="2">${formData.fix_but_flex_value_10}</td>
-        </tr>
-        <tr>
+        </tr>`
+            : ""
+        }
+        ${
+          formData.fix_but_flex_heading_11 &&
+          formData.fix_but_flex_value_11 &&
+          formData.fix_but_flex_heading_12 &&
+          formData.fix_but_flex_value_12
+            ? `<tr>
             <td>${formData.fix_but_flex_heading_11}:</td>
             <td colspan="2">${formData.fix_but_flex_value_11}</td>
             <td>${formData.fix_but_flex_heading_12}:</td>
             <td colspan="2">${formData.fix_but_flex_value_12}</td>
-        </tr>
+        </tr>`
+            : ""
+        }
 
         <tr>
             <td>MACHINE COLOUR:</td>
@@ -454,6 +480,13 @@ function generateMachineryReportHTML(formData, extraData, bgImageBase64) {
             <td colspan="6" style="height: 48px;">SIGNATURE WITH SEAL & STAMP</td>
         </tr>
     </table>
+        <div style="position: absolute; left:50%; bottom: 50px; transform:translateX(calc(-50% - 225px));  width: fit-content; height: fit-content;z-index:2;">
+          ${
+            stampImageBase64
+              ? `<img src="${stampImageBase64}" alt="stamp" style=" height: 150px;  pointer-events:none;" />`
+              : ""
+          }
+        </div>
     </div>
 </body>
 </html>
