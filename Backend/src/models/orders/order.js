@@ -87,7 +87,7 @@ const order = {
     // Role-based filters - flexible matching using includes()
     const roleName = user.role_name.toUpperCase();
     
-    if (roleName.includes("ADMIN") && roleName !== "DEVELOPER_ADMIN") {
+    if (roleName.includes("ADMIN") && roleName !== "DEVELOPER_ADMIN" && roleName !== "SUPER ADMIN") {
       // Admin users can only see orders assigned to them through order_users mapping
       // Exclude DEVELOPER_ADMIN (owner role) who should see everything
       const assignedOrderIds = await db("order_users")
@@ -311,7 +311,7 @@ const order = {
     // Check user access permissions - now we have officer_user_id in the order data
     const roleName = user.role_name.toUpperCase();
     
-    if (roleName.includes("ADMIN") && roleName !== "DEVELOPER_ADMIN") {
+    if (roleName.includes("ADMIN") && roleName !== "DEVELOPER_ADMIN" && roleName !== "SUPER ADMIN") {
       // Admin users can only see orders assigned to them through order_users mapping
       // Exclude DEVELOPER_ADMIN (owner role) who should see everything
       const isAssigned = await db("order_users")
