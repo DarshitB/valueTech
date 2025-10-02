@@ -1,6 +1,6 @@
 /**
  * OrderImages Component
- * 
+ *
  * Features:
  * - Lightbox with image and video support
  * - Individual approval/rejection with immediate API submission
@@ -9,10 +9,10 @@
  * - ResizeObserver error suppression for smooth transitions
  * - Bulk operations for selected images
  * - Collage generation for approved images
- * 
+ *
  * Status Codes:
  * - 0: Pending
- * - 1: Approved  
+ * - 1: Approved
  * - 2: Rejected
  */
 import React, { useEffect, useLayoutEffect, useState } from "react";
@@ -206,6 +206,40 @@ function OrderImages() {
     );
   }, [media?.media]);
 
+  // Compute displayed media IDs in the same order as on screen
+  const displayedMediaIds = React.useMemo(() => {
+    const sorted = [...(media?.media || [])].sort((a, b) => {
+      const aIsImage = isImage(a.media_url);
+      const bIsImage = isImage(b.media_url);
+      if (aIsImage && !bIsImage) return -1;
+      if (!aIsImage && bIsImage) return 1;
+      return 0;
+    });
+    return sorted.map((m) => m.id);
+  }, [media?.media]);
+
+  // Determine if all displayed media are selected
+  const isAllSelected = React.useMemo(() => {
+    if (!displayedMediaIds.length) return false;
+    if (selectedImageSequence.length !== displayedMediaIds.length) return false;
+    // Compare as sets to ensure equality
+    const sel = new Set(selectedImageSequence);
+    for (const id of displayedMediaIds) {
+      if (!sel.has(id)) return false;
+    }
+    return true;
+  }, [selectedImageSequence, displayedMediaIds]);
+
+  // Toggle select all/clear all
+  const handleSelectAll = () => {
+    if (!media?.media || media.media.length === 0) return;
+    if (isAllSelected) {
+      setSelectedImageSequence([]);
+    } else {
+      setSelectedImageSequence(displayedMediaIds);
+    }
+  };
+
   // Handle keyboard events for lightbox navigation and approval/rejection
   React.useEffect(() => {
     const handleKeyDown = (event) => {
@@ -218,7 +252,7 @@ function OrderImages() {
           event.stopPropagation();
           handleCustomClose();
           break;
-          
+
         case "Enter":
           // Mark current media as rejected
           const currentSlide = lightboxSlides[lightboxIndex];
@@ -226,7 +260,7 @@ function OrderImages() {
             handleApprovalChange(currentSlide.mediaId, 2); // 2 = rejected
           }
           break;
-          
+
         case " ":
           // Mark current media as approved
           event.preventDefault(); // Prevent page scroll
@@ -355,6 +389,14 @@ function OrderImages() {
       return;
     }
 
+    // Require valuer name set on order before generating collage
+    if (!order?.valuer_name || String(order.valuer_name).trim() === "") {
+      toast.error(
+        "Valuer name is not set for this order. Please set it in Order Attributes before generating collage."
+      );
+      return;
+    }
+
     const payload = {
       order_id: id.toString(),
       text: remarks.trim() || "",
@@ -462,8 +504,10 @@ function OrderImages() {
               const errorMessage = args[0];
               if (
                 typeof errorMessage === "string" &&
-                (errorMessage.includes("ResizeObserver loop completed with undelivered notifications") ||
-                 errorMessage.includes("ResizeObserver"))
+                (errorMessage.includes(
+                  "ResizeObserver loop completed with undelivered notifications"
+                ) ||
+                  errorMessage.includes("ResizeObserver"))
               ) {
                 return; // Suppress ResizeObserver errors
               }
@@ -500,8 +544,10 @@ function OrderImages() {
       const errorMessage = args[0];
       if (
         typeof errorMessage === "string" &&
-        (errorMessage.includes("ResizeObserver loop completed with undelivered notifications") ||
-         errorMessage.includes("ResizeObserver"))
+        (errorMessage.includes(
+          "ResizeObserver loop completed with undelivered notifications"
+        ) ||
+          errorMessage.includes("ResizeObserver"))
       ) {
         return; // Suppress ResizeObserver errors
       }
@@ -521,7 +567,7 @@ function OrderImages() {
     const slideIndex = lightboxSlides.findIndex(
       (slide) => slide.src === getImageUrl(mediaItem.media_url)
     );
-    
+
     if (slideIndex !== -1) {
       setLightboxIndex(slideIndex);
       setLightboxOpen(true);
@@ -544,13 +590,17 @@ function OrderImages() {
   const handleApprovalChange = (mediaId, status) => {
     // Find the current media item to check its current status
     const mediaItem = media.media.find((item) => item.id === parseInt(mediaId));
-    
+
     // If the status is the same as current, don't make unnecessary API call
     if (mediaItem && mediaItem.status === status) {
-      toast.info(`Image is already ${status === 1 ? 'approved' : status === 2 ? 'rejected' : 'pending'}`);
+      toast.info(
+        `Image is already ${
+          status === 1 ? "approved" : status === 2 ? "rejected" : "pending"
+        }`
+      );
       return;
     }
-    
+
     // Update local state for immediate UI feedback
     setLightboxApprovals((prev) => ({
       ...prev,
@@ -558,10 +608,12 @@ function OrderImages() {
     }));
 
     // Submit the change immediately to backend
-    const updates = [{
-      id: parseInt(mediaId),
-      status: status,
-    }];
+    const updates = [
+      {
+        id: parseInt(mediaId),
+        status: status,
+      },
+    ];
 
     dispatch(updateOrderMediaStatus({ updates })).then((result) => {
       if (result.meta.requestStatus === "fulfilled") {
@@ -635,14 +687,23 @@ function OrderImages() {
         <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12 h-100">
           <div className="order-images-container">
             <div className="order-images-header">
-              <h2>
-                Media Files{" "}
-                <span className="text-muted">
-                  {selectedImageSequence.length
-                    ? `(Selected - ${selectedImageSequence.length})`
-                    : ""}
-                </span>
-              </h2>
+              <div className="order-images-header-title-with-buttons">
+                <h2>
+                  Media Files{" "}
+                  <span className="text-muted">
+                    {selectedImageSequence.length
+                      ? `(Selected - ${selectedImageSequence.length})`
+                      : ""}
+                  </span>
+                </h2>
+                <button
+                  onClick={handleSelectAll}
+                  title={isAllSelected ? "Clear Selection" : "Select All"}
+                  className="btn btn-primary tooltip-link"
+                >
+                  {isAllSelected ? "Clear Selection" : "Select All"}
+                </button>
+              </div>
               <div className="order-images-buttons">
                 {hasPermission(
                   allowedPermissions,
@@ -656,6 +717,7 @@ function OrderImages() {
                     <UploadImageIcon />
                   </button>
                 )}
+
                 {hasPermission(
                   allowedPermissions,
                   "approve_reject_order_media_files"
@@ -902,12 +964,12 @@ function OrderImages() {
           fade: 150, // Reduced from 200 to minimize transition time
           swipe: 150, // Reduced from 200 to minimize transition time
         }}
-                 controller={{
-           closeOnBackdropClick: true,
-           closeOnPullDown: true,
-           closeOnPinch: true,
-           closeOnEscape: false, // Disable default Escape behavior to use our custom handler
-         }}
+        controller={{
+          closeOnBackdropClick: true,
+          closeOnPullDown: true,
+          closeOnPinch: true,
+          closeOnEscape: false, // Disable default Escape behavior to use our custom handler
+        }}
         zoom={{
           maxZoomPixelRatio: 3,
           zoomInMultiplier: 2,

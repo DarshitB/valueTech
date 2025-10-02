@@ -129,6 +129,19 @@ function AVRReport() {
     }
   }, []);
 
+  // Function to get reference number code based on surveyor name
+  const getRefNoCode = useCallback((surveyorName) => {
+    if (!surveyorName) return "";
+    
+    const name = surveyorName.toUpperCase();
+    if (name.includes("V.K. ASSOCIATES") || name.includes("VISHAL D. KOTHARI")) {
+      return "VKM";
+    } else if (name.includes("VALUETECH SOLUTIONS")) {
+      return "VTS";
+    }
+    return "";
+  }, []);
+
   // Function to parse currency value
   const parseCurrency = useCallback((value) => {
     if (!value || typeof value !== "string") return 0;
@@ -330,9 +343,10 @@ function AVRReport() {
         // ALWAYS use surveyor from order's valuer_name (never from report or previous state)
         surveyor: order?.valuer_name || "",
         license_no: order?.valuer_name ? getLicenseNumber(order.valuer_name) : "",
+        ref_no_code: order?.valuer_name ? getRefNoCode(order.valuer_name) : "",
       }));
     }
-  }, [order, getLicenseNumber]);
+  }, [order, getLicenseNumber, getRefNoCode]);
 
   // Populate form data from fetched AVR report (if available)
   useEffect(() => {
@@ -353,7 +367,7 @@ function AVRReport() {
       // More robust field population - try to set all relevant fields
       Object.entries(report).forEach(([key, value]) => {
         // Skip system fields and valuer-related fields (those come from order only)
-        if (key.startsWith('created_') || key.startsWith('updated_') || key === 'id' || key === 'order_id' || key === 'flexible_fields' || key === 'surveyor' || key === 'license_no') {
+        if (key.startsWith('created_') || key.startsWith('updated_') || key === 'id' || key === 'order_id' || key === 'flexible_fields' || key === 'surveyor' || key === 'license_no' || key === 'ref_no_code') {
           return;
         }
         
@@ -787,16 +801,12 @@ function AVRReport() {
                         readOnly
                       />
                       <span className="ref-no-slash">/</span>
-                      <SingleSearchSelect
-                        options={[
-                          { value: "VKM", label: "VKM" },
-                          { value: "VTS", label: "VTS" },
-                        ]}
+                      <input
+                        type="text"
+                        className="form-field"
                         name="ref_no_code"
                         value={reportFormData.ref_no_code}
-                        onChange={(value) =>
-                          handleSelectChange("ref_no_code", value)
-                        }
+                        readOnly
                         required
                       />
                       <span className="ref-no-slash">/</span>

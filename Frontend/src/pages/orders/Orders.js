@@ -88,6 +88,7 @@ function Orders() {
     order_priority: "",
     order_type: "",
     valuer_name: "",
+    admin_user_ids: [],
   });
 
   // State for order type filter
@@ -334,10 +335,17 @@ function Orders() {
   // Open Order Attributes Modal
   const openAttributesModal = (order) => {
     setAttributesOrderId(order.id);
+    
+    // Map assigned_users to admin_user_ids for pre-selection
+    const assignedUserIds = order.assigned_users 
+      ? order.assigned_users.map(user => user.id)
+      : [];
+    
     setAttributesFormData({
       order_priority: order.order_priority || "",
       order_type: order.order_type || "",
       valuer_name: order.valuer_name || "",
+      admin_user_ids: assignedUserIds,
     });
     setShowAttributesModal(true);
   };
@@ -363,6 +371,12 @@ function Orders() {
       payload.valuer_name = attributesFormData.valuer_name;
     }
 
+    // Always include selected admin users as user_ids array if any are selected
+    if (Array.isArray(attributesFormData.admin_user_ids) && attributesFormData.admin_user_ids.length > 0) {
+      // Ensure numeric IDs
+      payload.user_ids = attributesFormData.admin_user_ids.map((id) => Number(id)).filter((n) => !Number.isNaN(n));
+    }
+
     // Check if at least one field has a value that user can edit
     if (Object.keys(payload).length === 0) {
       const availableFields = [];
@@ -378,14 +392,32 @@ function Orders() {
       await dispatch(
         updateOrderAttributes({ id: attributesOrderId, data: payload })
       ).unwrap();
-      // Refetch orders to get updated data from server
-      dispatch(fetchOrders());
       setShowAttributesModal(false);
-    } catch (error) {
-      // Error is already handled by the reducer
-      console.error("Failed to update order attributes:", error);
+      setAttributesOrderId(null);
+      setAttributesFormData({
+        order_priority: "",
+        order_type: "",
+        valuer_name: "",
+        admin_user_ids: [],
+      });
+    } catch (err) {
+      toast.error(typeof err === "string" ? err : "Failed to update attributes");
     }
   };
+
+  // Compute ADMIN users options (role contains 'ADMIN' but not 'SUPER' or 'DEVELOPER', case-insensitive, separator-agnostic)
+  const adminUsersOptions = React.useMemo(() => {
+    if (!Array.isArray(users)) return [];
+    return users
+      .filter((u) => {
+        const roleName = String(u.role_name || "").toUpperCase();
+        const hasAdmin = roleName.includes("ADMIN");
+        const hasSuper = roleName.includes("SUPER");
+        const hasDeveloper = roleName.includes("DEVELOPER");
+        return hasAdmin && !hasSuper && !hasDeveloper;
+      })
+      .map((u) => ({ value: u.id, label: `${u.name} (${u.role_name})` }));
+  }, [users]);
   return (
     <div className="height-full-occupied order-data-container">
       {loading ? (
@@ -823,11 +855,11 @@ function Orders() {
 
                   {/* Field Verifier - Show when manager is assigned, user is MANAGER, or user has permission to edit manager field (but not Bank Officer) */}
                   {(formData.manager_id || isManager || isSuperAdmin) &&
-                    hasPermission(
+                    !isBankOfficer &&
+                    (isManager || hasPermission(
                       allowedPermissions,
                       "view_order_add_edit_manager_filed"
-                    ) &&
-                    !isBankOfficer && (
+                    )) && (
                       <div className="form-group">
                         <label htmlFor="fieldVerifierField">
                           Field Verifier
@@ -1000,6 +1032,23 @@ function Orders() {
                       />
                     </div>
                   )}
+
+                  <div className="form-group">
+                    <label>Select Admin Users (Multi)</label>
+                    <SingleSearchSelect
+                      className="search-selector"
+                      options={adminUsersOptions}
+                      value={attributesFormData.admin_user_ids}
+                      onChange={(values) =>
+                        setAttributesFormData({
+                          ...attributesFormData,
+                          admin_user_ids: values || [],
+                        })
+                      }
+                      placeholder="Select admin users..."
+                      isMulti={true}
+                    />
+                  </div>
                   <div className="form-buttons">
                     <button className="submit-button" type="submit">
                       Update Attributes
@@ -1015,6 +1064,7 @@ function Orders() {
                 order_priority: "",
                 order_type: "",
                 valuer_name: "",
+                admin_user_ids: [],
               });
             },
           }}

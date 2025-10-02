@@ -156,6 +156,19 @@ function MachineryReport() {
     return licenseMap[valuerName] || "";
   }, []);
 
+  // Function to get reference number code based on valuer name
+  const getRefNoCode = useCallback((valuerName) => {
+    if (!valuerName) return "";
+    
+    const name = valuerName.toUpperCase();
+    if (name.includes("V.K. ASSOCIATES") || name.includes("VISHAL D. KOTHARI")) {
+      return "VKM";
+    } else if (name.includes("VALUETECH SOLUTIONS")) {
+      return "VTS";
+    }
+    return "";
+  }, []);
+
   // Function to get current date in DD-MM-YYYY format
   const getCurrentDate = useCallback(() => {
     const today = new Date();
@@ -410,7 +423,7 @@ function MachineryReport() {
         ...prev,
         ref_no_bank: order?.bank_initial || "",
         state_name: prev.state_name || "MUM",
-        ref_no_code: prev.ref_no_code || "VTS",
+        ref_no_code: order?.valuer_name ? getRefNoCode(order.valuer_name) : "",
         initiated_by:
           order?.officer_name && order?.bank_name
             ? `${order.officer_name}, ${order.bank_name}`
@@ -425,7 +438,7 @@ function MachineryReport() {
         license_no: order?.valuer_name ? getLicenseNumber(order.valuer_name) : "",
       }));
     }
-  }, [order, getLicenseNumber]);
+  }, [order, getLicenseNumber, getRefNoCode]);
 
   // Populate form data from fetched Machinery report (if available)
   useEffect(() => {
@@ -446,7 +459,7 @@ function MachineryReport() {
       // More robust field population - try to set all relevant fields
       Object.entries(report).forEach(([key, value]) => {
         // Skip system fields and valuer-related fields (those come from order only)
-        if (key.startsWith('created_') || key.startsWith('updated_') || key === 'id' || key === 'order_id' || key === 'flexible_fields' || key === 'valuer_name' || key === 'license_no') {
+        if (key.startsWith('created_') || key.startsWith('updated_') || key === 'id' || key === 'order_id' || key === 'flexible_fields' || key === 'valuer_name' || key === 'license_no' || key === 'ref_no_code') {
           return;
         }
         
@@ -1455,15 +1468,12 @@ function MachineryReport() {
                         }
                       />
                       <span className="ref-no-slash">/</span>
-                      <SingleSearchSelect
-                        options={[
-                          { value: "VTS", label: "VTS" },
-                          { value: "VKM", label: "VKM" },
-                        ]}
-                        value={reportFormData.ref_no_code || "VTS"}
-                        onChange={(value) =>
-                          handleSelectChange("ref_no_code", value)
-                        }
+                      <input
+                        type="text"
+                        className="form-field"
+                        value={reportFormData.ref_no_code || ""}
+                        readOnly
+                        required
                       />
                       <span className="ref-no-slash">/</span>
                       <input
@@ -1512,7 +1522,6 @@ function MachineryReport() {
                       readOnly
                       placeholder="Set from order attributes"
                       required
-                      style={{ backgroundColor: "#f5f5f5", cursor: "not-allowed" }}
                     />
                   </div>
                 </div>

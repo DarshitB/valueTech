@@ -559,7 +559,7 @@ exports.updateOrderAttributes = async (req, res, next) => {
       await Order.updateOrderAttributes(orderId, filteredUpdateData, userId);
     }
 
-    // Handle user assignments if user_ids is provided
+    // Handle user assignments - always process if user_ids is provided, even if empty array
     if (user_ids !== undefined) {
       // Validate that user_ids is an array
       if (!Array.isArray(user_ids)) {
@@ -578,7 +578,7 @@ exports.updateOrderAttributes = async (req, res, next) => {
       const oldAssignedUsers = existingOrder.assigned_users || [];
       const oldUserIds = oldAssignedUsers.map(u => u.id);
       
-      // Prepare user assignments data
+      // Prepare user assignments data (even if empty array)
       const usersToInsert = user_ids.map((uid) => ({
         order_id: orderId,
         user_id: uid,
@@ -586,7 +586,7 @@ exports.updateOrderAttributes = async (req, res, next) => {
         created_at: new Date(),
       }));
 
-      // Replace existing user assignments
+      // Replace existing user assignments (this will delete all and insert new ones)
       await Order.replaceOrderUsers(orderId, usersToInsert);
       
       // Build user assignment change description

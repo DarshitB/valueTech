@@ -472,11 +472,28 @@
       align-items: center;
       gap: 10px;
       margin-bottom: 20px;
-      h2 {
-        font-size: 20px;
-        color: $base-font-color;
-        span {
-          font-size: 12px;
+      .order-images-header-title-with-buttons {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        h2 {
+          font-size: 20px;
+          color: $base-font-color;
+          margin-bottom: 0;
+          span {
+            font-size: 12px;
+          }
+        }
+        .tooltip-link{
+          border: 1px solid $primary-color !important;
+          &:hover{
+            background-color: transparent !important;
+            color: $primary-color !important;
+          }
+          &:focus{
+            background-color: transparent !important;
+            color: $primary-color !important;
+          }
         }
       }
       .order-images-buttons {
