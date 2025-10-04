@@ -100,12 +100,25 @@ const order = {
       )
       .whereNull("orders.deleted_at");
 
-    // Role-based filters using robust role parsing
-    const { isAdminOnly } = parseRole(user.role_name);
+    // Role-based filters - check if role contains specific keywords
+    const roleName = (user.role_name || "").toUpperCase();
     
-    if (isAdminOnly) {
-      // Admin users can only see orders assigned to them through order_users mapping
-      // Exclude DEVELOPER_ADMIN (owner role) who should see everything
+    // Roles that should see all orders (no filtering)
+    const privilegedRoles = [
+      "DEVELOPER_ADMIN",
+      "SUPER ADMIN", 
+      "MANAGER",
+      "TELECALLER",
+      "BANK AUTHORITY",
+      "BANK OFFICER"
+    ];
+    
+    // Check if user role contains any of the privileged keywords
+    const hasPrivilegedRole = privilegedRoles.some(keyword => roleName.includes(keyword));
+    
+    // If user doesn't have a privileged role, show only assigned orders
+    if (!hasPrivilegedRole) {
+      // For all other roles, check if they have assigned orders
       const assignedOrderIds = await db("order_users")
         .select("order_id")
         .where("user_id", user.id)
@@ -113,13 +126,17 @@ const order = {
       
       const orderIds = assignedOrderIds.map(o => o.order_id);
       
+      // If user has assigned orders, show only those
       if (orderIds.length > 0) {
         baseQuery.whereIn("orders.id", orderIds);
       } else {
         // If no orders assigned, return empty array by adding impossible condition
         baseQuery.where("orders.id", -1);
       }
-    } else if ((user.role_name || "").toUpperCase().includes("BANK AUTHORITY")) {
+    }
+    
+    // Additional role-specific filters (these work alongside assigned orders)
+    if ((user.role_name || "").toUpperCase().includes("BANK AUTHORITY")) {
       baseQuery.andWhere(function () {
         this.where("orders.created_by", user.id)
           .orWhere("officers.user_id", user.id)
@@ -367,20 +384,36 @@ const order = {
     if (!order) return null;
 
     // Check user access permissions - now we have officer_user_id in the order data
-    const { isAdminOnly } = parseRole(user.role_name);
+    const roleName = (user.role_name || "").toUpperCase();
     
-    if (isAdminOnly) {
-      // Admin users can only see orders assigned to them through order_users mapping
-      // Exclude DEVELOPER_ADMIN (owner role) who should see everything
+    // Roles that should see all orders (no filtering)
+    const privilegedRoles = [
+      "DEVELOPER_ADMIN",
+      "SUPER ADMIN", 
+      "MANAGER",
+      "TELECALLER",
+      "BANK AUTHORITY",
+      "BANK OFFICER"
+    ];
+    
+    // Check if user role contains any of the privileged keywords
+    const hasPrivilegedRole = privilegedRoles.some(keyword => roleName.includes(keyword));
+    
+    // If user doesn't have a privileged role, show only assigned orders
+    if (!hasPrivilegedRole) {
+      // For all other roles, check if they have access to this specific order
       const isAssigned = await db("order_users")
         .where({ order_id: id, user_id: user.id })
         .whereNull("deleted_at")
         .first();
       
       if (!isAssigned) {
-        return null; // Admin can only see orders assigned to them
+        return null; // User can only see orders assigned to them
       }
-    } else if ((user.role_name || "").toUpperCase().includes("BANK OFFICER")) {
+    }
+    
+    // Additional role-specific access checks (these work alongside assigned orders)
+    if ((user.role_name || "").toUpperCase().includes("BANK OFFICER")) {
       if (order.officer_user_id !== user.id) {
         return null; // Officer can only see orders assigned to them
       }
@@ -405,13 +438,15 @@ const order = {
         "order_status_master.id"
       )
       .leftJoin("users", "order_status_history.changed_by", "users.id")
+      .leftJoin("field_verifiers", "order_status_history.changed_by", "field_verifiers.id")
       .select(
         "order_status_history.id",
         "order_status_history.status_id",
         "order_status_master.name as status_name",
         "order_status_history.changed_by",
         "order_status_history.activity_extra",
-        "users.name as changed_by_name",
+        "order_status_history.user_type",
+        db.raw("CASE WHEN order_status_history.user_type = 'field_verifier' THEN field_verifiers.name ELSE users.name END as changed_by_name"),
         "order_status_history.changed_at"
       )
       .where("order_status_history.order_id", id)

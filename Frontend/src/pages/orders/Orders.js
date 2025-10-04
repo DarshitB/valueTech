@@ -371,14 +371,22 @@ function Orders() {
       payload.valuer_name = attributesFormData.valuer_name;
     }
 
-    // Always include selected admin users as user_ids array if any are selected
-    if (Array.isArray(attributesFormData.admin_user_ids) && attributesFormData.admin_user_ids.length > 0) {
-      // Ensure numeric IDs
+    // Always include user_ids array (even if empty) to handle user removal from backend
+    if (Array.isArray(attributesFormData.admin_user_ids)) {
+      // Always send as array - empty array to clear assignments, populated array to set assignments
       payload.user_ids = attributesFormData.admin_user_ids.map((id) => Number(id)).filter((n) => !Number.isNaN(n));
     }
 
     // Check if at least one field has a value that user can edit
-    if (Object.keys(payload).length === 0) {
+    // Note: user_ids is always an array (empty array clears assignments), so it's always considered a valid field
+    const hasValidFields = Object.keys(payload).some(key => {
+      if (key === 'user_ids') {
+        return true; // user_ids field is always valid (even if empty array)
+      }
+      return payload[key] !== null && payload[key] !== undefined && payload[key] !== "";
+    });
+    
+    if (!hasValidFields) {
       const availableFields = [];
       if (canEditPriority) availableFields.push("priority");
       if (canEditType) availableFields.push("type");
@@ -405,16 +413,33 @@ function Orders() {
     }
   };
 
-  // Compute ADMIN users options (role contains 'ADMIN' but not 'SUPER' or 'DEVELOPER', case-insensitive, separator-agnostic)
+  // Compute users options (show all users except specific roles)
   const adminUsersOptions = React.useMemo(() => {
     if (!Array.isArray(users)) return [];
+    
+    // Define excluded roles (case-insensitive)
+    const excludedRoles = [
+      "DEVELOPER_ADMIN",
+      "SUPER ADMIN", 
+      "MANAGER",
+      "TELECALLER",
+      "BANK AUTHORITY",
+      "BANK OFFICER"
+    ];
+    
     return users
       .filter((u) => {
         const roleName = String(u.role_name || "").toUpperCase();
-        const hasAdmin = roleName.includes("ADMIN");
-        const hasSuper = roleName.includes("SUPER");
-        const hasDeveloper = roleName.includes("DEVELOPER");
-        return hasAdmin && !hasSuper && !hasDeveloper;
+        
+        // Check if role includes any excluded role (case-insensitive, space-agnostic)
+        const isExcluded = excludedRoles.some(excludedRole => {
+          // Remove spaces and normalize both role names for comparison
+          const normalizedRoleName = roleName.replace(/\s+/g, "");
+          const normalizedExcludedRole = excludedRole.replace(/\s+/g, "");
+          return normalizedRoleName.includes(normalizedExcludedRole);
+        });
+        
+        return !isExcluded;
       })
       .map((u) => ({ value: u.id, label: `${u.name} (${u.role_name})` }));
   }, [users]);
@@ -1034,7 +1059,7 @@ function Orders() {
                   )}
 
                   <div className="form-group">
-                    <label>Select Admin Users (Multi)</label>
+                    <label>Users assigned</label>
                     <SingleSearchSelect
                       className="search-selector"
                       options={adminUsersOptions}
@@ -1045,7 +1070,7 @@ function Orders() {
                           admin_user_ids: values || [],
                         })
                       }
-                      placeholder="Select admin users..."
+                      placeholder="Select users..."
                       isMulti={true}
                     />
                   </div>

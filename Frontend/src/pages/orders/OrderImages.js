@@ -360,24 +360,36 @@ function OrderImages() {
       return false;
     }
 
-    // Check image count validation based on text
+    // Check image count validation based on allowed counts and text
     const hasText = remarks && remarks.trim().length > 0;
     const imageCount = selectedImageSequence.length;
-
-    if (hasText) {
-      // If text is present, image count should be odd
-      if (imageCount % 2 === 0) {
-        toast.error("When adding text, please select an odd number of images");
-        return false;
+    
+    // Allowed total counts for collage generation (images + text if present)
+    const allowedCounts = [2, 4, 6, 8, 12, 16, 20, 24, 32];
+    
+    // Calculate total count (images + text if present)
+    const totalCount = hasText ? imageCount + 1 : imageCount;
+    
+    // Validate total count against allowed counts
+    if (!allowedCounts.includes(totalCount)) {
+      if (hasText) {
+        // Check if user selected even number of images when text is present
+        if (imageCount % 2 === 0) {
+          toast.error("When adding text, please select an odd number of images");
+        } else {
+          // User selected odd number but total count is not in allowed list
+          toast.error(`With text, select 1, 3, 5, 7, 11, 15, 19, 23, or 31 images. You selected ${imageCount}.`);
+        }
+      } else {
+        // When no text, check if user selected odd number
+        if (imageCount % 2 !== 0) {
+          toast.error("When no text is added, please select an even number of images");
+        } else {
+          // User selected even number but not in allowed list
+          toast.error(`Select 2, 4, 6, 8, 12, 16, 20, 24, or 32 images. You selected ${imageCount}.`);
+        }
       }
-    } else {
-      // If no text, image count should be even
-      if (imageCount % 2 !== 0) {
-        toast.error(
-          "When no text is added, please select an even number of images"
-        );
-        return false;
-      }
+      return false;
     }
 
     return true;

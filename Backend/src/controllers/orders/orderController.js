@@ -506,6 +506,7 @@ exports.updateOrderAttributes = async (req, res, next) => {
     const updateData = req.body;
     const userId = req.user?.id;
 
+    /* console.log("updateData", updateData); */
     // Validate that order exists
     const existingOrder = await Order.findById(orderId, req.user);
     if (!existingOrder) {
@@ -552,7 +553,18 @@ exports.updateOrderAttributes = async (req, res, next) => {
         const displayNewValue = newValue === null ? 'null' : newValue === '' ? 'empty' : newValue;
         
         if (oldValue !== newValue) {
-          changes.push(`${key} changed from "${displayOldValue}" to "${displayNewValue}"`);
+          // Format field names for better readability
+          const formatFieldName = (fieldName) => {
+            const fieldMap = {
+              'order_priority': 'ORDER PRIORITY',
+              'order_type': 'ORDER TYPE',
+              'valuer_name': 'VALUER NAME'
+            };
+            return fieldMap[fieldName] || fieldName.replace(/_/g, ' ').toUpperCase();
+          };
+          
+          const formattedKey = formatFieldName(key);
+          changes.push(`${formattedKey} changed from "${displayOldValue}" to "${displayNewValue}"`);
         }
       }
       
@@ -593,9 +605,28 @@ exports.updateOrderAttributes = async (req, res, next) => {
       if (user_ids.length === 0 && oldUserIds.length > 0) {
         changes.push(`All user assignments removed`);
       } else if (oldUserIds.length === 0 && user_ids.length > 0) {
-        changes.push(`${user_ids.length} user(s) assigned`);
+        // Get user names for the newly assigned users
+        const assignedUsers = await User.findManyByIds(user_ids);
+        const userNames = assignedUsers.map(u => u.name).join(', ');
+        changes.push(`${userNames} assigned`);
       } else if (JSON.stringify(oldUserIds.sort()) !== JSON.stringify(user_ids.sort())) {
-        changes.push(`User assignments updated (${user_ids.length} user(s) assigned)`);
+        // Find added and removed users
+        const addedUserIds = user_ids.filter(id => !oldUserIds.includes(id));
+        const removedUserIds = oldUserIds.filter(id => !user_ids.includes(id));
+        
+        // Get user names for added users
+        if (addedUserIds.length > 0) {
+          const addedUsers = await User.findManyByIds(addedUserIds);
+          const addedUserNames = addedUsers.map(u => u.name).join(', ');
+          changes.push(`${addedUserNames} assigned To order Assign List`);
+        }
+        
+        // Get user names for removed users
+        if (removedUserIds.length > 0) {
+          const removedUsers = await User.findManyByIds(removedUserIds);
+          const removedUserNames = removedUsers.map(u => u.name).join(', ');
+          changes.push(`${removedUserNames} removed From order Assign List`);
+        }
       }
     }
 

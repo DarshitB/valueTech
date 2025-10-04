@@ -33,7 +33,7 @@ function writeBase64ToTemp(dataUrl) {
 /**
  * Helper: Update order status to 6 (Assets Submitted) after successful upload
  */
-async function updateOrderStatusToAssetsSubmitted(orderId, verifierId) {
+async function updateOrderStatusToAssetsSubmitted(orderId, verifierId, imageCount = 0) {
   try {
     // Update order status to 6 (Assets Submitted)
     await Order.updateOrder(orderId, {
@@ -46,8 +46,10 @@ async function updateOrderStatusToAssetsSubmitted(orderId, verifierId) {
     const statusHistoryData = {
       order_id: orderId,
       status_id: 6, // Assets Submitted
+      user_type: 'field_verifier',
       changed_by: verifierId,
       changed_at: new Date(),
+      activity_extra: `${imageCount} file(s) Uploaded`
     };
 
     await OrderStatusHistory.createStatusHistory(statusHistoryData);
@@ -145,7 +147,7 @@ async function uploadMultipart(req, res, next) {
     cleanupTempFiles(tempPaths);
 
     // Update order status to 6 (Assets Submitted) after successful upload
-    await updateOrderStatusToAssetsSubmitted(orderRow.id, id);
+    await updateOrderStatusToAssetsSubmitted(orderRow.id, id, filesToUpload.length);
 
     res.json({ state: 1, message: 'successfully uploaded the images', files: saved });
   } catch (err) {
@@ -249,7 +251,7 @@ async function uploadBase64(req, res, next) {
     cleanupTempFiles(tempPaths);
 
     // Update order status to 6 (Assets Submitted) after successful upload
-    await updateOrderStatusToAssetsSubmitted(orderRow.id, id);
+    await updateOrderStatusToAssetsSubmitted(orderRow.id, id, filesToUpload.length);
 
     res.json({ state: 1, message: 'successfully uploaded the images', files: saved });
   } catch (err) {

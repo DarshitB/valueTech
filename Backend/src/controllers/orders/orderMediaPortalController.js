@@ -1,18 +1,22 @@
 const orderMediaPortal = require("../../models/orders/orderMediaPortal");
 const Order = require("../../models/orders/order");
 const OrderStatusHistory = require("../../models/orders/orderStatusHistory");
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const yauzl = require('yauzl');
-const { v4: uuidv4 } = require('uuid');
+const fs = require("fs");
+const path = require("path");
+const os = require("os");
+const yauzl = require("yauzl");
+const { v4: uuidv4 } = require("uuid");
 const {
   ensureOrderFolders,
   ensureMediaSubfolders,
   copyMultipleFilesToFolder,
-  cleanupTempFiles
-} = require('../../utils/localFileHelper');
-const { BadRequestError, NotFoundError, AppError } = require('../../utils/customErrors');
+  cleanupTempFiles,
+} = require("../../utils/localFileHelper");
+const {
+  BadRequestError,
+  NotFoundError,
+  AppError,
+} = require("../../utils/customErrors");
 
 /**
  * Helper: Update order status to 7 (Assets Approved) when images are approved
@@ -23,7 +27,7 @@ async function updateOrderStatusToAssetsApproved(orderId, userId) {
     await Order.updateOrder(orderId, {
       current_status_id: 7,
       updated_at: new Date(),
-      updated_by: userId
+      updated_by: userId,
     });
 
     // Create status history entry
@@ -36,7 +40,7 @@ async function updateOrderStatusToAssetsApproved(orderId, userId) {
 
     await OrderStatusHistory.createStatusHistory(statusHistoryData);
   } catch (error) {
-    console.error('Error updating order status to Assets Approved:', error);
+    console.error("Error updating order status to Assets Approved:", error);
     // Don't throw error here as media status update was successful
   }
 }
@@ -93,15 +97,19 @@ async function updateMediaStatus(req, res, next) {
   try {
     const { updates } = req.body;
     const { id: userId } = req.user;
-    
+
     if (!updates || !Array.isArray(updates) || updates.length === 0) {
-      throw new BadRequestError("Updates array is required and must not be empty");
+      throw new BadRequestError(
+        "Updates array is required and must not be empty"
+      );
     }
 
     // Validate each update object
     for (const update of updates) {
       if (!update.id || update.status === undefined) {
-        throw new BadRequestError("Each update must have 'id' and 'status' fields");
+        throw new BadRequestError(
+          "Each update must have 'id' and 'status' fields"
+        );
       }
 
       // Validate status is a number (0, 1, or 2)
@@ -122,7 +130,7 @@ async function updateMediaStatus(req, res, next) {
     );
 
     // Check if any media was approved (status = 1) and update order status
-    const hasApprovedMedia = updates.some(update => update.status === 1);
+    const hasApprovedMedia = updates.some((update) => update.status === 1);
     if (hasApprovedMedia && updatedRecords.length > 0) {
       // Get order ID from the first updated record
       const orderId = updatedRecords[0].order_id;
@@ -202,59 +210,63 @@ async function getOrderMediaCount(req, res, next) {
 function extractZipFile(zipPath, extractDir) {
   return new Promise((resolve, reject) => {
     const extractedFiles = [];
-    
+
     yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
       if (err) return reject(err);
-      
+
       zipfile.readEntry();
-      zipfile.on('entry', (entry) => {
+      zipfile.on("entry", (entry) => {
         // Skip directories and non-media files
-        if (entry.fileName.endsWith('/') || 
-            (!entry.fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp|mp4|avi|mov|wmv|flv|webm)$/i))) {
+        if (
+          entry.fileName.endsWith("/") ||
+          !entry.fileName.match(
+            /\.(jpg|jpeg|png|gif|bmp|webp|mp4|avi|mov|wmv|flv|webm)$/i
+          )
+        ) {
           zipfile.readEntry();
           return;
         }
-        
+
         zipfile.openReadStream(entry, (err, readStream) => {
           if (err) {
             zipfile.readEntry();
             return;
           }
-          
+
           // Create safe filename
-          const safeFileName = entry.fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const safeFileName = entry.fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
           const extractPath = path.join(extractDir, safeFileName);
-          
+
           // Ensure directory exists
           const extractDirPath = path.dirname(extractPath);
           if (!fs.existsSync(extractDirPath)) {
             fs.mkdirSync(extractDirPath, { recursive: true });
           }
-          
+
           const writeStream = fs.createWriteStream(extractPath);
-          
+
           readStream.pipe(writeStream);
-          
-          writeStream.on('close', () => {
+
+          writeStream.on("close", () => {
             extractedFiles.push({
               originalName: entry.fileName,
               extractedPath: extractPath,
-              size: entry.uncompressedSize
+              size: entry.uncompressedSize,
             });
             zipfile.readEntry();
           });
-          
-          writeStream.on('error', (err) => {
+
+          writeStream.on("error", (err) => {
             zipfile.readEntry();
           });
         });
       });
-      
-      zipfile.on('end', () => {
+
+      zipfile.on("end", () => {
         resolve(extractedFiles);
       });
-      
-      zipfile.on('error', reject);
+
+      zipfile.on("error", reject);
     });
   });
 }
@@ -264,12 +276,12 @@ function extractZipFile(zipPath, extractDir) {
  */
 function getFileTypeFromExtension(fileName) {
   const ext = path.extname(fileName).toLowerCase();
-  const videoExts = ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm'];
-  const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
-  
-  if (videoExts.includes(ext)) return 'video';
-  if (imageExts.includes(ext)) return 'image';
-  return 'unknown';
+  const videoExts = [".mp4", ".avi", ".mov", ".wmv", ".flv", ".webm"];
+  const imageExts = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"];
+
+  if (videoExts.includes(ext)) return "video";
+  if (imageExts.includes(ext)) return "image";
+  return "unknown";
 }
 
 /**
@@ -278,21 +290,21 @@ function getFileTypeFromExtension(fileName) {
 function getMimeTypeFromExtension(fileName) {
   const ext = path.extname(fileName).toLowerCase();
   const mimeTypes = {
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.png': 'image/png',
-    '.gif': 'image/gif',
-    '.bmp': 'image/bmp',
-    '.webp': 'image/webp',
-    '.mp4': 'video/mp4',
-    '.avi': 'video/x-msvideo',
-    '.mov': 'video/quicktime',
-    '.wmv': 'video/x-ms-wmv',
-    '.flv': 'video/x-flv',
-    '.webm': 'video/webm'
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".bmp": "image/bmp",
+    ".webp": "image/webp",
+    ".mp4": "video/mp4",
+    ".avi": "video/x-msvideo",
+    ".mov": "video/quicktime",
+    ".wmv": "video/x-ms-wmv",
+    ".flv": "video/x-flv",
+    ".webm": "video/webm",
   };
-  
-  return mimeTypes[ext] || 'application/octet-stream';
+
+  return mimeTypes[ext] || "application/octet-stream";
 }
 
 /**
@@ -303,7 +315,7 @@ function getMimeTypeFromExtension(fileName) {
 async function uploadZip(req, res, next) {
   let tempPaths = [];
   let extractDir = null;
-  
+
   try {
     const { orderId } = req.body;
     const zipFile = req.file; // Single ZIP file
@@ -338,9 +350,11 @@ async function uploadZip(req, res, next) {
     // Extract ZIP file
     console.log(`📦 Extracting ZIP file: ${zipFile.originalname}`);
     const extractedFiles = await extractZipFile(zipFile.path, extractDir);
-    
+
     if (extractedFiles.length === 0) {
-      throw new BadRequestError("No valid image or video files found in the ZIP");
+      throw new BadRequestError(
+        "No valid image or video files found in the ZIP"
+      );
     }
 
     console.log(`📁 Extracted ${extractedFiles.length} files from ZIP`);
@@ -355,8 +369,8 @@ async function uploadZip(req, res, next) {
 
     for (const extractedFile of extractedFiles) {
       const fileType = getFileTypeFromExtension(extractedFile.originalName);
-      
-      if (fileType === 'unknown') continue;
+
+      if (fileType === "unknown") continue;
 
       // Generate filename: orderNumber_fileType_timestamp_uuid.extension (prevents conflicts)
       const timestamp = Date.now();
@@ -365,20 +379,20 @@ async function uploadZip(req, res, next) {
       const generatedFilename = `${order.order_number}_${fileType}_${timestamp}_${uniqueId}${extension}`;
 
       // Choose target folder path
-      const targetFolderPath = fileType === 'video' ? videosPath : imagesPath;
+      const targetFolderPath = fileType === "video" ? videosPath : imagesPath;
 
       filesToUpload.push({
         path: extractedFile.extractedPath,
         name: generatedFilename,
         mimeType: getMimeTypeFromExtension(extractedFile.originalName),
         targetFolderPath: targetFolderPath,
-        fileType: fileType
+        fileType: fileType,
       });
 
       // Prepare database record
       mediaRecords.push({
         order_id: orderIdNum,
-        uploader_type: 'portal_users',
+        uploader_type: "portal_users",
         uploader_id: userId,
         media_type: fileType,
         status: 0, // Pending approval
@@ -386,7 +400,9 @@ async function uploadZip(req, res, next) {
     }
 
     if (filesToUpload.length === 0) {
-      throw new BadRequestError("No valid image or video files found in the ZIP");
+      throw new BadRequestError(
+        "No valid image or video files found in the ZIP"
+      );
     }
 
     // Copy all files to target folders
@@ -400,14 +416,14 @@ async function uploadZip(req, res, next) {
         ...mediaRecords[i],
         media_url: uploadedFiles[i].webContentLink,
       };
-      
+
       const mediaId = await orderMediaPortal.insertMedia(mediaRecord);
       savedMedia.push({
         id: mediaId,
         filename: filesToUpload[i].name,
         media_type: mediaRecord.media_type,
         media_url: mediaRecord.media_url,
-        status: mediaRecord.status
+        status: mediaRecord.status,
       });
     }
 
@@ -415,6 +431,22 @@ async function uploadZip(req, res, next) {
     console.log(`🧹 Cleaning up temporary files...`);
     cleanupTempFiles(tempPaths);
     cleanupTempFiles([zipFile.path]); // Clean up the uploaded ZIP file
+
+    // Create status history entry for ZIP upload
+    try {
+      const statusHistoryData = {
+        order_id: orderIdNum,
+        status_id: 6, // Assets Submitted
+        changed_by: userId,
+        changed_at: new Date(),
+        activity_extra: `${savedMedia.length} file(s) Uploaded via ZIP`,
+      };
+
+      await OrderStatusHistory.createStatusHistory(statusHistoryData);
+    } catch (error) {
+      console.error("Error creating status history:", error);
+      // Don't throw error here as upload was successful
+    }
 
     console.log(`✅ Successfully uploaded ${savedMedia.length} files from ZIP`);
 
@@ -429,15 +461,14 @@ async function uploadZip(req, res, next) {
         uploaded_files: savedMedia,
         total_count: savedMedia.length,
         summary: {
-          images: savedMedia.filter(f => f.media_type === 'image').length,
-          videos: savedMedia.filter(f => f.media_type === 'video').length
-        }
+          images: savedMedia.filter((f) => f.media_type === "image").length,
+          videos: savedMedia.filter((f) => f.media_type === "video").length,
+        },
       },
     });
-
   } catch (error) {
     console.error("Error in uploadZip:", error);
-    
+
     // Cleanup on error
     if (tempPaths && tempPaths.length > 0) {
       cleanupTempFiles(tempPaths);
@@ -445,7 +476,7 @@ async function uploadZip(req, res, next) {
     if (req.file && req.file.path) {
       cleanupTempFiles([req.file.path]);
     }
-    
+
     // Let the error handler middleware handle the error
     next(error);
   }

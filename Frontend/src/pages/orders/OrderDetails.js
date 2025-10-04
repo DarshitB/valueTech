@@ -296,7 +296,7 @@ function OrderDetails() {
         return;
       }
 
-    setComment(newValue);
+      setComment(newValue);
       setTaggedUserIds(validMentions.map((m) => Number(m.id)));
     },
     []
@@ -324,6 +324,13 @@ function OrderDetails() {
   // Helper function to display a value or a dash if the value is null/undefined
   const showValue = (val) =>
     val === null || val === undefined || val === "" ? "-" : val;
+
+  // Helper function to show toast error for missing valuer name
+  const showValuerNameError = (reportType) => {
+    toast.error(
+      `Please set a valuer name for this order before accessing the ${reportType} report.`
+    );
+  };
 
   // Helper function to get filename from media URL - Secure implementation
   const getFilenameFromMediaUrl = (media_url) => {
@@ -778,7 +785,11 @@ function OrderDetails() {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     // Validate TO recipients
-    if (!mailFormData.to || !Array.isArray(mailFormData.to) || mailFormData.to.length === 0) {
+    if (
+      !mailFormData.to ||
+      !Array.isArray(mailFormData.to) ||
+      mailFormData.to.length === 0
+    ) {
       toast.error("Please select at least one recipient");
       return;
     }
@@ -1107,11 +1118,11 @@ function OrderDetails() {
                           <span>Manager</span>
                           <span>:</span>
                         </p>
-                  </div>
+                      </div>
                       <div className="order-details-info-set-details">
                         <p>{showValue(order?.manager_name)}</p>
-                </div>
-              </div>
+                      </div>
+                    </div>
                     <div className="order-details-info-set">
                       <div className="order-details-info-set-heading">
                         <p>
@@ -1149,11 +1160,11 @@ function OrderDetails() {
                     title="Documents"
                     className="tooltip-link"
                   >
-                  <FolderIcon />
+                    <FolderIcon />
                     {/*  <DocumentsIcon /> */}
-                </Link>
+                  </Link>
                 )}
-                
+
                 {/* Conditional Report Buttons based on Category
                     - "COMMERCIAL VEHICLE" -> CV Report
                     - "CONSTRUCTION EQUIPMENTS" -> CE Report  
@@ -1162,13 +1173,31 @@ function OrderDetails() {
                 */}
                 {order?.category_name === "COMMERCIAL VEHICLE" && (
                   <>
-                  <Link
-                    to={`/orders/${id}/details/cv-report`}
-                    title="CV Report"
-                    className="tooltip-link"
-                  >
-                    <ReportIcon />
-                  </Link>
+                    {order?.valuer_name && order.valuer_name.trim() !== "" ? (
+                      <Link
+                        to={`/orders/${id}/details/cv-report`}
+                        title="CV Report"
+                        className="tooltip-link"
+                      >
+                        <ReportIcon />
+                      </Link>
+                    ) : (
+                      <button
+                        title="CV Report"
+                        className="tooltip-link"
+                        onClick={() => showValuerNameError("CV")}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          padding: 0,
+                          cursor: "pointer",
+                          outline: "none",
+                          boxShadow: "none",
+                        }}
+                      >
+                        <ReportIcon />
+                      </button>
+                    )}
                     {/* <Link
                       to={`/orders/${id}/details/ce-report`}
                       title="CE Report"
@@ -1192,36 +1221,96 @@ function OrderDetails() {
                     </Link> */}
                   </>
                 )}
-                
+
                 {order?.category_name === "CONSTRUCTION EQUIPMENT" && (
-                  <Link
-                    to={`/orders/${id}/details/ce-report`}
-                    title="CE Report"
-                    className="tooltip-link"
-                  >
-                    <ReportIcon />
-                  </Link>
+                  <>
+                    {order?.valuer_name && order.valuer_name.trim() !== "" ? (
+                      <Link
+                        to={`/orders/${id}/details/ce-report`}
+                        title="CE Report"
+                        className="tooltip-link"
+                      >
+                        <ReportIcon />
+                      </Link>
+                    ) : (
+                      <button
+                        title="CE Report"
+                        className="tooltip-link"
+                        onClick={() => showValuerNameError("CE")}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          padding: 0,
+                          cursor: "pointer",
+                          outline: "none",
+                          boxShadow: "none",
+                        }}
+                      >
+                        <ReportIcon />
+                      </button>
+                    )}
+                  </>
                 )}
-                
-                {order?.category_name && 
-                 order.category_name.toUpperCase().includes("AVR") && (
-                  <Link
-                    to={`/orders/${id}/details/avr-report`}
-                    title="AVR Report"
-                    className="tooltip-link"
-                  >
-                    <ReportIcon />
-                  </Link>
-                )}
-                
+
+                {order?.category_name &&
+                  order.category_name.toUpperCase().includes("AVR") && (
+                    <>
+                      {order?.valuer_name && order.valuer_name.trim() !== "" ? (
+                        <Link
+                          to={`/orders/${id}/details/avr-report`}
+                          title="AVR Report"
+                          className="tooltip-link"
+                        >
+                          <ReportIcon />
+                        </Link>
+                      ) : (
+                        <button
+                          title="AVR Report"
+                          className="tooltip-link"
+                          onClick={() => showValuerNameError("AVR")}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            padding: 0,
+                            cursor: "pointer",
+                            outline: "none",
+                            boxShadow: "none",
+                          }}
+                        >
+                          <ReportIcon />
+                        </button>
+                      )}
+                    </>
+                  )}
+
                 {order?.category_name === "MACHINERY" && (
-                  <Link
-                    to={`/orders/${id}/details/machinery-report`}
-                    title="Machinery Report"
-                    className="tooltip-link"
-                  >
-                    <ReportIcon />
-                  </Link>
+                  <>
+                    {order?.valuer_name && order.valuer_name.trim() !== "" ? (
+                      <Link
+                        to={`/orders/${id}/details/machinery-report`}
+                        title="Machinery Report"
+                        className="tooltip-link"
+                      >
+                        <ReportIcon />
+                      </Link>
+                    ) : (
+                      <button
+                        title="Machinery Report"
+                        className="tooltip-link"
+                        onClick={() => showValuerNameError("Machinery")}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          padding: 0,
+                          cursor: "pointer",
+                          outline: "none",
+                          boxShadow: "none",
+                        }}
+                      >
+                        <ReportIcon />
+                      </button>
+                    )}
+                  </>
                 )}
                 {/* <Link
                   to={`/orders/${id}/details/custom-report`}
@@ -1234,13 +1323,33 @@ function OrderDetails() {
                   allowedPermissions,
                   "view_order_media_files"
                 ) && (
-                  <Link
-                    to={`/orders/${id}/details/images`}
-                    title="Images"
-                    className="tooltip-link"
-                  >
-                    <ImageCollageIcon />
-                  </Link>
+                  <>
+                    {order?.valuer_name && order.valuer_name.trim() !== "" ? (
+                      <Link
+                        to={`/orders/${id}/details/images`}
+                        title="Images"
+                        className="tooltip-link"
+                      >
+                        <ImageCollageIcon />
+                      </Link>
+                    ) : (
+                      <button
+                        title="Images"
+                        className="tooltip-link"
+                        onClick={() => showValuerNameError("Images")}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          padding: 0,
+                          cursor: "pointer",
+                          outline: "none",
+                          boxShadow: "none",
+                        }}
+                      >
+                        <ImageCollageIcon />
+                      </button>
+                    )}
+                  </>
                 )}
 
                 <Link title="Approve" className="tooltip-link">
@@ -1285,10 +1394,11 @@ function OrderDetails() {
                             {timeAgo(status.changed_at)}
                           </p>
                           <p className="activity-description">
-                            {status.status_name
-                              ? showValue(status.status_name)
-                              : showValue(status.activity_extra)}{" "}
-                            by {showValue(status.changed_by_name)}
+                            {status.status_name && status.activity_extra
+                              ? `${showValue(status.status_name)} by ${showValue(status.changed_by_name)} [ ${showValue(status.activity_extra)} ]`
+                              : status.status_name
+                              ? `${showValue(status.status_name)} by ${showValue(status.changed_by_name)}`
+                              : `${showValue(status.activity_extra)} by ${showValue(status.changed_by_name)}`}
                           </p>
                         </div>
                       </div>
@@ -1644,15 +1754,15 @@ function OrderDetails() {
                   <div className="form-group">
                     <label htmlFor="to">To*</label>
                     <SingleSearchSelect
-                        id="to"
+                      id="to"
                       className="search-selector"
                       options={bankOfficersOptions}
-                        value={mailFormData.to}
+                      value={mailFormData.to}
                       onChange={handleToFieldChange}
                       placeholder="Select recipients..."
                       isMulti={true}
-                      />
-                    </div>
+                    />
+                  </div>
 
                   <div className="form-group">
                     <label>CC</label>

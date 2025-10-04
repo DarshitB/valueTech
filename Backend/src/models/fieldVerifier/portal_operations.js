@@ -39,7 +39,7 @@ const portal_operations = {
       if (roleName.includes("MANAGER")) {
         baseQuery.where("field_verifiers.created_by", user.id);
       }
-      // Other roles can see all (DEVELOPER_ADMIN, TELECALLER, etc.)
+      // Other roles can see all (developer_admin, TELECALLER, etc.)
     }
 
     return await baseQuery;
