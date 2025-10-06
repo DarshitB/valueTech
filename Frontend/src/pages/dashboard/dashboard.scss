@@ -185,6 +185,68 @@
   }
 }
 
+.manager-dashboard {
+  .manager-dashboard-card {
+    border-radius: 12px;
+    padding: 20px;
+    min-height: 300px;
+    height: 100%;
+    &.blue-card {
+      background: linear-gradient(to right, #6527b8, #632ce5);
+      color: $primary-font-color;
+    }
+    &.green-card {
+      background: linear-gradient(to right, #33a430, #6ecd31);
+      color: $primary-font-color;
+    }
+    .manager-dashboard-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid $primary-font-color;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+      h2 {
+        margin-bottom: 0;
+        margin-top: 0;
+        font-size: 23px;
+      }
+      p {
+        margin-bottom: 0;
+        font-size: 23px;
+        font-weight: 700;
+      }
+    }
+    .manager-dashboard-card-body {
+      display: flex;
+      height: calc(100% - 59px);
+      align-items: center;
+      justify-content: center;
+      .row {
+        height: fit-content;
+      }
+      .manager-dashboard-card-body-item {
+        margin-bottom: 0;
+        padding: 10px;
+        border-color: $primary-font-color;
+        span {
+          text-align: center;
+          display: block;
+          width: 100%;
+          font-size: 18px;
+          font-weight: 200;
+          margin-bottom: 5px;
+        }
+        p {
+          text-align: center;
+          font-size: 23px;
+          font-weight: 700;
+          margin-bottom: 0;
+        }
+      }
+    }
+  }
+}
 // Welcome message styles
 .welcome-message-container {
   display: flex;

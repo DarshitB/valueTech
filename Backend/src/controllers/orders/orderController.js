@@ -3,12 +3,60 @@ const OrderStatusMaster = require("../../models/orders/orderStatusMaster");
 const OrderStatusHistory = require("../../models/orders/orderStatusHistory");
 const Officer = require("../../models/user/officer");
 const User = require("../../models/user/user");
+const db = require("../../../db");
 
 const {
   NotFoundError,
   ConflictError,
   BadRequestError,
 } = require("../../utils/customErrors");
+
+// Helper functions to get names by IDs
+async function getUserName(userId) {
+  try {
+    const user = await db("users").select("name").where("id", userId).first();
+    return user ? user.name : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function getOfficerName(officerId) {
+  try {
+    const officer = await db("officers")
+      .leftJoin("users", "officers.user_id", "users.id")
+      .select("users.name")
+      .where("officers.id", officerId)
+      .first();
+    return officer ? officer.name : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function getFieldVerifierName(fieldVerifierId) {
+  try {
+    const fieldVerifier = await db("field_verifiers")
+      .select("name")
+      .where("id", fieldVerifierId)
+      .first();
+    return fieldVerifier ? fieldVerifier.name : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function getCategoryName(categoryId) {
+  try {
+    const category = await db("child_category")
+      .select("name")
+      .where("id", categoryId)
+      .first();
+    return category ? category.name : null;
+  } catch (error) {
+    return null;
+  }
+}
 
 // Get All Orders based on user role
 exports.getAll = async (req, res, next) => {
@@ -233,6 +281,7 @@ exports.update = async (req, res, next) => {
       place_of_inspection,
       date_of_inspection,
     } = req.body;
+    console.log("req.body", req.body);
     /* console.log(req.body); */
     // Fetch existing order to check permissions
     const existingOrder = await Order.findById(orderId, req.user);
@@ -331,11 +380,80 @@ exports.update = async (req, res, next) => {
       req.user?.id
     );
 
-    // Create status history entries based on changes
+    // Track changes for detailed activity log
+    const changes = [];
     let hasStatusChange = false;
+    let hasFieldVerifierChange = false;
+
+    // Check for field changes and build detailed change descriptions
+    const fieldsToCheck = [
+      'customer_name', 'contact', 'alternative_contact', 'supervisor_number', 
+      'driver_number', 'child_category_id', 'officer_id', 'manager_id', 
+      'registration_number', 'place_of_inspection', 'date_of_inspection'
+    ];
+
+    for (const field of fieldsToCheck) {
+      const newValue = req.body[field];
+      if (newValue !== undefined) {
+        const oldValue = existingOrder[field];
+        
+        if (oldValue !== newValue) {
+          // Format field names for better readability
+          const formatFieldName = (fieldName) => {
+            const fieldMap = {
+              'customer_name': 'CUSTOMER NAME',
+              'contact': 'CONTACT',
+              'alternative_contact': 'ALTERNATIVE CONTACT',
+              'supervisor_number': 'SUPERVISOR NUMBER',
+              'driver_number': 'DRIVER NUMBER',
+              'child_category_id': 'CATEGORY',
+              'officer_id': 'OFFICER',
+              'manager_id': 'MANAGER',
+              'registration_number': 'REGISTRATION NUMBER',
+              'place_of_inspection': 'PLACE OF INSPECTION',
+              'date_of_inspection': 'DATE OF INSPECTION'
+            };
+            return fieldMap[fieldName] || fieldName.replace(/_/g, ' ').toUpperCase();
+          };
+          
+          // Get display values (names instead of IDs for certain fields)
+          let displayOldValue, displayNewValue;
+          
+          if (field === 'manager_id') {
+            displayOldValue = oldValue ? existingOrder.manager_name || `Manager ${oldValue}` : 'null';
+            displayNewValue = newValue ? await getUserName(newValue) || `Manager ${newValue}` : 'null';
+          } else if (field === 'officer_id') {
+            displayOldValue = oldValue ? existingOrder.officer_name || `Officer ${oldValue}` : 'null';
+            displayNewValue = newValue ? await getOfficerName(newValue) || `Officer ${newValue}` : 'null';
+          } else if (field === 'child_category_id') {
+            displayOldValue = oldValue ? existingOrder.child_category_name || `Category ${oldValue}` : 'null';
+            displayNewValue = newValue ? await getCategoryName(newValue) || `Category ${newValue}` : 'null';
+          } else {
+            displayOldValue = oldValue === null ? 'null' : oldValue === '' ? 'empty' : oldValue;
+            displayNewValue = newValue === null ? 'null' : newValue === '' ? 'empty' : newValue;
+          }
+          
+          const formattedField = formatFieldName(field);
+          changes.push(`${formattedField} changed from "${displayOldValue}" to "${displayNewValue}"`);
+        }
+      }
+    }
+
+    // Check if field verifier assignment changed (separate from other fields)
+    if (
+      field_verifier_id !== undefined &&
+      field_verifier_id !== existingOrder.field_verifier_id
+    ) {
+      hasFieldVerifierChange = true;
+    }
 
     // Check if status changed due to supervisor_number, driver_number, or manager_id changes
     if (newStatusId !== existingOrder.current_status_id) {
+      hasStatusChange = true;
+    }
+
+    // Create status history entries based on changes
+    if (hasStatusChange) {
       const statusHistoryData = {
         order_id: orderId,
         status_id: newStatusId,
@@ -344,14 +462,22 @@ exports.update = async (req, res, next) => {
       };
 
       await OrderStatusHistory.createStatusHistory(statusHistoryData);
-      hasStatusChange = true;
     }
 
-    // Check if field verifier assignment changed
-    if (
-      field_verifier_id &&
-      field_verifier_id !== existingOrder.field_verifier_id
-    ) {
+    // Create detailed field changes record (if there are field changes)
+    if (changes.length > 0) {
+      const statusHistoryData = {
+        order_id: orderId,
+        activity_extra: changes.join('; '),
+        changed_by: req.user?.id,
+        changed_at: new Date(),
+      };
+
+      await OrderStatusHistory.createStatusHistory(statusHistoryData);
+    }
+
+    // Create field verifier assignment record (if field verifier changed)
+    if (hasFieldVerifierChange) {
       const fieldVerifierStatusHistory = {
         order_id: orderId,
         activity_extra: "Field Verifier Assigned",
@@ -360,19 +486,6 @@ exports.update = async (req, res, next) => {
       };
 
       await OrderStatusHistory.createStatusHistory(fieldVerifierStatusHistory);
-      hasStatusChange = true;
-    }
-
-    // If no specific status changes, create general edit record
-    if (!hasStatusChange) {
-      const statusHistoryData = {
-        order_id: orderId,
-        activity_extra: "Order Edited",
-        changed_by: req.user?.id,
-        changed_at: new Date(),
-      };
-
-      await OrderStatusHistory.createStatusHistory(statusHistoryData);
     }
 
     // Get enriched updated order data for response
@@ -635,14 +748,14 @@ exports.updateOrderAttributes = async (req, res, next) => {
 
     // Log the activity with detailed changes
     if (changes.length > 0) {
-      const statusHistoryData = {
-        order_id: orderId,
+    const statusHistoryData = {
+      order_id: orderId,
         activity_extra: changes.join('; '),
-        changed_by: userId,
-        changed_at: new Date(),
-      };
+      changed_by: userId,
+      changed_at: new Date(),
+    };
 
-      await OrderStatusHistory.createStatusHistory(statusHistoryData);
+    await OrderStatusHistory.createStatusHistory(statusHistoryData);
     }
 
     res.status(200).json({

@@ -79,7 +79,7 @@ function generateCEReportHTML(formData, extraData, bgImageBase64, stampImageBase
 </head>
 <body>
     <div class="content-wrapper">
-        <table>
+        <table style="min-height: calc(100% - 225px);">
         <tr>
             <th colspan="6">${extraData.bank_name}</th>
         </tr>
@@ -384,7 +384,7 @@ function generateCEReportHTML(formData, extraData, bgImageBase64, stampImageBase
                 <table style="margin: 0;border-collapse: collapse;width: 100%;">
                     <tr>
                         <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${formData.fix_but_flex_value_18}</td>
-                        <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${formData.fix_but_flex_heading_19}</td>
+                        <td style="border-top: 0px;border-bottom: 0px;border-left:0px;border-right:0px;">${formData.fix_but_flex_heading_19}</td>
                     </tr>
                 </table>
             </td>

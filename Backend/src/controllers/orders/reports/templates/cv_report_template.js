@@ -84,7 +84,7 @@ function generateCVReportHTML(
 </head>
 <body>
     <div class="content-wrapper">
-        <table>
+        <table style="min-height: calc(100% - 225px);">
         <tr>
             <th colspan="6">${extraData.bank_name}</th>
         </tr>

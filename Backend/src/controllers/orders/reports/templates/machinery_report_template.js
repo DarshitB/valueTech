@@ -8,7 +8,12 @@
  * @param {string} stampImageBase64 - Stamp image as base64
  * @returns {string} HTML content
  */
-function generateMachineryReportHTML(formData, extraData, bgImageBase64, stampImageBase64) {
+function generateMachineryReportHTML(
+  formData,
+  extraData,
+  bgImageBase64,
+  stampImageBase64
+) {
   return `
 <!DOCTYPE html>
 <html>
@@ -79,7 +84,7 @@ function generateMachineryReportHTML(formData, extraData, bgImageBase64, stampIm
 </head>
 <body>
     <div class="content-wrapper">
-        <table>
+        <table style="min-height: calc(100% - 225px);">
         <tr>
             <th colspan="6">VALUATION REPORT FOR ${extraData.cat} / ${
     extraData.subCat
@@ -149,7 +154,11 @@ function generateMachineryReportHTML(formData, extraData, bgImageBase64, stampIm
                 : "NOT APPLICABLE"
             }</td>
             <td>REGISTRATION DATE:</td>
-            <td colspan="2">${formData.registration_date === "00-00-0000" ? "NA" : formData.registration_date}</td>
+            <td colspan="2">${
+              formData.registration_date === "00-00-0000"
+                ? "NA"
+                : formData.registration_date
+            }</td>
         </tr>
         <tr>
             <td>LOCATION OF MACHINERY:</td>

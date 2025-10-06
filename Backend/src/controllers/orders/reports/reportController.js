@@ -162,9 +162,13 @@ exports.generateReport = async (req, res, next) => {
       tyre_image_base64,
       ...mainReportData
     } = formData;
+    
+    // Filter form data to only include valid database columns
+    const validFields = filterValidReportFields(mainReportData, requestedReportType);
+    
     const reportData = {
       order_id: order.id,
-      ...mainReportData,
+      ...validFields,
       created_by: userId,
       created_at: new Date(),
     };
@@ -807,17 +811,19 @@ function filterValidReportFields(formData, reportType) {
       'report_date', 'valuer_name', 'license_no', 'valuer_contact', 'valuation_purpose',
       'initiated_by', 'date_of_inspection', 'place_of_inspection',
       'registered_owner_name', 'registered_owner_address', 'proposed_owner_name', 'proposed_owner_address',
-      'registration_no', 'registration_date', 'registered_location', 'owner_serial_no',
-      'manufacture_year', 'asset_make', 'model', 'engine_no_detail', 'chassis_no',
-      'body_type', 'fuel_type', 'kilometer_reading', 'invoice_no_date',
-      'hyp_with', 'hyp_from_date', 'asset_classification', 'no_of_cylinder',
-      'engine_condition', 'chassis_condition', 'body_condition', 'cabin_condition',
-      'electrical_condition', 'gear_transmission', 'battery_available', 'gross_vehicle_weight',
-      'front_tyre_no', 'front_tyre_condition', 'middle_tyre_no', 'middle_tyre_condition',
-      'rear_tyre_no', 'rear_tyre_condition', 'no_of_tyres', 'stepney',
-      'horse_power', 'mechanical_unit_condition', 'cubic_capacity', 'suspension',
-      'seating_capacity', 'tool_kit_available', 'vehicle_colour', 'color_condition',
-      'damages_if_any', 'rc_book_verified', 'tax_invoice_copy', 'tax_upto_title', 'tax_upto',
+      'registration_no', 'registration_date', 'location_of_machinery', 'owner_serial_no',
+      'manufacture_year', 'asset_make', 'model', 'control_system', 'machine_serial_no',
+      'laf_id', 'application_usage', 'invoice_no_date',
+      'hyp_with', 'machine_type', 'asset_classification', 'no_of_cylinder',
+      'machine_technology', 'machine_condition', 'electrical_condition', 'mechanical_condition',
+      'fix_but_flex_heading_1', 'fix_but_flex_value_1', 'fix_but_flex_heading_2', 'fix_but_flex_value_2',
+      'fix_but_flex_heading_3', 'fix_but_flex_value_3', 'fix_but_flex_heading_4', 'fix_but_flex_value_4',
+      'fix_but_flex_heading_5', 'fix_but_flex_value_5', 'fix_but_flex_heading_6', 'fix_but_flex_value_6',
+      'fix_but_flex_heading_7', 'fix_but_flex_value_7', 'fix_but_flex_heading_8', 'fix_but_flex_value_8',
+      'fix_but_flex_heading_9', 'fix_but_flex_value_9', 'fix_but_flex_heading_10', 'fix_but_flex_value_10',
+      'fix_but_flex_heading_11', 'fix_but_flex_value_11', 'fix_but_flex_heading_12', 'fix_but_flex_value_12',
+      'machine_colour', 'color_condition', 'damages_if_any',
+      'rc_book_verified', 'tax_invoice_copy', 'tax_upto_title', 'tax_upto',
       'permit_upto', 'permit_type', 'fitness_upto_title', 'fitness_upto',
       'insurance_co_name', 'policy_no', 'insurance_valid_date', 'insured_value', 'insurance_verified',
       'tax_invoice_cost', 'depreciation', 'depreciation_value', 'appraiser_value',

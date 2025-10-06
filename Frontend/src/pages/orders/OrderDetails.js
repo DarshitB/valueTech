@@ -1171,91 +1171,44 @@ function OrderDetails() {
                     - Categories containing "AVR" -> AVR Report
                     - "MACHINERY" -> Machinery Report
                 */}
-                {order?.category_name === "COMMERCIAL VEHICLE" && (
+                {hasPermission(allowedPermissions, "generate_order_report") && (
                   <>
-                    {order?.valuer_name && order.valuer_name.trim() !== "" ? (
-                      <Link
-                        to={`/orders/${id}/details/cv-report`}
-                        title="CV Report"
-                        className="tooltip-link"
-                      >
-                        <ReportIcon />
-                      </Link>
-                    ) : (
-                      <button
-                        title="CV Report"
-                        className="tooltip-link"
-                        onClick={() => showValuerNameError("CV")}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          padding: 0,
-                          cursor: "pointer",
-                          outline: "none",
-                          boxShadow: "none",
-                        }}
-                      >
-                        <ReportIcon />
-                      </button>
-                    )}
-                    {/* <Link
-                      to={`/orders/${id}/details/ce-report`}
-                      title="CE Report"
-                      className="tooltip-link"
-                    >
-                      <ReportIcon />
-                    </Link>
-                    <Link
-                      to={`/orders/${id}/details/avr-report`}
-                      title="AVR Report"
-                      className="tooltip-link"
-                    >
-                      <ReportIcon />
-                    </Link>
-                    <Link
-                      to={`/orders/${id}/details/machinery-report`}
-                      title="Machinery Report"
-                      className="tooltip-link"
-                    >
-                      <ReportIcon />
-                    </Link> */}
-                  </>
-                )}
-
-                {order?.category_name === "CONSTRUCTION EQUIPMENT" && (
-                  <>
-                    {order?.valuer_name && order.valuer_name.trim() !== "" ? (
-                      <Link
-                        to={`/orders/${id}/details/ce-report`}
-                        title="CE Report"
-                        className="tooltip-link"
-                      >
-                        <ReportIcon />
-                      </Link>
-                    ) : (
-                      <button
-                        title="CE Report"
-                        className="tooltip-link"
-                        onClick={() => showValuerNameError("CE")}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          padding: 0,
-                          cursor: "pointer",
-                          outline: "none",
-                          boxShadow: "none",
-                        }}
-                      >
-                        <ReportIcon />
-                      </button>
-                    )}
-                  </>
-                )}
-
-                {order?.category_name &&
-                  order.category_name.toUpperCase().includes("AVR") && (
-                    <>
-                      {order?.valuer_name && order.valuer_name.trim() !== "" ? (
+                    {/* CV Report - Commercial Vehicle */}
+                    {order?.category_name === "COMMERCIAL VEHICLE" && (
+                      <>
+                        {order?.valuer_name &&
+                        order.valuer_name.trim() !== "" ? (
+                          <Link
+                            to={`/orders/${id}/details/cv-report`}
+                            title="CV Report"
+                            className="tooltip-link"
+                          >
+                            <ReportIcon />
+                          </Link>
+                        ) : (
+                          <button
+                            title="CV Report"
+                            className="tooltip-link"
+                            onClick={() => showValuerNameError("CV")}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              padding: 0,
+                              cursor: "pointer",
+                              outline: "none",
+                              boxShadow: "none",
+                            }}
+                          >
+                            <ReportIcon />
+                          </button>
+                        )}
+                        {/* <Link
+                          to={`/orders/${id}/details/ce-report`}
+                          title="CE Report"
+                          className="tooltip-link"
+                        >
+                          <ReportIcon />
+                        </Link>
                         <Link
                           to={`/orders/${id}/details/avr-report`}
                           title="AVR Report"
@@ -1263,52 +1216,111 @@ function OrderDetails() {
                         >
                           <ReportIcon />
                         </Link>
-                      ) : (
-                        <button
-                          title="AVR Report"
+                        <Link
+                          to={`/orders/${id}/details/machinery-report`}
+                          title="Machinery Report"
                           className="tooltip-link"
-                          onClick={() => showValuerNameError("AVR")}
-                          style={{
-                            background: "none",
-                            border: "none",
-                            padding: 0,
-                            cursor: "pointer",
-                            outline: "none",
-                            boxShadow: "none",
-                          }}
                         >
                           <ReportIcon />
-                        </button>
-                      )}
-                    </>
-                  )}
+                        </Link> */}
+                      </>
+                    )}
 
-                {order?.category_name === "MACHINERY" && (
-                  <>
-                    {order?.valuer_name && order.valuer_name.trim() !== "" ? (
-                      <Link
-                        to={`/orders/${id}/details/machinery-report`}
-                        title="Machinery Report"
-                        className="tooltip-link"
-                      >
-                        <ReportIcon />
-                      </Link>
-                    ) : (
-                      <button
-                        title="Machinery Report"
-                        className="tooltip-link"
-                        onClick={() => showValuerNameError("Machinery")}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          padding: 0,
-                          cursor: "pointer",
-                          outline: "none",
-                          boxShadow: "none",
-                        }}
-                      >
-                        <ReportIcon />
-                      </button>
+                    {/* CE Report - Construction Equipment */}
+                    {order?.category_name === "CONSTRUCTION EQUIPMENT" && (
+                      <>
+                        {order?.valuer_name &&
+                        order.valuer_name.trim() !== "" ? (
+                          <Link
+                            to={`/orders/${id}/details/ce-report`}
+                            title="CE Report"
+                            className="tooltip-link"
+                          >
+                            <ReportIcon />
+                          </Link>
+                        ) : (
+                          <button
+                            title="CE Report"
+                            className="tooltip-link"
+                            onClick={() => showValuerNameError("CE")}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              padding: 0,
+                              cursor: "pointer",
+                              outline: "none",
+                              boxShadow: "none",
+                            }}
+                          >
+                            <ReportIcon />
+                          </button>
+                        )}
+                      </>
+                    )}
+
+                    {/* AVR Report - Categories containing AVR */}
+                    {order?.category_name &&
+                      order.category_name.toUpperCase().includes("AVR") && (
+                        <>
+                          {order?.valuer_name &&
+                          order.valuer_name.trim() !== "" ? (
+                            <Link
+                              to={`/orders/${id}/details/avr-report`}
+                              title="AVR Report"
+                              className="tooltip-link"
+                            >
+                              <ReportIcon />
+                            </Link>
+                          ) : (
+                            <button
+                              title="AVR Report"
+                              className="tooltip-link"
+                              onClick={() => showValuerNameError("AVR")}
+                              style={{
+                                background: "none",
+                                border: "none",
+                                padding: 0,
+                                cursor: "pointer",
+                                outline: "none",
+                                boxShadow: "none",
+                              }}
+                            >
+                              <ReportIcon />
+                            </button>
+                          )}
+                        </>
+                      )}
+
+                    {/* Machinery Report */}
+                    {order?.category_name === "MACHINERY" && (
+                      <>
+                        {order?.valuer_name &&
+                        order.valuer_name.trim() !== "" ? (
+                          <Link
+                            to={`/orders/${id}/details/machinery-report`}
+                            title="Machinery Report"
+                            className="tooltip-link"
+                          >
+                            <ReportIcon />
+                          </Link>
+                        ) : (
+                          <button
+                            title="Machinery Report"
+                            className="tooltip-link"
+                            onClick={() => showValuerNameError("Machinery")}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              padding: 0,
+                              cursor: "pointer",
+                              outline: "none",
+                              boxShadow: "none",
+                            }}
+                          >
+                            <ReportIcon />
+                          </button>
+                        )}
+                      </>
                     )}
                   </>
                 )}
@@ -1395,10 +1407,18 @@ function OrderDetails() {
                           </p>
                           <p className="activity-description">
                             {status.status_name && status.activity_extra
-                              ? `${showValue(status.status_name)} by ${showValue(status.changed_by_name)} [ ${showValue(status.activity_extra)} ]`
+                              ? `${showValue(
+                                  status.status_name
+                                )} by ${showValue(
+                                  status.changed_by_name
+                                )} [ ${showValue(status.activity_extra)} ]`
                               : status.status_name
-                              ? `${showValue(status.status_name)} by ${showValue(status.changed_by_name)}`
-                              : `${showValue(status.activity_extra)} by ${showValue(status.changed_by_name)}`}
+                              ? `${showValue(
+                                  status.status_name
+                                )} by ${showValue(status.changed_by_name)}`
+                              : `${showValue(
+                                  status.activity_extra
+                                )} by ${showValue(status.changed_by_name)}`}
                           </p>
                         </div>
                       </div>

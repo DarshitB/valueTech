@@ -85,7 +85,7 @@ function generateAVRReportHTML(
 </head>
 <body>
     <div class="content-wrapper">
-        <table>
+        <table style="min-height: calc(100% - 225px);">
             <tr>
                 <td colspan="3">Ref. No. ${formData.ref_no_year}/${
     formData.ref_no_bank

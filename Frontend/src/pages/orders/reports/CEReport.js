@@ -2230,6 +2230,8 @@ function CEReport() {
                     </label>
                     <SingleSearchSelect
                       options={[
+                        { value: "EXCELLENT", label: "EXCELLENT" },
+                        { value: "VERY GOOD", label: "VERY GOOD" },
                         { value: "GOOD", label: "GOOD" },
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
@@ -2250,6 +2252,8 @@ function CEReport() {
                     </label>
                     <SingleSearchSelect
                       options={[
+                        { value: "EXCELLENT", label: "EXCELLENT" },
+                        { value: "VERY GOOD", label: "VERY GOOD" },
                         { value: "GOOD", label: "GOOD" },
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
@@ -2270,6 +2274,8 @@ function CEReport() {
                     </label>
                     <SingleSearchSelect
                       options={[
+                        { value: "EXCELLENT", label: "EXCELLENT" },
+                        { value: "VERY GOOD", label: "VERY GOOD" },
                         { value: "GOOD", label: "GOOD" },
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
@@ -2290,6 +2296,8 @@ function CEReport() {
                     </label>
                     <SingleSearchSelect
                       options={[
+                        { value: "EXCELLENT", label: "EXCELLENT" },
+                        { value: "VERY GOOD", label: "VERY GOOD" },
                         { value: "GOOD", label: "GOOD" },
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
@@ -2310,6 +2318,8 @@ function CEReport() {
                     </label>
                     <SingleSearchSelect
                       options={[
+                        { value: "EXCELLENT", label: "EXCELLENT" },
+                        { value: "VERY GOOD", label: "VERY GOOD" },
                         { value: "GOOD", label: "GOOD" },
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
@@ -2330,6 +2340,8 @@ function CEReport() {
                     </label>
                     <SingleSearchSelect
                       options={[
+                        { value: "EXCELLENT", label: "EXCELLENT" },
+                        { value: "VERY GOOD", label: "VERY GOOD" },
                         { value: "GOOD", label: "GOOD" },
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },

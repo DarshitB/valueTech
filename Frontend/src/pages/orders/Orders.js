@@ -253,19 +253,59 @@ function Orders() {
 
     // No validation needed - field verifier is optional
 
-    // All validations passed — build payload
-    const payload = {
-      customer_name: formData.customer_name.trim(),
-      contact: formData.contact.trim(),
-      alternative_contact: formData.alternative_contact.trim() || null,
-      supervisor_number: formData.supervisor_number.trim() || null,
-      driver_number: formData.driver_number.trim() || null,
-      child_category_id: formData.child_category_id,
-      registration_number: formData.registration_number.trim() || null,
-      place_of_inspection: formData.place_of_inspection.trim() || null,
-    };
+    // Build payload based on add vs edit mode
+    let payload = {};
+    
+    if (isEdit) {
+      // For edit mode, only include changed fields
+      const currentOrder = orders.find(order => order.id === editOrderId);
+      
+      // Always include required fields for edit
+      payload.customer_name = formData.customer_name.trim();
+      payload.contact = formData.contact.trim();
+      
+      // Only include other fields if they have changed
+      if (formData.alternative_contact !== (currentOrder.alternative_contact || "")) {
+        payload.alternative_contact = formData.alternative_contact.trim() || null;
+      }
+      
+      if (formData.supervisor_number !== (currentOrder.supervisor_number || "")) {
+        payload.supervisor_number = formData.supervisor_number.trim() || null;
+      }
+      
+      if (formData.driver_number !== (currentOrder.driver_number || "")) {
+        payload.driver_number = formData.driver_number.trim() || null;
+      }
+      
+      if (formData.child_category_id !== (currentOrder.child_category_id || "")) {
+        payload.child_category_id = formData.child_category_id;
+      }
+      
+      if (formData.registration_number !== (currentOrder.registration_number || "")) {
+        payload.registration_number = formData.registration_number.trim() || null;
+      }
+      
+      if (formData.place_of_inspection !== (currentOrder.place_of_inspection || "")) {
+        payload.place_of_inspection = formData.place_of_inspection.trim() || null;
+      }
+    } else {
+      // For add mode, include all fields
+      payload = {
+        customer_name: formData.customer_name.trim(),
+        contact: formData.contact.trim(),
+        alternative_contact: formData.alternative_contact.trim() || null,
+        supervisor_number: formData.supervisor_number.trim() || null,
+        driver_number: formData.driver_number.trim() || null,
+        child_category_id: formData.child_category_id,
+        registration_number: formData.registration_number.trim() || null,
+        place_of_inspection: formData.place_of_inspection.trim() || null,
+      };
+    }
 
     // Handle officer_id, manager_id, and field_verifier_id based on permissions and user role
+    let newOfficerId = null;
+    let newManagerId = null;
+    let newFieldVerifierId = null;
 
     // Officer ID handling - Bank Officers get their own officer ID automatically
     if (isBankOfficer) {
@@ -276,39 +316,67 @@ function Orders() {
 
       if (currentOfficer) {
         // Use the officer's ID, not the user's ID
-        payload.officer_id = currentOfficer.id;
+        newOfficerId = currentOfficer.id;
       }
     } else if (
       hasPermission(allowedPermissions, "view_order_add_edit_officer_filed")
     ) {
       // For other users, use form data if they have permission
-      payload.officer_id = formData.officer_id;
+      newOfficerId = formData.officer_id;
     }
 
     // MANAGER ID handling - MANAGER users get their own user ID automatically
     if (isManager) {
       // For MANAGER users, use their own user ID as manager_id
-      payload.manager_id = currentUser?.id;
+      newManagerId = currentUser?.id;
 
       // Field Verifier - only include if manager is assigned (which it will be for MANAGER users)
-      if (payload.manager_id) {
-        payload.field_verifier_id = formData.field_verifier_id;
+      if (newManagerId) {
+        newFieldVerifierId = formData.field_verifier_id;
       }
     } else if (
       hasPermission(allowedPermissions, "view_order_add_edit_manager_filed")
     ) {
       // For other users, use form data if they have permission
-      payload.manager_id = formData.manager_id;
+      newManagerId = formData.manager_id;
 
       // Field Verifier - only include if manager is assigned and user has manager permission
       if (formData.manager_id) {
-        payload.field_verifier_id = formData.field_verifier_id;
+        newFieldVerifierId = formData.field_verifier_id;
       }
     }
 
     // Field Verifier for Super Admin - can assign field verifier even without manager
     if (isSuperAdmin && formData.field_verifier_id) {
-      payload.field_verifier_id = formData.field_verifier_id;
+      newFieldVerifierId = formData.field_verifier_id;
+    }
+
+    // For edit mode, only include these fields if they have changed
+    if (isEdit) {
+      const currentOrder = orders.find(order => order.id === editOrderId);
+      
+      if (newOfficerId !== (currentOrder.officer_id || null)) {
+        payload.officer_id = newOfficerId;
+      }
+      
+      if (newManagerId !== (currentOrder.manager_id || null)) {
+        payload.manager_id = newManagerId;
+      }
+      
+      if (newFieldVerifierId !== (currentOrder.field_verifier_id || null)) {
+        payload.field_verifier_id = newFieldVerifierId;
+      }
+    } else {
+      // For add mode, include these fields
+      if (newOfficerId !== null) {
+        payload.officer_id = newOfficerId;
+      }
+      if (newManagerId !== null) {
+        payload.manager_id = newManagerId;
+      }
+      if (newFieldVerifierId !== null) {
+        payload.field_verifier_id = newFieldVerifierId;
+      }
     }
 
     if (isEdit) {

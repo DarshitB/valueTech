@@ -392,7 +392,7 @@ async function uploadZip(req, res, next) {
       // Prepare database record
       mediaRecords.push({
         order_id: orderIdNum,
-        uploader_type: "portal_users",
+        uploader_type: 'portal_users', // Required field for order_media_image_video table
         uploader_id: userId,
         media_type: fileType,
         status: 0, // Pending approval
@@ -432,8 +432,16 @@ async function uploadZip(req, res, next) {
     cleanupTempFiles(tempPaths);
     cleanupTempFiles([zipFile.path]); // Clean up the uploaded ZIP file
 
-    // Create status history entry for ZIP upload
+    // Update order status to 6 (Assets Submitted) and create status history entry
     try {
+      // Update the order's current status
+      await Order.updateOrder(orderIdNum, {
+        current_status_id: 6, // Assets Submitted
+        updated_at: new Date(),
+        updated_by: userId,
+      });
+
+      // Create status history entry for ZIP upload
       const statusHistoryData = {
         order_id: orderIdNum,
         status_id: 6, // Assets Submitted
@@ -444,7 +452,7 @@ async function uploadZip(req, res, next) {
 
       await OrderStatusHistory.createStatusHistory(statusHistoryData);
     } catch (error) {
-      console.error("Error creating status history:", error);
+      console.error("Error updating order status and creating status history:", error);
       // Don't throw error here as upload was successful
     }
 

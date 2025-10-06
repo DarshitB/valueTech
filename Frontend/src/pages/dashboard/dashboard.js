@@ -48,17 +48,22 @@ function Dashboard() {
   }, [dispatch]);
 
   // Check if current user is TELECALLER (case-insensitive) - matches any role containing "TELECALLER"
-  const isTelecaller = currentUser?.role.name?.toUpperCase().includes("TELECALLER");
+  const isTelecaller = currentUser?.role.name
+    ?.toUpperCase()
+    .includes("TELECALLER");
 
   // Check if current user is Bank Officer (case-insensitive) - matches any role containing "BANK OFFICER"
-  const isBankOfficer =
-    currentUser?.role.name?.toUpperCase().includes("BANK OFFICER");
+  const isBankOfficer = currentUser?.role.name
+    ?.toUpperCase()
+    .includes("BANK OFFICER");
 
   // Check if current user is MANAGER (case-insensitive) - matches any role containing "MANAGER"
   const isManager = currentUser?.role.name?.toUpperCase().includes("MANAGER");
 
   // Check if current user is Super Admin (case-insensitive) - matches any role containing "SUPER ADMIN"
-  const isSuperAdmin = currentUser?.role.name?.toUpperCase().includes("SUPER ADMIN");
+  const isSuperAdmin = currentUser?.role.name
+    ?.toUpperCase()
+    .includes("SUPER ADMIN");
 
   // Filter users by role for officer and manager selection
   const bankOfficers = officers.filter(
@@ -67,8 +72,8 @@ function Dashboard() {
       officer.role_name.toUpperCase().includes("BANK AUTHORITY")
   );
 
-  const managers = users.filter(
-    (user) => user.role_name.toUpperCase().includes("MANAGER")
+  const managers = users.filter((user) =>
+    user.role_name.toUpperCase().includes("MANAGER")
   );
 
   // Fields allowed for TELECALLER role
@@ -85,7 +90,7 @@ function Dashboard() {
 
   // State for order type filter
   const [selectedOrderType, setSelectedOrderType] = useState("");
-  
+
   // State for priority filter
   const [selectedPriority, setSelectedPriority] = useState("");
 
@@ -165,6 +170,39 @@ function Dashboard() {
 
   const todaysOrdersCount = (orders || []).filter((o) =>
     isSameDay(getCreatedDate(o), new Date())
+  ).length;
+
+  // Calculate pending orders (orders that are not completed, ongoing, or submitted)
+  const pendingOrdersCount = (orders || []).filter((order) => {
+    const status = order.current_status_name?.toLowerCase();
+    return (
+      !status ||
+      (status !== "completed" &&
+        status !== "ongoing" &&
+        status !== "submitted" &&
+        status !== "validate" &&
+        status !== "re-validate")
+    );
+  }).length;
+
+  // Calculate ongoing orders
+  const ongoingOrdersCount = (orders || []).filter(
+    (order) => order.current_status_name?.toLowerCase() === "ongoing"
+  ).length;
+
+  // Calculate completed orders
+  const completedOrdersCount = (orders || []).filter(
+    (order) => order.current_status_name?.toLowerCase() === "completed"
+  ).length;
+
+  // Calculate active field verifiers
+  const activeFieldVerifiersCount = (fieldVerifiers || []).filter(
+    (verifier) => verifier.is_active === true
+  ).length;
+
+  // Calculate inactive field verifiers
+  const inactiveFieldVerifiersCount = (fieldVerifiers || []).filter(
+    (verifier) => verifier.is_active === false
   ).length;
 
   const formatTwoDigits = (num) => String(num ?? 0).padStart(2, "0");
@@ -285,7 +323,7 @@ function Dashboard() {
   return (
     <div className="dashboard-container height-full-occupied">
       <div className="dashboard-container-sneak-peek">
-        {!hasAnyDashboardPermission && !isTelecaller ? (
+        {!hasAnyDashboardPermission && !isTelecaller && !isManager ? (
           <div className="welcome-message-container">
             <div className="welcome-message">
               <h2>Welcome {currentUser?.name || "User"}</h2>
@@ -418,13 +456,22 @@ function Dashboard() {
                       {{
                         buttons: (
                           <div
-                            style={{ display: "flex", gap: "10px", alignItems: "center" }}
+                            style={{
+                              display: "flex",
+                              gap: "10px",
+                              alignItems: "center",
+                            }}
                           >
-                            {hasPermission(allowedPermissions, "view_order_type_filter") && (
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_type_filter"
+                            ) && (
                               <select
                                 className="form-field type-priority-selector"
                                 value={selectedOrderType}
-                                onChange={(e) => setSelectedOrderType(e.target.value)}
+                                onChange={(e) =>
+                                  setSelectedOrderType(e.target.value)
+                                }
                               >
                                 <option value="">All Types</option>
                                 <option value="VKA1">VKA1</option>
@@ -432,11 +479,16 @@ function Dashboard() {
                                 <option value="VKA3">VKA3</option>
                               </select>
                             )}
-                            {hasPermission(allowedPermissions, "view_order_priority_filter") && (
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_priority_filter"
+                            ) && (
                               <select
                                 className="form-field type-priority-selector"
                                 value={selectedPriority}
-                                onChange={(e) => setSelectedPriority(e.target.value)}
+                                onChange={(e) =>
+                                  setSelectedPriority(e.target.value)
+                                }
                               >
                                 <option value="">All Priorities</option>
                                 <option value="High">High</option>
@@ -444,10 +496,7 @@ function Dashboard() {
                                 <option value="Low">Low</option>
                               </select>
                             )}
-                            {hasPermission(
-                              allowedPermissions,
-                              "add_order"
-                            ) && (
+                            {hasPermission(allowedPermissions, "add_order") && (
                               <Link className="btn" to="/orders">
                                 See All
                               </Link>
@@ -476,7 +525,8 @@ function Dashboard() {
                           .filter((order) => {
                             // Filter by order type if selected
                             const typeMatch =
-                              !selectedOrderType || order.order_type === selectedOrderType;
+                              !selectedOrderType ||
+                              order.order_type === selectedOrderType;
 
                             // Filter by priority if selected
                             const priorityMatch =
@@ -488,85 +538,86 @@ function Dashboard() {
                           })
                           .slice(0, 9)
                           .map((order) => (
-                          <tr
-                            key={order.id}
-                            className={
-                              hasPermission(
-                                allowedPermissions,
-                                "view_order_details"
-                              )
-                                ? "clickable-row"
-                                : ""
-                            }
-                            onClick={() => {
-                              if (
-                                hasPermission(
-                                  allowedPermissions,
-                                  "view_order_details"
-                                )
-                              ) {
-                                navigate(`/orders/${order.id}/details`);
-                              }
-                            }}
-                            style={{
-                              cursor: hasPermission(
-                                allowedPermissions,
-                                "view_order_details"
-                              )
-                                ? "pointer"
-                                : "default",
-                            }}
-                          >
-                            <td
+                            <tr
+                              key={order.id}
                               className={
                                 hasPermission(
                                   allowedPermissions,
                                   "view_order_details"
                                 )
-                                  ? "get-me-inside"
+                                  ? "clickable-row"
                                   : ""
                               }
+                              onClick={() => {
+                                if (
+                                  hasPermission(
+                                    allowedPermissions,
+                                    "view_order_details"
+                                  )
+                                ) {
+                                  navigate(`/orders/${order.id}/details`);
+                                }
+                              }}
+                              style={{
+                                cursor: hasPermission(
+                                  allowedPermissions,
+                                  "view_order_details"
+                                )
+                                  ? "pointer"
+                                  : "default",
+                              }}
                             >
-                              {order.order_number}
-                            </td>
-                            <td>{order.registration_number || "-"}</td>
-                            <td>{order.bank_name || "-"}</td>
-                            <td>{order.officer_name || "-"}</td>
-                            <td>{order.created_by}</td>
-                            <td>{order.updated_by || "-"}</td>
-                            <td>{order.order_type || "-"}</td>
-                            <td>
-                              <span
-                                className={`priority-badge priority-${
-                                  order.order_priority?.toLowerCase() || "none"
-                                }`}
+                              <td
+                                className={
+                                  hasPermission(
+                                    allowedPermissions,
+                                    "view_order_details"
+                                  )
+                                    ? "get-me-inside"
+                                    : ""
+                                }
                               >
-                                {order.order_priority || "-"}
-                              </span>
-                            </td>
-                            <td>
-                              <p className="status-state order-state">
-                                {order.current_status_name}
-                              </p>
-                            </td>
-                            <td style={{ textAlign: "center" }}>
-                              {hasPermission(
-                                allowedPermissions,
-                                "edit_order"
-                              ) && (
-                                <button
-                                  className="action-icons"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openEditModal(order);
-                                  }}
+                                {order.order_number}
+                              </td>
+                              <td>{order.registration_number || "-"}</td>
+                              <td>{order.bank_name || "-"}</td>
+                              <td>{order.officer_name || "-"}</td>
+                              <td>{order.created_by}</td>
+                              <td>{order.updated_by || "-"}</td>
+                              <td>{order.order_type || "-"}</td>
+                              <td>
+                                <span
+                                  className={`priority-badge priority-${
+                                    order.order_priority?.toLowerCase() ||
+                                    "none"
+                                  }`}
                                 >
-                                  <EditIcon />
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        )),
+                                  {order.order_priority || "-"}
+                                </span>
+                              </td>
+                              <td>
+                                <p className="status-state order-state">
+                                  {order.current_status_name}
+                                </p>
+                              </td>
+                              <td style={{ textAlign: "center" }}>
+                                {hasPermission(
+                                  allowedPermissions,
+                                  "edit_order"
+                                ) && (
+                                  <button
+                                    className="action-icons"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openEditModal(order);
+                                    }}
+                                  >
+                                    <EditIcon />
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          )),
                       }}
                     </CustomDataTable>
                   )}
@@ -577,77 +628,168 @@ function Dashboard() {
         )}
       </div>
       {/* just for telecoller */}
-      {isTelecaller && hasPermission(allowedPermissions, "view_dashboard_order_cards_telecaller") && (
-        <div className="telecoller-dashboard">
-          {loading ? (
-            <div className="loading-message">
-              <p>Loading orders...</p>
-            </div>
-          ) : orders && orders.length > 0 ? (
-            orders.map((order) => (
-              <div
-                key={order.id}
-                className="telecoller-dashboard-order-card clickable-card"
-                onClick={() => openEditModal(order)}
-                style={{ cursor: "pointer" }}
-              >
-                <div className="telecoller-dashboard-order-card-header">
-                  <h3>Order ID {order.order_number || "-----"}</h3>
+      {/* Telecaller with permission - show order cards */}
+      {isTelecaller &&
+        hasPermission(
+          allowedPermissions,
+          "view_dashboard_order_cards_telecaller"
+        ) && (
+          <div className="telecoller-dashboard">
+            {loading ? (
+              <div className="loading-message">
+                <p>Loading orders...</p>
+              </div>
+            ) : orders && orders.length > 0 ? (
+              orders.map((order) => (
+                <div
+                  key={order.id}
+                  className="telecoller-dashboard-order-card clickable-card"
+                  onClick={() => openEditModal(order)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <div className="telecoller-dashboard-order-card-header">
+                    <h3>Order ID {order.order_number || "-----"}</h3>
+                  </div>
+                  <div className="telecoller-dashboard-order-card-body">
+                    <div className="telecoller-dashboard-order-card-body-item">
+                      <span>Category</span>
+                      <p>{order.child_category_name || "-----"}</p>
+                    </div>
+                    <div className="telecoller-dashboard-order-card-body-item">
+                      <span>Asset Regn No.</span>
+                      <p>{order.registration_number || "-----"}</p>
+                    </div>
+                    <div className="telecoller-dashboard-order-card-body-item">
+                      <span>Client Name</span>
+                      <p>{order.customer_name || "-----"}</p>
+                    </div>
+                    <div className="telecoller-dashboard-order-card-body-item two-rows">
+                      <div className="telecoller-dashboard-order-card-body-item-inner">
+                        <span>Contact Number</span>
+                        <p>{order.contact || "-----"}</p>
+                      </div>
+                      <div className="telecoller-dashboard-order-card-body-item-inner">
+                        <span>Alternative Contact Number</span>
+                        <p>{order.alternative_contact || "-----"}</p>
+                      </div>
+                    </div>
+                    <div className="telecoller-dashboard-order-card-body-item two-rows">
+                      <div className="telecoller-dashboard-order-card-body-item-inner">
+                        <span>Supervisor Number</span>
+                        <p>{order.supervisor_number || "-----"}</p>
+                      </div>
+                      <div className="telecoller-dashboard-order-card-body-item-inner">
+                        <span>Driver Number</span>
+                        <p>{order.driver_number || "-----"}</p>
+                      </div>
+                    </div>
+                    <div className="telecoller-dashboard-order-card-body-item two-rows">
+                      <div className="telecoller-dashboard-order-card-body-item-inner">
+                        <span>Bank</span>
+                        <p>{order.bank_name || "-----"}</p>
+                      </div>
+                      <div className="telecoller-dashboard-order-card-body-item-inner">
+                        <span>Officer</span>
+                        <p>{order.officer_name || "-----"}</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="telecoller-dashboard-order-card-body">
-                  <div className="telecoller-dashboard-order-card-body-item">
-                    <span>Category</span>
-                    <p>{order.child_category_name || "-----"}</p>
-                  </div>
-                  <div className="telecoller-dashboard-order-card-body-item">
-                    <span>Asset Regn No.</span>
-                    <p>{order.registration_number || "-----"}</p>
-                  </div>
-                  <div className="telecoller-dashboard-order-card-body-item">
-                    <span>Client Name</span>
-                    <p>{order.customer_name || "-----"}</p>
-                  </div>
-                  <div className="telecoller-dashboard-order-card-body-item two-rows">
-                    <div className="telecoller-dashboard-order-card-body-item-inner">
-                      <span>Contact Number</span>
-                      <p>{order.contact || "-----"}</p>
+              ))
+            ) : (
+              <div className="no-orders-message">
+                <p>No orders found</p>
+              </div>
+            )}
+          </div>
+        )}
+      {/* End of Telecaller dashboard */}
+      {/* Manager dashboard */}
+      {isManager && (
+        <div className="manager-dashboard">
+          <div className="row">
+            <div className="col-md-6">
+              <div className="manager-dashboard-card blue-card">
+                <div className="manager-dashboard-card-header">
+                  <h2>Total Orders</h2>
+                  <p>{formatTwoDigits(orders.length)}</p>
+                </div>
+                <div className="manager-dashboard-card-body">
+                  <div className="row w-100 m-0 p-0">
+                    <div className="col-md-6 p-0">
+                      <div className="manager-dashboard-card-body-item border-right border-bottom">
+                        <span>Today's Orders</span>
+                        <p>{formatTwoDigits(todaysOrdersCount)}</p>
+                      </div>
                     </div>
-                    <div className="telecoller-dashboard-order-card-body-item-inner">
-                      <span>Alternative Contact Number</span>
-                      <p>{order.alternative_contact || "-----"}</p>
+                    <div className="col-md-6 p-0">
+                      <div className="manager-dashboard-card-body-item border-bottom">
+                        <span>Pending Orders</span>
+                        <p>{formatTwoDigits(pendingOrdersCount)}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="telecoller-dashboard-order-card-body-item two-rows">
-                    <div className="telecoller-dashboard-order-card-body-item-inner">
-                      <span>Supervisor Number</span>
-                      <p>{order.supervisor_number || "-----"}</p>
+                    <div className="col-md-6 p-0">
+                      <div className="manager-dashboard-card-body-item border-right">
+                        <span>Ongoing Orders</span>
+                        <p>{formatTwoDigits(ongoingOrdersCount)}</p>
+                      </div>
                     </div>
-                    <div className="telecoller-dashboard-order-card-body-item-inner">
-                      <span>Driver Number</span>
-                      <p>{order.driver_number || "-----"}</p>
-                    </div>
-                  </div>
-                  <div className="telecoller-dashboard-order-card-body-item two-rows">
-                    <div className="telecoller-dashboard-order-card-body-item-inner">
-                      <span>Bank</span>
-                      <p>{order.bank_name || "-----"}</p>
-                    </div>
-                    <div className="telecoller-dashboard-order-card-body-item-inner">
-                      <span>Officer</span>
-                      <p>{order.officer_name || "-----"}</p>
+                    <div className="col-md-6 p-0">
+                      <div className="manager-dashboard-card-body-item">
+                        <span>Completed Orders</span>
+                        <p>{formatTwoDigits(completedOrdersCount)}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            ))
-          ) : (
-            <div className="no-orders-message">
-              <p>No orders found</p>
             </div>
-          )}
+            <div className="col-md-6">
+              <div className="manager-dashboard-card green-card">
+                <div className="manager-dashboard-card-header">
+                  <h2>Filed Verifier</h2>
+                </div>
+                <div className="manager-dashboard-card-body">
+                  <div className="row w-100 m-0 p-0">
+                    <div className="col-md-4">
+                      <div className="manager-dashboard-card-body-item border-right">
+                        <span>Total Filed Verifier</span>
+                        <p>{formatTwoDigits(fieldVerifiers.length)}</p>
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="manager-dashboard-card-body-item border-right">
+                        <span>Active Filed Verifier</span>
+                        <p>{formatTwoDigits(activeFieldVerifiersCount)}</p>
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="manager-dashboard-card-body-item">
+                        <span>Inactive Filed Verifier</span>
+                        <p>{formatTwoDigits(inactiveFieldVerifiersCount)}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
-
+      {/* End of Manager dashboard */}
+      {/* Telecaller without permission - show welcome message only */}
+      {isTelecaller &&
+        !hasPermission(
+          allowedPermissions,
+          "view_dashboard_order_cards_telecaller"
+        ) && (
+          <div className="welcome-message-container">
+            <div className="welcome-message">
+              <h2>Welcome {currentUser?.name || "User"}</h2>
+              <p>Hope you are doing well</p>
+            </div>
+          </div>
+        )}
       {/* 👤 Form Modal (Edit) */}
       {showFormModal && (
         <FormModel>
