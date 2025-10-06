@@ -17,4 +17,5 @@ exports.seed = async function (knex) {
     password: hash,
     role_id: adminRoleId,
   });
+  
 };
