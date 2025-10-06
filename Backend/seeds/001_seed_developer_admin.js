@@ -12,7 +12,7 @@ exports.seed = async function (knex) {
   const hash = await bcrypt.hash(process.env.DEFAULT_ADMIN_PASSWORD, 10);
 
   await knex("users").insert({
-    name: "Owner",
+    name: "developer",
     email: process.env.DEFAULT_ADMIN_USERNAME,
     password: hash,
     role_id: adminRoleId,
