@@ -51,13 +51,13 @@ const corsOptions = {
   origin: [
     "http://localhost:3000",
 
-    "http://sendbox.valuetechsolutions.in",
-    "http://www.sendbox.valuetechsolutions.in",
+    "http://sandbox.valuetechsolutions.in",
+    "http://www.sandbox.valuetechsolutions.in",
     "http://valuetechsolutions.in",
     "http://www.valuetechsolutions.in",
 
-    "https://sendbox.valuetechsolutions.in",
-    "https://www.sendbox.valuetechsolutions.in",
+    "https://sandbox.valuetechsolutions.in",
+    "https://www.sandbox.valuetechsolutions.in",
     "https://valuetechsolutions.in",
     "https://www.valuetechsolutions.in",
 
