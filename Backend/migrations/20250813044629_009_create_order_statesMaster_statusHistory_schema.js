@@ -39,6 +39,8 @@ exports.up = async function (knex) {
     .references("id").inTable("users").onDelete("RESTRICT");
     
     table.string("registration_number").nullable();
+    table.string("supervisor_number", 20).nullable().comment("Supervisor contact number");
+    table.string("driver_number", 20).nullable().comment("Driver contact number");
     table.text("place_of_inspection").nullable();
     table.date("date_of_inspection").nullable();
 
@@ -49,6 +51,14 @@ exports.up = async function (knex) {
     table.string("payment_amount").nullable();
     table.string("payment_mode").nullable();
     table.string("payment_status").nullable();
+
+    table.string("order_priority").nullable();
+    table.string("order_type").nullable();
+
+    table.integer("field_verifier_id").unsigned().nullable()
+    .references("id").inTable("field_verifiers").onDelete("SET NULL");
+
+    table.string("valuer_name").nullable().comment("Name of the valuer assigned to the order");
 
     // Audit columns
     table.timestamp("created_at").defaultTo(knex.fn.now());
@@ -74,6 +84,8 @@ exports.up = async function (knex) {
 
     table.string("activity_extra").nullable();
       
+    table.string("user_type").nullable().comment("Type of user who made the change (e.g., 'field_verifier', 'portal_user')");
+
     table.integer("changed_by").unsigned().notNullable()
       .references("id").inTable("users").onDelete("RESTRICT");
 

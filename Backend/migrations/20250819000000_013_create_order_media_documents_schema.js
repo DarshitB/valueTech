@@ -17,6 +17,8 @@ exports.up = async function (knex) {
     table.string("document_type").notNullable(); // 'collage', 'report', 'documents', 'other'
     table.string("created_type").notNullable(); // 'generate', 'upload', 'other'
     
+    table.string("status").nullable();
+
     // Audit fields
     table.timestamp("created_at").defaultTo(knex.fn.now());
     table.integer("created_by").unsigned()
@@ -32,6 +34,7 @@ exports.up = async function (knex) {
     table.index("media_type");
     table.index("document_type");
     table.index("created_type");
+    table.index("status", "order_media_documents_status_idx");
     table.index("created_by");
     table.index("deleted_at");
   });
