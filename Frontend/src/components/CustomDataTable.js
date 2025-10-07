@@ -16,11 +16,12 @@ const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = tr
   // Extract raw data from row elements
   const rawData = useMemo(() => {
     return React.Children.map(rows, (row) => {
-      const cells = React.Children.toArray(row.props.children);
+      // Filter out falsy values (false, null, undefined) from children
+      const cells = React.Children.toArray(row.props.children).filter(Boolean);
       return {
         element: row,
         data: cells.map(
-          (cell) => cell.props.children?.toString().toLowerCase() ?? ""
+          (cell) => cell.props?.children?.toString().toLowerCase() ?? ""
         ),
       };
     });
@@ -145,19 +146,23 @@ const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = tr
         <table className="dataTable-table">
           <thead>
             <tr className="dataTable-table-heading-tr">
-              {React.Children.map(header.props.children, (th, index) => (
-                <th
-                  className={`dataTable-table-heading-th ${
-                    th.props.className || ""
-                  }`}
-                  onClick={() => handleSort(index)}
-                  style={th.props.style || {}}
-                >
-                  {th.props.children}
-                  {sortConfig.index === index &&
-                    (sortConfig.direction === "asc" ? " ▲" : " ▼")}
-                </th>
-              ))}
+              {React.Children.map(header.props.children, (th, index) => {
+                // Filter out falsy values (false, null, undefined)
+                if (!th) return null;
+                return (
+                  <th
+                    className={`dataTable-table-heading-th ${
+                      th.props.className || ""
+                    }`}
+                    onClick={() => handleSort(index)}
+                    style={th.props.style || {}}
+                  >
+                    {th.props.children}
+                    {sortConfig.index === index &&
+                      (sortConfig.direction === "asc" ? " ▲" : " ▼")}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -169,8 +174,11 @@ const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = tr
                 className: "hover:bg-gray-50",
                 key: element.key,
                 children: React.Children.map(element.props.children, (child, childIndex) => {
+                  // Filter out falsy values (false, null, undefined)
+                  if (!child) return null;
+                  
                   // Replace the sequential number in the first column (index 0)
-                  if (childIndex === 0 && child.props.className === "sequential-number") {
+                  if (childIndex === 0 && child.props?.className === "sequential-number") {
                     return React.cloneElement(child, {
                       children: sequentialNumber
                     });

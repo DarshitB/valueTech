@@ -59,7 +59,7 @@
   }
   .dataTable-table-container {
     height: calc(100% - 95px);
-    overflow-y: auto;
+    overflow: auto;
     .dataTable-table {
       width: 100%;
       height: auto;
@@ -165,7 +165,24 @@
     }
   }
 }
-
+.order-data-container {
+  .dataTable-container {
+    .dataTable-table-container {
+      .dataTable-table {
+        width: max-content;
+      }
+    }
+  }
+}
+.dashboard-order-table {
+  .dataTable-container {
+    .dataTable-table-container {
+      .dataTable-table {
+        width: max-content;
+      }
+    }
+  }
+}
 @media (max-width: 676px) {
   .dataTable-container {
     padding: 20px;

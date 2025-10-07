@@ -445,7 +445,7 @@ function Dashboard() {
             )}
             {hasOrderTablePermission && (
               <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12">
-                <div className="orders-container">
+                <div className="orders-container dashboard-order-table">
                   {loading ? (
                     <p>Loading...</p>
                   ) : (
@@ -505,20 +505,94 @@ function Dashboard() {
                         ),
                         header: (
                           <tr>
-                            <th style={{ width: "150px" }}>Order Number</th>
-                            <th style={{ width: "200px" }}>
-                              Registration Number
-                            </th>
-                            <th style={{ width: "150px" }}>Bank</th>
-                            <th style={{ width: "150px" }}>Officer</th>
-                            <th style={{ width: "120px" }}>Created By</th>
-                            <th>Updated By</th>
-                            <th style={{ width: "120px" }}>Type</th>
-                            <th style={{ width: "120px" }}>Priority</th>
-                            <th style={{ width: "175px" }}>Status</th>
-                            <th style={{ textAlign: "center", width: "100px" }}>
-                              Action
-                            </th>
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_table_order_number_db"
+                            ) && (
+                              <th style={{ width: "150px" }}>Order Number</th>
+                            )}
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_table_category_db"
+                            ) && <th style={{ width: "150px" }}>Category</th>}
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_table_asset_category_db"
+                            ) && (
+                              <th style={{ width: "150px" }}>Asset Category</th>
+                            )}
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_table_sub_category_db"
+                            ) && (
+                              <th style={{ width: "150px" }}>Subcategory</th>
+                            )}
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_table_manager_db"
+                            ) && <th style={{ width: "150px" }}>Manager</th>}
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_table_field_verifier_db"
+                            ) && (
+                              <th style={{ width: "150px" }}>Field Verifier</th>
+                            )}
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_table_Bank_db"
+                            ) && <th style={{ width: "150px" }}>Bank</th>}
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_table_Bank_Branch_db"
+                            ) && <th style={{ width: "150px" }}>Branch</th>}
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_table_Branch_Officer_db"
+                            ) && <th style={{ width: "150px" }}>Officer</th>}
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_table_registration_number_db"
+                            ) && (
+                              <th style={{ width: "200px" }}>
+                                Registration Number
+                              </th>
+                            )}
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_table_created_by_db"
+                            ) && <th style={{ width: "120px" }}>Created By</th>}
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_table_updated_by_db"
+                            ) && <th>Updated By</th>}
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_table_priority_db"
+                            ) && <th style={{ width: "120px" }}>Priority</th>}
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_table_type_db"
+                            ) && <th style={{ width: "120px" }}>Type</th>}
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_table_valuer_name_db"
+                            ) && (
+                              <th style={{ width: "120px" }}>Valuer Name</th>
+                            )}
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_table_status_db"
+                            ) && <th style={{ width: "175px" }}>Status</th>}
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_table_action_db"
+                            ) && (
+                              <th
+                                style={{ textAlign: "center", width: "200px" }}
+                              >
+                                Action
+                              </th>
+                            )}
                           </tr>
                         ),
                         rows: orders
@@ -567,55 +641,121 @@ function Dashboard() {
                                   : "default",
                               }}
                             >
-                              <td
-                                className={
-                                  hasPermission(
-                                    allowedPermissions,
-                                    "view_order_details"
-                                  )
-                                    ? "get-me-inside"
-                                    : ""
-                                }
-                              >
-                                {order.order_number}
-                              </td>
-                              <td>{order.registration_number || "-"}</td>
-                              <td>{order.bank_name || "-"}</td>
-                              <td>{order.officer_name || "-"}</td>
-                              <td>{order.created_by}</td>
-                              <td>{order.updated_by || "-"}</td>
-                              <td>{order.order_type || "-"}</td>
-                              <td>
-                                <span
-                                  className={`priority-badge priority-${
-                                    order.order_priority?.toLowerCase() ||
-                                    "none"
-                                  }`}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_order_number_db"
+                              ) && (
+                                <td
+                                  className={
+                                    hasPermission(
+                                      allowedPermissions,
+                                      "view_order_details"
+                                    )
+                                      ? "get-me-inside"
+                                      : ""
+                                  }
                                 >
-                                  {order.order_priority || "-"}
-                                </span>
-                              </td>
-                              <td>
-                                <p className="status-state order-state">
-                                  {order.current_status_name}
-                                </p>
-                              </td>
-                              <td style={{ textAlign: "center" }}>
-                                {hasPermission(
-                                  allowedPermissions,
-                                  "edit_order"
-                                ) && (
-                                  <button
-                                    className="action-icons"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      openEditModal(order);
-                                    }}
+                                  {order.order_number}
+                                </td>
+                              )}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_category_db"
+                              ) && <td>{order.category_name || "-"}</td>}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_asset_category_db"
+                              ) && <td>{order.sub_category_name || "-"}</td>}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_sub_category_db"
+                              ) && <td>{order.child_category_name || "-"}</td>}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_manager_db"
+                              ) && <td>{order.manager_name || "-"}</td>}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_field_verifier_db"
+                              ) && <td>{order.field_verifier_name || "-"}</td>}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_Bank_db"
+                              ) && <td>{order.bank_name || "-"}</td>}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_Bank_Branch_db"
+                              ) && <td>{order.branch_name || "-"}</td>}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_Branch_Officer_db"
+                              ) && <td>{order.officer_name || "-"}</td>}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_registration_number_db"
+                              ) && <td>{order.registration_number || "-"}</td>}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_created_by_db"
+                              ) && <td>{order.created_by}</td>}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_updated_by_db"
+                              ) && <td>{order.updated_by || "-"}</td>}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_priority_db"
+                              ) && (
+                                <td>
+                                  <span
+                                    className={`priority-badge priority-${
+                                      order.order_priority?.toLowerCase() ||
+                                      "none"
+                                    }`}
                                   >
-                                    <EditIcon />
-                                  </button>
-                                )}
-                              </td>
+                                    {order.order_priority || "-"}
+                                  </span>
+                                </td>
+                              )}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_type_db"
+                              ) && <td>{order.order_type || "-"}</td>}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_valuer_name_db"
+                              ) && <td>{order.valuer_name || "-"}</td>}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_status_db"
+                              ) && (
+                                <td>
+                                  <p className="status-state order-state">
+                                    {order.current_status_name}
+                                  </p>
+                                </td>
+                              )}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_action_db"
+                              ) && (
+                                <td style={{ textAlign: "center" }}>
+                                  {hasPermission(
+                                    allowedPermissions,
+                                    "edit_order"
+                                  ) && (
+                                    <button
+                                      className="action-icons"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openEditModal(order);
+                                      }}
+                                    >
+                                      <EditIcon />
+                                    </button>
+                                  )}
+                                </td>
+                              )}
                             </tr>
                           )),
                       }}

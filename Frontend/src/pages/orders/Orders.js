@@ -98,12 +98,15 @@ function Orders() {
   const [selectedPriority, setSelectedPriority] = useState("");
 
   // Check if current user is TELECALLER (case-insensitive) - matches any role containing "TELECALLER"
-  const isTelecaller = currentUser?.role.name?.toUpperCase().includes("TELECALLER");
+  const isTelecaller = currentUser?.role.name
+    ?.toUpperCase()
+    .includes("TELECALLER");
   /* console.log("isTelecaller", currentUser?.role.name); */
 
   // Check if current user is Bank Officer (case-insensitive) - matches any role containing "BANK OFFICER"
-  const isBankOfficer =
-    currentUser?.role.name?.toUpperCase().includes("BANK OFFICER");
+  const isBankOfficer = currentUser?.role.name
+    ?.toUpperCase()
+    .includes("BANK OFFICER");
   /* console.log("isBankOfficer", currentUser?.role.name); */
 
   // Check if current user is MANAGER (case-insensitive) - matches any role containing "MANAGER"
@@ -111,7 +114,9 @@ function Orders() {
   /* console.log("isManager", currentUser?.role.name); */
 
   // Check if current user is Super Admin (case-insensitive) - matches any role containing "SUPER ADMIN"
-  const isSuperAdmin = currentUser?.role.name?.toUpperCase().includes("SUPER ADMIN");
+  const isSuperAdmin = currentUser?.role.name
+    ?.toUpperCase()
+    .includes("SUPER ADMIN");
   /* console.log("isSuperAdmin", currentUser?.role.name); */
 
   // Filter users by role for officer and manager selection
@@ -121,8 +126,8 @@ function Orders() {
       officer.role_name.toUpperCase().includes("BANK AUTHORITY")
   );
 
-  const managers = users.filter(
-    (user) => user.role_name.toUpperCase().includes("MANAGER")
+  const managers = users.filter((user) =>
+    user.role_name.toUpperCase().includes("MANAGER")
   );
 
   // Fields allowed for TELECALLER role
@@ -255,38 +260,54 @@ function Orders() {
 
     // Build payload based on add vs edit mode
     let payload = {};
-    
+
     if (isEdit) {
       // For edit mode, only include changed fields
-      const currentOrder = orders.find(order => order.id === editOrderId);
-      
+      const currentOrder = orders.find((order) => order.id === editOrderId);
+
       // Always include required fields for edit
       payload.customer_name = formData.customer_name.trim();
       payload.contact = formData.contact.trim();
-      
+
       // Only include other fields if they have changed
-      if (formData.alternative_contact !== (currentOrder.alternative_contact || "")) {
-        payload.alternative_contact = formData.alternative_contact.trim() || null;
+      if (
+        formData.alternative_contact !==
+        (currentOrder.alternative_contact || "")
+      ) {
+        payload.alternative_contact =
+          formData.alternative_contact.trim() || null;
       }
-      
-      if (formData.supervisor_number !== (currentOrder.supervisor_number || "")) {
+
+      if (
+        formData.supervisor_number !== (currentOrder.supervisor_number || "")
+      ) {
         payload.supervisor_number = formData.supervisor_number.trim() || null;
       }
-      
+
       if (formData.driver_number !== (currentOrder.driver_number || "")) {
         payload.driver_number = formData.driver_number.trim() || null;
       }
-      
-      if (formData.child_category_id !== (currentOrder.child_category_id || "")) {
+
+      if (
+        formData.child_category_id !== (currentOrder.child_category_id || "")
+      ) {
         payload.child_category_id = formData.child_category_id;
       }
-      
-      if (formData.registration_number !== (currentOrder.registration_number || "")) {
-        payload.registration_number = formData.registration_number.trim() || null;
+
+      if (
+        formData.registration_number !==
+        (currentOrder.registration_number || "")
+      ) {
+        payload.registration_number =
+          formData.registration_number.trim() || null;
       }
-      
-      if (formData.place_of_inspection !== (currentOrder.place_of_inspection || "")) {
-        payload.place_of_inspection = formData.place_of_inspection.trim() || null;
+
+      if (
+        formData.place_of_inspection !==
+        (currentOrder.place_of_inspection || "")
+      ) {
+        payload.place_of_inspection =
+          formData.place_of_inspection.trim() || null;
       }
     } else {
       // For add mode, include all fields
@@ -353,16 +374,16 @@ function Orders() {
 
     // For edit mode, only include these fields if they have changed
     if (isEdit) {
-      const currentOrder = orders.find(order => order.id === editOrderId);
-      
+      const currentOrder = orders.find((order) => order.id === editOrderId);
+
       if (newOfficerId !== (currentOrder.officer_id || null)) {
         payload.officer_id = newOfficerId;
       }
-      
+
       if (newManagerId !== (currentOrder.manager_id || null)) {
         payload.manager_id = newManagerId;
       }
-      
+
       if (newFieldVerifierId !== (currentOrder.field_verifier_id || null)) {
         payload.field_verifier_id = newFieldVerifierId;
       }
@@ -403,12 +424,12 @@ function Orders() {
   // Open Order Attributes Modal
   const openAttributesModal = (order) => {
     setAttributesOrderId(order.id);
-    
+
     // Map assigned_users to admin_user_ids for pre-selection
-    const assignedUserIds = order.assigned_users 
-      ? order.assigned_users.map(user => user.id)
+    const assignedUserIds = order.assigned_users
+      ? order.assigned_users.map((user) => user.id)
       : [];
-    
+
     setAttributesFormData({
       order_priority: order.order_priority || "",
       order_type: order.order_type || "",
@@ -420,17 +441,23 @@ function Orders() {
 
   // Handle Order Attributes Submit
   const handleAttributesSubmit = async () => {
-    const canEditPriority = hasPermission(allowedPermissions, "edit_order_priority");
+    const canEditPriority = hasPermission(
+      allowedPermissions,
+      "edit_order_priority"
+    );
     const canEditType = hasPermission(allowedPermissions, "edit_order_type");
-    const canEditValuerName = hasPermission(allowedPermissions, "edit_valuer_name_to_order");
+    const canEditValuerName = hasPermission(
+      allowedPermissions,
+      "edit_valuer_name_to_order"
+    );
 
     // Build payload with only the fields that user has permission to edit and have values
     const payload = {};
-    
+
     if (canEditPriority && attributesFormData.order_priority) {
       payload.order_priority = attributesFormData.order_priority;
     }
-    
+
     if (canEditType && attributesFormData.order_type) {
       payload.order_type = attributesFormData.order_type;
     }
@@ -442,24 +469,30 @@ function Orders() {
     // Always include user_ids array (even if empty) to handle user removal from backend
     if (Array.isArray(attributesFormData.admin_user_ids)) {
       // Always send as array - empty array to clear assignments, populated array to set assignments
-      payload.user_ids = attributesFormData.admin_user_ids.map((id) => Number(id)).filter((n) => !Number.isNaN(n));
+      payload.user_ids = attributesFormData.admin_user_ids
+        .map((id) => Number(id))
+        .filter((n) => !Number.isNaN(n));
     }
 
     // Check if at least one field has a value that user can edit
     // Note: user_ids is always an array (empty array clears assignments), so it's always considered a valid field
-    const hasValidFields = Object.keys(payload).some(key => {
-      if (key === 'user_ids') {
+    const hasValidFields = Object.keys(payload).some((key) => {
+      if (key === "user_ids") {
         return true; // user_ids field is always valid (even if empty array)
       }
-      return payload[key] !== null && payload[key] !== undefined && payload[key] !== "";
+      return (
+        payload[key] !== null &&
+        payload[key] !== undefined &&
+        payload[key] !== ""
+      );
     });
-    
+
     if (!hasValidFields) {
       const availableFields = [];
       if (canEditPriority) availableFields.push("priority");
       if (canEditType) availableFields.push("type");
       if (canEditValuerName) availableFields.push("valuer name");
-      
+
       toast.error(`Please select ${availableFields.join(" or ")} to update.`);
       return;
     }
@@ -477,36 +510,38 @@ function Orders() {
         admin_user_ids: [],
       });
     } catch (err) {
-      toast.error(typeof err === "string" ? err : "Failed to update attributes");
+      toast.error(
+        typeof err === "string" ? err : "Failed to update attributes"
+      );
     }
   };
 
   // Compute users options (show all users except specific roles)
   const adminUsersOptions = React.useMemo(() => {
     if (!Array.isArray(users)) return [];
-    
+
     // Define excluded roles (case-insensitive)
     const excludedRoles = [
       "DEVELOPER_ADMIN",
-      "SUPER ADMIN", 
+      "SUPER ADMIN",
       "MANAGER",
       "TELECALLER",
       "BANK AUTHORITY",
-      "BANK OFFICER"
+      "BANK OFFICER",
     ];
-    
+
     return users
       .filter((u) => {
         const roleName = String(u.role_name || "").toUpperCase();
-        
+
         // Check if role includes any excluded role (case-insensitive, space-agnostic)
-        const isExcluded = excludedRoles.some(excludedRole => {
+        const isExcluded = excludedRoles.some((excludedRole) => {
           // Remove spaces and normalize both role names for comparison
           const normalizedRoleName = roleName.replace(/\s+/g, "");
           const normalizedExcludedRole = excludedRole.replace(/\s+/g, "");
           return normalizedRoleName.includes(normalizedExcludedRole);
         });
-        
+
         return !isExcluded;
       })
       .map((u) => ({ value: u.id, label: `${u.name} (${u.role_name})` }));
@@ -522,7 +557,10 @@ function Orders() {
               <div
                 style={{ display: "flex", gap: "10px", alignItems: "center" }}
               >
-                {hasPermission(allowedPermissions, "view_order_type_filter") && (
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_type_filter"
+                ) && (
                   <select
                     className="form-field type-priority-selector"
                     value={selectedOrderType}
@@ -534,7 +572,10 @@ function Orders() {
                     <option value="VKA3">VKA3</option>
                   </select>
                 )}
-                {hasPermission(allowedPermissions, "view_order_priority_filter") && (
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_priority_filter"
+                ) && (
                   <select
                     className="form-field type-priority-selector"
                     value={selectedPriority}
@@ -555,16 +596,76 @@ function Orders() {
             ),
             header: (
               <tr>
-                <th style={{ width: "150px" }}>Order Number</th>
-                <th style={{ width: "150px" }}>Officer</th>
-                <th style={{ width: "200px" }}>Registration Number</th>
-                <th style={{ width: "120px" }}>Bank</th>
-                <th style={{ width: "120px" }}>Created By</th>
-                <th>Updated By</th>
-                <th style={{ width: "120px" }}>Type</th>
-                <th style={{ width: "120px" }}>Priority</th>
-                <th style={{ width: "175px" }}>Status</th>
-                <th style={{ textAlign: "center", width: "200px" }}>Action</th>
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_table_order_number"
+                ) && <th style={{ width: "150px" }}>Order Number</th>}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_table_category"
+                ) && <th style={{ width: "150px" }}>Category</th>}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_table_asset_category"
+                ) && <th style={{ width: "150px" }}>Asset Category</th>}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_table_sub_category"
+                ) && <th style={{ width: "150px" }}>Subcategory</th>}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_table_manager"
+                ) && <th style={{ width: "150px" }}>Manager</th>}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_table_field_verifier"
+                ) && <th style={{ width: "150px" }}>Field Verifier</th>}
+                {hasPermission(allowedPermissions, "view_order_table_Bank") && (
+                  <th style={{ width: "150px" }}>Bank</th>
+                )}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_table_Bank_Branch"
+                ) && <th style={{ width: "150px" }}>Branch</th>}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_table_Branch_Officer"
+                ) && <th style={{ width: "150px" }}>Officer</th>}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_table_registration_number"
+                ) && <th style={{ width: "200px" }}>Registration Number</th>}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_table_created_by"
+                ) && <th style={{ width: "120px" }}>Created By</th>}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_table_updated_by"
+                ) && <th>Updated By</th>}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_table_priority"
+                ) && <th style={{ width: "120px" }}>Priority</th>}
+                {hasPermission(allowedPermissions, "view_order_table_type") && (
+                  <th style={{ width: "120px" }}>Type</th>
+                )}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_table_valuer_name"
+                ) && <th style={{ width: "120px" }}>Valuer Name</th>}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_table_status"
+                ) && <th style={{ width: "175px" }}>Status</th>}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_table_action"
+                ) && (
+                  <th style={{ textAlign: "center", width: "200px" }}>
+                    Action
+                  </th>
+                )}
               </tr>
             ),
             rows: orders
@@ -605,73 +706,144 @@ function Orders() {
                       : "default",
                   }}
                 >
-                  <td
-                    className={
-                      hasPermission(allowedPermissions, "view_order_details")
-                        ? "get-me-inside"
-                        : ""
-                    }
-                  >
-                    {order.order_number}
-                  </td>
-                  <td>{order.officer_name || "-"}</td>
-                  <td>{order.registration_number || "-"}</td>
-                  <td>{order.bank_name || "-"}</td>
-
-                  <td>{order.created_by}</td>
-                  <td>{order.updated_by || "-"}</td>
-                  <td>{order.order_type || "-"}</td>
-                  <td>
-                    <span
-                      className={`priority-badge priority-${
-                        order.order_priority?.toLowerCase() || "none"
-                      }`}
+                  {hasPermission(
+                    allowedPermissions,
+                    "view_order_table_order_number"
+                  ) && (
+                    <td
+                      className={
+                        hasPermission(allowedPermissions, "view_order_details")
+                          ? "get-me-inside"
+                          : ""
+                      }
                     >
-                      {order.order_priority || "-"}
-                    </span>
-                  </td>
-                  <td>
-                    <p className="status-state order-state">
-                      {order.current_status_name}
-                    </p>
-                  </td>
-                  <td style={{ textAlign: "center" }}>
-                    {hasPermission(allowedPermissions, "edit_order") && (
-                      <button
-                        className="action-icons"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openEditModal(order);
-                        }}
+                      {order.order_number}
+                    </td>
+                  )}
+                  {hasPermission(
+                    allowedPermissions,
+                    "view_order_table_category"
+                  ) && <td>{order.category_name || "-"}</td>}
+                  {hasPermission(
+                    allowedPermissions,
+                    "view_order_table_asset_category"
+                  ) && <td>{order.sub_category_name || "-"}</td>}
+                  {hasPermission(
+                    allowedPermissions,
+                    "view_order_table_sub_category"
+                  ) && <td>{order.child_category_name || "-"}</td>}
+                  {hasPermission(
+                    allowedPermissions,
+                    "view_order_table_manager"
+                  ) && <td>{order.manager_name || "-"}</td>}
+                  {hasPermission(
+                    allowedPermissions,
+                    "view_order_table_field_verifier"
+                  ) && <td>{order.field_verifier_name || "-"}</td>}
+                  {hasPermission(
+                    allowedPermissions,
+                    "view_order_table_Bank"
+                  ) && <td>{order.bank_name || "-"}</td>}
+                  {hasPermission(
+                    allowedPermissions,
+                    "view_order_table_Bank_Branch"
+                  ) && <td>{order.branch_name || "-"}</td>}
+                  {hasPermission(
+                    allowedPermissions,
+                    "view_order_table_Branch_Officer"
+                  ) && <td>{order.officer_name || "-"}</td>}
+                  {hasPermission(
+                    allowedPermissions,
+                    "view_order_table_registration_number"
+                  ) && <td>{order.registration_number || "-"}</td>}
+                  {hasPermission(
+                    allowedPermissions,
+                    "view_order_table_created_by"
+                  ) && <td>{order.created_by}</td>}
+                  {hasPermission(
+                    allowedPermissions,
+                    "view_order_table_updated_by"
+                  ) && <td>{order.updated_by || "-"}</td>}
+                  {hasPermission(
+                    allowedPermissions,
+                    "view_order_table_priority"
+                  ) && (
+                    <td>
+                      <span
+                        className={`priority-badge priority-${
+                          order.order_priority?.toLowerCase() || "none"
+                        }`}
                       >
-                        <EditIcon />
-                      </button>
-                    )}
-                    {hasPermission(allowedPermissions, "delete_order") && (
-                      <button
-                        className="action-icons"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          confirmDelete(order.id, order.customer_name);
-                        }}
-                      >
-                        <DeleteIcon />
-                      </button>
-                    )}
-                    {(hasPermission(allowedPermissions, "edit_order_priority") ||
-                      hasPermission(allowedPermissions, "edit_order_type") ||
-                      hasPermission(allowedPermissions, "edit_valuer_name_to_order")) && (
-                      <button
-                        className="action-icons"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openAttributesModal(order);
-                        }}
-                      >
-                        <EditIcon />
-                      </button>
-                    )}
-                  </td>
+                        {order.order_priority || "-"}
+                      </span>
+                    </td>
+                  )}
+                  {hasPermission(
+                    allowedPermissions,
+                    "view_order_table_type"
+                  ) && <td>{order.order_type || "-"}</td>}
+                  {hasPermission(
+                    allowedPermissions,
+                    "view_order_table_valuer_name"
+                  ) && <td>{order.valuer_name || "-"}</td>}
+                  {hasPermission(
+                    allowedPermissions,
+                    "view_order_table_status"
+                  ) && (
+                    <td>
+                      <p className="status-state order-state">
+                        {order.current_status_name}
+                      </p>
+                    </td>
+                  )}
+                  {hasPermission(
+                    allowedPermissions,
+                    "view_order_table_action"
+                  ) && (
+                    <td style={{ textAlign: "center" }}>
+                      {hasPermission(allowedPermissions, "edit_order") && (
+                        <button
+                          className="action-icons"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditModal(order);
+                          }}
+                        >
+                          <EditIcon />
+                        </button>
+                      )}
+                      {hasPermission(allowedPermissions, "delete_order") && (
+                        <button
+                          className="action-icons"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            confirmDelete(order.id, order.customer_name);
+                          }}
+                        >
+                          <DeleteIcon />
+                        </button>
+                      )}
+                      {(hasPermission(
+                        allowedPermissions,
+                        "edit_order_priority"
+                      ) ||
+                        hasPermission(allowedPermissions, "edit_order_type") ||
+                        hasPermission(
+                          allowedPermissions,
+                          "edit_valuer_name_to_order"
+                        )) && (
+                        <button
+                          className="action-icons"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openAttributesModal(order);
+                          }}
+                        >
+                          <EditIcon />
+                        </button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               )),
           }}
@@ -949,10 +1121,11 @@ function Orders() {
                   {/* Field Verifier - Show when manager is assigned, user is MANAGER, or user has permission to edit manager field (but not Bank Officer) */}
                   {(formData.manager_id || isManager || isSuperAdmin) &&
                     !isBankOfficer &&
-                    (isManager || hasPermission(
-                      allowedPermissions,
-                      "view_order_add_edit_manager_filed"
-                    )) && (
+                    (isManager ||
+                      hasPermission(
+                        allowedPermissions,
+                        "view_order_add_edit_manager_filed"
+                      )) && (
                       <div className="form-group">
                         <label htmlFor="fieldVerifierField">
                           Field Verifier
@@ -1087,9 +1260,7 @@ function Orders() {
                               type="radio"
                               name="order_type"
                               value={type}
-                              checked={
-                                attributesFormData.order_type === type
-                              }
+                              checked={attributesFormData.order_type === type}
                               onChange={(e) =>
                                 setAttributesFormData({
                                   ...attributesFormData,
@@ -1104,15 +1275,27 @@ function Orders() {
                     </div>
                   )}
 
-                  {hasPermission(allowedPermissions, "edit_valuer_name_to_order") && (
+                  {hasPermission(
+                    allowedPermissions,
+                    "edit_valuer_name_to_order"
+                  ) && (
                     <div className="form-group">
                       <label>Valuer Name</label>
                       <SingleSearchSelect
                         className="search-selector"
                         options={[
-                          { value: "V.K. ASSOCIATES", label: "V.K. ASSOCIATES" },
-                          { value: "VALUETECH SOLUTIONS", label: "VALUETECH SOLUTIONS" },
-                          { value: "VISHAL D. KOTHARI", label: "VISHAL D. KOTHARI" },
+                          {
+                            value: "V.K. ASSOCIATES",
+                            label: "V.K. ASSOCIATES",
+                          },
+                          {
+                            value: "VALUETECH SOLUTIONS",
+                            label: "VALUETECH SOLUTIONS",
+                          },
+                          {
+                            value: "VISHAL D. KOTHARI",
+                            label: "VISHAL D. KOTHARI",
+                          },
                         ]}
                         value={attributesFormData.valuer_name}
                         onChange={(value) =>
