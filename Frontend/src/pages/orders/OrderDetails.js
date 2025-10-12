@@ -14,7 +14,10 @@ import {
   addComment,
   updatePaymentStatus,
 } from "../../redux/reducers/orderReducer";
-import { fetchApprovedOrderMediaDocuments } from "../../redux/reducers/orderMediaDocumentsReducer";
+import {
+  fetchApprovedOrderMediaDocuments,
+  fetchOrderMediaDocuments,
+} from "../../redux/reducers/orderMediaDocumentsReducer";
 import { fetchOfficers } from "../../redux/reducers/officerReducer";
 import { getUsers } from "../../api/user.api";
 import { MentionsInput, Mention } from "react-mentions";
@@ -96,7 +99,7 @@ function OrderDetails() {
   const order = useSelector((state) => state.orders.selected);
   const comments = useSelector((state) => state.orders.comments);
   const paymentUpdating = useSelector((state) => state.orders.paymentUpdating);
-  const { approvedDocuments, approvedLoading } = useSelector(
+  const { approvedDocuments, approvedLoading, documents } = useSelector(
     (state) => state.orderMediaDocuments
   );
   const { list: officers } = useSelector((state) => state.officers);
@@ -145,6 +148,7 @@ function OrderDetails() {
       dispatch(fetchOrderById(id));
       dispatch(fetchComments(id));
       dispatch(fetchOfficers());
+      dispatch(fetchOrderMediaDocuments(id));
     }
   }, [dispatch, id]);
 
@@ -325,12 +329,72 @@ function OrderDetails() {
   const showValue = (val) =>
     val === null || val === undefined || val === "" ? "-" : val;
 
+  // Format date to IST with custom format
+  const formatDateToIST = (dateString) => {
+    if (!dateString) return "-";
+
+    try {
+      const date = new Date(dateString);
+
+      // Convert to IST (UTC+5:30)
+      const istDate = new Date(date.getTime() + 5.5 * 60 * 60 * 1000);
+
+      // Format as DD/MM/YYYY HH:MM AM/PM
+      const day = String(istDate.getUTCDate()).padStart(2, "0");
+      const month = String(istDate.getUTCMonth() + 1).padStart(2, "0");
+      const year = istDate.getUTCFullYear();
+
+      let hours = istDate.getUTCHours();
+      const minutes = String(istDate.getUTCMinutes()).padStart(2, "0");
+      const ampm = hours >= 12 ? "PM" : "AM";
+
+      // Convert to 12-hour format
+      hours = hours % 12;
+      hours = hours ? hours : 12; // 0 should be 12
+      hours = String(hours).padStart(2, "0");
+
+      return `${day}/${month}/${year} ${hours}:${minutes}${ampm}`;
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return dateString; // Return original if formatting fails
+    }
+  };
+
   // Helper function to show toast error for missing valuer name
   const showValuerNameError = (reportType) => {
     toast.error(
       `Please set a valuer name for this order before accessing the ${reportType} report.`
     );
   };
+
+  // Check if order has at least one collage and one report
+  const hasCollageAndReport = useMemo(() => {
+    // Use documents instead of approvedDocuments since they're available immediately
+    const documentsToCheck = documents?.documents || documents;
+
+    if (!documentsToCheck || !Array.isArray(documentsToCheck)) {
+      console.log("No documents or not array:", documentsToCheck);
+      return false;
+    }
+
+    console.log("All documents:", documentsToCheck);
+
+    const collages = documentsToCheck.filter(
+      (doc) => doc.document_type === "collage"
+    );
+    const reports = documentsToCheck.filter(
+      (doc) => doc.document_type === "report"
+    );
+
+    console.log("Collages found:", collages);
+    console.log("Reports found:", reports);
+    console.log(
+      "Has both collage and report:",
+      collages.length > 0 && reports.length > 0
+    );
+
+    return collages.length > 0 && reports.length > 0;
+  }, [documents]);
 
   // Helper function to get filename from media URL - Secure implementation
   const getFilenameFromMediaUrl = (media_url) => {
@@ -920,14 +984,24 @@ function OrderDetails() {
               <p>Order Number</p>
               <h6>{showValue(order?.order_number)}</h6>
             </div>
-            <div className="order-impo-info-card">
-              <p>Order Status</p>
-              <h6>{showValue(order?.current_status_name)}</h6>
-            </div>
-            <div className="order-impo-info-card">
-              <p>Payment Status</p>
-              <h6>{order?.payment_status ? order.payment_status : "-"}</h6>
-            </div>
+            {hasPermission(
+              allowedPermissions,
+              "view_order_details_order_status"
+            ) && (
+              <div className="order-impo-info-card">
+                <p>Order Status</p>
+                <h6>{showValue(order?.current_status_name)}</h6>
+              </div>
+            )}
+            {hasPermission(
+              allowedPermissions,
+              "view_order_details_payment_status"
+            ) && (
+              <div className="order-impo-info-card">
+                <p>Payment Status</p>
+                <h6>{order?.payment_status ? order.payment_status : "-"}</h6>
+              </div>
+            )}
           </div>
         </div>
         {/* Main content area for order details */}
@@ -1067,7 +1141,7 @@ function OrderDetails() {
                         </p>
                       </div>
                       <div className="order-details-info-set-details">
-                        <p>{showValue(order?.date_of_inspection)}</p>
+                        <p>{formatDateToIST(order?.date_of_inspection)}</p>
                       </div>
                     </div>
                   </div>
@@ -1112,28 +1186,38 @@ function OrderDetails() {
                         <p>{showValue(order?.officer_name)}</p>
                       </div>
                     </div>
-                    <div className="order-details-info-set">
-                      <div className="order-details-info-set-heading">
-                        <p>
-                          <span>Manager</span>
-                          <span>:</span>
-                        </p>
+                    {hasPermission(
+                      allowedPermissions,
+                      "view_order_details_manager_name"
+                    ) && (
+                      <div className="order-details-info-set">
+                        <div className="order-details-info-set-heading">
+                          <p>
+                            <span>Manager</span>
+                            <span>:</span>
+                          </p>
+                        </div>
+                        <div className="order-details-info-set-details">
+                          <p>{showValue(order?.manager_name)}</p>
+                        </div>
                       </div>
-                      <div className="order-details-info-set-details">
-                        <p>{showValue(order?.manager_name)}</p>
+                    )}
+                    {hasPermission(
+                      allowedPermissions,
+                      "view_order_details_field_verifier_name"
+                    ) && (
+                      <div className="order-details-info-set">
+                        <div className="order-details-info-set-heading">
+                          <p>
+                            <span>Field Verifier</span>
+                            <span>:</span>
+                          </p>
+                        </div>
+                        <div className="order-details-info-set-details">
+                          <p>{showValue(order?.field_verifier_name)}</p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="order-details-info-set">
-                      <div className="order-details-info-set-heading">
-                        <p>
-                          <span>Field Verifier</span>
-                          <span>:</span>
-                        </p>
-                      </div>
-                      <div className="order-details-info-set-details">
-                        <p>{showValue(order?.field_verifier_name)}</p>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1364,26 +1448,46 @@ function OrderDetails() {
                   </>
                 )}
 
-                <Link title="Approve" className="tooltip-link">
-                  <ApprovedIcon />
-                </Link>
-                <Link title="Validate" className="tooltip-link">
-                  <ValidateIcon />
-                </Link>
-                <Link
-                  title="Payment"
-                  className="tooltip-link"
-                  onClick={OpenPaymentModal}
-                >
-                  <PaymentIcon />
-                </Link>
-                <Link
-                  title="Mail"
-                  className="tooltip-link"
-                  onClick={OpenMailModal}
-                >
-                  <MailIcon />
-                </Link>
+                {hasCollageAndReport && hasPermission(
+                  allowedPermissions,
+                  "view_order_complete_button"
+                ) && (
+                  <Link title="Complete" className="tooltip-link">
+                    <ValidateIcon />
+                  </Link>
+                )}
+                {hasCollageAndReport && hasPermission(
+                  allowedPermissions,
+                  "view_order_authenticate_button"
+                ) && (
+                  <Link title="Authenticate" className="tooltip-link">
+                    <ApprovedIcon />
+                  </Link>
+                )}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_payment_button"
+                ) && (
+                  <Link
+                    title="Payment"
+                    className="tooltip-link"
+                    onClick={OpenPaymentModal}
+                  >
+                    <PaymentIcon />
+                  </Link>
+                )}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_mail_button"
+                ) && (
+                  <Link
+                    title="Mail"
+                    className="tooltip-link"
+                    onClick={OpenMailModal}
+                  >
+                    <MailIcon />
+                  </Link>
+                )}
               </div>
             </div>
             {hasPermission(

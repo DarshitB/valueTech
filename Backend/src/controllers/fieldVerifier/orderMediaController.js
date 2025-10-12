@@ -12,6 +12,7 @@ const { insertMedia, getOrderByNumber } = require('../../models/fieldVerifier/or
 const Order = require('../../models/orders/order');
 const OrderStatusHistory = require('../../models/orders/orderStatusHistory');
 const { BadRequestError, NotFoundError } = require('../../utils/customErrors');
+const db = require("../../../db");
 
 /**
  * Helper: write base64 data to temp file and return path + filename
@@ -35,12 +36,26 @@ function writeBase64ToTemp(dataUrl) {
  */
 async function updateOrderStatusToAssetsSubmitted(orderId, verifierId, imageCount = 0) {
   try {
-    // Update order status to 6 (Assets Submitted)
-    await Order.updateOrder(orderId, {
+    // Direct query to check if date_of_inspection is already set
+    const currentOrder = await db('orders')
+      .select('date_of_inspection')
+      .where('id', orderId)
+      .first();
+    
+    // Prepare update data
+    const updateData = {
       current_status_id: 6,
       updated_at: new Date(),
       updated_by: verifierId
-    });
+    };
+    
+    // Only set date_of_inspection if it's null/empty
+    if (!currentOrder || !currentOrder.date_of_inspection) {
+      updateData.date_of_inspection = new Date();
+    }
+
+    // Update order status to 6 (Assets Submitted)
+    await Order.updateOrder(orderId, updateData);
 
     // Create status history entry
     const statusHistoryData = {

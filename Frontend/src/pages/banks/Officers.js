@@ -90,6 +90,7 @@ function Officers() {
     // Find current user's officer record if they are BANK AUTHORITY
     let preSelectedDepartment = [];
     let preSelectedBranch = "";
+    let defaultRoleId = "";
 
     if (isBankAuthority) {
       // Find the officer record that matches the current user
@@ -113,11 +114,19 @@ function Officers() {
           preSelectedBranch
         }); */
       }
+
+      // Set default role to Bank Officer for BANK AUTHORITY users
+      const bankOfficerRole = roles.find((role) => 
+        role.name?.toUpperCase().includes("BANK OFFICER")
+      );
+      if (bankOfficerRole) {
+        defaultRoleId = bankOfficerRole.id.toString();
+      }
     }
 
     setFormData({
       name: "",
-      role_id: "",
+      role_id: defaultRoleId,
       department: preSelectedDepartment,
       branch_id: preSelectedBranch,
       mobile: "",
@@ -350,44 +359,47 @@ function Officers() {
                   />
                 </div>
 
-                <div className="form-group">
-                  <label>Role</label>
-                  <div className="radio-group officer">
-                    {officerRoles.map((role) => (
-                      <label
-                        key={role.id}
-                        className={`radio-label ${
-                          formData.role_id === role.id.toString()
-                            ? "selected"
-                            : ""
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="role"
-                          value={role.id}
-                          checked={formData.role_id === role.id.toString()}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              role_id: e.target.value,
-                            })
-                          }
-                        />
-                        {role.name}
-                      </label>
-                    ))}
+                {/* Only show role selector if user is NOT Bank Authority */}
+                {!isBankAuthority && (
+                  <div className="form-group">
+                    <label>Role</label>
+                    <div className="radio-group officer">
+                      {officerRoles.map((role) => (
+                        <label
+                          key={role.id}
+                          className={`radio-label ${
+                            formData.role_id === role.id.toString()
+                              ? "selected"
+                              : ""
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="role"
+                            value={role.id}
+                            checked={formData.role_id === role.id.toString()}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                role_id: e.target.value,
+                              })
+                            }
+                          />
+                          {role.name}
+                        </label>
+                      ))}
+                    </div>
+                    {/*  <SingleSearchSelect
+                      options={officerRoles.map((r) => ({
+                        value: r.id,
+                        label: r.name,
+                      }))}
+                      value={formData.role_id}
+                      onChange={(val) => setFormData({ ...formData, role_id: val })}
+                      placeholder="Select role"
+                    /> */}
                   </div>
-                  {/*  <SingleSearchSelect
-                    options={officerRoles.map((r) => ({
-                      value: r.id,
-                      label: r.name,
-                    }))}
-                    value={formData.role_id}
-                    onChange={(val) => setFormData({ ...formData, role_id: val })}
-                    placeholder="Select role"
-                  /> */}
-                </div>
+                )}
                 {!isBankAuthority && (
                   <>
                     <div className="form-group">

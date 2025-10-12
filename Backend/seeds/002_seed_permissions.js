@@ -75,6 +75,10 @@ exports.seed = async function (knex) {
     "assign_user_to_order",
     "add_valuer_name_to_order",
     "edit_valuer_name_to_order",
+    "view_order_details_order_status",
+    "view_order_details_payment_status",
+    "view_order_details_manager_name",
+    "view_order_details_field_verifier_name",
 
     "view_order_recent_activity",
 
@@ -103,6 +107,9 @@ exports.seed = async function (knex) {
     "view_order_validate_button",
     "view_order_payment_button",
     "view_order_mail_button",
+    "view_order_complete_button",
+    "view_order_authenticate_button",
+    "view_order_re_validate_button",
 
     "view_order_table_order_number",
     "view_order_table_category",

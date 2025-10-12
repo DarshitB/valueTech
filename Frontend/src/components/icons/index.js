@@ -5,6 +5,7 @@ export {
   SearchIcon,
   DeleteIcon,
   EditIcon,
+  MoreIcon,
   CloseIcon,
   UsersIcon,
   PermissionIcon,

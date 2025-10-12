@@ -17,7 +17,7 @@ import {
 } from "../../redux/reducers/childCategoryReducer";
 import { fetchFieldVerifiers } from "../../redux/reducers/fieldVerifierReducer";
 import CustomDataTable from "../../components/CustomDataTable";
-import { DeleteIcon, EditIcon } from "../../components/icons";
+import { DeleteIcon, EditIcon, MoreIcon } from "../../components/icons";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import FormModel from "../../components/FormModel";
 import SingleSearchSelect from "../../components/SingleSearchSelect";
@@ -839,7 +839,7 @@ function Orders() {
                             openAttributesModal(order);
                           }}
                         >
-                          <EditIcon />
+                          <MoreIcon />
                         </button>
                       )}
                     </td>

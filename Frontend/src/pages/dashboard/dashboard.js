@@ -57,6 +57,11 @@ function Dashboard() {
     ?.toUpperCase()
     .includes("BANK OFFICER");
 
+  // Check if current user is Bank Authority (case-insensitive) - matches any role containing "BANK AUTHORITY"
+  const isBankAuthority = currentUser?.role.name
+    ?.toUpperCase()
+    .includes("BANK AUTHORITY");
+
   // Check if current user is MANAGER (case-insensitive) - matches any role containing "MANAGER"
   const isManager = currentUser?.role.name?.toUpperCase().includes("MANAGER");
 
@@ -172,23 +177,17 @@ function Dashboard() {
     isSameDay(getCreatedDate(o), new Date())
   ).length;
 
-  // Calculate pending orders (orders that are not completed, ongoing, or submitted)
+  // Calculate pending orders (orders with status_id < 5)
   const pendingOrdersCount = (orders || []).filter((order) => {
-    const status = order.current_status_name?.toLowerCase();
-    return (
-      !status ||
-      (status !== "completed" &&
-        status !== "ongoing" &&
-        status !== "submitted" &&
-        status !== "validate" &&
-        status !== "re-validate")
-    );
+    const statusId = order.current_status_id;
+    return statusId && statusId < 5;
   }).length;
 
-  // Calculate ongoing orders
-  const ongoingOrdersCount = (orders || []).filter(
-    (order) => order.current_status_name?.toLowerCase() === "ongoing"
-  ).length;
+  // Calculate ongoing orders (orders with status_id >= 5)
+  const ongoingOrdersCount = (orders || []).filter((order) => {
+    const statusId = order.current_status_id;
+    return statusId && statusId >= 5;
+  }).length;
 
   // Calculate completed orders
   const completedOrdersCount = (orders || []).filter(
@@ -322,6 +321,79 @@ function Dashboard() {
 
   return (
     <div className="dashboard-container height-full-occupied">
+      {/* Manager dashboard */}
+      {isManager && (
+        <div className="manager-dashboard">
+          <div className="row">
+            <div className="col-md-6">
+              <div className="manager-dashboard-card blue-card">
+                <div className="manager-dashboard-card-header">
+                  <h2>Total Orders</h2>
+                  <p>{formatTwoDigits(orders.length)}</p>
+                </div>
+                <div className="manager-dashboard-card-body">
+                  <div className="row w-100 m-0 p-0">
+                    <div className="col-md-6 p-0">
+                      <div className="manager-dashboard-card-body-item border-right border-bottom">
+                        <span>Today's Orders</span>
+                        <p>{formatTwoDigits(todaysOrdersCount)}</p>
+                      </div>
+                    </div>
+                    <div className="col-md-6 p-0">
+                      <div className="manager-dashboard-card-body-item border-bottom">
+                        <span>Pending Orders</span>
+                        <p>{formatTwoDigits(pendingOrdersCount)}</p>
+                      </div>
+                    </div>
+                    <div className="col-md-6 p-0">
+                      <div className="manager-dashboard-card-body-item border-right">
+                        <span>Ongoing Orders</span>
+                        <p>{formatTwoDigits(ongoingOrdersCount)}</p>
+                      </div>
+                    </div>
+                    <div className="col-md-6 p-0">
+                      <div className="manager-dashboard-card-body-item">
+                        <span>Completed Orders</span>
+                        <p>{formatTwoDigits(completedOrdersCount)}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-6">
+              <div className="manager-dashboard-card green-card">
+                <div className="manager-dashboard-card-header">
+                  <h2>Filed Verifier</h2>
+                </div>
+                <div className="manager-dashboard-card-body">
+                  <div className="row w-100 m-0 p-0">
+                    <div className="col-md-4">
+                      <div className="manager-dashboard-card-body-item border-right">
+                        <span>Total Filed Verifier</span>
+                        <p>{formatTwoDigits(fieldVerifiers.length)}</p>
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="manager-dashboard-card-body-item border-right">
+                        <span>Active Filed Verifier</span>
+                        <p>{formatTwoDigits(activeFieldVerifiersCount)}</p>
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="manager-dashboard-card-body-item">
+                        <span>Inactive Filed Verifier</span>
+                        <p>{formatTwoDigits(inactiveFieldVerifiersCount)}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* End of Manager dashboard */}
       <div className="dashboard-container-sneak-peek">
         {!hasAnyDashboardPermission && !isTelecaller && !isManager ? (
           <div className="welcome-message-container">
@@ -345,80 +417,304 @@ function Dashboard() {
               >
                 <div className="left-part-of-sneak-peek">
                   <div className="row">
-                    <div className="col-xl-4 col-lg-4 col-md-4 col-sm-12 col-xs-12">
-                      <div className="padding-top-bottom">
-                        <div className="sneak-peek-card today-orders">
-                          <DashboardIcon className="sneak-peek-card-icon" />
-                          <h3>Today's Orders</h3>
-                          <p>{formatTwoDigits(todaysOrdersCount)}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="col-xl-8 col-lg-8 col-md-8 col-sm-12 col-xs-12">
-                      <div className="row">
-                        <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                    {isBankAuthority ? (
+                      <>
+                        <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 col-xs-12">
                           <div className="padding-top-bottom">
-                            <div className="sneak-peek-card order-status ongoing-orders">
-                              <h3>Ongoing</h3>
-                              <p>
-                                {formatTwoDigits(
-                                  orders.filter(
-                                    (order) =>
-                                      order.current_status_name === "Ongoing"
-                                  ).length
-                                )}
-                              </p>
+                            <div className="sneak-peek-card today-orders">
+                              <DashboardIcon className="sneak-peek-card-icon" />
+                              <h3>Today's Orders</h3>
+                              <p>{formatTwoDigits(todaysOrdersCount)}</p>
                             </div>
                           </div>
                         </div>
-                        <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                        <div className="col-xl-5 col-lg-6 col-md-8 col-sm-12 col-xs-12">
+                          <div className="row">
+                            {/* For Bank Authority and Bank Officer users - custom layout */}
+                            {isBankAuthority || isBankOfficer ? (
+                              <>
+                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                                  <div className="padding-top-bottom">
+                                    <div className="sneak-peek-card order-status ongoing-orders">
+                                      <h3>Total Orders</h3>
+                                      <p>{formatTwoDigits(orders.length)}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                                  <div className="padding-top-bottom">
+                                    <div className="sneak-peek-card order-status re-validate-orders">
+                                      <h3>Ongoing</h3>
+                                      <p>
+                                        {formatTwoDigits(
+                                          orders.filter((order) => {
+                                            const status =
+                                              order.current_status_name?.toLowerCase();
+                                            // Count orders that are not "submitted" or "completed"
+                                            return (
+                                              status &&
+                                              status !== "submitted" &&
+                                              status !== "completed"
+                                            );
+                                          }).length
+                                        )}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                                  <div className="padding-top-bottom">
+                                    <div className="sneak-peek-card order-status submitted-orders">
+                                      <h3>Document Submitted</h3>
+                                      <p>-</p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                                  <div className="padding-top-bottom">
+                                    <div className="sneak-peek-card order-status validate-orders">
+                                      <h3>Completed</h3>
+                                      <p>-</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </>
+                            ) : (
+                              /* For other users - original layout */
+                              <>
+                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                                  <div className="padding-top-bottom">
+                                    <div className="sneak-peek-card order-status ongoing-orders">
+                                      <h3>Ongoing</h3>
+                                      <p>
+                                        {formatTwoDigits(
+                                          orders.filter(
+                                            (order) =>
+                                              order.current_status_name ===
+                                              "Ongoing"
+                                          ).length
+                                        )}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                                  <div className="padding-top-bottom">
+                                    <div className="sneak-peek-card order-status submitted-orders">
+                                      <h3>Submitted</h3>
+                                      <p>
+                                        {formatTwoDigits(
+                                          orders.filter(
+                                            (order) =>
+                                              order.current_status_name ===
+                                              "Submitted"
+                                          ).length
+                                        )}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                                  <div className="padding-top-bottom">
+                                    <div className="sneak-peek-card order-status validate-orders">
+                                      <h3>Validate</h3>
+                                      <p>
+                                        {formatTwoDigits(
+                                          orders.filter(
+                                            (order) =>
+                                              order.current_status_name ===
+                                              "Validate"
+                                          ).length
+                                        )}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                                  <div className="padding-top-bottom">
+                                    <div className="sneak-peek-card order-status re-validate-orders">
+                                      <h3>re-validate</h3>
+                                      <p>
+                                        {formatTwoDigits(
+                                          orders.filter(
+                                            (order) =>
+                                              order.current_status_name ===
+                                              "re-validate"
+                                          ).length
+                                        )}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 col-xs-12">
                           <div className="padding-top-bottom">
-                            <div className="sneak-peek-card order-status submitted-orders">
-                              <h3>Submitted</h3>
-                              <p>
-                                {formatTwoDigits(
-                                  orders.filter(
-                                    (order) =>
-                                      order.current_status_name === "Submitted"
-                                  ).length
-                                )}
-                              </p>
+                            <div className="sneak-peek-card today-orders">
+                              <DashboardIcon className="sneak-peek-card-icon" />
+                              <h3>Total Officer</h3>
+                              <p>{formatTwoDigits(officers.length)}</p>
                             </div>
                           </div>
                         </div>
-                        <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
-                          <div className="padding-top-bottom">
-                            <div className="sneak-peek-card order-status validate-orders">
-                              <h3>Validate</h3>
-                              <p>
-                                {formatTwoDigits(
-                                  orders.filter(
-                                    (order) =>
-                                      order.current_status_name === "Validate"
-                                  ).length
-                                )}
-                              </p>
+                        <div className="col-xl-3 col-lg-2 col-md-4 col-sm-12 col-xs-12">
+                          <div className="row">
+                            <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12">
+                              <div className="padding-top-bottom">
+                                <div className="sneak-peek-card order-status ongoing-orders">
+                                  <h3>Active Officer</h3>
+                                  <p>-</p>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12">
+                              <div className="padding-top-bottom">
+                                <div className="sneak-peek-card order-status submitted-orders">
+                                  <h3>Inactive Officer</h3>
+                                  <p>-</p>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </div>
-                        <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                      </>
+                    ) : (
+                      <>
+                        <div className="col-xl-4 col-lg-4 col-md-4 col-sm-12 col-xs-12">
                           <div className="padding-top-bottom">
-                            <div className="sneak-peek-card order-status re-validate-orders">
-                              <h3>re-validate</h3>
-                              <p>
-                                {formatTwoDigits(
-                                  orders.filter(
-                                    (order) =>
-                                      order.current_status_name ===
-                                      "re-validate"
-                                  ).length
-                                )}
-                              </p>
+                            <div className="sneak-peek-card today-orders">
+                              <DashboardIcon className="sneak-peek-card-icon" />
+                              <h3>Today's Orders</h3>
+                              <p>{formatTwoDigits(todaysOrdersCount)}</p>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    </div>
+                        <div className="col-xl-8 col-lg-8 col-md-8 col-sm-12 col-xs-12">
+                          <div className="row">
+                            {/* For Bank Authority and Bank Officer users - custom layout */}
+                            {isBankAuthority || isBankOfficer ? (
+                              <>
+                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                                  <div className="padding-top-bottom">
+                                    <div className="sneak-peek-card order-status ongoing-orders">
+                                      <h3>Total Orders</h3>
+                                      <p>{formatTwoDigits(orders.length)}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                                  <div className="padding-top-bottom">
+                                    <div className="sneak-peek-card order-status re-validate-orders">
+                                      <h3>Ongoing</h3>
+                                      <p>
+                                        {formatTwoDigits(
+                                          orders.filter((order) => {
+                                            const status =
+                                              order.current_status_name?.toLowerCase();
+                                            // Count orders that are not "submitted" or "completed"
+                                            return (
+                                              status &&
+                                              status !== "submitted" &&
+                                              status !== "completed"
+                                            );
+                                          }).length
+                                        )}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                                  <div className="padding-top-bottom">
+                                    <div className="sneak-peek-card order-status submitted-orders">
+                                      <h3>Document Submitted</h3>
+                                      <p>-</p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                                  <div className="padding-top-bottom">
+                                    <div className="sneak-peek-card order-status validate-orders">
+                                      <h3>Completed</h3>
+                                      <p>-</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </>
+                            ) : (
+                              /* For other users - original layout */
+                              <>
+                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                                  <div className="padding-top-bottom">
+                                    <div className="sneak-peek-card order-status ongoing-orders">
+                                      <h3>Ongoing</h3>
+                                      <p>
+                                        {formatTwoDigits(
+                                          orders.filter(
+                                            (order) =>
+                                              order.current_status_name ===
+                                              "Ongoing"
+                                          ).length
+                                        )}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                                  <div className="padding-top-bottom">
+                                    <div className="sneak-peek-card order-status submitted-orders">
+                                      <h3>Submitted</h3>
+                                      <p>
+                                        {formatTwoDigits(
+                                          orders.filter(
+                                            (order) =>
+                                              order.current_status_name ===
+                                              "Submitted"
+                                          ).length
+                                        )}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                                  <div className="padding-top-bottom">
+                                    <div className="sneak-peek-card order-status validate-orders">
+                                      <h3>Validate</h3>
+                                      <p>
+                                        {formatTwoDigits(
+                                          orders.filter(
+                                            (order) =>
+                                              order.current_status_name ===
+                                              "Validate"
+                                          ).length
+                                        )}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
+                                  <div className="padding-top-bottom">
+                                    <div className="sneak-peek-card order-status re-validate-orders">
+                                      <h3>re-validate</h3>
+                                      <p>
+                                        {formatTwoDigits(
+                                          orders.filter(
+                                            (order) =>
+                                              order.current_status_name ===
+                                              "re-validate"
+                                          ).length
+                                        )}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -496,7 +792,10 @@ function Dashboard() {
                                 <option value="Low">Low</option>
                               </select>
                             )}
-                            {hasPermission(allowedPermissions, "add_order") && (
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order"
+                            ) && (
                               <Link className="btn" to="/orders">
                                 See All
                               </Link>
@@ -610,7 +909,13 @@ function Dashboard() {
                             // Show order only if both filters match (or no filter is selected)
                             return typeMatch && priorityMatch;
                           })
-                          .slice(0, 9)
+                          .slice(
+                            0,
+                            // Remove limit for Manager, Bank Authority, and Bank Officer roles
+                            isManager || isBankAuthority || isBankOfficer
+                              ? undefined
+                              : 9
+                          )
                           .map((order) => (
                             <tr
                               key={order.id}
@@ -844,79 +1149,7 @@ function Dashboard() {
           </div>
         )}
       {/* End of Telecaller dashboard */}
-      {/* Manager dashboard */}
-      {isManager && (
-        <div className="manager-dashboard">
-          <div className="row">
-            <div className="col-md-6">
-              <div className="manager-dashboard-card blue-card">
-                <div className="manager-dashboard-card-header">
-                  <h2>Total Orders</h2>
-                  <p>{formatTwoDigits(orders.length)}</p>
-                </div>
-                <div className="manager-dashboard-card-body">
-                  <div className="row w-100 m-0 p-0">
-                    <div className="col-md-6 p-0">
-                      <div className="manager-dashboard-card-body-item border-right border-bottom">
-                        <span>Today's Orders</span>
-                        <p>{formatTwoDigits(todaysOrdersCount)}</p>
-                      </div>
-                    </div>
-                    <div className="col-md-6 p-0">
-                      <div className="manager-dashboard-card-body-item border-bottom">
-                        <span>Pending Orders</span>
-                        <p>{formatTwoDigits(pendingOrdersCount)}</p>
-                      </div>
-                    </div>
-                    <div className="col-md-6 p-0">
-                      <div className="manager-dashboard-card-body-item border-right">
-                        <span>Ongoing Orders</span>
-                        <p>{formatTwoDigits(ongoingOrdersCount)}</p>
-                      </div>
-                    </div>
-                    <div className="col-md-6 p-0">
-                      <div className="manager-dashboard-card-body-item">
-                        <span>Completed Orders</span>
-                        <p>{formatTwoDigits(completedOrdersCount)}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-6">
-              <div className="manager-dashboard-card green-card">
-                <div className="manager-dashboard-card-header">
-                  <h2>Filed Verifier</h2>
-                </div>
-                <div className="manager-dashboard-card-body">
-                  <div className="row w-100 m-0 p-0">
-                    <div className="col-md-4">
-                      <div className="manager-dashboard-card-body-item border-right">
-                        <span>Total Filed Verifier</span>
-                        <p>{formatTwoDigits(fieldVerifiers.length)}</p>
-                      </div>
-                    </div>
-                    <div className="col-md-4">
-                      <div className="manager-dashboard-card-body-item border-right">
-                        <span>Active Filed Verifier</span>
-                        <p>{formatTwoDigits(activeFieldVerifiersCount)}</p>
-                      </div>
-                    </div>
-                    <div className="col-md-4">
-                      <div className="manager-dashboard-card-body-item">
-                        <span>Inactive Filed Verifier</span>
-                        <p>{formatTwoDigits(inactiveFieldVerifiersCount)}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* End of Manager dashboard */}
+
       {/* Telecaller without permission - show welcome message only */}
       {isTelecaller &&
         !hasPermission(
