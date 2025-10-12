@@ -6,6 +6,7 @@ const path = require("path");
 const os = require("os");
 const yauzl = require("yauzl");
 const { v4: uuidv4 } = require("uuid");
+const db = require("../../../db");
 const {
   ensureOrderFolders,
   ensureMediaSubfolders,
@@ -434,12 +435,26 @@ async function uploadZip(req, res, next) {
 
     // Update order status to 6 (Assets Submitted) and create status history entry
     try {
-      // Update the order's current status
-      await Order.updateOrder(orderIdNum, {
+      // Direct query to check if date_of_inspection is already set
+      const currentOrder = await db('orders')
+        .select('date_of_inspection')
+        .where('id', orderIdNum)
+        .first();
+      
+      // Prepare update data
+      const updateData = {
         current_status_id: 6, // Assets Submitted
         updated_at: new Date(),
         updated_by: userId,
-      });
+      };
+      
+      // Only set date_of_inspection if it's null/empty
+      if (!currentOrder || !currentOrder.date_of_inspection) {
+        updateData.date_of_inspection = new Date();
+      }
+
+      // Update the order's current status
+      await Order.updateOrder(orderIdNum, updateData);
 
       // Create status history entry for ZIP upload
       const statusHistoryData = {
