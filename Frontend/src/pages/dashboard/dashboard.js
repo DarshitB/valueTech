@@ -1,7 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
-import { fetchOrders, editOrder } from "../../redux/reducers/orderReducer";
+import {
+  fetchOrders,
+  addOrder,
+  editOrder,
+  removeOrder,
+  updateOrderAttributes,
+} from "../../redux/reducers/orderReducer";
 import { fetchUsers } from "../../redux/reducers/userReducer";
 import { fetchOfficers } from "../../redux/reducers/officerReducer";
 import {
@@ -17,7 +23,8 @@ import { toast } from "react-toastify";
 import CustomDataTable from "../../components/CustomDataTable";
 import "./dashboard.scss";
 import { DashboardIcon, CheckinIcon } from "../../components/icons/Icons";
-import { EditIcon } from "../../components/icons";
+import { DeleteIcon, EditIcon, MoreIcon } from "../../components/icons";
+import ConfirmationModal from "../../components/ConfirmationModal";
 
 function Dashboard() {
   const dispatch = useDispatch();
@@ -158,6 +165,19 @@ function Dashboard() {
   const [editOrderId, setEditOrderId] = useState(null);
   const [showFormModal, setShowFormModal] = useState(false);
 
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [confirmDeleteName, setConfirmDeleteName] = useState("");
+
+  // State for order attributes modal
+  const [showAttributesModal, setShowAttributesModal] = useState(false);
+  const [attributesOrderId, setAttributesOrderId] = useState(null);
+  const [attributesFormData, setAttributesFormData] = useState({
+    order_priority: "",
+    order_type: "",
+    valuer_name: "",
+    admin_user_ids: [],
+  });
+
   // Helper: count today's orders (by created date)
   const isSameDay = (d1, d2) =>
     d1 &&
@@ -206,10 +226,53 @@ function Dashboard() {
 
   const formatTwoDigits = (num) => String(num ?? 0).padStart(2, "0");
 
+  // Open Add Order Form
+  const openAddModal = () => {
+    setIsEdit(false);
+
+    setFormData({
+      customer_name: "",
+      contact: "",
+      alternative_contact: "",
+      supervisor_number: "",
+      driver_number: "",
+      child_category_id: "",
+      registration_number: "",
+      place_of_inspection: "",
+      officer_id: null,
+      manager_id: null,
+      field_verifier_id: null,
+    });
+    setShowFormModal(true);
+  };
+
   // Open Edit Modal
   const openEditModal = (order) => {
     setIsEdit(true);
     setEditOrderId(order.id);
+
+    // Find PAN INDIA manager for pre-selection in specific cases
+    const panIndiaManager = managers.find(
+      (manager) => manager.name?.toUpperCase() === "PAN INDIA"
+    );
+
+    // Pre-select PAN INDIA manager only if:
+    // 1. Order status is 3 (Telecaller Complete)
+    // 2. Order doesn't have a manager assigned
+    // 3. PAN INDIA manager exists
+    // 4. User has permission to view/edit manager field
+    let preSelectedManagerId = order.manager_id || null;
+
+    if (
+      order.current_status_id === 3 &&
+      !order.manager_id &&
+      panIndiaManager &&
+      hasPermission(allowedPermissions, "view_order_add_edit_manager_filed") &&
+      !isManager
+    ) {
+      preSelectedManagerId = panIndiaManager.id;
+    }
+
     setFormData({
       customer_name: order.customer_name || "",
       contact: order.contact || "",
@@ -220,13 +283,123 @@ function Dashboard() {
       registration_number: order.registration_number || "",
       place_of_inspection: order.place_of_inspection || "",
       officer_id: order.officer_id || null,
-      manager_id: order.manager_id || null,
+      manager_id: preSelectedManagerId,
       field_verifier_id: order.field_verifier_id || null,
     });
     setShowFormModal(true);
   };
 
-  // Submit Edit
+  // Confirm delete
+  const confirmDelete = (id, name) => {
+    setConfirmDeleteId(id);
+    setConfirmDeleteName(name);
+  };
+
+  const handleConfirmDelete = () => {
+    dispatch(removeOrder(confirmDeleteId));
+    setConfirmDeleteId(null);
+  };
+
+  // Open Order Attributes Modal
+  const openAttributesModal = (order) => {
+    setAttributesOrderId(order.id);
+
+    // Map assigned_users to admin_user_ids for pre-selection
+    const assignedUserIds = order.assigned_users
+      ? order.assigned_users.map((user) => user.id)
+      : [];
+
+    setAttributesFormData({
+      order_priority: order.order_priority || "",
+      order_type: order.order_type || "",
+      valuer_name: order.valuer_name || "",
+      admin_user_ids: assignedUserIds,
+    });
+    setShowAttributesModal(true);
+  };
+
+  // Handle Order Attributes Submit
+  const handleAttributesSubmit = async () => {
+    const canEditPriority = hasPermission(
+      allowedPermissions,
+      "edit_order_priority_db"
+    );
+    const canEditType = hasPermission(allowedPermissions, "edit_order_type_db");
+    const canEditValuerName = hasPermission(
+      allowedPermissions,
+      "edit_valuer_name_to_order_db"
+    );
+    const canAssignUsers = hasPermission(
+      allowedPermissions,
+      "assign_user_to_order_db"
+    );
+
+    // Build payload with only the fields that user has permission to edit and have values
+    const payload = {};
+
+    if (canEditPriority && attributesFormData.order_priority) {
+      payload.order_priority = attributesFormData.order_priority;
+    }
+
+    if (canEditType && attributesFormData.order_type) {
+      payload.order_type = attributesFormData.order_type;
+    }
+
+    if (canEditValuerName && attributesFormData.valuer_name) {
+      payload.valuer_name = attributesFormData.valuer_name;
+    }
+
+    // Include user_ids array only if user has permission (even if empty) to handle user removal from backend
+    if (canAssignUsers && Array.isArray(attributesFormData.admin_user_ids)) {
+      // Always send as array - empty array to clear assignments, populated array to set assignments
+      payload.user_ids = attributesFormData.admin_user_ids
+        .map((id) => Number(id))
+        .filter((n) => !Number.isNaN(n));
+    }
+
+    // Check if at least one field has a value that user can edit
+    // Note: user_ids is always an array (empty array clears assignments), so it's always considered a valid field
+    const hasValidFields = Object.keys(payload).some((key) => {
+      if (key === "user_ids") {
+        return true; // user_ids field is always valid (even if empty array)
+      }
+      return (
+        payload[key] !== null &&
+        payload[key] !== undefined &&
+        payload[key] !== ""
+      );
+    });
+
+    if (!hasValidFields) {
+      const availableFields = [];
+      if (canEditPriority) availableFields.push("priority");
+      if (canEditType) availableFields.push("type");
+      if (canEditValuerName) availableFields.push("valuer name");
+
+      toast.error(`Please select ${availableFields.join(" or ")} to update.`);
+      return;
+    }
+
+    try {
+      await dispatch(
+        updateOrderAttributes({ id: attributesOrderId, data: payload })
+      ).unwrap();
+      setShowAttributesModal(false);
+      setAttributesOrderId(null);
+      setAttributesFormData({
+        order_priority: "",
+        order_type: "",
+        valuer_name: "",
+        admin_user_ids: [],
+      });
+    } catch (err) {
+      toast.error(
+        typeof err === "string" ? err : "Failed to update attributes"
+      );
+    }
+  };
+
+  // Submit Add/Edit
   const handleSubmit = () => {
     // Collect all validation errors
     if (!formData.customer_name.trim()) {
@@ -239,19 +412,75 @@ function Dashboard() {
       return;
     }
 
-    // All validations passed — build payload
-    const payload = {
-      customer_name: formData.customer_name.trim(),
-      contact: formData.contact.trim(),
-      alternative_contact: formData.alternative_contact.trim() || null,
-      supervisor_number: formData.supervisor_number.trim() || null,
-      driver_number: formData.driver_number.trim() || null,
-      child_category_id: formData.child_category_id,
-      registration_number: formData.registration_number.trim() || null,
-      place_of_inspection: formData.place_of_inspection.trim() || null,
-    };
+    // Build payload based on add vs edit mode
+    let payload = {};
+
+    if (isEdit) {
+      // For edit mode, only include changed fields
+      const currentOrder = orders.find((order) => order.id === editOrderId);
+
+      // Always include required fields for edit
+      payload.customer_name = formData.customer_name.trim();
+      payload.contact = formData.contact.trim();
+
+      // Only include other fields if they have changed
+      if (
+        formData.alternative_contact !==
+        (currentOrder.alternative_contact || "")
+      ) {
+        payload.alternative_contact =
+          formData.alternative_contact.trim() || null;
+      }
+
+      if (
+        formData.supervisor_number !== (currentOrder.supervisor_number || "")
+      ) {
+        payload.supervisor_number = formData.supervisor_number.trim() || null;
+      }
+
+      if (formData.driver_number !== (currentOrder.driver_number || "")) {
+        payload.driver_number = formData.driver_number.trim() || null;
+      }
+
+      if (
+        formData.child_category_id !== (currentOrder.child_category_id || "")
+      ) {
+        payload.child_category_id = formData.child_category_id;
+      }
+
+      if (
+        formData.registration_number !==
+        (currentOrder.registration_number || "")
+      ) {
+        payload.registration_number =
+          formData.registration_number.trim() || null;
+      }
+
+      if (
+        formData.place_of_inspection !==
+        (currentOrder.place_of_inspection || "")
+      ) {
+        payload.place_of_inspection =
+          formData.place_of_inspection.trim() || null;
+      }
+    } else {
+      // For add mode, include all fields
+      payload = {
+        customer_name: formData.customer_name.trim(),
+        contact: formData.contact.trim(),
+        alternative_contact: formData.alternative_contact.trim() || null,
+        supervisor_number: formData.supervisor_number.trim() || null,
+        driver_number: formData.driver_number.trim() || null,
+        child_category_id: formData.child_category_id,
+        registration_number: formData.registration_number.trim() || null,
+        place_of_inspection: formData.place_of_inspection.trim() || null,
+      };
+    }
 
     // Handle officer_id, manager_id, and field_verifier_id based on permissions and user role
+    let newOfficerId = null;
+    let newManagerId = null;
+    let newFieldVerifierId = null;
 
     // Officer ID handling - Bank Officers get their own officer ID automatically
     if (isBankOfficer) {
@@ -262,42 +491,74 @@ function Dashboard() {
 
       if (currentOfficer) {
         // Use the officer's ID, not the user's ID
-        payload.officer_id = currentOfficer.id;
+        newOfficerId = currentOfficer.id;
       }
     } else if (
       hasPermission(allowedPermissions, "view_order_add_edit_officer_filed")
     ) {
       // For other users, use form data if they have permission
-      payload.officer_id = formData.officer_id;
+      newOfficerId = formData.officer_id;
     }
 
     // MANAGER ID handling - MANAGER users get their own user ID automatically
     if (isManager) {
       // For MANAGER users, use their own user ID as manager_id
-      payload.manager_id = currentUser?.id;
+      newManagerId = currentUser?.id;
 
       // Field Verifier - only include if manager is assigned (which it will be for MANAGER users)
-      if (payload.manager_id) {
-        payload.field_verifier_id = formData.field_verifier_id;
+      if (newManagerId) {
+        newFieldVerifierId = formData.field_verifier_id;
       }
     } else if (
       hasPermission(allowedPermissions, "view_order_add_edit_manager_filed")
     ) {
       // For other users, use form data if they have permission
-      payload.manager_id = formData.manager_id;
+      newManagerId = formData.manager_id;
 
       // Field Verifier - only include if manager is assigned and user has manager permission
       if (formData.manager_id) {
-        payload.field_verifier_id = formData.field_verifier_id;
+        newFieldVerifierId = formData.field_verifier_id;
       }
     }
 
     // Field Verifier for Super Admin - can assign field verifier even without manager
     if (isSuperAdmin && formData.field_verifier_id) {
-      payload.field_verifier_id = formData.field_verifier_id;
+      newFieldVerifierId = formData.field_verifier_id;
     }
 
-    dispatch(editOrder({ id: editOrderId, data: payload }));
+    // For edit mode, only include these fields if they have changed
+    if (isEdit) {
+      const currentOrder = orders.find((order) => order.id === editOrderId);
+
+      if (newOfficerId !== (currentOrder.officer_id || null)) {
+        payload.officer_id = newOfficerId;
+      }
+
+      if (newManagerId !== (currentOrder.manager_id || null)) {
+        payload.manager_id = newManagerId;
+      }
+
+      if (newFieldVerifierId !== (currentOrder.field_verifier_id || null)) {
+        payload.field_verifier_id = newFieldVerifierId;
+      }
+    } else {
+      // For add mode, include these fields
+      if (newOfficerId !== null) {
+        payload.officer_id = newOfficerId;
+      }
+      if (newManagerId !== null) {
+        payload.manager_id = newManagerId;
+      }
+      if (newFieldVerifierId !== null) {
+        payload.field_verifier_id = newFieldVerifierId;
+      }
+    }
+
+    if (isEdit) {
+      dispatch(editOrder({ id: editOrderId, data: payload }));
+    } else {
+      dispatch(addOrder(payload));
+    }
 
     // Close modal after submit
     setShowFormModal(false);
@@ -318,6 +579,37 @@ function Dashboard() {
   );
   const hasAnyDashboardPermission =
     hasStatisticsPermission || hasCheckinPermission || hasOrderTablePermission;
+
+  // Compute users options (show all users except specific roles)
+  const adminUsersOptions = React.useMemo(() => {
+    if (!Array.isArray(users)) return [];
+
+    // Define excluded roles (case-insensitive)
+    const excludedRoles = [
+      "DEVELOPER_ADMIN",
+      "SUPER ADMIN",
+      "MANAGER",
+      "TELECALLER",
+      "BANK AUTHORITY",
+      "BANK OFFICER",
+    ];
+
+    return users
+      .filter((u) => {
+        const roleName = String(u.role_name || "").toUpperCase();
+
+        // Check if role includes any excluded role (case-insensitive, space-agnostic)
+        const isExcluded = excludedRoles.some((excludedRole) => {
+          // Remove spaces and normalize both role names for comparison
+          const normalizedRoleName = roleName.replace(/\s+/g, "");
+          const normalizedExcludedRole = excludedRole.replace(/\s+/g, "");
+          return normalizedRoleName.includes(normalizedExcludedRole);
+        });
+
+        return !isExcluded;
+      })
+      .map((u) => ({ value: u.id, label: `${u.name} (${u.role_name})` }));
+  }, [users]);
 
   return (
     <div className="dashboard-container height-full-occupied">
@@ -760,7 +1052,7 @@ function Dashboard() {
                           >
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_type_filter"
+                              "view_order_type_filter_db"
                             ) && (
                               <select
                                 className="form-field type-priority-selector"
@@ -777,7 +1069,7 @@ function Dashboard() {
                             )}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_priority_filter"
+                              "view_order_priority_filter_db"
                             ) && (
                               <select
                                 className="form-field type-priority-selector"
@@ -792,14 +1084,19 @@ function Dashboard() {
                                 <option value="Low">Low</option>
                               </select>
                             )}
-                            {hasPermission(
+                            {hasPermission(allowedPermissions, "add_order_db") && (
+                              <button className="btn" onClick={openAddModal}>
+                                Add Order
+                              </button>
+                            )}
+                            {/* {hasPermission(
                               allowedPermissions,
                               "view_order"
                             ) && (
                               <Link className="btn" to="/orders">
                                 See All
                               </Link>
-                            )}
+                            )} */}
                           </div>
                         ),
                         header: (
@@ -1047,7 +1344,7 @@ function Dashboard() {
                                 <td style={{ textAlign: "center" }}>
                                   {hasPermission(
                                     allowedPermissions,
-                                    "edit_order"
+                                    "edit_order_db"
                                   ) && (
                                     <button
                                       className="action-icons"
@@ -1057,6 +1354,45 @@ function Dashboard() {
                                       }}
                                     >
                                       <EditIcon />
+                                    </button>
+                                  )}
+                                  {hasPermission(
+                                    allowedPermissions,
+                                    "delete_order_db"
+                                  ) && (
+                                    <button
+                                      className="action-icons"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        confirmDelete(
+                                          order.id,
+                                          order.customer_name
+                                        );
+                                      }}
+                                    >
+                                      <DeleteIcon />
+                                    </button>
+                                  )}
+                                  {(hasPermission(
+                                    allowedPermissions,
+                                    "edit_order_priority_db"
+                                  ) ||
+                                    hasPermission(
+                                      allowedPermissions,
+                                      "edit_order_type_db"
+                                    ) ||
+                                    hasPermission(
+                                      allowedPermissions,
+                                      "edit_valuer_name_to_order_db"
+                                    )) && (
+                                    <button
+                                      className="action-icons"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openAttributesModal(order);
+                                      }}
+                                    >
+                                      <MoreIcon />
                                     </button>
                                   )}
                                 </td>
@@ -1163,14 +1499,16 @@ function Dashboard() {
             </div>
           </div>
         )}
-      {/* 👤 Form Modal (Edit) */}
+      {/* 👤 Form Modal (Add/Edit) */}
       {showFormModal && (
         <FormModel>
           {{
-            title: `Edit Order - ${
-              orders.find((order) => order.id === editOrderId)?.order_number ||
-              "N/A"
-            }`,
+            title: isEdit
+              ? `Edit Order - ${
+                  orders.find((order) => order.id === editOrderId)
+                    ?.order_number || "N/A"
+                }`
+              : "Add Order",
             body: (
               <form
                 className="body-form-box"
@@ -1470,7 +1808,7 @@ function Dashboard() {
 
                   <div className="form-buttons">
                     <button className="submit-button" type="submit">
-                      Update
+                      {isEdit ? "Update" : "Add"}
                     </button>
                   </div>
                 </div>
@@ -1494,6 +1832,173 @@ function Dashboard() {
                 officer_id: null,
                 manager_id: null,
                 field_verifier_id: null,
+              });
+            },
+          }}
+        </FormModel>
+      )}
+
+      {/* ❗ Delete Confirm Modal */}
+      {confirmDeleteId && (
+        <ConfirmationModal
+          title="Confirm Deletion"
+          message={`Are you sure you want to delete <span class="danger">${confirmDeleteName}</span>?`}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
+      )}
+
+      {/* 📝 Order Attributes Modal */}
+      {showAttributesModal && (
+        <FormModel>
+          {{
+            title: "Update Order Attributes",
+            body: (
+              <form
+                className="body-form-box"
+                onSubmit={(e) => {
+                  e.preventDefault(); // prevent full page reload
+                  handleAttributesSubmit();
+                }}
+              >
+                <div className="body-form-box">
+                  {hasPermission(allowedPermissions, "edit_order_priority_db") && (
+                    <div className="form-group order-priority-radio-group">
+                      <label>Order Priority</label>
+                      <div className="radio-group three-items">
+                        {["Low", "Average", "High"].map((priority) => (
+                          <label
+                            key={priority}
+                            className={`radio-label ${priority.toLowerCase()} ${
+                              attributesFormData.order_priority === priority
+                                ? "selected"
+                                : ""
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="order_priority"
+                              value={priority}
+                              checked={
+                                attributesFormData.order_priority === priority
+                              }
+                              onChange={(e) =>
+                                setAttributesFormData({
+                                  ...attributesFormData,
+                                  order_priority: e.target.value,
+                                })
+                              }
+                            />
+                            {priority}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {hasPermission(allowedPermissions, "edit_order_type_db") && (
+                    <div className="form-group">
+                      <label>Order Type</label>
+                      <div className="radio-group three-items">
+                        {["VKA1", "VKA2", "VKA3"].map((type) => (
+                          <label
+                            key={type}
+                            className={`radio-label ${
+                              attributesFormData.order_type === type
+                                ? "selected"
+                                : ""
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="order_type"
+                              value={type}
+                              checked={attributesFormData.order_type === type}
+                              onChange={(e) =>
+                                setAttributesFormData({
+                                  ...attributesFormData,
+                                  order_type: e.target.value,
+                                })
+                              }
+                            />
+                            {type}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {hasPermission(
+                    allowedPermissions,
+                    "edit_valuer_name_to_order_db"
+                  ) && (
+                    <div className="form-group">
+                      <label>Valuer Name</label>
+                      <SingleSearchSelect
+                        className="search-selector"
+                        options={[
+                          {
+                            value: "V.K. ASSOCIATES",
+                            label: "V.K. ASSOCIATES",
+                          },
+                          {
+                            value: "VALUETECH SOLUTIONS",
+                            label: "VALUETECH SOLUTIONS",
+                          },
+                          {
+                            value: "VISHAL D. KOTHARI",
+                            label: "VISHAL D. KOTHARI",
+                          },
+                        ]}
+                        value={attributesFormData.valuer_name}
+                        onChange={(value) =>
+                          setAttributesFormData({
+                            ...attributesFormData,
+                            valuer_name: value,
+                          })
+                        }
+                        placeholder="Select valuer name"
+                      />
+                    </div>
+                  )}
+
+                  {hasPermission(
+                    allowedPermissions,
+                    "assign_user_to_order_db"
+                  ) && (
+                    <div className="form-group">
+                      <label>Users assigned</label>
+                      <SingleSearchSelect
+                        className="search-selector"
+                        options={adminUsersOptions}
+                        value={attributesFormData.admin_user_ids}
+                        onChange={(values) =>
+                          setAttributesFormData({
+                            ...attributesFormData,
+                            admin_user_ids: values || [],
+                          })
+                        }
+                        placeholder="Select users..."
+                        isMulti={true}
+                      />
+                    </div>
+                  )}
+                  <div className="form-buttons">
+                    <button className="submit-button" type="submit">
+                      Update Attributes
+                    </button>
+                  </div>
+                </div>
+              </form>
+            ),
+            onClose: () => {
+              setShowAttributesModal(false);
+              setAttributesOrderId(null);
+              setAttributesFormData({
+                order_priority: "",
+                order_type: "",
+                valuer_name: "",
+                admin_user_ids: [],
               });
             },
           }}

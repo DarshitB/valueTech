@@ -67,7 +67,13 @@ exports.seed = async function (knex) {
     "add_order",
     "edit_order",
     "delete_order",
+    
+    "add_order_db",
+    "edit_order_db",
+    "delete_order_db",
+
     "view_order_details",
+
     "view_order_priority_filter",
     "edit_order_priority",
     "view_order_type_filter",
@@ -75,10 +81,21 @@ exports.seed = async function (knex) {
     "assign_user_to_order",
     "add_valuer_name_to_order",
     "edit_valuer_name_to_order",
+
+    "view_order_priority_filter_db",
+    "edit_order_priority_db",
+    "view_order_type_filter_db",
+    "edit_order_type_db",
+    "assign_user_to_order_db",
+    "edit_valuer_name_to_order_db",
+
     "view_order_details_order_status",
     "view_order_details_payment_status",
     "view_order_details_manager_name",
     "view_order_details_field_verifier_name",
+    "view_order_details_field_bank_name",
+    "view_order_details_field_branch_name",
+    "view_order_details_field_officer_name",
 
     "view_order_recent_activity",
 

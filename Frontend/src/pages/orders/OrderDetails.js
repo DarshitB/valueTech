@@ -373,11 +373,11 @@ function OrderDetails() {
     const documentsToCheck = documents?.documents || documents;
 
     if (!documentsToCheck || !Array.isArray(documentsToCheck)) {
-      console.log("No documents or not array:", documentsToCheck);
+      /* console.log("No documents or not array:", documentsToCheck); */
       return false;
     }
 
-    console.log("All documents:", documentsToCheck);
+    /* console.log("All documents:", documentsToCheck); */
 
     const collages = documentsToCheck.filter(
       (doc) => doc.document_type === "collage"
@@ -386,15 +386,26 @@ function OrderDetails() {
       (doc) => doc.document_type === "report"
     );
 
-    console.log("Collages found:", collages);
+    /* console.log("Collages found:", collages);
     console.log("Reports found:", reports);
     console.log(
       "Has both collage and report:",
       collages.length > 0 && reports.length > 0
-    );
+    ); */
 
     return collages.length > 0 && reports.length > 0;
   }, [documents]);
+
+  // Check if user has ANY office information permissions
+  const hasAnyOfficePermission = useMemo(() => {
+    return (
+      hasPermission(allowedPermissions, "view_order_details_bank_name") ||
+      hasPermission(allowedPermissions, "view_order_details_branch_name") ||
+      hasPermission(allowedPermissions, "view_order_details_officer_name") ||
+      hasPermission(allowedPermissions, "view_order_details_manager_name") ||
+      hasPermission(allowedPermissions, "view_order_details_field_verifier_name")
+    );
+  }, [allowedPermissions]);
 
   // Helper function to get filename from media URL - Secure implementation
   const getFilenameFromMediaUrl = (media_url) => {
@@ -574,7 +585,7 @@ function OrderDetails() {
 
                 // In a real implementation, you might want to remove this document
                 // For now, just show it's clickable with validation
-                console.log("Remove attachment:", Number(doc.id));
+                /* console.log("Remove attachment:", Number(doc.id)); */
               }}
               aria-label={`Remove ${getFilenameFromMediaUrl(doc.media_url)}`}
             >
@@ -789,7 +800,7 @@ function OrderDetails() {
   // Handle billing form submission
   const handleBillingFormSubmit = (e) => {
     e.preventDefault();
-    console.log("Billing Form Data:", billingFormData);
+    /* console.log("Billing Form Data:", billingFormData); */
     // Here you can add API call to save billing data
     // dispatch(saveBillingData({ orderId: id, billingData: billingFormData }));
     alert("Billing details saved successfully!");
@@ -804,7 +815,7 @@ function OrderDetails() {
   // Handle "Open In Tally" button
   const handleOpenInTally = (e) => {
     e.preventDefault();
-    console.log("Opening in Tally with data:", billingFormData);
+    /* console.log("Opening in Tally with data:", billingFormData); */
     // Here you can add logic to open Tally with the billing data
     alert("Opening in Tally...");
   };
@@ -953,7 +964,7 @@ function OrderDetails() {
       ),
     };
 
-    console.log("Sanitized Mail Data:", sanitizedMailData);
+    /*  console.log("Sanitized Mail Data:", sanitizedMailData); */
 
     // Here you can add API call to send mail
     // dispatch(sendMail(sanitizedMailData));
@@ -1009,7 +1020,7 @@ function OrderDetails() {
           <div className="order-details-info">
             <div className="row h-100">
               {/* General information about the order */}
-              <div className="col-xl-4 col-lg-6 col-md-6 col-sm-12 col-xs-12 border-right h-100 mb-lg-4 ">
+              <div className={`${hasAnyOfficePermission ? 'col-xl-4' : 'col-xl-6'} col-lg-6 col-md-6 col-sm-12 col-xs-12 border-right h-100 mb-lg-4`}>
                 <div className="order-details-info-card">
                   <h6>General Information</h6>
                   <div className="order-details-info-sets">
@@ -1084,7 +1095,7 @@ function OrderDetails() {
                 </div>
               </div>
               {/* Client information section */}
-              <div className="col-xl-4 col-lg-6 col-md-6 col-sm-12 col-xs-12 border-right h-100 mb-lg-4 ">
+              <div className={`${hasAnyOfficePermission ? 'col-xl-4' : 'col-xl-6'} col-lg-6 col-md-6 col-sm-12 col-xs-12 ${hasAnyOfficePermission ? 'border-right' : ''} h-100 mb-lg-4`}>
                 <div className="order-details-info-card client">
                   <h6>Client Information</h6>
                   <div className="order-details-info-sets">
@@ -1147,45 +1158,61 @@ function OrderDetails() {
                   </div>
                 </div>
               </div>
-              {/* Office information section */}
-              <div className="col-xl-4 col-lg-6 col-md-6 col-sm-12 col-xs-12">
-                <div className="order-details-info-card office">
-                  <h6>Office Information</h6>
-                  <div className="order-details-info-sets">
-                    {/* Bank, branch, officer, and inspection details */}
-                    <div className="order-details-info-set">
-                      <div className="order-details-info-set-heading">
-                        <p>
-                          <span>Bank</span>
-                          <span>:</span>
-                        </p>
+              {/* Office information section - Only show if user has any office permission */}
+              {hasAnyOfficePermission && (
+                <div className="col-xl-4 col-lg-6 col-md-6 col-sm-12 col-xs-12">
+                  <div className="order-details-info-card office">
+                    <h6>Office Information</h6>
+                    <div className="order-details-info-sets">
+                      {/* Bank, branch, officer, and inspection details */}
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_order_details_bank_name"
+                      ) && (
+                      <div className="order-details-info-set">
+                        <div className="order-details-info-set-heading">
+                          <p>
+                            <span>Bank</span>
+                            <span>:</span>
+                          </p>
+                        </div>
+                        <div className="order-details-info-set-details">
+                          <p>{showValue(order?.bank_name)}</p>
+                        </div>
                       </div>
-                      <div className="order-details-info-set-details">
-                        <p>{showValue(order?.bank_name)}</p>
+                    )}
+                    {hasPermission(
+                      allowedPermissions,
+                      "view_order_details_branch_name"
+                    ) && (
+                      <div className="order-details-info-set">
+                        <div className="order-details-info-set-heading">
+                          <p>
+                            <span>Branch</span>
+                            <span>:</span>
+                          </p>
+                        </div>
+                        <div className="order-details-info-set-details">
+                          <p>{showValue(order?.branch_name)}</p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="order-details-info-set">
-                      <div className="order-details-info-set-heading">
-                        <p>
-                          <span>Branch</span>
-                          <span>:</span>
-                        </p>
+                    )}
+                    {hasPermission(
+                      allowedPermissions,
+                      "view_order_details_officer_name"
+                    ) && (
+                      <div className="order-details-info-set">
+                        <div className="order-details-info-set-heading">
+                          <p>
+                            <span>Officer</span>
+                            <span>:</span>
+                          </p>
+                        </div>
+                        <div className="order-details-info-set-details">
+                          <p>{showValue(order?.officer_name)}</p>
+                        </div>
                       </div>
-                      <div className="order-details-info-set-details">
-                        <p>{showValue(order?.branch_name)}</p>
-                      </div>
-                    </div>
-                    <div className="order-details-info-set">
-                      <div className="order-details-info-set-heading">
-                        <p>
-                          <span>Officer</span>
-                          <span>:</span>
-                        </p>
-                      </div>
-                      <div className="order-details-info-set-details">
-                        <p>{showValue(order?.officer_name)}</p>
-                      </div>
-                    </div>
+                    )}
                     {hasPermission(
                       allowedPermissions,
                       "view_order_details_manager_name"
@@ -1221,6 +1248,7 @@ function OrderDetails() {
                   </div>
                 </div>
               </div>
+              )}
             </div>
           </div>
         </div>
@@ -1448,22 +1476,24 @@ function OrderDetails() {
                   </>
                 )}
 
-                {hasCollageAndReport && hasPermission(
-                  allowedPermissions,
-                  "view_order_complete_button"
-                ) && (
-                  <Link title="Complete" className="tooltip-link">
-                    <ValidateIcon />
-                  </Link>
-                )}
-                {hasCollageAndReport && hasPermission(
-                  allowedPermissions,
-                  "view_order_authenticate_button"
-                ) && (
-                  <Link title="Authenticate" className="tooltip-link">
-                    <ApprovedIcon />
-                  </Link>
-                )}
+                {hasCollageAndReport &&
+                  hasPermission(
+                    allowedPermissions,
+                    "view_order_complete_button"
+                  ) && (
+                    <Link title="Complete" className="tooltip-link">
+                      <ValidateIcon />
+                    </Link>
+                  )}
+                {hasCollageAndReport &&
+                  hasPermission(
+                    allowedPermissions,
+                    "view_order_authenticate_button"
+                  ) && (
+                    <Link title="Authenticate" className="tooltip-link">
+                      <ApprovedIcon />
+                    </Link>
+                  )}
                 {hasPermission(
                   allowedPermissions,
                   "view_order_payment_button"

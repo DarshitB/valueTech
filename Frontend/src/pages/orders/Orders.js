@@ -46,7 +46,7 @@ function Orders() {
   const { list: fieldVerifiers } = useSelector((state) => state.fieldVerifier);
 
   // console.log("officers", officers);
-  /* console.log("orders", orders); */
+  console.log("orders", orders);
   // Fetch everything on mount
   useEffect(() => {
     dispatch(fetchOrders());
@@ -190,23 +190,6 @@ function Orders() {
   const openAddModal = () => {
     setIsEdit(false);
 
-    // Find PAN INDIA manager (case-insensitive) for pre-selection
-    const panIndiaManager = managers.find(
-      (manager) => manager.name?.toUpperCase() === "PAN INDIA"
-    );
-
-    /* console.log("PAN INDIA MANAGER found:", panIndiaManager); */
-
-    // Pre-select PAN INDIA manager if user has access to manager field and manager exists
-    const preSelectedManagerId =
-      hasPermission(allowedPermissions, "view_order_add_edit_manager_filed") &&
-      !isManager &&
-      panIndiaManager
-        ? panIndiaManager.id
-        : null;
-
-    /* console.log("Pre-selected MANAGER ID:", preSelectedManagerId); */
-
     setFormData({
       customer_name: "",
       contact: "",
@@ -217,7 +200,7 @@ function Orders() {
       registration_number: "",
       place_of_inspection: "",
       officer_id: null,
-      manager_id: preSelectedManagerId,
+      manager_id: null,
       field_verifier_id: null,
     });
     setShowFormModal(true);
@@ -227,6 +210,29 @@ function Orders() {
   const openEditModal = (order) => {
     setIsEdit(true);
     setEditOrderId(order.id);
+
+    // Find PAN INDIA manager for pre-selection in specific cases
+    const panIndiaManager = managers.find(
+      (manager) => manager.name?.toUpperCase() === "PAN INDIA"
+    );
+
+    // Pre-select PAN INDIA manager only if:
+    // 1. Order status is 3 (Telecaller Complete)
+    // 2. Order doesn't have a manager assigned
+    // 3. PAN INDIA manager exists
+    // 4. User has permission to view/edit manager field
+    let preSelectedManagerId = order.manager_id || null;
+
+    if (
+      order.current_status_id === 3 &&
+      !order.manager_id &&
+      panIndiaManager &&
+      hasPermission(allowedPermissions, "view_order_add_edit_manager_filed") &&
+      !isManager
+    ) {
+      preSelectedManagerId = panIndiaManager.id;
+    }
+
     setFormData({
       customer_name: order.customer_name || "",
       contact: order.contact || "",
@@ -237,7 +243,7 @@ function Orders() {
       registration_number: order.registration_number || "",
       place_of_inspection: order.place_of_inspection || "",
       officer_id: order.officer_id || null,
-      manager_id: order.manager_id || null,
+      manager_id: preSelectedManagerId,
       field_verifier_id: order.field_verifier_id || null,
     });
     setShowFormModal(true);
@@ -450,6 +456,10 @@ function Orders() {
       allowedPermissions,
       "edit_valuer_name_to_order"
     );
+    const canAssignUsers = hasPermission(
+      allowedPermissions,
+      "assign_user_to_order"
+    );
 
     // Build payload with only the fields that user has permission to edit and have values
     const payload = {};
@@ -466,8 +476,8 @@ function Orders() {
       payload.valuer_name = attributesFormData.valuer_name;
     }
 
-    // Always include user_ids array (even if empty) to handle user removal from backend
-    if (Array.isArray(attributesFormData.admin_user_ids)) {
+    // Include user_ids array only if user has permission (even if empty) to handle user removal from backend
+    if (canAssignUsers && Array.isArray(attributesFormData.admin_user_ids)) {
       // Always send as array - empty array to clear assignments, populated array to set assignments
       payload.user_ids = attributesFormData.admin_user_ids
         .map((id) => Number(id))
@@ -587,7 +597,7 @@ function Orders() {
                     <option value="Low">Low</option>
                   </select>
                 )}
-                {hasPermission(allowedPermissions, "add_order") && (
+                {hasPermission(allowedPermissions, "add_order_db") && (
                   <button className="btn" onClick={openAddModal}>
                     Add Order
                   </button>
@@ -854,7 +864,12 @@ function Orders() {
       {showFormModal && (
         <FormModel>
           {{
-            title: isEdit ? "Edit Order" : "Add Order",
+            title: isEdit
+              ? `Edit Order - ${
+                  orders.find((order) => order.id === editOrderId)
+                    ?.order_number || "N/A"
+                }`
+              : "Add Order",
             body: (
               <form
                 className="body-form-box"
@@ -1309,22 +1324,27 @@ function Orders() {
                     </div>
                   )}
 
-                  <div className="form-group">
-                    <label>Users assigned</label>
-                    <SingleSearchSelect
-                      className="search-selector"
-                      options={adminUsersOptions}
-                      value={attributesFormData.admin_user_ids}
-                      onChange={(values) =>
-                        setAttributesFormData({
-                          ...attributesFormData,
-                          admin_user_ids: values || [],
-                        })
-                      }
-                      placeholder="Select users..."
-                      isMulti={true}
-                    />
-                  </div>
+                  {hasPermission(
+                    allowedPermissions,
+                    "assign_user_to_order"
+                  ) && (
+                    <div className="form-group">
+                      <label>Users assigned</label>
+                      <SingleSearchSelect
+                        className="search-selector"
+                        options={adminUsersOptions}
+                        value={attributesFormData.admin_user_ids}
+                        onChange={(values) =>
+                          setAttributesFormData({
+                            ...attributesFormData,
+                            admin_user_ids: values || [],
+                          })
+                        }
+                        placeholder="Select users..."
+                        isMulti={true}
+                      />
+                    </div>
+                  )}
                   <div className="form-buttons">
                     <button className="submit-button" type="submit">
                       Update Attributes

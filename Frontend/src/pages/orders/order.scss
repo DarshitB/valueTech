@@ -170,7 +170,8 @@
             }
             .activity-description {
               margin-bottom: 0px;
-              font-size: 20px;
+              font-size: 15px;
+              line-height: 1.5;
               font-weight: 600;
               color: $base-font-color;
             }
@@ -484,13 +485,13 @@
             font-size: 12px;
           }
         }
-        .tooltip-link{
+        .tooltip-link {
           border: 1px solid $primary-color !important;
-          &:hover{
+          &:hover {
             background-color: transparent !important;
             color: $primary-color !important;
           }
-          &:focus{
+          &:focus {
             background-color: transparent !important;
             color: $primary-color !important;
           }
