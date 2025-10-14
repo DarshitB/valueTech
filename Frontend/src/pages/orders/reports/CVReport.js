@@ -3029,8 +3029,14 @@ function CVReport() {
                       id="no_of_photograph"
                       name="no_of_photograph"
                       value={reportFormData.no_of_photograph}
-                      onChange={handleFormChange}
-                      placeholder="10"
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Only allow numbers, + and -
+                        const sanitized = value.replace(/[^0-9+\-]/g, '');
+                        e.target.value = sanitized;
+                        handleFormChange(e);
+                      }}
+                      placeholder="e.g., 10 or 1+3+6 or 5-2"
                       required
                     />
                   </div>
@@ -3046,8 +3052,14 @@ function CVReport() {
                       id="no_of_collage"
                       name="no_of_collage"
                       value={reportFormData.no_of_collage}
-                      onChange={handleFormChange}
-                      placeholder="2"
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Only allow numbers, + and -
+                        const sanitized = value.replace(/[^0-9+\-]/g, '');
+                        e.target.value = sanitized;
+                        handleFormChange(e);
+                      }}
+                      placeholder="e.g., 2 or 1+1"
                       required
                     />
                   </div>

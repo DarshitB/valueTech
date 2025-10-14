@@ -58,6 +58,99 @@ const upload = multer({
 });
 
 /**
+ * Helper function to convert number to words
+ * e.g., 12 -> "TWELVE"
+ */
+function numberToWords(num) {
+  const ones = ["", "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE"];
+  const tens = ["", "", "TWENTY", "THIRTY", "FORTY", "FIFTY", "SIXTY", "SEVENTY", "EIGHTY", "NINETY"];
+  const teens = ["TEN", "ELEVEN", "TWELVE", "THIRTEEN", "FOURTEEN", "FIFTEEN", "SIXTEEN", "SEVENTEEN", "EIGHTEEN", "NINETEEN"];
+  
+  if (num === 0) return "ZERO";
+  if (num < 10) return ones[num];
+  if (num >= 10 && num < 20) return teens[num - 10];
+  if (num >= 20 && num < 100) {
+    const ten = Math.floor(num / 10);
+    const one = num % 10;
+    return tens[ten] + (one > 0 ? " " + ones[one] : "");
+  }
+  if (num >= 100 && num < 1000) {
+    const hundred = Math.floor(num / 100);
+    const remainder = num % 100;
+    return ones[hundred] + " HUNDRED" + (remainder > 0 ? " " + numberToWords(remainder) : "");
+  }
+  
+  return num.toString(); // For numbers >= 1000, just return as string
+}
+
+/**
+ * Generic helper function to convert numeric expression to formatted string
+ * e.g., "1+2+9" -> "12(TWELVE)"
+ * ONLY allows numbers, spaces, + and - symbols
+ * Throws error if other symbols are present
+ * 
+ * @param {string} fieldValue - The field value to convert (e.g., "1+2+9")
+ * @param {string} fieldName - Name of the field for error messages (e.g., "no_of_photograph")
+ * @returns {string} Formatted string like "12(TWELVE)" or original if just a number
+ * @throws {BadRequestError} If invalid characters are present
+ */
+function convertNumericExpression(fieldValue, fieldName = 'field') {
+  if (!fieldValue || typeof fieldValue !== 'string') {
+    return fieldValue;
+  }
+  
+  // Trim whitespace
+  const trimmedValue = fieldValue.trim();
+  
+  // Check for invalid characters - ONLY allow: numbers (0-9), spaces, + and -
+  const invalidCharsRegex = /[^0-9+\-\s]/g;
+  const invalidChars = trimmedValue.match(invalidCharsRegex);
+  
+  if (invalidChars) {
+    const uniqueInvalidChars = [...new Set(invalidChars)].join(', ');
+    throw new BadRequestError(
+      `Invalid characters found in ${fieldName}: "${uniqueInvalidChars}". Only numbers, spaces, + and - are allowed.`
+    );
+  }
+  
+  // Check if it contains mathematical operators (+ or -)
+  if (trimmedValue.includes('+') || trimmedValue.includes('-')) {
+    try {
+      // Replace spaces and evaluate
+      const expression = trimmedValue.replace(/\s/g, '');
+      
+      // Additional safety check: ensure it's a valid expression pattern
+      // Should be: number, then (+/-), then number, etc.
+      const validExpressionPattern = /^-?\d+(\s*[+\-]\s*\d+)*$/;
+      if (!validExpressionPattern.test(trimmedValue)) {
+        throw new BadRequestError(
+          `Invalid expression format in ${fieldName}: "${trimmedValue}". Expected format like "1+2+3" or "10-5+3".`
+        );
+      }
+      
+      // Evaluate the expression
+      const sum = eval(expression);
+      
+      if (!isNaN(sum) && isFinite(sum)) {
+        const roundedSum = Math.round(sum);
+        const wordsInParens = numberToWords(roundedSum);
+        return `${roundedSum}(${wordsInParens})`;
+      }
+    } catch (error) {
+      if (error instanceof BadRequestError) {
+        throw error; // Re-throw BadRequestError
+      }
+      throw new BadRequestError(
+        `Failed to evaluate expression in ${fieldName}: "${trimmedValue}"`
+      );
+    }
+  }
+  
+  // If it's just a number, return as is
+  return trimmedValue;
+}
+
+/**
  * Generate Report PDF
  * POST /orders-reports/:order_id/generate
  */
@@ -126,6 +219,25 @@ exports.generateReport = async (req, res, next) => {
     // Add chassis image to form data
     formData.tyre_image_base64 = chassisImageBase64;
 
+    // Convert no_of_photograph for display (e.g., "1+2+9" -> "12(TWELVE)")
+    // Store original in DB, but convert for template
+    const originalPhotographNumber = formData.no_of_photograph;
+    if (formData.no_of_photograph) {
+      formData.no_of_photograph = convertNumericExpression(
+        formData.no_of_photograph, 
+        'no_of_photograph'
+      );
+    }
+
+    // Convert no_of_collage for display (same logic as no_of_photograph)
+    const originalCollageNumber = formData.no_of_collage;
+    if (formData.no_of_collage) {
+      formData.no_of_collage = convertNumericExpression(
+        formData.no_of_collage, 
+        'no_of_collage'
+      );
+    }
+
     // Create upload directory structure: uploads/YYYY/MMM/orderNumber/reports/
     const now = new Date();
     const year = now.getFullYear().toString();
@@ -162,6 +274,14 @@ exports.generateReport = async (req, res, next) => {
       tyre_image_base64,
       ...mainReportData
     } = formData;
+    
+    // Restore original values for database storage
+    if (originalPhotographNumber !== undefined) {
+      mainReportData.no_of_photograph = originalPhotographNumber;
+    }
+    if (originalCollageNumber !== undefined) {
+      mainReportData.no_of_collage = originalCollageNumber;
+    }
     
     // Filter form data to only include valid database columns
     const validFields = filterValidReportFields(mainReportData, requestedReportType);
