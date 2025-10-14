@@ -1038,8 +1038,8 @@ function Dashboard() {
                     <p>Loading...</p>
                   ) : (
                     <CustomDataTable
-                      showEntriesSelector={false}
-                      showFooter={false}
+                      showEntriesSelector={true}
+                      showFooter={true}
                     >
                       {{
                         buttons: (
@@ -1206,13 +1206,6 @@ function Dashboard() {
                             // Show order only if both filters match (or no filter is selected)
                             return typeMatch && priorityMatch;
                           })
-                          .slice(
-                            0,
-                            // Remove limit for Manager, Bank Authority, and Bank Officer roles
-                            isManager || isBankAuthority || isBankOfficer
-                              ? undefined
-                              : 9
-                          )
                           .map((order) => (
                             <tr
                               key={order.id}
