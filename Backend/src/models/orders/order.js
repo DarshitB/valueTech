@@ -163,7 +163,7 @@ const order = {
     }
 
     // Sort by newest first
-    baseQuery.orderBy("orders.created_at", "desc");
+    baseQuery.orderBy("orders.created_at", "asc");
 
     const orders = await baseQuery;
     

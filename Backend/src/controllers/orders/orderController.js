@@ -58,6 +58,23 @@ async function getCategoryName(categoryId) {
   }
 }
 
+/**
+ * Get Pan India manager ID (case-insensitive search)
+ * @returns {number|null} Manager user ID or null if not found
+ */
+async function getPanIndiaManagerId() {
+  try {
+    const manager = await db("users")
+      .select("id")
+      .whereRaw("LOWER(name) = ?", ["pan india"])
+      .first();
+    return manager ? manager.id : null;
+  } catch (error) {
+    console.error("Error fetching Pan India manager:", error);
+    return null;
+  }
+}
+
 // Get All Orders based on user role
 exports.getAll = async (req, res, next) => {
   try {
@@ -146,6 +163,7 @@ exports.create = async (req, res, next) => {
 
     // Determine order status based on field_verifier_id, manager_id, supervisor_number, and driver_number
     let orderStatusId;
+    let finalManagerId = manager_id;
     const hasSupervisorAndDriver = supervisor_number && driver_number;
 
     if (field_verifier_id) {
@@ -157,6 +175,15 @@ exports.create = async (req, res, next) => {
     } else if (hasSupervisorAndDriver) {
       // If both supervisor and driver numbers are set but no manager, status should be 3 (Telecaller Completed)
       orderStatusId = 3;
+      
+      // Auto-assign "Pan India" manager if no manager is provided
+      if (!manager_id) {
+        const panIndiaManagerId = await getPanIndiaManagerId();
+        if (panIndiaManagerId) {
+          finalManagerId = panIndiaManagerId;
+          orderStatusId = 4; // Update status to 4 (Manager Assigned) since we're assigning Pan India
+        }
+      }
     } else {
       // If supervisor or driver number is missing, status should be 2 (Telecaller Assigned)
       orderStatusId = 2;
@@ -204,7 +231,7 @@ exports.create = async (req, res, next) => {
       driver_number: driver_number || null,
       child_category_id: child_category_id || null,
       officer_id: officer_id || null,
-      manager_id: manager_id || null,
+      manager_id: finalManagerId || null,
       field_verifier_id: field_verifier_id || null,
       registration_number: registration_number || null,
       place_of_inspection: place_of_inspection || null,
@@ -234,7 +261,7 @@ exports.create = async (req, res, next) => {
     // If field_verifier is assigned, create both manager (4) and field verifier (5) records
     if (field_verifier_id) {
       // First create Manager Assigned status (if manager is assigned)
-      if (manager_id) {
+      if (finalManagerId) {
         const managerStatusHistory = {
           order_id: order.id,
           status_id: 4, // Manager Assigned
@@ -322,14 +349,15 @@ exports.update = async (req, res, next) => {
     // Determine new order status based on field_verifier_id, manager_id, supervisor_number, and driver_number
     // IMPORTANT: Only update status if current status is lower than the new status
     let newStatusId;
+    let finalManagerId = manager_id !== undefined ? manager_id : existingOrder.manager_id;
+    
     const currentSupervisorNumber =
       supervisor_number !== undefined
         ? supervisor_number
         : existingOrder.supervisor_number;
     const currentDriverNumber =
       driver_number !== undefined ? driver_number : existingOrder.driver_number;
-    const currentManagerId =
-      manager_id !== undefined ? manager_id : existingOrder.manager_id;
+    const currentManagerId = finalManagerId;
     const currentFieldVerifierId =
       field_verifier_id !== undefined
         ? field_verifier_id
@@ -347,6 +375,15 @@ exports.update = async (req, res, next) => {
     } else if (hasSupervisorAndDriver) {
       // If both supervisor and driver numbers are set but no manager, status should be 3 (Telecaller Completed)
       newStatusId = 3;
+      
+      // Auto-assign "Pan India" manager if no manager is currently set
+      if (!currentManagerId && existingOrder.current_status_id < 3) {
+        const panIndiaManagerId = await getPanIndiaManagerId();
+        if (panIndiaManagerId) {
+          finalManagerId = panIndiaManagerId;
+          newStatusId = 4; // Update status to 4 (Manager Assigned) since we're assigning Pan India
+        }
+      }
     } else {
       // If supervisor or driver number is missing, status should be 2 (Telecaller Assigned)
       newStatusId = 2;
@@ -387,7 +424,7 @@ exports.update = async (req, res, next) => {
         existingOrder.child_category_id
       ),
       officer_id: getIntegerValue(officer_id, existingOrder.officer_id),
-      manager_id: getIntegerValue(manager_id, existingOrder.manager_id),
+      manager_id: finalManagerId,
       field_verifier_id: getIntegerValue(
         field_verifier_id,
         existingOrder.field_verifier_id

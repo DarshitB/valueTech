@@ -251,28 +251,6 @@ function Dashboard() {
     setIsEdit(true);
     setEditOrderId(order.id);
 
-    // Find PAN INDIA manager for pre-selection in specific cases
-    const panIndiaManager = managers.find(
-      (manager) => manager.name?.toUpperCase() === "PAN INDIA"
-    );
-
-    // Pre-select PAN INDIA manager only if:
-    // 1. Order status is 3 (Telecaller Complete)
-    // 2. Order doesn't have a manager assigned
-    // 3. PAN INDIA manager exists
-    // 4. User has permission to view/edit manager field
-    let preSelectedManagerId = order.manager_id || null;
-
-    if (
-      order.current_status_id === 3 &&
-      !order.manager_id &&
-      panIndiaManager &&
-      hasPermission(allowedPermissions, "view_order_add_edit_manager_filed") &&
-      !isManager
-    ) {
-      preSelectedManagerId = panIndiaManager.id;
-    }
-
     setFormData({
       customer_name: order.customer_name || "",
       contact: order.contact || "",
@@ -283,7 +261,7 @@ function Dashboard() {
       registration_number: order.registration_number || "",
       place_of_inspection: order.place_of_inspection || "",
       officer_id: order.officer_id || null,
-      manager_id: preSelectedManagerId,
+      manager_id: order.manager_id || null,
       field_verifier_id: order.field_verifier_id || null,
     });
     setShowFormModal(true);
