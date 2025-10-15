@@ -14,6 +14,7 @@ import {
   saveOrderReport,
   clearCurrentReport,
 } from "../../../redux/reducers/orderReportReducer";
+import { fetchAssetMakesForReports } from "../../../redux/reducers/assetMakesReducer";
 import { usePageTitle } from "../../../context/PageTitleContext";
 import SingleSearchSelect from "../../../components/SingleSearchSelect";
 import { toast } from "react-toastify";
@@ -35,6 +36,11 @@ function CVReport() {
     generating,
     saving,
   } = useSelector((state) => state.orderReports);
+
+  // Get asset makes data from Redux store
+  const { list: assetMakes, loading: assetMakesLoading } = useSelector((state) => state.assetMakes);
+  const [showOtherAssetMake, setShowOtherAssetMake] = useState(false);
+  const [otherAssetMake, setOtherAssetMake] = useState("");
   // Set page title using custom hook
   const { setTitle } = usePageTitle();
   // Clear report data when component mounts or order changes
@@ -50,8 +56,11 @@ function CVReport() {
       dispatch(
         fetchOrderReport({ orderId: id, reportType: "report_cv", silent: true })
       );
+      // Fetch asset makes for CV report
+      dispatch(fetchAssetMakesForReports("report_cv"));
     }
   }, [dispatch, id]);
+
 
   // Reset form data when component mounts or order ID changes
   useEffect(() => {
@@ -380,6 +389,7 @@ function CVReport() {
     owner_serial_no: "",
     manufacture_year: "",
     asset_make: "",
+    new_asset_make: "",
     model: "",
 
     engine_no_detail: "",
@@ -910,14 +920,33 @@ function CVReport() {
           value = order?.child_category_name || "";
         }
 
-        // Special handling for amount_in_words - use memoized value
-        if (key === "amount_in_words") {
-          value = amountInWords;
+        // Clear asset_make if new_asset_make has value
+        if (key === "asset_make" && reportFormData.new_asset_make) {
+          return; // Skip adding asset_make to payload if new_asset_make exists
         }
 
-        // Special handling for no_of_tyres - use memoized value
+        // Special handling for amount_in_words - compute from fair_market_value
+        if (key === "amount_in_words") {
+          const fmv = reportFormData.fair_market_value;
+          console.log('🔍 CVReport Generate - fair_market_value raw:', fmv);
+          const amount = parseCurrency(fmv);
+          console.log('🔍 CVReport Generate - parsed amount:', amount);
+          value = amount > 0 ? convertNumberToWordsIndian(amount) : "";
+          console.log('🔍 CVReport Generate - amount_in_words computed:', value);
+          // Force include even if empty
+          formData.append(key, value);
+          return; // Skip the normal flow for this field
+        }
+
+        // Special handling for no_of_tyres - compute from tyre numbers
         if (key === "no_of_tyres") {
-          value = totalTyres;
+          const front = parseInt(reportFormData.front_tyre_no) || 0;
+          const middle = parseInt(reportFormData.middle_tyre_no) || 0;
+          const rear = parseInt(reportFormData.rear_tyre_no) || 0;
+          const total = front + middle + rear;
+          const word = numberToWords(total);
+          value = `${total} (${word})`;
+          console.log('🔍 CVReport Generate - no_of_tyres computed:', value);
         }
 
         if (value !== null && value !== "") {
@@ -1057,6 +1086,9 @@ function CVReport() {
       dispatch,
       id,
       order,
+      parseCurrency,
+      convertNumberToWordsIndian,
+      numberToWords,
     ]
   );
 
@@ -1081,7 +1113,31 @@ function CVReport() {
       
       if (alwaysIncludeFields.includes(key)) {
         // Always include these fields, even if empty
-        reportData[key] = value || "";
+        let defaultValue = value || "";
+        // Use computed amountInWords value if this is amount_in_words field
+        if (key === 'amount_in_words') {
+          // Compute amount in words from fair_market_value
+          const fmv = reportFormData.fair_market_value;
+          console.log('🔍 CVReport Save - fair_market_value raw:', fmv);
+          const amount = parseCurrency(fmv);
+          console.log('🔍 CVReport Save - parsed amount:', amount);
+          defaultValue = amount > 0 ? convertNumberToWordsIndian(amount) : "";
+          console.log('🔍 CVReport Save - amount_in_words - Computed value:', defaultValue);
+          // Force include even if empty
+          reportData[key] = defaultValue;
+          return; // Skip the normal flow for this field
+        }
+        // Use computed no_of_tyres value if this is no_of_tyres field
+        if (key === 'no_of_tyres') {
+          const front = parseInt(reportFormData.front_tyre_no) || 0;
+          const middle = parseInt(reportFormData.middle_tyre_no) || 0;
+          const rear = parseInt(reportFormData.rear_tyre_no) || 0;
+          const total = front + middle + rear;
+          const word = numberToWords(total);
+          defaultValue = `${total} (${word})`;
+          console.log('🔍 CVReport Save - no_of_tyres - Computed value:', defaultValue);
+        }
+        reportData[key] = defaultValue;
       } else {
         // Only include fields that have meaningful values (not null, undefined, or empty string)
         if (value !== null && value !== undefined && value !== "") {
@@ -1132,6 +1188,14 @@ function CVReport() {
       return;
     }
 
+    console.log('📤 CVReport - Sending to backend - reportData:', reportData);
+    console.log('📤 CVReport - amount_in_words in payload:', reportData.amount_in_words);
+
+    // Debug log for payload
+    console.log('🔍 CVReport Save - Final reportData:', reportData);
+    console.log('🔍 CVReport Save - amount_in_words in payload:', reportData.amount_in_words);
+    console.log('🔍 CVReport Save - fair_market_value:', reportFormData.fair_market_value);
+
     // Dispatch save action with JSON data
     dispatch(
       saveOrderReport({
@@ -1146,6 +1210,9 @@ function CVReport() {
     chassisImpressionFile,
     dispatch,
     id,
+    parseCurrency,
+    convertNumberToWordsIndian,
+    numberToWords,
   ]);
 
   // Render flexible fields for a section
@@ -1903,49 +1970,45 @@ function CVReport() {
                     <label htmlFor="asset_make">
                       Asset Make <span class="text-danger">*</span>
                     </label>
-                    <SingleSearchSelect
-                      options={[
-                        { value: "TATA MOTORS LTD", label: "TATA MOTORS LTD" },
-                        {
-                          value: "ASHOK LEYLAND LIMITED",
-                          label: "ASHOK LEYLAND LIMITED",
-                        },
-                        {
-                          value: "VE COMMERCIAL VEHICLES LIMITED",
-                          label: "VE COMMERCIAL VEHICLES LIMITED",
-                        },
-                        {
-                          value: "MAHINDRA & MAHINDRA LIMITED",
-                          label: "MAHINDRA & MAHINDRA LIMITED",
-                        },
-                        { value: "PIAGGIO INDIA", label: "PIAGGIO INDIA" },
-                        {
-                          value: "SCANIA COMMERCIAL VEHICLE INDIA PVT. LTD",
-                          label: "SCANIA COMMERCIAL VEHICLE INDIA PVT. LTD",
-                        },
-                        { value: "FORCE MOTORS", label: "FORCE MOTORS" },
-                        {
-                          value:
-                            "DAIMLER INDIA COMMERCIAL VEHICLES PVT.LTD/BHARATBENZ",
-                          label:
-                            "DAIMLER INDIA COMMERCIAL VEHICLES PVT.LTD/BHARATBENZ",
-                        },
-                        { value: "VOLVO TRUCKS", label: "VOLVO TRUCKS" },
-                        {
-                          value: "SWARAJ MAZDA – SML ISUZU",
-                          label: "SWARAJ MAZDA – SML ISUZU",
-                        },
-                        {
-                          value: "MARUTI SUZUKI INDIA LTD",
-                          label: "MARUTI SUZUKI INDIA LTD",
-                        },
-                      ]}
-                      value={reportFormData.asset_make}
-                      onChange={(value) =>
-                        handleSelectChange("asset_make", value)
-                      }
-                      required
-                    />
+                    <div>
+                      <SingleSearchSelect
+                        options={[
+                          ...assetMakes.map((make) => ({
+                            value: make.id,
+                            label: make.name,
+                          })),
+                          { value: "OTHERS", label: "OTHERS" },
+                        ]}
+                        value={parseInt(reportFormData.asset_make)}
+                        onChange={(value) => {
+                          handleSelectChange("asset_make", value);
+                          setShowOtherAssetMake(value === "OTHERS");
+                          if (value !== "OTHERS") {
+                            setOtherAssetMake("");
+                          }
+                        }}
+                        isLoading={assetMakesLoading}
+                        required
+                      />
+                      {showOtherAssetMake && (
+                        <input
+                          type="text"
+                          className="form-field mt-2"
+                          name="new_asset_make"
+                          placeholder="Enter Asset Make"
+                          value={otherAssetMake}
+                          onChange={(e) => {
+                            const value = e.target.value.toUpperCase();
+                            setOtherAssetMake(value);
+                            handleSelectChange(
+                              "new_asset_make",
+                              value || "OTHERS"
+                            );
+                          }}
+                          required
+                        />
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="col-md-3">
@@ -3032,7 +3095,7 @@ function CVReport() {
                       onChange={(e) => {
                         const value = e.target.value;
                         // Only allow numbers, + and -
-                        const sanitized = value.replace(/[^0-9+\-]/g, '');
+                        const sanitized = value.replace(/[^0-9+\-]/g, "");
                         e.target.value = sanitized;
                         handleFormChange(e);
                       }}
@@ -3055,7 +3118,7 @@ function CVReport() {
                       onChange={(e) => {
                         const value = e.target.value;
                         // Only allow numbers, + and -
-                        const sanitized = value.replace(/[^0-9+\-]/g, '');
+                        const sanitized = value.replace(/[^0-9+\-]/g, "");
                         e.target.value = sanitized;
                         handleFormChange(e);
                       }}

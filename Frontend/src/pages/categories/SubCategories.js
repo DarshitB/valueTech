@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchSubCategories,
@@ -21,8 +21,9 @@ import { usePageTitle } from "../../context/PageTitleContext";
 function SubCategories() {
   const { id } = useParams(); // category ID from URL
   const dispatch = useDispatch();
-  const { setTitle } = usePageTitle();
+  const navigate = useNavigate();
 
+  const { setTitle } = usePageTitle();
   const allowedPermissions = useSelector(selectPermissions);
   const { list: allSubCategories, loading } = useSelector(
     (state) => state.subcategories
@@ -128,7 +129,10 @@ function SubCategories() {
                   placeholder="Add asset category"
                   value={formData.name}
                   onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value.toUpperCase() })
+                    setFormData({
+                      ...formData,
+                      name: e.target.value.toUpperCase(),
+                    })
                   }
                 />
                 <button className="btn" type="submit">
@@ -146,19 +150,35 @@ function SubCategories() {
               </tr>
             ),
             rows: subcategories.map((sub, index) => (
-              <tr key={sub.id}>
+              <tr
+                key={sub.id}
+                onClick={() => {
+                  if (
+                    hasPermission(allowedPermissions, "view_child_category")
+                  ) {
+                    navigate(
+                      `/categories/${id}/subcategories/${sub.id}/childcategories`
+                    );
+                  }
+                }}
+                style={{
+                  cursor: hasPermission(
+                    allowedPermissions,
+                    "view_order_details"
+                  )
+                    ? "pointer"
+                    : "default",
+                }}
+              >
                 <td className="sequential-number">{index + 1}</td>
-                <td>
-                  {hasPermission(allowedPermissions, "view_child_category") ? (
-                    <Link
-                      className="get-me-inside"
-                      to={`/categories/${id}/subcategories/${sub.id}/childcategories`}
-                    >
-                      {sub.name}
-                    </Link>
-                  ) : (
-                    sub.name
-                  )}
+                <td
+                  className={
+                    hasPermission(allowedPermissions, "view_order_details")
+                      ? "get-me-inside"
+                      : ""
+                  }
+                >
+                  {sub.name}
                 </td>
                 <td>{sub.created_by}</td>
                 <td>{sub.updated_by || "-"}</td>
@@ -207,7 +227,10 @@ function SubCategories() {
                       id="subCategoryName"
                       value={formData.name}
                       onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value.toUpperCase() })
+                        setFormData({
+                          ...formData,
+                          name: e.target.value.toUpperCase(),
+                        })
                       }
                     />
                   </div>

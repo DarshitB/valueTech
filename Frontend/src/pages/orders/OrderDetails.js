@@ -45,6 +45,7 @@ import { Link } from "react-router-dom";
 import { usePageTitle } from "../../context/PageTitleContext";
 import { hasPermission } from "../../utils/permissionUtils";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
+import { updateOrderToStatus9 } from "../../redux/reducers/orderReducer";
 import FormModel from "../../components/FormModel";
 import SingleSearchSelect from "../../components/SingleSearchSelect";
 import { toast } from "react-toastify";
@@ -94,14 +95,22 @@ function OrderDetails() {
 
   /* get logged user permission */
   const allowedPermissions = useSelector(selectPermissions);
+  const currentUser = useSelector((state) => state.auth.user);
+  const isExemptAdmin = currentUser?.role?.name.toUpperCase().includes("SUPER ADMIN") || currentUser?.role?.name === "developer_admin";
 
   // Select order and comments data from Redux store
   const order = useSelector((state) => state.orders.selected);
   const comments = useSelector((state) => state.orders.comments);
   const paymentUpdating = useSelector((state) => state.orders.paymentUpdating);
-  const { approvedDocuments, approvedLoading, documents } = useSelector(
+  // Get media documents from Redux store
+  const orderMediaDocumentsState = useSelector(
     (state) => state.orderMediaDocuments
   );
+  const {
+    approvedDocuments,
+    approvedLoading,
+    documents: orderMediaDocuments,
+  } = orderMediaDocumentsState;
   const { list: officers } = useSelector((state) => state.officers);
 
   // Set page title using custom hook
@@ -142,13 +151,13 @@ function OrderDetails() {
     comments: "",
   });
 
-  // Fetch order details and comments when component mounts or ID changes
+  // Fetch order details, comments, and media documents when component mounts or ID changes
   useEffect(() => {
     if (id) {
       dispatch(fetchOrderById(id));
       dispatch(fetchComments(id));
-      dispatch(fetchOfficers());
       dispatch(fetchOrderMediaDocuments(id));
+      dispatch(fetchOfficers());
     }
   }, [dispatch, id]);
 
@@ -369,8 +378,9 @@ function OrderDetails() {
 
   // Check if order has at least one collage and one report
   const hasCollageAndReport = useMemo(() => {
-    // Use documents instead of approvedDocuments since they're available immediately
-    const documentsToCheck = documents?.documents || documents;
+    // Use orderMediaDocuments instead of approvedDocuments since they're available immediately
+    const documentsToCheck =
+      orderMediaDocuments?.documents || orderMediaDocuments;
 
     if (!documentsToCheck || !Array.isArray(documentsToCheck)) {
       /* console.log("No documents or not array:", documentsToCheck); */
@@ -394,7 +404,7 @@ function OrderDetails() {
     ); */
 
     return collages.length > 0 && reports.length > 0;
-  }, [documents]);
+  }, [orderMediaDocuments]);
 
   // Check if user has ANY office information permissions
   const hasAnyOfficePermission = useMemo(() => {
@@ -403,7 +413,10 @@ function OrderDetails() {
       hasPermission(allowedPermissions, "view_order_details_branch_name") ||
       hasPermission(allowedPermissions, "view_order_details_officer_name") ||
       hasPermission(allowedPermissions, "view_order_details_manager_name") ||
-      hasPermission(allowedPermissions, "view_order_details_field_verifier_name")
+      hasPermission(
+        allowedPermissions,
+        "view_order_details_field_verifier_name"
+      )
     );
   }, [allowedPermissions]);
 
@@ -1020,7 +1033,11 @@ function OrderDetails() {
           <div className="order-details-info">
             <div className="row h-100">
               {/* General information about the order */}
-              <div className={`${hasAnyOfficePermission ? 'col-xl-4' : 'col-xl-6'} col-lg-6 col-md-6 col-sm-12 col-xs-12 border-right h-100 mb-lg-4`}>
+              <div
+                className={`${
+                  hasAnyOfficePermission ? "col-xl-4" : "col-xl-6"
+                } col-lg-6 col-md-6 col-sm-12 col-xs-12 border-right h-100 mb-lg-4`}
+              >
                 <div className="order-details-info-card">
                   <h6>General Information</h6>
                   <div className="order-details-info-sets">
@@ -1095,7 +1112,13 @@ function OrderDetails() {
                 </div>
               </div>
               {/* Client information section */}
-              <div className={`${hasAnyOfficePermission ? 'col-xl-4' : 'col-xl-6'} col-lg-6 col-md-6 col-sm-12 col-xs-12 ${hasAnyOfficePermission ? 'border-right' : ''} h-100 mb-lg-4`}>
+              <div
+                className={`${
+                  hasAnyOfficePermission ? "col-xl-4" : "col-xl-6"
+                } col-lg-6 col-md-6 col-sm-12 col-xs-12 ${
+                  hasAnyOfficePermission ? "border-right" : ""
+                } h-100 mb-lg-4`}
+              >
                 <div className="order-details-info-card client">
                   <h6>Client Information</h6>
                   <div className="order-details-info-sets">
@@ -1169,85 +1192,85 @@ function OrderDetails() {
                         allowedPermissions,
                         "view_order_details_bank_name"
                       ) && (
-                      <div className="order-details-info-set">
-                        <div className="order-details-info-set-heading">
-                          <p>
-                            <span>Bank</span>
-                            <span>:</span>
-                          </p>
+                        <div className="order-details-info-set">
+                          <div className="order-details-info-set-heading">
+                            <p>
+                              <span>Bank</span>
+                              <span>:</span>
+                            </p>
+                          </div>
+                          <div className="order-details-info-set-details">
+                            <p>{showValue(order?.bank_name)}</p>
+                          </div>
                         </div>
-                        <div className="order-details-info-set-details">
-                          <p>{showValue(order?.bank_name)}</p>
+                      )}
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_order_details_branch_name"
+                      ) && (
+                        <div className="order-details-info-set">
+                          <div className="order-details-info-set-heading">
+                            <p>
+                              <span>Branch</span>
+                              <span>:</span>
+                            </p>
+                          </div>
+                          <div className="order-details-info-set-details">
+                            <p>{showValue(order?.branch_name)}</p>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    {hasPermission(
-                      allowedPermissions,
-                      "view_order_details_branch_name"
-                    ) && (
-                      <div className="order-details-info-set">
-                        <div className="order-details-info-set-heading">
-                          <p>
-                            <span>Branch</span>
-                            <span>:</span>
-                          </p>
+                      )}
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_order_details_officer_name"
+                      ) && (
+                        <div className="order-details-info-set">
+                          <div className="order-details-info-set-heading">
+                            <p>
+                              <span>Officer</span>
+                              <span>:</span>
+                            </p>
+                          </div>
+                          <div className="order-details-info-set-details">
+                            <p>{showValue(order?.officer_name)}</p>
+                          </div>
                         </div>
-                        <div className="order-details-info-set-details">
-                          <p>{showValue(order?.branch_name)}</p>
+                      )}
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_order_details_manager_name"
+                      ) && (
+                        <div className="order-details-info-set">
+                          <div className="order-details-info-set-heading">
+                            <p>
+                              <span>Manager</span>
+                              <span>:</span>
+                            </p>
+                          </div>
+                          <div className="order-details-info-set-details">
+                            <p>{showValue(order?.manager_name)}</p>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    {hasPermission(
-                      allowedPermissions,
-                      "view_order_details_officer_name"
-                    ) && (
-                      <div className="order-details-info-set">
-                        <div className="order-details-info-set-heading">
-                          <p>
-                            <span>Officer</span>
-                            <span>:</span>
-                          </p>
+                      )}
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_order_details_field_verifier_name"
+                      ) && (
+                        <div className="order-details-info-set">
+                          <div className="order-details-info-set-heading">
+                            <p>
+                              <span>Field Verifier</span>
+                              <span>:</span>
+                            </p>
+                          </div>
+                          <div className="order-details-info-set-details">
+                            <p>{showValue(order?.field_verifier_name)}</p>
+                          </div>
                         </div>
-                        <div className="order-details-info-set-details">
-                          <p>{showValue(order?.officer_name)}</p>
-                        </div>
-                      </div>
-                    )}
-                    {hasPermission(
-                      allowedPermissions,
-                      "view_order_details_manager_name"
-                    ) && (
-                      <div className="order-details-info-set">
-                        <div className="order-details-info-set-heading">
-                          <p>
-                            <span>Manager</span>
-                            <span>:</span>
-                          </p>
-                        </div>
-                        <div className="order-details-info-set-details">
-                          <p>{showValue(order?.manager_name)}</p>
-                        </div>
-                      </div>
-                    )}
-                    {hasPermission(
-                      allowedPermissions,
-                      "view_order_details_field_verifier_name"
-                    ) && (
-                      <div className="order-details-info-set">
-                        <div className="order-details-info-set-heading">
-                          <p>
-                            <span>Field Verifier</span>
-                            <span>:</span>
-                          </p>
-                        </div>
-                        <div className="order-details-info-set-details">
-                          <p>{showValue(order?.field_verifier_name)}</p>
-                        </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
               )}
             </div>
           </div>
@@ -1290,13 +1313,23 @@ function OrderDetails() {
                       <>
                         {order?.valuer_name &&
                         order.valuer_name.trim() !== "" ? (
-                          <Link
-                            to={`/orders/${id}/details/cv-report`}
-                            title="CV Report"
-                            className="tooltip-link"
-                          >
-                            <ReportIcon />
-                          </Link>
+                          order?.current_status_id === 9 && !isExemptAdmin ? (
+                            <span
+                              title="CV Report (Disabled)"
+                              className="tooltip-link disabled"
+                              style={{ cursor: "not-allowed" }}
+                            >
+                              <ReportIcon />
+                            </span>
+                          ) : (
+                            <Link
+                              to={`/orders/${id}/details/cv-report`}
+                              title="CV Report"
+                              className="tooltip-link"
+                            >
+                              <ReportIcon />
+                            </Link>
+                          )
                         ) : (
                           <button
                             title="CV Report"
@@ -1343,13 +1376,23 @@ function OrderDetails() {
                       <>
                         {order?.valuer_name &&
                         order.valuer_name.trim() !== "" ? (
-                          <Link
-                            to={`/orders/${id}/details/ce-report`}
-                            title="CE Report"
-                            className="tooltip-link"
-                          >
-                            <ReportIcon />
-                          </Link>
+                          order?.current_status_id === 9 && !isExemptAdmin ? (
+                            <span
+                              title="CE Report (Disabled)"
+                              className="tooltip-link disabled"
+                              style={{ cursor: "not-allowed" }}
+                            >
+                              <ReportIcon />
+                            </span>
+                          ) : (
+                            <Link
+                              to={`/orders/${id}/details/ce-report`}
+                              title="CE Report"
+                              className="tooltip-link"
+                            >
+                              <ReportIcon />
+                            </Link>
+                          )
                         ) : (
                           <button
                             title="CE Report"
@@ -1376,13 +1419,23 @@ function OrderDetails() {
                         <>
                           {order?.valuer_name &&
                           order.valuer_name.trim() !== "" ? (
-                            <Link
-                              to={`/orders/${id}/details/avr-report`}
-                              title="AVR Report"
-                              className="tooltip-link"
-                            >
-                              <ReportIcon />
-                            </Link>
+                            order?.current_status_id === 9 && !isExemptAdmin ? (
+                              <span
+                                title="AVR Report (Disabled)"
+                                className="tooltip-link disabled"
+                                style={{ cursor: "not-allowed" }}
+                              >
+                                <ReportIcon />
+                              </span>
+                            ) : (
+                              <Link
+                                to={`/orders/${id}/details/avr-report`}
+                                title="AVR Report"
+                                className="tooltip-link"
+                              >
+                                <ReportIcon />
+                              </Link>
+                            )
                           ) : (
                             <button
                               title="AVR Report"
@@ -1408,13 +1461,23 @@ function OrderDetails() {
                       <>
                         {order?.valuer_name &&
                         order.valuer_name.trim() !== "" ? (
-                          <Link
-                            to={`/orders/${id}/details/machinery-report`}
-                            title="Machinery Report"
-                            className="tooltip-link"
-                          >
-                            <ReportIcon />
-                          </Link>
+                          order?.current_status_id === 9 && !isExemptAdmin ? (
+                            <span
+                              title="Machinery Report (Disabled)"
+                              className="tooltip-link disabled"
+                              style={{ cursor: "not-allowed" }}
+                            >
+                              <ReportIcon />
+                            </span>
+                          ) : (
+                            <Link
+                              to={`/orders/${id}/details/machinery-report`}
+                              title="Machinery Report"
+                              className="tooltip-link"
+                            >
+                              <ReportIcon />
+                            </Link>
+                          )
                         ) : (
                           <button
                             title="Machinery Report"
@@ -1449,13 +1512,23 @@ function OrderDetails() {
                 ) && (
                   <>
                     {order?.valuer_name && order.valuer_name.trim() !== "" ? (
-                      <Link
-                        to={`/orders/${id}/details/images`}
-                        title="Images"
-                        className="tooltip-link"
-                      >
-                        <ImageCollageIcon />
-                      </Link>
+                      order?.current_status_id === 9 && !isExemptAdmin ? (
+                        <span
+                          title="Images (Disabled)"
+                          className="tooltip-link disabled"
+                          style={{ cursor: "not-allowed" }}
+                        >
+                          <ImageCollageIcon />
+                        </span>
+                      ) : (
+                        <Link
+                          to={`/orders/${id}/details/images`}
+                          title="Images"
+                          className="tooltip-link"
+                        >
+                          <ImageCollageIcon />
+                        </Link>
+                      )
                     ) : (
                       <button
                         title="Images"
@@ -1476,20 +1549,73 @@ function OrderDetails() {
                   </>
                 )}
 
-                {hasCollageAndReport &&
-                  hasPermission(
+                {/* Complete button - only show if:
+                    1. Has permission to view complete button
+                    2. Order status is 8
+                    3. Has at least one approved report and one approved collage
+                */}
+                {(() => {
+                  // Debug each condition
+                  const hasCompletePermission = hasPermission(
                     allowedPermissions,
                     "view_order_complete_button"
-                  ) && (
-                    <Link title="Complete" className="tooltip-link">
-                      <ValidateIcon />
-                    </Link>
-                  )}
+                  );
+                  const hasCorrectStatus = order?.current_status_id === 8;
+
+                  // Get all documents from the Redux state
+                  const allDocs =
+                    orderMediaDocumentsState?.documents?.documents ||
+                    orderMediaDocumentsState?.documents ||
+                    [];
+
+                  // Get all reports and collages first
+                  const allReports = allDocs.filter(
+                    (doc) => doc.document_type === "report"
+                  );
+                  const allCollages = allDocs.filter(
+                    (doc) => doc.document_type === "collage"
+                  );
+
+                  // Then filter for approved ones
+                  const approvedReports = allReports.filter(
+                    (doc) => doc.status === "approved"
+                  );
+                  const approvedCollages = allCollages.filter(
+                    (doc) => doc.status === "approved"
+                  );
+
+                  // Check if we have at least one of each
+                  const hasApprovedReport = approvedReports.length > 0;
+                  const hasApprovedCollage = approvedCollages.length > 0;
+
+                  return (
+                    hasCompletePermission &&
+                    hasCorrectStatus &&
+                    hasApprovedReport &&
+                    hasApprovedCollage && (
+                      <Link
+                        title="Complete"
+                        className="tooltip-link"
+                        onClick={() => {
+                          dispatch(updateOrderToStatus9(id)).then((result) => {
+                            if (result.meta.requestStatus === "fulfilled") {
+                              // Status updated to 9 successfully
+                              dispatch(fetchOrderById(id)); // Refresh order data
+                            }
+                          });
+                        }}
+                      >
+                        <ValidateIcon />
+                      </Link>
+                    )
+                  );
+                })()}
                 {hasCollageAndReport &&
                   hasPermission(
                     allowedPermissions,
                     "view_order_authenticate_button"
-                  ) && (
+                  ) &&
+                  order?.current_status_id === 9 && (
                     <Link title="Authenticate" className="tooltip-link">
                       <ApprovedIcon />
                     </Link>

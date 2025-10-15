@@ -145,6 +145,11 @@
         width: 33.33%;
       }
     }
+    &.two-items {
+      .radio-label {
+        width: 50%;
+      }
+    }
   }
 }
 @media (max-width: 676px) {

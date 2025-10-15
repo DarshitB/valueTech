@@ -156,6 +156,8 @@ exports.seed = async function (knex) {
     "view_order_table_Bank_Branch_db",
     "view_order_table_Branch_Officer_db",
     "view_order_table_registration_number_db",
+    "view_order_table_payment_status_db",
+    "view_order_table_payment_amount_db",
     "view_order_table_created_by_db",
     "view_order_table_updated_by_db",
     "view_order_table_priority_db",

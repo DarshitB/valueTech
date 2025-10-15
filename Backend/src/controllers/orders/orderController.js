@@ -73,20 +73,20 @@ exports.getForMobile = async (req, res, next) => {
   try {
     // Get field verifier ID from the authenticated user
     const fieldVerifierId = req.verifier.id;
-    
+
     const orders = await Order.getForMobile(fieldVerifierId);
-    
+
     if (orders && orders.length > 0) {
       res.json({
         state: 1,
         message: "orders fetch successfully",
-        orders: orders
+        orders: orders,
       });
     } else {
       res.json({
         state: 0,
         message: "No Orders",
-        orders: []
+        orders: [],
       });
     }
   } catch (err) {
@@ -144,12 +144,15 @@ exports.create = async (req, res, next) => {
       if (!manager) throw new BadRequestError("Invalid manager selected");
     }
 
-    // Determine order status based on supervisor_number, driver_number, and manager_id
+    // Determine order status based on field_verifier_id, manager_id, supervisor_number, and driver_number
     let orderStatusId;
     const hasSupervisorAndDriver = supervisor_number && driver_number;
-    
-    if (manager_id) {
-      // If both supervisor and driver numbers are set AND manager is assigned, status should be 4 (Manager Assigned)
+
+    if (field_verifier_id) {
+      // If field verifier is assigned, status should be 5 (Field Verifier Assigned)
+      orderStatusId = 5;
+    } else if (manager_id) {
+      // If manager is assigned, status should be 4 (Manager Assigned)
       orderStatusId = 4;
     } else if (hasSupervisorAndDriver) {
       // If both supervisor and driver numbers are set but no manager, status should be 3 (Telecaller Completed)
@@ -208,6 +211,7 @@ exports.create = async (req, res, next) => {
       date_of_inspection: date_of_inspection || null,
       current_status_id: orderStatusId,
       order_type: "VKA1",
+      order_priority: "Low",
       created_by: req.user?.id,
       created_at: new Date(),
     };
@@ -226,26 +230,37 @@ exports.create = async (req, res, next) => {
     };
     await OrderStatusHistory.createStatusHistory(pendingStatusHistory);
 
-    // Create the appropriate status based on supervisor_number, driver_number, and manager_id
-    const finalStatusHistory = {
-      order_id: order.id,
-      status_id: orderStatusId,
-      changed_by: req.user?.id,
-      changed_at: new Date(),
-    };
-    await OrderStatusHistory.createStatusHistory(finalStatusHistory);
-
+    // Create status history entries based on what was assigned
+    // If field_verifier is assigned, create both manager (4) and field verifier (5) records
     if (field_verifier_id) {
-      // If field verifier is assigned, create field verifier assignment record
+      // First create Manager Assigned status (if manager is assigned)
+      if (manager_id) {
+        const managerStatusHistory = {
+          order_id: order.id,
+          status_id: 4, // Manager Assigned
+          changed_by: req.user?.id,
+          changed_at: new Date(),
+        };
+        await OrderStatusHistory.createStatusHistory(managerStatusHistory);
+      }
+
+      // Then create Field Verifier Assigned status
       const fieldVerifierStatusHistory = {
         order_id: order.id,
-        activity_extra: "Field Verifier Assigned",
+        status_id: 5, // Field Verifier Assigned
         changed_by: req.user?.id,
         changed_at: new Date(),
       };
-
-      // Create status history entry
       await OrderStatusHistory.createStatusHistory(fieldVerifierStatusHistory);
+    } else {
+      // Create single status history based on calculated status
+      const finalStatusHistory = {
+        order_id: order.id,
+        status_id: orderStatusId,
+        changed_by: req.user?.id,
+        changed_at: new Date(),
+      };
+      await OrderStatusHistory.createStatusHistory(finalStatusHistory);
     }
 
     res.locals.newRecordId = order.id;
@@ -304,15 +319,29 @@ exports.update = async (req, res, next) => {
       if (!manager) throw new BadRequestError("Invalid manager selected");
     }
 
-    // Determine new order status based on supervisor_number, driver_number, and manager_id
+    // Determine new order status based on field_verifier_id, manager_id, supervisor_number, and driver_number
+    // IMPORTANT: Only update status if current status is lower than the new status
     let newStatusId;
-    const currentSupervisorNumber = supervisor_number !== undefined ? supervisor_number : existingOrder.supervisor_number;
-    const currentDriverNumber = driver_number !== undefined ? driver_number : existingOrder.driver_number;
-    const currentManagerId = manager_id !== undefined ? manager_id : existingOrder.manager_id;
-    
-    const hasSupervisorAndDriver = currentSupervisorNumber && currentDriverNumber;
-    
-    if (currentManagerId) {
+    const currentSupervisorNumber =
+      supervisor_number !== undefined
+        ? supervisor_number
+        : existingOrder.supervisor_number;
+    const currentDriverNumber =
+      driver_number !== undefined ? driver_number : existingOrder.driver_number;
+    const currentManagerId =
+      manager_id !== undefined ? manager_id : existingOrder.manager_id;
+    const currentFieldVerifierId =
+      field_verifier_id !== undefined
+        ? field_verifier_id
+        : existingOrder.field_verifier_id;
+
+    const hasSupervisorAndDriver =
+      currentSupervisorNumber && currentDriverNumber;
+
+    if (currentFieldVerifierId) {
+      // field verifier is assigned, status should be 5 (Field Verifier Assigned)
+      newStatusId = 5;
+    } else if (currentManagerId) {
       // manager is assigned, status should be 4 (Manager Assigned)
       newStatusId = 4;
     } else if (hasSupervisorAndDriver) {
@@ -321,6 +350,12 @@ exports.update = async (req, res, next) => {
     } else {
       // If supervisor or driver number is missing, status should be 2 (Telecaller Assigned)
       newStatusId = 2;
+    }
+
+    // Only update status if current status is lower than the new calculated status
+    // This prevents downgrading from higher statuses (e.g., 6 -> 4)
+    if (existingOrder.current_status_id >= newStatusId) {
+      newStatusId = existingOrder.current_status_id;
     }
 
     // Helper function to handle empty strings for integer fields
@@ -387,54 +422,80 @@ exports.update = async (req, res, next) => {
 
     // Check for field changes and build detailed change descriptions
     const fieldsToCheck = [
-      'customer_name', 'contact', 'alternative_contact', 'supervisor_number', 
-      'driver_number', 'child_category_id', 'officer_id', 'manager_id', 
-      'registration_number', 'place_of_inspection', 'date_of_inspection'
+      "customer_name",
+      "contact",
+      "alternative_contact",
+      "supervisor_number",
+      "driver_number",
+      "child_category_id",
+      "officer_id",
+      "manager_id",
+      "registration_number",
+      "place_of_inspection",
+      "date_of_inspection",
     ];
 
     for (const field of fieldsToCheck) {
       const newValue = req.body[field];
       if (newValue !== undefined) {
         const oldValue = existingOrder[field];
-        
+
         if (oldValue !== newValue) {
           // Format field names for better readability
           const formatFieldName = (fieldName) => {
             const fieldMap = {
-              'customer_name': 'CUSTOMER NAME',
-              'contact': 'CONTACT',
-              'alternative_contact': 'ALTERNATIVE CONTACT',
-              'supervisor_number': 'SUPERVISOR NUMBER',
-              'driver_number': 'DRIVER NUMBER',
-              'child_category_id': 'CATEGORY',
-              'officer_id': 'OFFICER',
-              'manager_id': 'MANAGER',
-              'registration_number': 'REGISTRATION NUMBER',
-              'place_of_inspection': 'PLACE OF INSPECTION',
-              'date_of_inspection': 'DATE OF INSPECTION'
+              customer_name: "CUSTOMER NAME",
+              contact: "CONTACT",
+              alternative_contact: "ALTERNATIVE CONTACT",
+              supervisor_number: "SUPERVISOR NUMBER",
+              driver_number: "DRIVER NUMBER",
+              child_category_id: "CATEGORY",
+              officer_id: "OFFICER",
+              manager_id: "MANAGER",
+              registration_number: "REGISTRATION NUMBER",
+              place_of_inspection: "PLACE OF INSPECTION",
+              date_of_inspection: "DATE OF INSPECTION",
             };
-            return fieldMap[fieldName] || fieldName.replace(/_/g, ' ').toUpperCase();
+            return (
+              fieldMap[fieldName] || fieldName.replace(/_/g, " ").toUpperCase()
+            );
           };
-          
+
           // Get display values (names instead of IDs for certain fields)
           let displayOldValue, displayNewValue;
-          
-          if (field === 'manager_id') {
-            displayOldValue = oldValue ? existingOrder.manager_name || `Manager ${oldValue}` : 'null';
-            displayNewValue = newValue ? await getUserName(newValue) || `Manager ${newValue}` : 'null';
-          } else if (field === 'officer_id') {
-            displayOldValue = oldValue ? existingOrder.officer_name || `Officer ${oldValue}` : 'null';
-            displayNewValue = newValue ? await getOfficerName(newValue) || `Officer ${newValue}` : 'null';
-          } else if (field === 'child_category_id') {
-            displayOldValue = oldValue ? existingOrder.child_category_name || `Category ${oldValue}` : 'null';
-            displayNewValue = newValue ? await getCategoryName(newValue) || `Category ${newValue}` : 'null';
+
+          if (field === "manager_id") {
+            displayOldValue = oldValue
+              ? existingOrder.manager_name || `Manager ${oldValue}`
+              : "null";
+            displayNewValue = newValue
+              ? (await getUserName(newValue)) || `Manager ${newValue}`
+              : "null";
+          } else if (field === "officer_id") {
+            displayOldValue = oldValue
+              ? existingOrder.officer_name || `Officer ${oldValue}`
+              : "null";
+            displayNewValue = newValue
+              ? (await getOfficerName(newValue)) || `Officer ${newValue}`
+              : "null";
+          } else if (field === "child_category_id") {
+            displayOldValue = oldValue
+              ? existingOrder.child_category_name || `Category ${oldValue}`
+              : "null";
+            displayNewValue = newValue
+              ? (await getCategoryName(newValue)) || `Category ${newValue}`
+              : "null";
           } else {
-            displayOldValue = oldValue === null ? 'null' : oldValue === '' ? 'empty' : oldValue;
-            displayNewValue = newValue === null ? 'null' : newValue === '' ? 'empty' : newValue;
+            displayOldValue =
+              oldValue === null ? "null" : oldValue === "" ? "empty" : oldValue;
+            displayNewValue =
+              newValue === null ? "null" : newValue === "" ? "empty" : newValue;
           }
-          
+
           const formattedField = formatFieldName(field);
-          changes.push(`${formattedField} changed from "${displayOldValue}" to "${displayNewValue}"`);
+          changes.push(
+            `${formattedField} changed from "${displayOldValue}" to "${displayNewValue}"`
+          );
         }
       }
     }
@@ -454,38 +515,49 @@ exports.update = async (req, res, next) => {
 
     // Create status history entries based on changes
     if (hasStatusChange) {
-      const statusHistoryData = {
-        order_id: orderId,
-        status_id: newStatusId,
-        changed_by: req.user?.id,
-        changed_at: new Date(),
-      };
+      // If field verifier was assigned and manager is also set, create both status records
+      if (hasFieldVerifierChange && currentManagerId) {
+        // First create Manager Assigned status (4)
+        const managerStatusHistory = {
+          order_id: orderId,
+          status_id: 4, // Manager Assigned
+          changed_by: req.user?.id,
+          changed_at: new Date(),
+        };
+        await OrderStatusHistory.createStatusHistory(managerStatusHistory);
 
-      await OrderStatusHistory.createStatusHistory(statusHistoryData);
+        // Then create Field Verifier Assigned status (5)
+        const fieldVerifierStatusHistory = {
+          order_id: orderId,
+          status_id: 5, // Field Verifier Assigned
+          changed_by: req.user?.id,
+          changed_at: new Date(),
+        };
+        await OrderStatusHistory.createStatusHistory(
+          fieldVerifierStatusHistory
+        );
+      } else {
+        // Create single status history based on new status
+        const statusHistoryData = {
+          order_id: orderId,
+          status_id: newStatusId,
+          changed_by: req.user?.id,
+          changed_at: new Date(),
+        };
+        await OrderStatusHistory.createStatusHistory(statusHistoryData);
+      }
     }
 
     // Create detailed field changes record (if there are field changes)
     if (changes.length > 0) {
       const statusHistoryData = {
         order_id: orderId,
-        activity_extra: changes.join('; '),
+        activity_extra: changes.join("; "),
         changed_by: req.user?.id,
         changed_at: new Date(),
       };
 
       await OrderStatusHistory.createStatusHistory(statusHistoryData);
-    }
-
-    // Create field verifier assignment record (if field verifier changed)
-    if (hasFieldVerifierChange) {
-      const fieldVerifierStatusHistory = {
-        order_id: orderId,
-        activity_extra: "Field Verifier Assigned",
-        changed_by: req.user?.id,
-        changed_at: new Date(),
-      };
-
-      await OrderStatusHistory.createStatusHistory(fieldVerifierStatusHistory);
     }
 
     // Get enriched updated order data for response
@@ -608,7 +680,7 @@ exports.softDelete = async (req, res, next) => {
  * PATCH /orders/:id/attributes
  * Update specific order attributes (flexible partial update)
  * Supports assigning multiple users to an order via user_ids array
- * 
+ *
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  * @param {Function} next - Express next function
@@ -628,19 +700,31 @@ exports.updateOrderAttributes = async (req, res, next) => {
 
     // Validate that at least one attribute is provided
     if (!updateData || Object.keys(updateData).length === 0) {
-      throw new BadRequestError("At least one attribute must be provided for update");
+      throw new BadRequestError(
+        "At least one attribute must be provided for update"
+      );
     }
 
     // Extract user_ids from updateData (handle separately like officer categories)
     const { user_ids, ...otherUpdateData } = updateData;
 
     // Remove any system fields that shouldn't be updated directly
-    const restrictedFields = ['id', 'order_number', 'created_at', 'created_by', 'updated_by', 'updated_at', 'deleted_at'];
+    const restrictedFields = [
+      "id",
+      "order_number",
+      "created_at",
+      "created_by",
+      "updated_by",
+      "updated_at",
+      "deleted_at",
+    ];
     const filteredUpdateData = {};
 
     for (const [key, value] of Object.entries(otherUpdateData)) {
       if (restrictedFields.includes(key)) {
-        throw new BadRequestError(`Field '${key}' cannot be updated through this endpoint`);
+        throw new BadRequestError(
+          `Field '${key}' cannot be updated through this endpoint`
+        );
       }
       // Include fields with actual values (allow null, empty string, 0, false)
       // Only exclude undefined values
@@ -650,7 +734,10 @@ exports.updateOrderAttributes = async (req, res, next) => {
     }
 
     // Validate that we have at least one valid field to update (either regular fields or user_ids)
-    if (Object.keys(filteredUpdateData).length === 0 && user_ids === undefined) {
+    if (
+      Object.keys(filteredUpdateData).length === 0 &&
+      user_ids === undefined
+    ) {
       throw new BadRequestError("No valid fields provided for update");
     }
 
@@ -662,25 +749,31 @@ exports.updateOrderAttributes = async (req, res, next) => {
       // Build detailed change descriptions
       for (const [key, newValue] of Object.entries(filteredUpdateData)) {
         const oldValue = existingOrder[key];
-        const displayOldValue = oldValue === null ? 'null' : oldValue === '' ? 'empty' : oldValue;
-        const displayNewValue = newValue === null ? 'null' : newValue === '' ? 'empty' : newValue;
-        
+        const displayOldValue =
+          oldValue === null ? "null" : oldValue === "" ? "empty" : oldValue;
+        const displayNewValue =
+          newValue === null ? "null" : newValue === "" ? "empty" : newValue;
+
         if (oldValue !== newValue) {
           // Format field names for better readability
           const formatFieldName = (fieldName) => {
             const fieldMap = {
-              'order_priority': 'ORDER PRIORITY',
-              'order_type': 'ORDER TYPE',
-              'valuer_name': 'VALUER NAME'
+              order_priority: "ORDER PRIORITY",
+              order_type: "ORDER TYPE",
+              valuer_name: "VALUER NAME",
             };
-            return fieldMap[fieldName] || fieldName.replace(/_/g, ' ').toUpperCase();
+            return (
+              fieldMap[fieldName] || fieldName.replace(/_/g, " ").toUpperCase()
+            );
           };
-          
+
           const formattedKey = formatFieldName(key);
-          changes.push(`${formattedKey} changed from "${displayOldValue}" to "${displayNewValue}"`);
+          changes.push(
+            `${formattedKey} changed from "${displayOldValue}" to "${displayNewValue}"`
+          );
         }
       }
-      
+
       await Order.updateOrderAttributes(orderId, filteredUpdateData, userId);
     }
 
@@ -701,8 +794,8 @@ exports.updateOrderAttributes = async (req, res, next) => {
 
       // Get old assigned users for comparison
       const oldAssignedUsers = existingOrder.assigned_users || [];
-      const oldUserIds = oldAssignedUsers.map(u => u.id);
-      
+      const oldUserIds = oldAssignedUsers.map((u) => u.id);
+
       // Prepare user assignments data (even if empty array)
       const usersToInsert = user_ids.map((uid) => ({
         order_id: orderId,
@@ -713,31 +806,35 @@ exports.updateOrderAttributes = async (req, res, next) => {
 
       // Replace existing user assignments (this will delete all and insert new ones)
       await Order.replaceOrderUsers(orderId, usersToInsert);
-      
+
       // Build user assignment change description
       if (user_ids.length === 0 && oldUserIds.length > 0) {
         changes.push(`All user assignments removed`);
       } else if (oldUserIds.length === 0 && user_ids.length > 0) {
         // Get user names for the newly assigned users
         const assignedUsers = await User.findManyByIds(user_ids);
-        const userNames = assignedUsers.map(u => u.name).join(', ');
+        const userNames = assignedUsers.map((u) => u.name).join(", ");
         changes.push(`${userNames} assigned`);
-      } else if (JSON.stringify(oldUserIds.sort()) !== JSON.stringify(user_ids.sort())) {
+      } else if (
+        JSON.stringify(oldUserIds.sort()) !== JSON.stringify(user_ids.sort())
+      ) {
         // Find added and removed users
-        const addedUserIds = user_ids.filter(id => !oldUserIds.includes(id));
-        const removedUserIds = oldUserIds.filter(id => !user_ids.includes(id));
-        
+        const addedUserIds = user_ids.filter((id) => !oldUserIds.includes(id));
+        const removedUserIds = oldUserIds.filter(
+          (id) => !user_ids.includes(id)
+        );
+
         // Get user names for added users
         if (addedUserIds.length > 0) {
           const addedUsers = await User.findManyByIds(addedUserIds);
-          const addedUserNames = addedUsers.map(u => u.name).join(', ');
+          const addedUserNames = addedUsers.map((u) => u.name).join(", ");
           changes.push(`${addedUserNames} assigned To order Assign List`);
         }
-        
+
         // Get user names for removed users
         if (removedUserIds.length > 0) {
           const removedUsers = await User.findManyByIds(removedUserIds);
-          const removedUserNames = removedUsers.map(u => u.name).join(', ');
+          const removedUserNames = removedUsers.map((u) => u.name).join(", ");
           changes.push(`${removedUserNames} removed From order Assign List`);
         }
       }
@@ -748,27 +845,67 @@ exports.updateOrderAttributes = async (req, res, next) => {
 
     // Log the activity with detailed changes
     if (changes.length > 0) {
-    const statusHistoryData = {
-      order_id: orderId,
-        activity_extra: changes.join('; '),
-      changed_by: userId,
-      changed_at: new Date(),
-    };
+      const statusHistoryData = {
+        order_id: orderId,
+        activity_extra: changes.join("; "),
+        changed_by: userId,
+        changed_at: new Date(),
+      };
 
-    await OrderStatusHistory.createStatusHistory(statusHistoryData);
+      await OrderStatusHistory.createStatusHistory(statusHistoryData);
     }
 
     res.status(200).json({
       success: true,
       message: "Order attributes updated successfully",
       data: enrichedOrder,
-      changes: changes
+      changes: changes,
     });
-
   } catch (err) {
     if (err.code === "23505") {
       return next(new ConflictError("Order number already exists"));
     }
+    next(err);
+  }
+};
+
+/**
+ * Update Order Status to 9
+ * PATCH /api/orders/:id/update-status-9
+ */
+exports.updateStatusToNine = async (req, res, next) => {
+  try {
+    const { id: orderId } = req.params;
+    const { id: userId } = req.user;
+
+    // Fetch existing order to check if it exists
+    const existingOrder = await Order.findById(orderId, req.user);
+    if (!existingOrder) {
+      throw new NotFoundError("Order not found");
+    }
+
+    // Update order status to 9
+    await Order.updateOrder(orderId, {
+      current_status_id: 9,
+      updated_at: new Date(),
+      updated_by: userId,
+    });
+
+    // Create status history entry
+    const statusHistoryData = {
+      order_id: orderId,
+      status_id: 9,
+      changed_by: userId,
+      changed_at: new Date(),
+    };
+
+    await OrderStatusHistory.createStatusHistory(statusHistoryData);
+
+    res.status(200).json({
+      success: true,
+      message: "Order status updated to 9 successfully",
+    });
+  } catch (err) {
     next(err);
   }
 };

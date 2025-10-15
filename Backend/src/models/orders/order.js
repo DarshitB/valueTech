@@ -116,23 +116,31 @@ const order = {
     // Check if user role contains any of the privileged keywords
     const hasPrivilegedRole = privilegedRoles.some(keyword => roleName.includes(keyword));
     
-    // If user doesn't have a privileged role, show only assigned orders
+    // If user doesn't have a privileged role, apply order assignment filtering
     if (!hasPrivilegedRole) {
-      // For all other roles, check if they have assigned orders
+      // Get orders that are assigned to this user
       const assignedOrderIds = await db("order_users")
         .select("order_id")
         .where("user_id", user.id)
         .whereNull("deleted_at");
       
-      const orderIds = assignedOrderIds.map(o => o.order_id);
+      const userAssignedOrderIds = assignedOrderIds.map(o => o.order_id);
       
-      // If user has assigned orders, show only those
-      if (orderIds.length > 0) {
-        baseQuery.whereIn("orders.id", orderIds);
-      } else {
-        // If no orders assigned, return empty array by adding impossible condition
-        baseQuery.where("orders.id", -1);
-      }
+      // Get all orders that have ANY user assignments
+      const ordersWithAssignments = await db("order_users")
+        .select("order_id")
+        .whereNull("deleted_at")
+        .distinct();
+      
+      const ordersWithAnyAssignment = ordersWithAssignments.map(o => o.order_id);
+      
+      // Show orders that:
+      // 1. Are assigned to this user, OR
+      // 2. Have NO user assignments at all (available to everyone)
+      baseQuery.where(function() {
+        this.whereIn("orders.id", userAssignedOrderIds)
+          .orWhereNotIn("orders.id", ordersWithAnyAssignment);
+      });
     }
     
     // Additional role-specific filters (these work alongside assigned orders)
@@ -399,17 +407,27 @@ const order = {
     // Check if user role contains any of the privileged keywords
     const hasPrivilegedRole = privilegedRoles.some(keyword => roleName.includes(keyword));
     
-    // If user doesn't have a privileged role, show only assigned orders
+    // If user doesn't have a privileged role, check order assignment
     if (!hasPrivilegedRole) {
-      // For all other roles, check if they have access to this specific order
+      // Check if this order is assigned to the user
       const isAssigned = await db("order_users")
         .where({ order_id: id, user_id: user.id })
         .whereNull("deleted_at")
         .first();
       
-      if (!isAssigned) {
+      // Check if this order has ANY user assignments
+      const hasAnyAssignment = await db("order_users")
+        .where({ order_id: id })
+        .whereNull("deleted_at")
+        .first();
+      
+      // If order has assignments but user is not assigned, deny access
+      if (hasAnyAssignment && !isAssigned) {
         return null; // User can only see orders assigned to them
       }
+      
+      // If order has no assignments, allow access to everyone
+      // If user is assigned, allow access
     }
     
     // Additional role-specific access checks (these work alongside assigned orders)

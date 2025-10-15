@@ -10,13 +10,14 @@ import CustomDataTable from "../../components/CustomDataTable";
 import { DeleteIcon, EditIcon } from "../../components/icons";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import FormModel from "../../components/FormModel";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
 import { hasPermission } from "../../utils/permissionUtils";
 import { toast } from "react-toastify";
 
 function States() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   /* get logged user permission */
   const allowedPermissions = useSelector(selectPermissions);
@@ -113,7 +114,9 @@ function States() {
                         name="state_name"
                         placeholder="Add state"
                         value={newStateName}
-                        onChange={(e) => setNewStateName(e.target.value.toUpperCase())}
+                        onChange={(e) =>
+                          setNewStateName(e.target.value.toUpperCase())
+                        }
                       />
                       <button className="btn" type="submit">
                         Add State
@@ -135,19 +138,33 @@ function States() {
             ),
 
             rows: data.map((item, index) => (
-              <tr key={item.id}>
+              <tr
+                key={item.id}
+                onClick={() => {
+                  if (
+                    hasPermission(allowedPermissions, "view_child_category")
+                  ) {
+                    navigate(`/states/${item.id}/cities`);
+                  }
+                }}
+                style={{
+                  cursor: hasPermission(
+                    allowedPermissions,
+                    "view_order_details"
+                  )
+                    ? "pointer"
+                    : "default",
+                }}
+              >
                 <td className="sequential-number">{index + 1}</td>
-                <td>
-                  {hasPermission(allowedPermissions, "view_cities") ? (
-                    <Link
-                      className="get-me-inside"
-                      to={`/states/${item.id}/cities`}
-                    >
-                      {item.name}
-                    </Link>
-                  ) : (
-                    item.name
-                  )}
+                <td
+                  className={
+                    hasPermission(allowedPermissions, "view_order_details")
+                      ? "get-me-inside"
+                      : ""
+                  }
+                >
+                  {item.name}
                 </td>
                 <td>{item.created_by}</td>
                 <td>{item.updated_by || "-"}</td>
@@ -197,7 +214,9 @@ function States() {
                       name="stateName"
                       id="state_input"
                       value={editStateName}
-                      onChange={(e) => setEditStateName(e.target.value.toUpperCase())}
+                      onChange={(e) =>
+                        setEditStateName(e.target.value.toUpperCase())
+                      }
                     />
                   </div>
                   <div className="form-buttons">

@@ -1,4 +1,9 @@
-import React, { useEffect, useLayoutEffect, useState, useCallback } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useCallback,
+} from "react";
 import { useParams, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchOrderById } from "../../../redux/reducers/orderReducer";
@@ -8,6 +13,7 @@ import {
   saveOrderReport,
   clearCurrentReport,
 } from "../../../redux/reducers/orderReportReducer";
+import { fetchAssetMakesForReports } from "../../../redux/reducers/assetMakesReducer";
 import { usePageTitle } from "../../../context/PageTitleContext";
 import SingleSearchSelect from "../../../components/SingleSearchSelect";
 import { toast } from "react-toastify";
@@ -26,6 +32,11 @@ function AVRReport() {
     generating,
     saving,
   } = useSelector((state) => state.orderReports);
+
+  // Get asset makes data from Redux store
+  const { list: assetMakes, loading: assetMakesLoading } = useSelector(
+    (state) => state.assetMakes
+  );
   // Set page title using custom hook
   const { setTitle } = usePageTitle();
   // Clear report data when component mounts or order changes
@@ -45,6 +56,8 @@ function AVRReport() {
           silent: true,
         })
       );
+      // Fetch asset makes for AVR report
+      dispatch(fetchAssetMakesForReports("report_avr"));
     }
   }, [dispatch, id]);
 
@@ -132,9 +145,12 @@ function AVRReport() {
   // Function to get reference number code based on surveyor name
   const getRefNoCode = useCallback((surveyorName) => {
     if (!surveyorName) return "";
-    
+
     const name = surveyorName.toUpperCase();
-    if (name.includes("V.K. ASSOCIATES") || name.includes("VISHAL D. KOTHARI")) {
+    if (
+      name.includes("V.K. ASSOCIATES") ||
+      name.includes("VISHAL D. KOTHARI")
+    ) {
       return "VKM";
     } else if (name.includes("VALUETECH SOLUTIONS")) {
       return "VTS";
@@ -342,7 +358,9 @@ function AVRReport() {
         state_name: order?.state_name || "",
         // ALWAYS use surveyor from order's valuer_name (never from report or previous state)
         surveyor: order?.valuer_name || "",
-        license_no: order?.valuer_name ? getLicenseNumber(order.valuer_name) : "",
+        license_no: order?.valuer_name
+          ? getLicenseNumber(order.valuer_name)
+          : "",
         ref_no_code: order?.valuer_name ? getRefNoCode(order.valuer_name) : "",
       }));
     }
@@ -363,21 +381,30 @@ function AVRReport() {
 
     setReportFormData((prev) => {
       const updated = { ...prev };
-      
+
       // More robust field population - try to set all relevant fields
       Object.entries(report).forEach(([key, value]) => {
         // Skip system fields and valuer-related fields (those come from order only)
-        if (key.startsWith('created_') || key.startsWith('updated_') || key === 'id' || key === 'order_id' || key === 'flexible_fields' || key === 'surveyor' || key === 'license_no' || key === 'ref_no_code') {
+        if (
+          key.startsWith("created_") ||
+          key.startsWith("updated_") ||
+          key === "id" ||
+          key === "order_id" ||
+          key === "flexible_fields" ||
+          key === "surveyor" ||
+          key === "license_no" ||
+          key === "ref_no_code"
+        ) {
           return;
         }
-        
+
         // Convert null to empty string
         const fieldValue = value !== null ? value : "";
-        
+
         // Special handling for invoice_no_date - split into separate fields
-        if (key === 'invoice_no_date' && fieldValue) {
+        if (key === "invoice_no_date" && fieldValue) {
           // Parse "12 Dated 12" format
-          const parts = fieldValue.split(' Dated ');
+          const parts = fieldValue.split(" Dated ");
           if (parts.length === 2) {
             updated.invoice_no = parts[0].trim();
             updated.invoice_date = parts[1].trim();
@@ -388,11 +415,11 @@ function AVRReport() {
           }
           return;
         }
-        
+
         // Try to set the field (both existing and dynamic fields)
         updated[key] = fieldValue;
       });
-      
+
       return updated;
     });
 
@@ -635,10 +662,10 @@ function AVRReport() {
     // Add report form data - only include fields with actual values
     Object.keys(reportFormData).forEach((key) => {
       const value = reportFormData[key];
-      
+
       // Always include important read-only fields even if empty
-      const alwaysIncludeFields = [];  // AVR report may not have many read-only fields
-      
+      const alwaysIncludeFields = []; // AVR report may not have many read-only fields
+
       if (alwaysIncludeFields.includes(key)) {
         // Always include these fields, even if empty
         reportData[key] = value || "";
@@ -655,11 +682,16 @@ function AVRReport() {
     flexibleFields.forEach((field) => {
       // Only include fields with actual values
       if (field.field_value && field.field_value.trim() !== "") {
-        reportData[`flexible_fields[${formDataIndex}][section_name]`] = field.section_name;
-        reportData[`flexible_fields[${formDataIndex}][col_span]`] = field.col_span;
-        reportData[`flexible_fields[${formDataIndex}][field_label]`] = field.field_label;
-        reportData[`flexible_fields[${formDataIndex}][field_value]`] = field.field_value;
-        reportData[`flexible_fields[${formDataIndex}][field_order]`] = field.field_order;
+        reportData[`flexible_fields[${formDataIndex}][section_name]`] =
+          field.section_name;
+        reportData[`flexible_fields[${formDataIndex}][col_span]`] =
+          field.col_span;
+        reportData[`flexible_fields[${formDataIndex}][field_label]`] =
+          field.field_label;
+        reportData[`flexible_fields[${formDataIndex}][field_value]`] =
+          field.field_value;
+        reportData[`flexible_fields[${formDataIndex}][field_order]`] =
+          field.field_order;
         formDataIndex++;
 
         // Add second field for "Add Two" functionality
@@ -669,11 +701,16 @@ function AVRReport() {
           field.field_value_2 &&
           field.field_value_2.trim() !== ""
         ) {
-          reportData[`flexible_fields[${formDataIndex}][section_name]`] = field.section_name;
-          reportData[`flexible_fields[${formDataIndex}][col_span]`] = field.col_span;
-          reportData[`flexible_fields[${formDataIndex}][field_label]`] = field.field_label_2;
-          reportData[`flexible_fields[${formDataIndex}][field_value]`] = field.field_value_2;
-          reportData[`flexible_fields[${formDataIndex}][field_order]`] = field.field_order + 1;
+          reportData[`flexible_fields[${formDataIndex}][section_name]`] =
+            field.section_name;
+          reportData[`flexible_fields[${formDataIndex}][col_span]`] =
+            field.col_span;
+          reportData[`flexible_fields[${formDataIndex}][field_label]`] =
+            field.field_label_2;
+          reportData[`flexible_fields[${formDataIndex}][field_value]`] =
+            field.field_value_2;
+          reportData[`flexible_fields[${formDataIndex}][field_order]`] =
+            field.field_order + 1;
           formDataIndex++;
         }
       }
@@ -1556,7 +1593,10 @@ function AVRReport() {
                       readOnly
                       placeholder="Set from order attributes"
                       required
-                      style={{ backgroundColor: "#f5f5f5", cursor: "not-allowed" }}
+                      style={{
+                        backgroundColor: "#f5f5f5",
+                        cursor: "not-allowed",
+                      }}
                     />
                   </div>
                 </div>

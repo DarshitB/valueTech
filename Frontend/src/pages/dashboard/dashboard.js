@@ -1080,11 +1080,13 @@ function Dashboard() {
                               >
                                 <option value="">All Priorities</option>
                                 <option value="High">High</option>
-                                <option value="Average">Average</option>
                                 <option value="Low">Low</option>
                               </select>
                             )}
-                            {hasPermission(allowedPermissions, "add_order_db") && (
+                            {hasPermission(
+                              allowedPermissions,
+                              "add_order_db"
+                            ) && (
                               <button className="btn" onClick={openAddModal}>
                                 Add Order
                               </button>
@@ -1155,6 +1157,18 @@ function Dashboard() {
                             )}
                             {hasPermission(
                               allowedPermissions,
+                              "view_order_table_payment_status_db"
+                            ) && (
+                              <th style={{ width: "200px" }}>Payment Status</th>
+                            )}
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_table_payment_amount_db"
+                            ) && (
+                              <th style={{ width: "200px" }}>Payment Amount</th>
+                            )}
+                            {hasPermission(
+                              allowedPermissions,
                               "view_order_table_created_by_db"
                             ) && <th style={{ width: "120px" }}>Created By</th>}
                             {hasPermission(
@@ -1191,7 +1205,8 @@ function Dashboard() {
                             )}
                           </tr>
                         ),
-                        rows: orders
+                        rows: [...orders]
+                          .reverse()
                           .filter((order) => {
                             // Filter by order type if selected
                             const typeMatch =
@@ -1289,6 +1304,14 @@ function Dashboard() {
                                 allowedPermissions,
                                 "view_order_table_registration_number_db"
                               ) && <td>{order.registration_number || "-"}</td>}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_payment_status_db"
+                              ) && <td>{order.payment_status || "-"}</td>}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_payment_amount_db"
+                              ) && <td>{order.payment_amount || "-"}</td>}
                               {hasPermission(
                                 allowedPermissions,
                                 "view_order_table_created_by_db"
@@ -1855,11 +1878,14 @@ function Dashboard() {
                 }}
               >
                 <div className="body-form-box">
-                  {hasPermission(allowedPermissions, "edit_order_priority_db") && (
+                  {hasPermission(
+                    allowedPermissions,
+                    "edit_order_priority_db"
+                  ) && (
                     <div className="form-group order-priority-radio-group">
                       <label>Order Priority</label>
-                      <div className="radio-group three-items">
-                        {["Low", "Average", "High"].map((priority) => (
+                      <div className="radio-group two-items">
+                        {["Low", "High"].map((priority) => (
                           <label
                             key={priority}
                             className={`radio-label ${priority.toLowerCase()} ${

@@ -10,6 +10,8 @@ const AvrReport = require("../../../models/orders/reports/avrReport");
 const MachineryReport = require("../../../models/orders/reports/machineryReport");
 const CeReport = require("../../../models/orders/reports/ceReport");
 const orderMediaDocument = require("../../../models/orders/orderMediaDocument");
+const OrderStatusHistory = require("../../../models/orders/orderStatusHistory");
+const AssetMakesForReports = require("../../../models/orders/assetMakesOfReports");
 const { ensureDirectoryExists } = require("../../../utils/localFileHelper");
 
 // Import report templates
@@ -56,6 +58,45 @@ const upload = multer({
     }
   },
 });
+
+/**
+ * Helper function to check if order has both report and collage, and update status to 8 if true
+ * @param {number} orderId - The order ID
+ * @param {number} userId - The user ID making the change
+ */
+async function checkAndUpdateOrderStatus(orderId, userId) {
+  try {
+    // Check if order has at least one report
+    const documents = await orderMediaDocument.findByOrderId(orderId);
+    const hasReport = documents.some(doc => doc.document_type === 'report');
+    
+    // Check if order has at least one collage
+    const hasCollage = documents.some(doc => doc.document_type === 'collage');
+    
+    // If both exist, update status to 8
+    if (hasReport && hasCollage) {
+      await Order.updateOrder(orderId, {
+        current_status_id: 8,
+        updated_at: new Date(),
+        updated_by: userId
+      });
+      
+      // Create status history entry
+      const statusHistoryData = {
+        order_id: orderId,
+        status_id: 8,
+        changed_by: userId,
+        changed_at: new Date(),
+        activity_extra: 'Both report and collage generated'
+      };
+      
+      await OrderStatusHistory.createStatusHistory(statusHistoryData);
+    }
+  } catch (error) {
+    console.error('Error checking/updating order status:', error);
+    // Don't throw error - this is a non-critical operation
+  }
+}
 
 /**
  * Helper function to convert number to words
@@ -160,6 +201,10 @@ exports.generateReport = async (req, res, next) => {
     const { report_type: requestedReportType } = req.body;
     const { id: userId } = req.user;
     /* console.log("req.body", req.body); */
+    
+    // Define report types that have asset_make field
+    const reportTypesWithAssetMake = ['report_cv', 'report_machinery', 'report_ce'];
+    
     // Get order details with relationships
     const order = await Order.findById(order_id, req.user);
     if (!order) {
@@ -193,6 +238,37 @@ exports.generateReport = async (req, res, next) => {
 
       // Clean up temporary file
       fs.unlinkSync(imagePath);
+    }
+
+    // Handle asset_make: Only for report types that have this field (CV, Machinery, CE)
+    // AVR report does NOT have asset_make field
+    let assetMakeIdForDB = null;
+    let assetMakeNameForTemplate = null;
+    
+    if (reportTypesWithAssetMake.includes(requestedReportType.toLowerCase())) {
+      if (formData.new_asset_make && formData.new_asset_make.trim().length > 0) {
+        // If new_asset_make is provided, create new record and get its ID
+        const newAssetMakeRecord = await AssetMakesForReports.create({
+          order_type: requestedReportType,
+          name: formData.new_asset_make.trim(),
+          created_by: userId
+        });
+        
+        assetMakeIdForDB = newAssetMakeRecord.id;
+        assetMakeNameForTemplate = newAssetMakeRecord.name;
+      } else if (formData.asset_make) {
+        // If asset_make ID is provided, fetch the name
+        const assetMakeRecord = await AssetMakesForReports.findById(formData.asset_make);
+        if (assetMakeRecord) {
+          assetMakeIdForDB = assetMakeRecord.id;
+          assetMakeNameForTemplate = assetMakeRecord.name;
+        }
+      }
+      
+      // Replace asset_make in formData with the name for template display
+      if (assetMakeNameForTemplate) {
+        formData.asset_make = assetMakeNameForTemplate;
+      }
     }
 
     // Format insurance period if provided
@@ -267,11 +343,12 @@ exports.generateReport = async (req, res, next) => {
       throw new Error("Failed to generate report PDF");
     }
 
-    // Prepare report data (exclude flexible_fields, report_type, and tyre_image_base64 from main report data)
+    // Prepare report data (exclude flexible_fields, report_type, tyre_image_base64, and new_asset_make from main report data)
     const {
       flexible_fields,
       report_type,
       tyre_image_base64,
+      new_asset_make,
       ...mainReportData
     } = formData;
     
@@ -281,6 +358,11 @@ exports.generateReport = async (req, res, next) => {
     }
     if (originalCollageNumber !== undefined) {
       mainReportData.no_of_collage = originalCollageNumber;
+    }
+    
+    // Store asset_make ID (not name) in database - only for report types that have this field
+    if (reportTypesWithAssetMake.includes(requestedReportType.toLowerCase()) && assetMakeIdForDB !== null) {
+      mainReportData.asset_make = assetMakeIdForDB;
     }
     
     // Filter form data to only include valid database columns
@@ -374,6 +456,9 @@ exports.generateReport = async (req, res, next) => {
 
     // Set document ID for activity logger
     res.locals.documentId = documentId;
+
+    // Check if both report and collage exist, update status to 8 if true
+    await checkAndUpdateOrderStatus(order.id, userId);
 
     // Get the complete report data with flexible fields for response
     const completeReport = await ReportModel.findByOrderIdWithFlexibleFields(
@@ -698,6 +783,14 @@ exports.getReportByOrderAndType = async (req, res, next) => {
       });
     }
 
+    // If report has asset_make ID, fetch the name
+    if (report.asset_make) {
+      const assetMakeRecord = await AssetMakesForReports.findById(report.asset_make);
+      if (assetMakeRecord) {
+        report.asset_make_name = assetMakeRecord.name;
+      }
+    }
+
     // Return the report data
     res.status(200).json({
       success: true,
@@ -735,6 +828,27 @@ exports.saveReportData = async (req, res, next) => {
     // Handle flexible_fields - parse from request body format for save API
     let flexibleFields = parseFlexibleFieldsFromRequest(formData);
 
+    // Handle asset_make: Only for report types that have this field (CV, Machinery, CE)
+    // AVR report does NOT have asset_make field
+    const reportTypesWithAssetMake = ['report_cv', 'report_machinery', 'report_ce'];
+    let assetMakeIdForDB = null;
+    
+    if (reportTypesWithAssetMake.includes(requestedReportType.toLowerCase())) {
+      if (formData.new_asset_make && formData.new_asset_make.trim().length > 0) {
+        // If new_asset_make is provided, create new record and get its ID
+        const newAssetMakeRecord = await AssetMakesForReports.create({
+          order_type: requestedReportType,
+          name: formData.new_asset_make.trim(),
+          created_by: userId
+        });
+        
+        assetMakeIdForDB = newAssetMakeRecord.id;
+      } else if (formData.asset_make) {
+        // If asset_make ID is provided, use it as is
+        assetMakeIdForDB = formData.asset_make;
+      }
+    }
+
     // Format insurance period if provided
     let formattedPeriod = null;
     if (formData.period_of_insurance) {
@@ -758,6 +872,11 @@ exports.saveReportData = async (req, res, next) => {
       reportData.period_of_insurance = formattedPeriod;
     }
 
+    // Store asset_make ID in database (not the name) - only for report types that have this field
+    if (reportTypesWithAssetMake.includes(requestedReportType.toLowerCase()) && assetMakeIdForDB !== null) {
+      formData.asset_make = assetMakeIdForDB;
+    }
+    
     // Filter form data to only include valid database columns
     const validFields = filterValidReportFields(formData, requestedReportType);
     Object.assign(reportData, validFields);

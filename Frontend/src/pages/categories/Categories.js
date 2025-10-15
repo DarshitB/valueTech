@@ -14,10 +14,12 @@ import { selectPermissions } from "../../redux/selectors/authSelectors";
 import { hasPermission } from "../../utils/permissionUtils";
 import { usePageTitle } from "../../context/PageTitleContext";
 import { toast } from "react-toastify";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 function Categories() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+
   const { setTitle } = usePageTitle();
 
   // Set page title
@@ -125,7 +127,9 @@ function Categories() {
                         className="input-filed"
                         placeholder="Add category"
                         value={newCategoryName}
-                        onChange={(e) => setNewCategoryName(e.target.value.toUpperCase())}
+                        onChange={(e) =>
+                          setNewCategoryName(e.target.value.toUpperCase())
+                        }
                       />
                       <button className="btn" type="submit">
                         Add Category
@@ -149,19 +153,31 @@ function Categories() {
 
             // 📄 Table Rows
             rows: categories.map((item, index) => (
-              <tr key={item.id}>
+              <tr
+                key={item.id}
+                onClick={() => {
+                  if (hasPermission(allowedPermissions, "view_sub_category")) {
+                    navigate(`/categories/${item.id}/subcategories`);
+                  }
+                }}
+                style={{
+                  cursor: hasPermission(
+                    allowedPermissions,
+                    "view_order_details"
+                  )
+                    ? "pointer"
+                    : "default",
+                }}
+              >
                 <td className="sequential-number">{index + 1}</td>
-                <td>
-                  {hasPermission(allowedPermissions, "view_sub_category") ? (
-                    <Link
-                      className="get-me-inside"
-                      to={`/categories/${item.id}/subcategories`}
-                    >
-                      {item.name}
-                    </Link>
-                  ) : (
-                    item.name
-                  )}
+                <td
+                  className={
+                    hasPermission(allowedPermissions, "view_order_details")
+                      ? "get-me-inside"
+                      : ""
+                  }
+                >
+                  {item.name}
                 </td>
                 <td>{item.created_by}</td>
                 <td>{item.updated_by || "-"}</td>
@@ -210,7 +226,9 @@ function Categories() {
                       className="form-field"
                       id="category_input"
                       value={editCategoryName}
-                      onChange={(e) => setEditCategoryName(e.target.value.toUpperCase())}
+                      onChange={(e) =>
+                        setEditCategoryName(e.target.value.toUpperCase())
+                      }
                     />
                   </div>
                   <div className="form-buttons">

@@ -19,3 +19,9 @@ export const updatePaymentStatus = (id, payload) =>
 
 export const updateOrderAttributes = (id, payload) =>
   axios.patch(`${ENDPOINT}/${id}/attributes`, payload); // Update attributes of an order
+
+export const updateOrderToStatus9 = (id) =>
+  axios.patch(`${ENDPOINT}/${id}/update-status-9`); // Update order status to 9
+
+export const getAssetMakesForReports = (orderType) =>
+  axios.get(`/api/asset-makes-of-reports/${orderType}/order-types`); // Get asset makes for specific report type

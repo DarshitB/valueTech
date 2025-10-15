@@ -14,6 +14,7 @@ import {
   saveOrderReport,
   clearCurrentReport,
 } from "../../../redux/reducers/orderReportReducer";
+import { fetchAssetMakesForReports } from "../../../redux/reducers/assetMakesReducer";
 import { usePageTitle } from "../../../context/PageTitleContext";
 import SingleSearchSelect from "../../../components/SingleSearchSelect";
 import { toast } from "react-toastify";
@@ -35,6 +36,13 @@ function MachineryReport() {
     generating,
     saving,
   } = useSelector((state) => state.orderReports);
+
+  // Get asset makes data from Redux store
+  const { list: assetMakes, loading: assetMakesLoading } = useSelector(
+    (state) => state.assetMakes
+  );
+  const [showOtherAssetMake, setShowOtherAssetMake] = useState(false);
+  const [otherAssetMake, setOtherAssetMake] = useState("");
   // Set page title using custom hook
   const { setTitle } = usePageTitle();
 
@@ -55,6 +63,8 @@ function MachineryReport() {
           silent: true,
         })
       );
+      // Fetch asset makes for Machinery report
+      dispatch(fetchAssetMakesForReports("report_machinery"));
     }
   }, [dispatch, id]);
 
@@ -159,9 +169,12 @@ function MachineryReport() {
   // Function to get reference number code based on valuer name
   const getRefNoCode = useCallback((valuerName) => {
     if (!valuerName) return "";
-    
+
     const name = valuerName.toUpperCase();
-    if (name.includes("V.K. ASSOCIATES") || name.includes("VISHAL D. KOTHARI")) {
+    if (
+      name.includes("V.K. ASSOCIATES") ||
+      name.includes("VISHAL D. KOTHARI")
+    ) {
       return "VKM";
     } else if (name.includes("VALUETECH SOLUTIONS")) {
       return "VTS";
@@ -328,6 +341,7 @@ function MachineryReport() {
     owner_serial_no: "",
     manufacture_year: "",
     asset_make: "",
+    new_asset_make: "",
     model: "",
 
     control_system: "",
@@ -435,7 +449,9 @@ function MachineryReport() {
         hyp_with: order?.bank_name || "",
         // ALWAYS use valuer_name from order (never from report or previous state)
         valuer_name: order?.valuer_name || "",
-        license_no: order?.valuer_name ? getLicenseNumber(order.valuer_name) : "",
+        license_no: order?.valuer_name
+          ? getLicenseNumber(order.valuer_name)
+          : "",
       }));
     }
   }, [order, getLicenseNumber, getRefNoCode]);
@@ -455,21 +471,30 @@ function MachineryReport() {
 
     setReportFormData((prev) => {
       const updated = { ...prev };
-      
+
       // More robust field population - try to set all relevant fields
       Object.entries(report).forEach(([key, value]) => {
         // Skip system fields and valuer-related fields (those come from order only)
-        if (key.startsWith('created_') || key.startsWith('updated_') || key === 'id' || key === 'order_id' || key === 'flexible_fields' || key === 'valuer_name' || key === 'license_no' || key === 'ref_no_code') {
+        if (
+          key.startsWith("created_") ||
+          key.startsWith("updated_") ||
+          key === "id" ||
+          key === "order_id" ||
+          key === "flexible_fields" ||
+          key === "valuer_name" ||
+          key === "license_no" ||
+          key === "ref_no_code"
+        ) {
           return;
         }
-        
+
         // Convert null to empty string
         const fieldValue = value !== null ? value : "";
-        
+
         // Special handling for invoice_no_date - split into separate fields
-        if (key === 'invoice_no_date' && fieldValue) {
+        if (key === "invoice_no_date" && fieldValue) {
           // Parse "12 Dated 12" format
-          const parts = fieldValue.split(' Dated ');
+          const parts = fieldValue.split(" Dated ");
           if (parts.length === 2) {
             updated.invoice_no = parts[0].trim();
             updated.invoice_date = parts[1].trim();
@@ -480,11 +505,11 @@ function MachineryReport() {
           }
           return;
         }
-        
+
         // Try to set the field (both existing and dynamic fields)
         updated[key] = fieldValue;
       });
-      
+
       return updated;
     });
 
@@ -840,9 +865,20 @@ function MachineryReport() {
           value = order?.child_category_name || "";
         }
 
-        // Special handling for amount_in_words - use memoized value
+        // Clear asset_make if new_asset_make has value
+        if (key === "asset_make" && reportFormData.new_asset_make) {
+          return; // Skip adding asset_make to payload if new_asset_make exists
+        }
+
+        // Special handling for amount_in_words - compute from fair_market_value
         if (key === "amount_in_words") {
-          value = amountInWords;
+          const fmv = reportFormData.fair_market_value;
+          const amount = parseCurrency(fmv);
+          value = amount > 0 ? convertNumberToWordsIndian(amount) : "";
+          console.log(
+            "🔍 MachineryReport Generate - amount_in_words computed:",
+            value
+          );
         }
 
         if (value !== null && value !== "") {
@@ -975,6 +1011,8 @@ function MachineryReport() {
       dispatch,
       id,
       order,
+      parseCurrency,
+      convertNumberToWordsIndian,
     ]
   );
 
@@ -993,22 +1031,38 @@ function MachineryReport() {
     // Add report form data - only include fields with actual values
     Object.keys(reportFormData).forEach((key) => {
       const value = reportFormData[key];
-      
+
       // Always include important read-only fields even if empty
-      const alwaysIncludeFields = ['disclaimer', 'tax_invoice_copy'];
-      
+      const alwaysIncludeFields = [
+        "disclaimer",
+        "tax_invoice_copy",
+        "amount_in_words",
+        "license_no",
+        "valuer_contact",
+        "depreciation_value",
+      ];
+
       if (alwaysIncludeFields.includes(key)) {
         // Always include these fields with default values if empty
         let defaultValue = value || "";
-        
+
         // Set default values for read-only fields if they're empty
-        if (key === 'disclaimer' && !defaultValue) {
-          defaultValue = "THIS REPORT IS GENERATED BY THE VALUETECH SOLUTIONS AT THE SOLE REQUEST OF UGRO CAPITAL LIMITED, KAROL BAGH BRANCH, NEW DELHI WHOM, THIS VALUATION REPORT IS ADDRESSED AND IS TO BE USED SOLELY BY THE SAID PARTY FOR THE STATED PURPOSE ONLY. VALUETECH SOLUTIONS WILL NOT BE HELD LIABLE FOR ANY LOSS OR LIABLITY SUSTAINED BY ANY PARTY RELYING ON THIS VALUATION REPORT. VALUETECH SOLUTIONS HAS RELIED ON THE DATA PROVIDED BY THE CLIENT & HAS NOT VERIFIED GENUIUNENESS THEREOFF. AS THERE IS NO STANDARD PRICE LIST FOR PRE-OWNED/USED MACHINERY / CRANE, THIS VALUATION INDICATED IN THE REPORT IS OUR PROFESSIONAL OPINION ONLY ON THE MARKET VALUE OF THE PRODUCT SHOWN IN COLLAGE OR IN DETAILS BASED ON STANDARD VALUATION METHODOLOGY & PROCEDURES CALCULATING FLUCTUATIONS & LIMITATIONS OF VALUATED PRODUCTS. ACUAL REALISATION MAY DIFFER FROM THE VALUATION INDICATED IN THE REPORT. VALUETECH SOLUTIONS (SIGNATORY & EMPLOYEES WILL NOT BE HELD LIABLE FOR ANY DIRECT, INDIRECT CONSEQUENTIAL OR EXEMPLARY DAMAGES FOR ANY LOSS RESULTING FROM THE USE OF THIS REPORT. VALUETECH SOLUTIONS IS NOT RESPONSIBLE FOR VERIFYING THE GENUINENESS OF THE PROVIDED DOCUMENTS. THE VALUATION OF ASSET IS PRIMARILY BASED ON THE CONDITION OF THE MACHINERY AT THE TIME OF INSPECTION & SURVEY. TO GIVE LOAN TO THE APPLICANT IS THE RESPONSIIBLITY OF THE FINANCE COMPANY/BANK. WE ARE NOT RESPONSIBLE OR CONCERNED FOR THE SAME.";
+        if (key === "disclaimer" && !defaultValue) {
+          defaultValue =
+            "THIS REPORT IS GENERATED BY THE VALUETECH SOLUTIONS AT THE SOLE REQUEST OF UGRO CAPITAL LIMITED, KAROL BAGH BRANCH, NEW DELHI WHOM, THIS VALUATION REPORT IS ADDRESSED AND IS TO BE USED SOLELY BY THE SAID PARTY FOR THE STATED PURPOSE ONLY. VALUETECH SOLUTIONS WILL NOT BE HELD LIABLE FOR ANY LOSS OR LIABLITY SUSTAINED BY ANY PARTY RELYING ON THIS VALUATION REPORT. VALUETECH SOLUTIONS HAS RELIED ON THE DATA PROVIDED BY THE CLIENT & HAS NOT VERIFIED GENUIUNENESS THEREOFF. AS THERE IS NO STANDARD PRICE LIST FOR PRE-OWNED/USED MACHINERY / CRANE, THIS VALUATION INDICATED IN THE REPORT IS OUR PROFESSIONAL OPINION ONLY ON THE MARKET VALUE OF THE PRODUCT SHOWN IN COLLAGE OR IN DETAILS BASED ON STANDARD VALUATION METHODOLOGY & PROCEDURES CALCULATING FLUCTUATIONS & LIMITATIONS OF VALUATED PRODUCTS. ACUAL REALISATION MAY DIFFER FROM THE VALUATION INDICATED IN THE REPORT. VALUETECH SOLUTIONS (SIGNATORY & EMPLOYEES WILL NOT BE HELD LIABLE FOR ANY DIRECT, INDIRECT CONSEQUENTIAL OR EXEMPLARY DAMAGES FOR ANY LOSS RESULTING FROM THE USE OF THIS REPORT. VALUETECH SOLUTIONS IS NOT RESPONSIBLE FOR VERIFYING THE GENUINENESS OF THE PROVIDED DOCUMENTS. THE VALUATION OF ASSET IS PRIMARILY BASED ON THE CONDITION OF THE MACHINERY AT THE TIME OF INSPECTION & SURVEY. TO GIVE LOAN TO THE APPLICANT IS THE RESPONSIIBLITY OF THE FINANCE COMPANY/BANK. WE ARE NOT RESPONSIBLE OR CONCERNED FOR THE SAME.";
         }
-        if (key === 'tax_invoice_copy' && !defaultValue) {
+        if (key === "tax_invoice_copy" && !defaultValue) {
           defaultValue = "COPY AVAILABLE & VERIFIED";
         }
-        
+        // Use computed amountInWords value if this is amount_in_words field
+        if (key === "amount_in_words") {
+          // Compute amount in words from fair_market_value
+          const fmv = reportFormData.fair_market_value;
+          const amount = parseCurrency(fmv);
+          defaultValue = amount > 0 ? convertNumberToWordsIndian(amount) : "";
+          console.log("🔍 amount_in_words - Computed value:", defaultValue);
+        }
+
         reportData[key] = defaultValue;
       } else {
         // Only include fields that have meaningful values (not null, undefined, or empty string)
@@ -1020,8 +1074,9 @@ function MachineryReport() {
 
     // Force include critical read-only fields if they weren't processed above
     const criticalFields = {
-      'disclaimer': "THIS REPORT IS GENERATED BY THE VALUETECH SOLUTIONS AT THE SOLE REQUEST OF UGRO CAPITAL LIMITED, KAROL BAGH BRANCH, NEW DELHI WHOM, THIS VALUATION REPORT IS ADDRESSED AND IS TO BE USED SOLELY BY THE SAID PARTY FOR THE STATED PURPOSE ONLY. VALUETECH SOLUTIONS WILL NOT BE HELD LIABLE FOR ANY LOSS OR LIABLITY SUSTAINED BY ANY PARTY RELYING ON THIS VALUATION REPORT. VALUETECH SOLUTIONS HAS RELIED ON THE DATA PROVIDED BY THE CLIENT & HAS NOT VERIFIED GENUIUNENESS THEREOFF. AS THERE IS NO STANDARD PRICE LIST FOR PRE-OWNED/USED MACHINERY / CRANE, THIS VALUATION INDICATED IN THE REPORT IS OUR PROFESSIONAL OPINION ONLY ON THE MARKET VALUE OF THE PRODUCT SHOWN IN COLLAGE OR IN DETAILS BASED ON STANDARD VALUATION METHODOLOGY & PROCEDURES CALCULATING FLUCTUATIONS & LIMITATIONS OF VALUATED PRODUCTS. ACUAL REALISATION MAY DIFFER FROM THE VALUATION INDICATED IN THE REPORT. VALUETECH SOLUTIONS (SIGNATORY & EMPLOYEES WILL NOT BE HELD LIABLE FOR ANY DIRECT, INDIRECT CONSEQUENTIAL OR EXEMPLARY DAMAGES FOR ANY LOSS RESULTING FROM THE USE OF THIS REPORT. VALUETECH SOLUTIONS IS NOT RESPONSIBLE FOR VERIFYING THE GENUINENESS OF THE PROVIDED DOCUMENTS. THE VALUATION OF ASSET IS PRIMARILY BASED ON THE CONDITION OF THE MACHINERY AT THE TIME OF INSPECTION & SURVEY. TO GIVE LOAN TO THE APPLICANT IS THE RESPONSIIBLITY OF THE FINANCE COMPANY/BANK. WE ARE NOT RESPONSIBLE OR CONCERNED FOR THE SAME.",
-      'tax_invoice_copy': "COPY AVAILABLE & VERIFIED"
+      disclaimer:
+        "THIS REPORT IS GENERATED BY THE VALUETECH SOLUTIONS AT THE SOLE REQUEST OF UGRO CAPITAL LIMITED, KAROL BAGH BRANCH, NEW DELHI WHOM, THIS VALUATION REPORT IS ADDRESSED AND IS TO BE USED SOLELY BY THE SAID PARTY FOR THE STATED PURPOSE ONLY. VALUETECH SOLUTIONS WILL NOT BE HELD LIABLE FOR ANY LOSS OR LIABLITY SUSTAINED BY ANY PARTY RELYING ON THIS VALUATION REPORT. VALUETECH SOLUTIONS HAS RELIED ON THE DATA PROVIDED BY THE CLIENT & HAS NOT VERIFIED GENUIUNENESS THEREOFF. AS THERE IS NO STANDARD PRICE LIST FOR PRE-OWNED/USED MACHINERY / CRANE, THIS VALUATION INDICATED IN THE REPORT IS OUR PROFESSIONAL OPINION ONLY ON THE MARKET VALUE OF THE PRODUCT SHOWN IN COLLAGE OR IN DETAILS BASED ON STANDARD VALUATION METHODOLOGY & PROCEDURES CALCULATING FLUCTUATIONS & LIMITATIONS OF VALUATED PRODUCTS. ACUAL REALISATION MAY DIFFER FROM THE VALUATION INDICATED IN THE REPORT. VALUETECH SOLUTIONS (SIGNATORY & EMPLOYEES WILL NOT BE HELD LIABLE FOR ANY DIRECT, INDIRECT CONSEQUENTIAL OR EXEMPLARY DAMAGES FOR ANY LOSS RESULTING FROM THE USE OF THIS REPORT. VALUETECH SOLUTIONS IS NOT RESPONSIBLE FOR VERIFYING THE GENUINENESS OF THE PROVIDED DOCUMENTS. THE VALUATION OF ASSET IS PRIMARILY BASED ON THE CONDITION OF THE MACHINERY AT THE TIME OF INSPECTION & SURVEY. TO GIVE LOAN TO THE APPLICANT IS THE RESPONSIIBLITY OF THE FINANCE COMPANY/BANK. WE ARE NOT RESPONSIBLE OR CONCERNED FOR THE SAME.",
+      tax_invoice_copy: "COPY AVAILABLE & VERIFIED",
     };
 
     Object.entries(criticalFields).forEach(([fieldName, defaultValue]) => {
@@ -1033,15 +1088,20 @@ function MachineryReport() {
 
     // Add flexible fields in the same format as report generation
     let formDataIndex = 0;
-    
+
     flexibleFields.forEach((field) => {
       // Only include fields with actual values
       if (field.field_value && field.field_value.trim() !== "") {
-        reportData[`flexible_fields[${formDataIndex}][section_name]`] = field.section_name;
-        reportData[`flexible_fields[${formDataIndex}][col_span]`] = field.col_span;
-        reportData[`flexible_fields[${formDataIndex}][field_label]`] = field.field_label;
-        reportData[`flexible_fields[${formDataIndex}][field_value]`] = field.field_value;
-        reportData[`flexible_fields[${formDataIndex}][field_order]`] = field.field_order;
+        reportData[`flexible_fields[${formDataIndex}][section_name]`] =
+          field.section_name;
+        reportData[`flexible_fields[${formDataIndex}][col_span]`] =
+          field.col_span;
+        reportData[`flexible_fields[${formDataIndex}][field_label]`] =
+          field.field_label;
+        reportData[`flexible_fields[${formDataIndex}][field_value]`] =
+          field.field_value;
+        reportData[`flexible_fields[${formDataIndex}][field_order]`] =
+          field.field_order;
         formDataIndex++;
 
         // Add second field for "Add Two" functionality
@@ -1051,11 +1111,16 @@ function MachineryReport() {
           field.field_value_2 &&
           field.field_value_2.trim() !== ""
         ) {
-          reportData[`flexible_fields[${formDataIndex}][section_name]`] = field.section_name;
-          reportData[`flexible_fields[${formDataIndex}][col_span]`] = field.col_span;
-          reportData[`flexible_fields[${formDataIndex}][field_label]`] = field.field_label_2;
-          reportData[`flexible_fields[${formDataIndex}][field_value]`] = field.field_value_2;
-          reportData[`flexible_fields[${formDataIndex}][field_order]`] = field.field_order + 1;
+          reportData[`flexible_fields[${formDataIndex}][section_name]`] =
+            field.section_name;
+          reportData[`flexible_fields[${formDataIndex}][col_span]`] =
+            field.col_span;
+          reportData[`flexible_fields[${formDataIndex}][field_label]`] =
+            field.field_label_2;
+          reportData[`flexible_fields[${formDataIndex}][field_value]`] =
+            field.field_value_2;
+          reportData[`flexible_fields[${formDataIndex}][field_order]`] =
+            field.field_order + 1;
           formDataIndex++;
         }
       }
@@ -1069,6 +1134,9 @@ function MachineryReport() {
       return;
     }
 
+    console.log("📤 Sending to backend - reportData:", reportData);
+    console.log("📤 amount_in_words in payload:", reportData.amount_in_words);
+
     // Dispatch save action with JSON data
     dispatch(
       saveOrderReport({
@@ -1076,7 +1144,15 @@ function MachineryReport() {
         reportData: reportData,
       })
     );
-  }, [reportFormData, flexibleFields, validateFlexibleFields, dispatch, id]);
+  }, [
+    reportFormData,
+    flexibleFields,
+    validateFlexibleFields,
+    dispatch,
+    id,
+    parseCurrency,
+    convertNumberToWordsIndian,
+  ]);
 
   // Render flexible fields for a section
   const renderFlexibleFields = useCallback(
@@ -1799,49 +1875,45 @@ function MachineryReport() {
                     <label htmlFor="asset_make">
                       Asset Make & Supplier <span class="text-danger">*</span>
                     </label>
-                    <SingleSearchSelect
-                      options={[
-                        { value: "TATA MOTORS LTD", label: "TATA MOTORS LTD" },
-                        {
-                          value: "ASHOK LEYLAND LIMITED",
-                          label: "ASHOK LEYLAND LIMITED",
-                        },
-                        {
-                          value: "VE COMMERCIAL VEHICLES LIMITED",
-                          label: "VE COMMERCIAL VEHICLES LIMITED",
-                        },
-                        {
-                          value: "MAHINDRA & MAHINDRA LIMITED",
-                          label: "MAHINDRA & MAHINDRA LIMITED",
-                        },
-                        { value: "PIAGGIO INDIA", label: "PIAGGIO INDIA" },
-                        {
-                          value: "SCANIA COMMERCIAL VEHICLE INDIA PVT. LTD",
-                          label: "SCANIA COMMERCIAL VEHICLE INDIA PVT. LTD",
-                        },
-                        { value: "FORCE MOTORS", label: "FORCE MOTORS" },
-                        {
-                          value:
-                            "DAIMLER INDIA COMMERCIAL VEHICLES PVT.LTD/BHARATBENZ",
-                          label:
-                            "DAIMLER INDIA COMMERCIAL VEHICLES PVT.LTD/BHARATBENZ",
-                        },
-                        { value: "VOLVO TRUCKS", label: "VOLVO TRUCKS" },
-                        {
-                          value: "SWARAJ MAZDA – SML ISUZU",
-                          label: "SWARAJ MAZDA – SML ISUZU",
-                        },
-                        {
-                          value: "MARUTI SUZUKI INDIA LTD",
-                          label: "MARUTI SUZUKI INDIA LTD",
-                        },
-                      ]}
-                      value={reportFormData.asset_make}
-                      onChange={(value) =>
-                        handleSelectChange("asset_make", value)
-                      }
-                      required
-                    />
+                    <div>
+                      <SingleSearchSelect
+                        options={[
+                          ...assetMakes.map((make) => ({
+                            value: make.id,
+                            label: make.name,
+                          })),
+                          { value: "OTHERS", label: "OTHERS" },
+                        ]}
+                        value={parseInt(reportFormData.asset_make)}
+                        onChange={(value) => {
+                          handleSelectChange("asset_make", value);
+                          setShowOtherAssetMake(value === "OTHERS");
+                          if (value !== "OTHERS") {
+                            setOtherAssetMake("");
+                          }
+                        }}
+                        isLoading={assetMakesLoading}
+                        required
+                      />
+                      {showOtherAssetMake && (
+                        <input
+                          type="text"
+                          className="form-field mt-2"
+                          name="new_asset_make"
+                          placeholder="Enter Asset Make"
+                          value={otherAssetMake}
+                          onChange={(e) => {
+                            const value = e.target.value.toUpperCase();
+                            setOtherAssetMake(value);
+                            handleSelectChange(
+                              "new_asset_make",
+                              value || "OTHERS"
+                            );
+                          }}
+                          required
+                        />
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="col-md-3">
@@ -2884,7 +2956,7 @@ function MachineryReport() {
                       onChange={(e) => {
                         const value = e.target.value;
                         // Only allow numbers, + and -
-                        const sanitized = value.replace(/[^0-9+\-]/g, '');
+                        const sanitized = value.replace(/[^0-9+\-]/g, "");
                         e.target.value = sanitized;
                         handleFormChange(e);
                       }}
@@ -2907,7 +2979,7 @@ function MachineryReport() {
                       onChange={(e) => {
                         const value = e.target.value;
                         // Only allow numbers, + and -
-                        const sanitized = value.replace(/[^0-9+\-]/g, '');
+                        const sanitized = value.replace(/[^0-9+\-]/g, "");
                         e.target.value = sanitized;
                         handleFormChange(e);
                       }}

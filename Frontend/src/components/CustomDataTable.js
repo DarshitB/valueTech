@@ -27,11 +27,22 @@ const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = tr
     });
   }, [rows]);
 
-  // Filter by search
+  // Helper function to normalize text for search (remove separators)
+  const normalizeForSearch = (text) => {
+    if (!text) return "";
+    // Convert to lowercase and remove all separators (spaces, underscores, dashes, dots, etc.)
+    return text.toLowerCase().replace(/[\s_\-.,;:\/\\|]/g, '');
+  };
+
+  // Filter by search - robust search ignoring separators
   const filteredData = useMemo(() => {
     if (!search) return rawData;
+    const normalizedSearch = normalizeForSearch(search);
     return rawData.filter(({ data }) =>
-      data.some((value) => value.includes(search.toLowerCase()))
+      data.some((value) => {
+        const normalizedValue = normalizeForSearch(value);
+        return normalizedValue.includes(normalizedSearch);
+      })
     );
   }, [rawData, search]);
 

@@ -132,6 +132,19 @@ export const updateOrderAttributes = createAsyncThunk(
   }
 );
 
+// Async action: Update order status to 9
+export const updateOrderToStatus9 = createAsyncThunk(
+  "orders/updateToStatus9",
+  async (id, { rejectWithValue }) => {
+    try {
+      const res = await orderApi.updateOrderToStatus9(id);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
 
 // Initial state
 const initialState = {
@@ -354,6 +367,32 @@ const orderSlice = createSlice({
         state.attributesUpdating = false;
         state.attributesError = action.payload;
         toast.error(`Failed to update order attributes: ${action.payload}`);
+      })
+
+      // Update order status to 9
+      .addCase(updateOrderToStatus9.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateOrderToStatus9.fulfilled, (state, action) => {
+        state.loading = false;
+        
+        // Update the order status in both selected and list
+        if (state.selected) {
+          state.selected.current_status_id = 9;
+        }
+        
+        const listIdx = state.list.findIndex((o) => o.id === action.meta.arg);
+        if (listIdx !== -1) {
+          state.list[listIdx].current_status_id = 9;
+        }
+        
+        toast.success(action.payload?.message || "Order status updated to 9 successfully");
+      })
+      .addCase(updateOrderToStatus9.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+        toast.error(`Failed to update order status: ${action.payload}`);
       });
   },
 });

@@ -17,6 +17,7 @@ const STAMP_OFFSETS = {
 const Order = require("../../models/orders/order");
 const orderMediaPortal = require("../../models/orders/orderMediaPortal");
 const orderMediaDocument = require("../../models/orders/orderMediaDocument");
+const OrderStatusHistory = require("../../models/orders/orderStatusHistory");
 const { ensureDirectoryExists } = require("../../utils/localFileHelper");
 
 // Import custom error classes
@@ -36,6 +37,45 @@ const TEXT_STYLING = {
   lineHeight: 1.3, // Increased line height for better readability
   minFontSize: 12 // Minimum font size to prevent text from becoming unreadable
 };
+
+/**
+ * Helper function to check if order has both report and collage, and update status to 8 if true
+ * @param {number} orderId - The order ID
+ * @param {number} userId - The user ID making the change
+ */
+async function checkAndUpdateOrderStatus(orderId, userId) {
+  try {
+    // Check if order has at least one report
+    const documents = await orderMediaDocument.findByOrderId(orderId);
+    const hasReport = documents.some(doc => doc.document_type === 'report');
+    
+    // Check if order has at least one collage
+    const hasCollage = documents.some(doc => doc.document_type === 'collage');
+    
+    // If both exist, update status to 8
+    if (hasReport && hasCollage) {
+      await Order.updateOrder(orderId, {
+        current_status_id: 8,
+        updated_at: new Date(),
+        updated_by: userId
+      });
+      
+      // Create status history entry
+      const statusHistoryData = {
+        order_id: orderId,
+        status_id: 8,
+        changed_by: userId,
+        changed_at: new Date(),
+        activity_extra: 'Both report and collage generated'
+      };
+      
+      await OrderStatusHistory.createStatusHistory(statusHistoryData);
+    }
+  } catch (error) {
+    console.error('Error checking/updating order status:', error);
+    // Don't throw error - this is a non-critical operation
+  }
+}
 
 /**
  * Generate image collage with optional text overlay and convert to PDF
@@ -182,6 +222,9 @@ exports.generateCollage = async (req, res, next) => {
 
     // Set document ID for activity logger
     res.locals.documentId = documentId;
+
+    // Check if both report and collage exist, update status to 8 if true
+    await checkAndUpdateOrderStatus(order.id, userId);
 
     // Return success response with download URL
     res.json({

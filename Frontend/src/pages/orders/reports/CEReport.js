@@ -14,6 +14,7 @@ import {
   saveOrderReport,
   clearCurrentReport,
 } from "../../../redux/reducers/orderReportReducer";
+import { fetchAssetMakesForReports } from "../../../redux/reducers/assetMakesReducer";
 import { usePageTitle } from "../../../context/PageTitleContext";
 import SingleSearchSelect from "../../../components/SingleSearchSelect";
 import { toast } from "react-toastify";
@@ -35,6 +36,13 @@ function CEReport() {
     generating,
     saving,
   } = useSelector((state) => state.orderReports);
+
+  // Get asset makes data from Redux store
+  const { list: assetMakes, loading: assetMakesLoading } = useSelector(
+    (state) => state.assetMakes
+  );
+  const [showOtherAssetMake, setShowOtherAssetMake] = useState(false);
+  const [otherAssetMake, setOtherAssetMake] = useState("");
   // Set page title using custom hook
   const { setTitle } = usePageTitle();
 
@@ -51,6 +59,8 @@ function CEReport() {
       dispatch(
         fetchOrderReport({ orderId: id, reportType: "report_ce", silent: true })
       );
+      // Fetch asset makes for CE report
+      dispatch(fetchAssetMakesForReports("report_ce"));
     }
   }, [dispatch, id]);
 
@@ -158,9 +168,12 @@ function CEReport() {
   // Function to get reference number code based on valuer name
   const getRefNoCode = useCallback((valuerName) => {
     if (!valuerName) return "";
-    
+
     const name = valuerName.toUpperCase();
-    if (name.includes("V.K. ASSOCIATES") || name.includes("VISHAL D. KOTHARI")) {
+    if (
+      name.includes("V.K. ASSOCIATES") ||
+      name.includes("VISHAL D. KOTHARI")
+    ) {
       return "VKM";
     } else if (name.includes("VALUETECH SOLUTIONS")) {
       return "VTS";
@@ -378,6 +391,7 @@ function CEReport() {
     owner_serial_no: "",
     manufacture_year: "",
     asset_make: "",
+    new_asset_make: "",
     model: "",
 
     engine_no_detail: "",
@@ -528,7 +542,9 @@ function CEReport() {
         hyp_with: order?.bank_name || "",
         // ALWAYS use valuer_name from order (never from report or previous state)
         valuer_name: order?.valuer_name || "",
-        license_no: order?.valuer_name ? getLicenseNumber(order.valuer_name) : "",
+        license_no: order?.valuer_name
+          ? getLicenseNumber(order.valuer_name)
+          : "",
       }));
     }
   }, [order, getLicenseNumber, getRefNoCode]);
@@ -548,21 +564,30 @@ function CEReport() {
 
     setReportFormData((prev) => {
       const updated = { ...prev };
-      
+
       // More robust field population - try to set all relevant fields
       Object.entries(report).forEach(([key, value]) => {
         // Skip system fields and valuer-related fields (those come from order only)
-        if (key.startsWith('created_') || key.startsWith('updated_') || key === 'id' || key === 'order_id' || key === 'flexible_fields' || key === 'valuer_name' || key === 'license_no' || key === 'ref_no_code') {
+        if (
+          key.startsWith("created_") ||
+          key.startsWith("updated_") ||
+          key === "id" ||
+          key === "order_id" ||
+          key === "flexible_fields" ||
+          key === "valuer_name" ||
+          key === "license_no" ||
+          key === "ref_no_code"
+        ) {
           return;
         }
-        
+
         // Convert null to empty string
         const fieldValue = value !== null ? value : "";
-        
+
         // Special handling for invoice_no_date - split into separate fields
-        if (key === 'invoice_no_date' && fieldValue) {
+        if (key === "invoice_no_date" && fieldValue) {
           // Parse "12 Dated 12" format
-          const parts = fieldValue.split(' Dated ');
+          const parts = fieldValue.split(" Dated ");
           if (parts.length === 2) {
             updated.invoice_no = parts[0].trim();
             updated.invoice_date = parts[1].trim();
@@ -573,11 +598,11 @@ function CEReport() {
           }
           return;
         }
-        
+
         // Try to set the field (both existing and dynamic fields)
         updated[key] = fieldValue;
       });
-      
+
       return updated;
     });
 
@@ -942,14 +967,36 @@ function CEReport() {
           value = order?.child_category_name || "";
         }
 
-        // Special handling for amount_in_words - use memoized value
-        if (key === "amount_in_words") {
-          value = amountInWords;
+        // Clear asset_make if new_asset_make has value
+        if (key === "asset_make" && reportFormData.new_asset_make) {
+          return; // Skip adding asset_make to payload if new_asset_make exists
         }
 
-        // Special handling for no_of_tyres - use memoized value
+        // Special handling for amount_in_words - compute from fair_market_value
+        if (key === "amount_in_words") {
+          const fmv = reportFormData.fair_market_value;
+          console.log("🔍 CEReport Generate - fair_market_value raw:", fmv);
+          const amount = parseCurrency(fmv);
+          console.log("🔍 CEReport Generate - parsed amount:", amount);
+          value = amount > 0 ? convertNumberToWordsIndian(amount) : "";
+          console.log(
+            "🔍 CEReport Generate - amount_in_words computed:",
+            value
+          );
+          // Force include even if empty
+          formData.append(key, value);
+          return; // Skip the normal flow for this field
+        }
+
+        // Special handling for no_of_tyres - compute from tyre numbers
         if (key === "no_of_tyres") {
-          value = totalTyres;
+          const front = parseInt(reportFormData.front_tyre_no) || 0;
+          const middle = parseInt(reportFormData.middle_tyre_no) || 0;
+          const rear = parseInt(reportFormData.rear_tyre_no) || 0;
+          const total = front + middle + rear;
+          const word = numberToWords(total);
+          value = `${total} (${word})`;
+          console.log("🔍 CEReport Generate - no_of_tyres computed:", value);
         }
 
         if (value !== null && value !== "") {
@@ -1089,6 +1136,9 @@ function CEReport() {
       dispatch,
       id,
       order,
+      parseCurrency,
+      convertNumberToWordsIndian,
+      numberToWords,
     ]
   );
 
@@ -1107,13 +1157,49 @@ function CEReport() {
     // Add report form data - only include fields with actual values
     Object.keys(reportFormData).forEach((key) => {
       const value = reportFormData[key];
-      
+
       // Always include important read-only fields even if empty
-      const alwaysIncludeFields = ['license_no', 'valuer_contact', 'amount_in_words', 'depreciation_value'];
-      
+      const alwaysIncludeFields = [
+        "license_no",
+        "valuer_contact",
+        "amount_in_words",
+        "no_of_tyres",
+        "depreciation_value",
+      ];
+
       if (alwaysIncludeFields.includes(key)) {
         // Always include these fields, even if empty
-        reportData[key] = value || "";
+        let defaultValue = value || "";
+        // Use computed amountInWords value if this is amount_in_words field
+        if (key === "amount_in_words") {
+          // Compute amount in words from fair_market_value
+          const fmv = reportFormData.fair_market_value;
+          console.log("🔍 CEReport Save - fair_market_value raw:", fmv);
+          const amount = parseCurrency(fmv);
+          console.log("🔍 CEReport Save - parsed amount:", amount);
+          defaultValue = amount > 0 ? convertNumberToWordsIndian(amount) : "";
+          console.log(
+            "🔍 CEReport Save - amount_in_words - Computed value:",
+            defaultValue
+          );
+          // Force include even if empty
+          reportData[key] = defaultValue;
+          return; // Skip the normal flow for this field
+        }
+        // Use computed no_of_tyres value if this is no_of_tyres field
+        if (key === "no_of_tyres") {
+          const front = parseInt(reportFormData.front_tyre_no) || 0;
+          const middle = parseInt(reportFormData.middle_tyre_no) || 0;
+          const rear = parseInt(reportFormData.rear_tyre_no) || 0;
+          const total = front + middle + rear;
+          const word = numberToWords(total);
+          defaultValue = `${total} (${word})`;
+          console.log(
+            "🔍 CEReport Save - no_of_tyres - Computed value:",
+            defaultValue
+          );
+        }
+        reportData[key] = defaultValue;
       } else {
         // Only include fields that have meaningful values (not null, undefined, or empty string)
         if (value !== null && value !== undefined && value !== "") {
@@ -1127,11 +1213,16 @@ function CEReport() {
     flexibleFields.forEach((field) => {
       // Only include fields with actual values
       if (field.field_value && field.field_value.trim() !== "") {
-        reportData[`flexible_fields[${formDataIndex}][section_name]`] = field.section_name;
-        reportData[`flexible_fields[${formDataIndex}][col_span]`] = field.col_span;
-        reportData[`flexible_fields[${formDataIndex}][field_label]`] = field.field_label;
-        reportData[`flexible_fields[${formDataIndex}][field_value]`] = field.field_value;
-        reportData[`flexible_fields[${formDataIndex}][field_order]`] = field.field_order;
+        reportData[`flexible_fields[${formDataIndex}][section_name]`] =
+          field.section_name;
+        reportData[`flexible_fields[${formDataIndex}][col_span]`] =
+          field.col_span;
+        reportData[`flexible_fields[${formDataIndex}][field_label]`] =
+          field.field_label;
+        reportData[`flexible_fields[${formDataIndex}][field_value]`] =
+          field.field_value;
+        reportData[`flexible_fields[${formDataIndex}][field_order]`] =
+          field.field_order;
         formDataIndex++;
 
         // Add second field for "Add Two" functionality
@@ -1141,11 +1232,16 @@ function CEReport() {
           field.field_value_2 &&
           field.field_value_2.trim() !== ""
         ) {
-          reportData[`flexible_fields[${formDataIndex}][section_name]`] = field.section_name;
-          reportData[`flexible_fields[${formDataIndex}][col_span]`] = field.col_span;
-          reportData[`flexible_fields[${formDataIndex}][field_label]`] = field.field_label_2;
-          reportData[`flexible_fields[${formDataIndex}][field_value]`] = field.field_value_2;
-          reportData[`flexible_fields[${formDataIndex}][field_order]`] = field.field_order + 1;
+          reportData[`flexible_fields[${formDataIndex}][section_name]`] =
+            field.section_name;
+          reportData[`flexible_fields[${formDataIndex}][col_span]`] =
+            field.col_span;
+          reportData[`flexible_fields[${formDataIndex}][field_label]`] =
+            field.field_label_2;
+          reportData[`flexible_fields[${formDataIndex}][field_value]`] =
+            field.field_value_2;
+          reportData[`flexible_fields[${formDataIndex}][field_order]`] =
+            field.field_order + 1;
           formDataIndex++;
         }
       }
@@ -1164,6 +1260,23 @@ function CEReport() {
       return;
     }
 
+    console.log("📤 CEReport - Sending to backend - reportData:", reportData);
+    console.log(
+      "📤 CEReport - amount_in_words in payload:",
+      reportData.amount_in_words
+    );
+
+    // Debug log for payload
+    console.log("🔍 CEReport Save - Final reportData:", reportData);
+    console.log(
+      "🔍 CEReport Save - amount_in_words in payload:",
+      reportData.amount_in_words
+    );
+    console.log(
+      "🔍 CEReport Save - fair_market_value:",
+      reportFormData.fair_market_value
+    );
+
     // Dispatch save action with JSON data
     dispatch(
       saveOrderReport({
@@ -1178,6 +1291,9 @@ function CEReport() {
     chassisImpressionFile,
     dispatch,
     id,
+    parseCurrency,
+    convertNumberToWordsIndian,
+    numberToWords,
   ]);
 
   // Render flexible fields for a section
@@ -1926,59 +2042,45 @@ function CEReport() {
                     <label htmlFor="asset_make">
                       Asset Make <span class="text-danger">*</span>
                     </label>
-                    <SingleSearchSelect
-                      options={[
-                        { value: "TATA MOTORS LTD", label: "TATA MOTORS LTD" },
-                        {
-                          value: "ASHOK LEYLAND LIMITED",
-                          label: "ASHOK LEYLAND LIMITED",
-                        },
-                        {
-                          value: "VE COMMERCIAL VEHICLES LIMITED",
-                          label: "VE COMMERCIAL VEHICLES LIMITED",
-                        },
-                        {
-                          value: "MAHINDRA & MAHINDRA LIMITED",
-                          label: "MAHINDRA & MAHINDRA LIMITED",
-                        },
-                        { value: "PIAGGIO INDIA", label: "PIAGGIO INDIA" },
-                        {
-                          value: "SCANIA COMMERCIAL VEHICLE INDIA PVT. LTD",
-                          label: "SCANIA COMMERCIAL VEHICLE INDIA PVT. LTD",
-                        },
-                        { value: "FORCE MOTORS", label: "FORCE MOTORS" },
-                        {
-                          value:
-                            "DAIMLER INDIA COMMERCIAL VEHICLES PVT.LTD/BHARATBENZ",
-                          label:
-                            "DAIMLER INDIA COMMERCIAL VEHICLES PVT.LTD/BHARATBENZ",
-                        },
-                        { value: "VOLVO TRUCKS", label: "VOLVO TRUCKS" },
-                        {
-                          value: "SWARAJ MAZDA – SML ISUZU",
-                          label: "SWARAJ MAZDA – SML ISUZU",
-                        },
-                        {
-                          value: "MARUTI SUZUKI INDIA LTD",
-                          label: "MARUTI SUZUKI INDIA LTD",
-                        },
-                        {
-                          value: "XCMG CONSTRUCTION MACHINERY CO. LTD., CHINA",
-                          label: "XCMG CONSTRUCTION MACHINERY CO. LTD., CHINA",
-                        },
-                        {
-                          value:
-                            "ANE ASSET MAKE OPEN KARI NAKH AME ADD KARI SAKIYE EM",
-                          label:
-                            "ANE ASSET MAKE OPEN KARI NAKH AME ADD KARI SAKIYE EM",
-                        },
-                      ]}
-                      value={reportFormData.asset_make}
-                      onChange={(value) =>
-                        handleSelectChange("asset_make", value)
-                      }
-                      required
-                    />
+                    <div>
+                      <SingleSearchSelect
+                        options={[
+                          ...assetMakes.map((make) => ({
+                            value: make.id,
+                            label: make.name,
+                          })),
+                          { value: "OTHERS", label: "OTHERS" },
+                        ]}
+                        value={parseInt(reportFormData.asset_make)}
+                        onChange={(value) => {
+                          handleSelectChange("asset_make", value);
+                          setShowOtherAssetMake(value === "OTHERS");
+                          if (value !== "OTHERS") {
+                            setOtherAssetMake("");
+                          }
+                        }}
+                        isLoading={assetMakesLoading}
+                        required
+                      />
+                      {showOtherAssetMake && (
+                        <input
+                          type="text"
+                          className="form-field mt-2"
+                          name="new_asset_make"
+                          placeholder="Enter Asset Make"
+                          value={otherAssetMake}
+                          onChange={(e) => {
+                            const value = e.target.value.toUpperCase();
+                            setOtherAssetMake(value);
+                            handleSelectChange(
+                              "new_asset_make",
+                              value || "OTHERS"
+                            );
+                          }}
+                          required
+                        />
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="col-md-3">
@@ -3515,7 +3617,7 @@ function CEReport() {
                       onChange={(e) => {
                         const value = e.target.value;
                         // Only allow numbers, + and -
-                        const sanitized = value.replace(/[^0-9+\-]/g, '');
+                        const sanitized = value.replace(/[^0-9+\-]/g, "");
                         e.target.value = sanitized;
                         handleFormChange(e);
                       }}
@@ -3538,7 +3640,7 @@ function CEReport() {
                       onChange={(e) => {
                         const value = e.target.value;
                         // Only allow numbers, + and -
-                        const sanitized = value.replace(/[^0-9+\-]/g, '');
+                        const sanitized = value.replace(/[^0-9+\-]/g, "");
                         e.target.value = sanitized;
                         handleFormChange(e);
                       }}

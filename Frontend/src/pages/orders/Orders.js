@@ -593,7 +593,6 @@ function Orders() {
                   >
                     <option value="">All Priorities</option>
                     <option value="High">High</option>
-                    <option value="Average">Average</option>
                     <option value="Low">Low</option>
                   </select>
                 )}
@@ -678,7 +677,8 @@ function Orders() {
                 )}
               </tr>
             ),
-            rows: orders
+            rows: [...orders]
+              .reverse()
               .filter((order) => {
                 // Filter by order type if selected
                 const typeMatch =
@@ -1227,8 +1227,8 @@ function Orders() {
                   {hasPermission(allowedPermissions, "edit_order_priority") && (
                     <div className="form-group order-priority-radio-group">
                       <label>Order Priority</label>
-                      <div className="radio-group three-items">
-                        {["Low", "Average", "High"].map((priority) => (
+                      <div className="radio-group two-items">
+                        {["Low", "High"].map((priority) => (
                           <label
                             key={priority}
                             className={`radio-label ${priority.toLowerCase()} ${

@@ -40,6 +40,12 @@ router.patch(
   activityLogger("orders", (req) => req.params.id), // Log update
   orderController.updateOrderAttributes
 );
+router.patch(
+  "/:id/update-status-9",
+  checkPermission("view_order_complete_button"), // Check permission to edit order
+  activityLogger("orders", (req) => req.params.id), // Log update
+  orderController.updateStatusToNine
+);
 router.delete(
   "/:id",
   checkPermission("delete_order"), // Check permission to delete order

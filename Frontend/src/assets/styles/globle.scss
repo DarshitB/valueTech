@@ -41,10 +41,6 @@
   text-decoration: underline;
   color: $base-font-color !important;
   font-weight: normal;
-  &:hover {
-    text-decoration: none;
-    color: $primary-color !important;
-  }
 }
 .have-field-with-icon {
   position: relative;
