@@ -37,6 +37,9 @@ const mobileAuthController = {
         throw new BadRequestError("Invalid password");
       }
 
+      // Fetch complete verifier data with city and state information
+      const completeVerifier = await mobileAuth.findById(verifier.id);
+
       const expiresAt = new Date(
         Date.now() + JWT_EXPIRE_HOURS * 60 * 60 * 1000
       );
@@ -59,9 +62,19 @@ const mobileAuthController = {
         state: 1,
         message: "Login successful",
         token,
-        verifier_id: verifier.id,
         login_at: session.login_at,
         expires_at: session.expires_at,
+        verifier: {
+          id: completeVerifier.id,
+          name: completeVerifier.name,
+          username: completeVerifier.username,
+          mobile: completeVerifier.mobile,
+          city_id: completeVerifier.city_id,
+          city_name: completeVerifier.city_name,
+          state_id: completeVerifier.state_id,
+          state_name: completeVerifier.state_name,
+          is_active: completeVerifier.is_active,
+        },
       });
     } catch (error) {
       console.error("Login error:", error);
@@ -79,16 +92,16 @@ const mobileAuthController = {
       const session = await mobileAuth.findValidSession(token);
       /* console.log("SESSION FOUND:", session); */
       if (!session)
-        return res.status(401).json({ 
-          state: 0, 
-          message: "Invalid or expired token." 
+        return res.status(401).json({
+          state: 0,
+          message: "Invalid or expired token.",
         });
 
       await mobileAuth.logoutById(session.id);
 
-      return res.status(200).json({ 
-        state: 1, 
-        message: "Logout successful." 
+      return res.status(200).json({
+        state: 1,
+        message: "Logout successful.",
       });
     } catch (error) {
       console.error("Logout error:", error);

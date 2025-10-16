@@ -145,6 +145,19 @@ export const updateOrderToStatus9 = createAsyncThunk(
   }
 );
 
+// Async action: Update order status after under review
+export const updateStatusAfterUnderReview = createAsyncThunk(
+  "orders/updateStatusAfterUnderReview",
+  async ({ id, data }, { rejectWithValue }) => {
+    try {
+      const res = await orderApi.updateStatusAfterUnderReview(id, data);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
 
 // Initial state
 const initialState = {
@@ -369,7 +382,7 @@ const orderSlice = createSlice({
         toast.error(`Failed to update order attributes: ${action.payload}`);
       })
 
-      // Update order status to 9
+      // Update order status to 10
       .addCase(updateOrderToStatus9.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -379,17 +392,50 @@ const orderSlice = createSlice({
         
         // Update the order status in both selected and list
         if (state.selected) {
-          state.selected.current_status_id = 9;
+          state.selected.current_status_id = 10;
         }
         
         const listIdx = state.list.findIndex((o) => o.id === action.meta.arg);
         if (listIdx !== -1) {
-          state.list[listIdx].current_status_id = 9;
+          state.list[listIdx].current_status_id = 10;
         }
         
-        toast.success(action.payload?.message || "Order status updated to 9 successfully");
+        toast.success(action.payload?.message || "Order status updated to 10 successfully");
       })
       .addCase(updateOrderToStatus9.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+        toast.error(`Failed to update order status: ${action.payload}`);
+      })
+
+      // Update order status after under review
+      .addCase(updateStatusAfterUnderReview.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateStatusAfterUnderReview.fulfilled, (state, action) => {
+        state.loading = false;
+        
+        const response = action.payload;
+        const orderId = response?.data?.order_id;
+        const newStatusId = response?.data?.new_status_id;
+        const statusName = response?.data?.status_name;
+
+        // Update the order status in both selected and list
+        if (state.selected && state.selected.id === orderId) {
+          state.selected.current_status_id = newStatusId;
+          state.selected.current_status_name = statusName;
+        }
+        
+        const listIdx = state.list.findIndex((o) => o.id === orderId);
+        if (listIdx !== -1) {
+          state.list[listIdx].current_status_id = newStatusId;
+          state.list[listIdx].current_status_name = statusName;
+        }
+        
+        toast.success(response?.message || "Order status updated successfully");
+      })
+      .addCase(updateStatusAfterUnderReview.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
         toast.error(`Failed to update order status: ${action.payload}`);

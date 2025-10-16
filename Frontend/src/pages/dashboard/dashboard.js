@@ -200,13 +200,13 @@ function Dashboard() {
   // Calculate pending orders (orders with status_id < 5)
   const pendingOrdersCount = (orders || []).filter((order) => {
     const statusId = order.current_status_id;
-    return statusId && statusId < 5;
+    return statusId && statusId < 6;
   }).length;
 
   // Calculate ongoing orders (orders with status_id >= 5)
   const ongoingOrdersCount = (orders || []).filter((order) => {
     const statusId = order.current_status_id;
-    return statusId && statusId >= 5;
+    return statusId && statusId >= 6;
   }).length;
 
   // Calculate completed orders
@@ -1418,7 +1418,10 @@ function Dashboard() {
               orders.map((order) => (
                 <div
                   key={order.id}
-                  className="telecoller-dashboard-order-card clickable-card"
+                  className={`telecoller-dashboard-order-card clickable-card ${
+                    order.current_status_id === 5 ? 'reassign-order' : 
+                    order.current_status_id >= 7 ? 'complete-order' : ''
+                  }`}
                   onClick={() => openEditModal(order)}
                   style={{ cursor: "pointer" }}
                 >

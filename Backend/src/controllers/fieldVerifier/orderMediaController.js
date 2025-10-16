@@ -32,7 +32,7 @@ function writeBase64ToTemp(dataUrl) {
 }
 
 /**
- * Helper: Update order status to 6 (Assets Submitted) after successful upload
+ * Helper: Update order status to 7 (Assets Submitted) after successful upload
  */
 async function updateOrderStatusToAssetsSubmitted(orderId, verifierId, imageCount = 0) {
   try {
@@ -44,7 +44,7 @@ async function updateOrderStatusToAssetsSubmitted(orderId, verifierId, imageCoun
     
     // Prepare update data
     const updateData = {
-      current_status_id: 6,
+      current_status_id: 7,
       updated_at: new Date(),
       updated_by: verifierId
     };
@@ -54,13 +54,13 @@ async function updateOrderStatusToAssetsSubmitted(orderId, verifierId, imageCoun
       updateData.date_of_inspection = new Date();
     }
 
-    // Update order status to 6 (Assets Submitted)
+    // Update order status to 7 (Assets Submitted)
     await Order.updateOrder(orderId, updateData);
 
     // Create status history entry
     const statusHistoryData = {
       order_id: orderId,
-      status_id: 6, // Assets Submitted
+      status_id: 7, // Assets Submitted
       user_type: 'field_verifier',
       changed_by: verifierId,
       changed_at: new Date(),
@@ -161,7 +161,7 @@ async function uploadMultipart(req, res, next) {
     /* console.log(`🧹 Cleaning up ${tempPaths.length} temporary files...`); */
     cleanupTempFiles(tempPaths);
 
-    // Update order status to 6 (Assets Submitted) after successful upload
+    // Update order status to 7 (Assets Submitted) after successful upload
     await updateOrderStatusToAssetsSubmitted(orderRow.id, id, filesToUpload.length);
 
     res.json({ state: 1, message: 'successfully uploaded the images', files: saved });
@@ -265,7 +265,7 @@ async function uploadBase64(req, res, next) {
    /*  console.log(`🧹 Cleaning up ${tempPaths.length} temporary files...`); */
     cleanupTempFiles(tempPaths);
 
-    // Update order status to 6 (Assets Submitted) after successful upload
+    // Update order status to 7 (Assets Submitted) after successful upload
     await updateOrderStatusToAssetsSubmitted(orderRow.id, id, filesToUpload.length);
 
     res.json({ state: 1, message: 'successfully uploaded the images', files: saved });

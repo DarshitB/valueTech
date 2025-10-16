@@ -20,13 +20,13 @@ const {
 } = require("../../utils/customErrors");
 
 /**
- * Helper: Update order status to 7 (Assets Approved) when images are approved
+ * Helper: Update order status to 8 (Assets Approved) when images are approved
  */
 async function updateOrderStatusToAssetsApproved(orderId, userId) {
   try {
-    // Update order status to 7 (Assets Approved)
+    // Update order status to 8 (Assets Approved)
     await Order.updateOrder(orderId, {
-      current_status_id: 7,
+      current_status_id: 8,
       updated_at: new Date(),
       updated_by: userId,
     });
@@ -34,7 +34,7 @@ async function updateOrderStatusToAssetsApproved(orderId, userId) {
     // Create status history entry
     const statusHistoryData = {
       order_id: orderId,
-      status_id: 7, // Assets Approved
+      status_id: 8, // Assets Approved
       changed_by: userId,
       changed_at: new Date(),
     };
@@ -125,10 +125,13 @@ async function updateMediaStatus(req, res, next) {
     }
 
     // Update all media records
-    const updatedRecords = await orderMediaPortal.updateMultipleStatus(
+    const updatedRecordsArray = await orderMediaPortal.updateMultipleStatus(
       updates,
       userId
     );
+
+    // Flatten the array of arrays to get actual records
+    const updatedRecords = updatedRecordsArray.flat();
 
     // Check if any media was approved (status = 1) and update order status
     const hasApprovedMedia = updates.some((update) => update.status === 1);
@@ -140,7 +143,7 @@ async function updateMediaStatus(req, res, next) {
       }
     }
 
-    res.locals.id = updatedRecords[0].id;
+    res.locals.id = updatedRecords[0]?.id;
 
     res.json({
       success: true,
@@ -433,7 +436,7 @@ async function uploadZip(req, res, next) {
     cleanupTempFiles(tempPaths);
     cleanupTempFiles([zipFile.path]); // Clean up the uploaded ZIP file
 
-    // Update order status to 6 (Assets Submitted) and create status history entry
+    // Update order status to 7 (Assets Submitted) and create status history entry
     try {
       // Direct query to check if date_of_inspection is already set
       const currentOrder = await db('orders')
@@ -443,7 +446,7 @@ async function uploadZip(req, res, next) {
       
       // Prepare update data
       const updateData = {
-        current_status_id: 6, // Assets Submitted
+        current_status_id: 7, // Assets Submitted
         updated_at: new Date(),
         updated_by: userId,
       };
@@ -459,7 +462,7 @@ async function uploadZip(req, res, next) {
       // Create status history entry for ZIP upload
       const statusHistoryData = {
         order_id: orderIdNum,
-        status_id: 6, // Assets Submitted
+        status_id: 7, // Assets Submitted
         changed_by: userId,
         changed_at: new Date(),
         activity_extra: `${savedMedia.length} file(s) Uploaded via ZIP`,

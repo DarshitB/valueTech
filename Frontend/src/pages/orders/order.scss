@@ -829,7 +829,15 @@
     }
   }
 }
-
+.tooltip-link {
+  &.button {
+    &:focus{
+      border: unset !important;
+      outline: unset !important;
+      box-shadow: unset !important;
+    }
+  }
+}
 /* Lightbox customizations */
 .yarl__container {
   z-index: 9998 !important;

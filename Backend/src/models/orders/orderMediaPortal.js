@@ -35,7 +35,7 @@ const orderMediaPortal = {
           updated_at: new Date(),
           updated_by: updatedBy,
         })
-        .returning(["id", "status", "updated_at", "updated_by"])
+        .returning(["id", "order_id", "status", "updated_at", "updated_by"])
     );
 
     return Promise.all(promises);

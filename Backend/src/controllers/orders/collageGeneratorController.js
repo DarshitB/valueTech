@@ -39,7 +39,7 @@ const TEXT_STYLING = {
 };
 
 /**
- * Helper function to check if order has both report and collage, and update status to 8 if true
+ * Helper function to check if order has both report and collage, and update status to 9 if true
  * @param {number} orderId - The order ID
  * @param {number} userId - The user ID making the change
  */
@@ -52,10 +52,10 @@ async function checkAndUpdateOrderStatus(orderId, userId) {
     // Check if order has at least one collage
     const hasCollage = documents.some(doc => doc.document_type === 'collage');
     
-    // If both exist, update status to 8
+    // If both exist, update status to 9
     if (hasReport && hasCollage) {
       await Order.updateOrder(orderId, {
-        current_status_id: 8,
+        current_status_id: 9,
         updated_at: new Date(),
         updated_by: userId
       });
@@ -63,7 +63,7 @@ async function checkAndUpdateOrderStatus(orderId, userId) {
       // Create status history entry
       const statusHistoryData = {
         order_id: orderId,
-        status_id: 8,
+        status_id: 9,
         changed_by: userId,
         changed_at: new Date(),
         activity_extra: 'Both report and collage generated'
@@ -223,7 +223,7 @@ exports.generateCollage = async (req, res, next) => {
     // Set document ID for activity logger
     res.locals.documentId = documentId;
 
-    // Check if both report and collage exist, update status to 8 if true
+    // Check if both report and collage exist, update status to 9 if true
     await checkAndUpdateOrderStatus(order.id, userId);
 
     // Return success response with download URL

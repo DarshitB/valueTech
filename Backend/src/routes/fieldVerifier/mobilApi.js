@@ -11,5 +11,6 @@ router.use(mobileAuth);
 
 router.get("/me", mobileAuthController.getMe);
 router.get("/orders", orderController.getForMobile);
+router.post("/order-action", orderController.mobileOrderAction);
 
 module.exports = router;

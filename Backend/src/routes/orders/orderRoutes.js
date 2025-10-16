@@ -41,10 +41,16 @@ router.patch(
   orderController.updateOrderAttributes
 );
 router.patch(
-  "/:id/update-status-9",
+  "/:id/update-status-under-review",
   checkPermission("view_order_complete_button"), // Check permission to edit order
   activityLogger("orders", (req) => req.params.id), // Log update
-  orderController.updateStatusToNine
+  orderController.updateStatusToUnderReview
+);
+router.patch(
+  "/:id/update-status-after-under-review",
+  checkPermission("view_order_authenticate_button"), // Check permission to edit order
+  activityLogger("orders", (req) => req.params.id), // Log update
+  orderController.updateOrderStatusAfterUnderReview
 );
 router.delete(
   "/:id",

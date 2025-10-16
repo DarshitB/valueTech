@@ -140,6 +140,7 @@
   padding-bottom: 20px;
   .telecoller-dashboard-order-card {
     border: 1px solid $base-font-color-light;
+    background-color: $primary-color;
     border-radius: 12px;
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
     max-width: 450px;
@@ -148,38 +149,82 @@
     &:hover {
       border-color: $primary-color;
     }
-  }
-  .telecoller-dashboard-order-card-header {
-    border-bottom: 1px solid $base-font-color-light;
-    padding: 20px;
-    h3 {
-      margin-bottom: 0;
-      margin-top: 0;
-      font-size: 23px;
-      color: $base-font-color;
-    }
-  }
-  .telecoller-dashboard-order-card-body {
-    padding: 20px;
-    .telecoller-dashboard-order-card-body-item {
-      margin-bottom: 15px;
-      span {
-        font-size: 12px;
-        font-weight: 400;
-        color: $base-font-color;
-      }
-      p {
-        font-size: 16px;
-        font-weight: 700;
-        color: $base-font-color;
+
+    .telecoller-dashboard-order-card-header {
+      border-bottom: 1px solid $base-font-color-light;
+      padding: 20px;
+      h3 {
         margin-bottom: 0;
+        margin-top: 0;
+        font-size: 23px;
+        color: $primary-font-color;
       }
-      &.two-rows {
-        display: flex;
-        gap: 10px;
+    }
+    .telecoller-dashboard-order-card-body {
+      padding: 20px;
+      .telecoller-dashboard-order-card-body-item {
+        margin-bottom: 15px;
+        span {
+          font-size: 12px;
+          font-weight: 400;
+          color: $primary-font-color;
+          opacity: 0.8;
+        }
+        p {
+          font-size: 16px;
+          font-weight: 700;
+          color: $primary-font-color;
+          margin-bottom: 0;
+        }
+        &.two-rows {
+          display: flex;
+          gap: 10px;
+        }
+        .telecoller-dashboard-order-card-body-item-inner {
+          width: 50%;
+        }
       }
-      .telecoller-dashboard-order-card-body-item-inner {
-        width: 50%;
+    }
+    &.reassign-order {
+      background-color: $base-color;
+      border-color: $color-danger;
+      &:hover {
+        border-color: $primary-color;
+      }
+      .telecoller-dashboard-order-card-header {
+        border-bottom-color: $color-danger;
+        h3 {
+          color: $color-danger;
+        }
+      }
+      .telecoller-dashboard-order-card-body {
+        span {
+          color: $base-font-color;
+        }
+        p {
+          color: $base-font-color;
+        }
+      }
+    }
+    &.complete-order {
+      background-color: $color-success;
+      border-color: $base-font-color-light;
+      &:hover {
+        border-color: $primary-color;
+      }
+      .telecoller-dashboard-order-card-header {
+        border-bottom-color: $primary-font-color;
+        h3 {
+          color: $primary-font-color;
+        }
+      }
+      .telecoller-dashboard-order-card-body {
+        span {
+          color: $primary-font-color;
+        }
+        p {
+          color: $primary-font-color;
+        }
       }
     }
   }

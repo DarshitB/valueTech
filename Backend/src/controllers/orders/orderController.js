@@ -3,6 +3,7 @@ const OrderStatusMaster = require("../../models/orders/orderStatusMaster");
 const OrderStatusHistory = require("../../models/orders/orderStatusHistory");
 const Officer = require("../../models/user/officer");
 const User = require("../../models/user/user");
+const mobileAuth = require("../../models/fieldVerifier/mobile_auth");
 const db = require("../../../db");
 
 const {
@@ -91,6 +92,8 @@ exports.getForMobile = async (req, res, next) => {
     // Get field verifier ID from the authenticated user
     const fieldVerifierId = req.verifier.id;
 
+    const completeVerifier = await mobileAuth.findById(fieldVerifierId);
+
     const orders = await Order.getForMobile(fieldVerifierId);
 
     if (orders && orders.length > 0) {
@@ -98,12 +101,106 @@ exports.getForMobile = async (req, res, next) => {
         state: 1,
         message: "orders fetch successfully",
         orders: orders,
+        verifier: {
+          id: completeVerifier.id,
+          name: completeVerifier.name,
+          username: completeVerifier.username,
+          mobile: completeVerifier.mobile,
+          city_id: completeVerifier.city_id,
+          city_name: completeVerifier.city_name,
+          state_id: completeVerifier.state_id,
+          state_name: completeVerifier.state_name,
+          is_active: completeVerifier.is_active,
+        },
       });
     } else {
       res.json({
         state: 0,
         message: "No Orders",
         orders: [],
+      });
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Mobile Order Action - Handle field verifier actions
+ * POST /api/mobile/order-action
+ * Body: { order_id: number, action: "Reassign Telecaller" | "Job started" }
+ */
+exports.mobileOrderAction = async (req, res, next) => {
+  try {
+    const { order_id, action } = req.body;
+    const fieldVerifierId = req.verifier.id;
+
+    // Validation
+    if (!order_id) {
+      throw new BadRequestError("order_id is required");
+    }
+
+    if (!action) {
+      throw new BadRequestError("action is required");
+    }
+
+    const validActions = ["Reassign Telecaller", "Job started"];
+    if (!validActions.includes(action)) {
+      throw new BadRequestError(
+        `Invalid action. Must be one of: ${validActions.join(", ")}`
+      );
+    }
+
+    // Check if order exists
+    const order = await db("orders")
+      .select("id", "order_number", "current_status_id")
+      .where("id", order_id)
+      .whereNull("deleted_at")
+      .first();
+
+    if (!order) {
+      throw new NotFoundError("Order not found");
+    }
+
+    // Handle different actions
+    if (action === "Reassign Telecaller") {
+      // Update order status to 5
+      await Order.updateOrder(order_id, {
+        current_status_id: 5,
+        updated_at: new Date(),
+        updated_by: fieldVerifierId,
+      });
+
+      // Create status history entry
+      const statusHistoryData = {
+        order_id: order_id,
+        status_id: 5,
+        user_type: 'field_verifier',
+        changed_by: fieldVerifierId,
+        changed_at: new Date(),
+      };
+
+      await OrderStatusHistory.createStatusHistory(statusHistoryData);
+
+      return res.json({
+        state: 1,
+        message: "Order status updated to Reassign Telecaller successfully",
+      });
+    } else if (action === "Job started") {
+      // Just add status history entry, don't change order status
+      const statusHistoryData = {
+        order_id: order_id,
+        user_type: 'field_verifier',
+        changed_by: fieldVerifierId,
+        changed_at: new Date(),
+        activity_extra: "Order approved (Job started)"
+      };
+
+      await OrderStatusHistory.createStatusHistory(statusHistoryData);
+
+      return res.json({
+        state: 1,
+        message: "Job started recorded successfully",
       });
     }
   } catch (err) {
@@ -167,8 +264,8 @@ exports.create = async (req, res, next) => {
     const hasSupervisorAndDriver = supervisor_number && driver_number;
 
     if (field_verifier_id) {
-      // If field verifier is assigned, status should be 5 (Field Verifier Assigned)
-      orderStatusId = 5;
+      // If field verifier is assigned, status should be 6 (Field Verifier Assigned)
+      orderStatusId = 6;
     } else if (manager_id) {
       // If manager is assigned, status should be 4 (Manager Assigned)
       orderStatusId = 4;
@@ -258,7 +355,7 @@ exports.create = async (req, res, next) => {
     await OrderStatusHistory.createStatusHistory(pendingStatusHistory);
 
     // Create status history entries based on what was assigned
-    // If field_verifier is assigned, create both manager (4) and field verifier (5) records
+    // If field_verifier is assigned, create both manager (4) and field verifier (6) records
     if (field_verifier_id) {
       // First create Manager Assigned status (if manager is assigned)
       if (finalManagerId) {
@@ -274,7 +371,7 @@ exports.create = async (req, res, next) => {
       // Then create Field Verifier Assigned status
       const fieldVerifierStatusHistory = {
         order_id: order.id,
-        status_id: 5, // Field Verifier Assigned
+        status_id: 6, // Field Verifier Assigned
         changed_by: req.user?.id,
         changed_at: new Date(),
       };
@@ -346,10 +443,26 @@ exports.update = async (req, res, next) => {
       if (!manager) throw new BadRequestError("Invalid manager selected");
     }
 
+    // Check if Telecaller changed place_of_inspection - if yes, reset manager and field verifier
+    const isTelecaller = (req.user?.role_name || "").toUpperCase().includes("TELECALLER");
+    const placeOfInspectionChanged = 
+      place_of_inspection !== undefined && 
+      place_of_inspection !== existingOrder.place_of_inspection;
+    
+    let resetManagerAndFieldVerifier = false;
+    if (isTelecaller && placeOfInspectionChanged) {
+      resetManagerAndFieldVerifier = true;
+    }
+
     // Determine new order status based on field_verifier_id, manager_id, supervisor_number, and driver_number
     // IMPORTANT: Only update status if current status is lower than the new status
     let newStatusId;
     let finalManagerId = manager_id !== undefined ? manager_id : existingOrder.manager_id;
+    
+    // Reset manager if Telecaller changed place of inspection
+    if (resetManagerAndFieldVerifier) {
+      finalManagerId = null;
+    }
     
     const currentSupervisorNumber =
       supervisor_number !== undefined
@@ -358,17 +471,25 @@ exports.update = async (req, res, next) => {
     const currentDriverNumber =
       driver_number !== undefined ? driver_number : existingOrder.driver_number;
     const currentManagerId = finalManagerId;
-    const currentFieldVerifierId =
+    let currentFieldVerifierId =
       field_verifier_id !== undefined
         ? field_verifier_id
         : existingOrder.field_verifier_id;
+    
+    // Reset field verifier if Telecaller changed place of inspection
+    if (resetManagerAndFieldVerifier) {
+      currentFieldVerifierId = null;
+    }
 
     const hasSupervisorAndDriver =
       currentSupervisorNumber && currentDriverNumber;
 
-    if (currentFieldVerifierId) {
-      // field verifier is assigned, status should be 5 (Field Verifier Assigned)
-      newStatusId = 5;
+    // If Telecaller changed place_of_inspection and reset manager/field verifier, set status to 3
+    if (resetManagerAndFieldVerifier) {
+      newStatusId = 3; // Telecaller Completed
+    } else if (currentFieldVerifierId) {
+      // field verifier is assigned, status should be 6 (Field Verifier Assigned)
+      newStatusId = 6;
     } else if (currentManagerId) {
       // manager is assigned, status should be 4 (Manager Assigned)
       newStatusId = 4;
@@ -391,7 +512,8 @@ exports.update = async (req, res, next) => {
 
     // Only update status if current status is lower than the new calculated status
     // This prevents downgrading from higher statuses (e.g., 6 -> 4)
-    if (existingOrder.current_status_id >= newStatusId) {
+    // EXCEPTION: If Telecaller changed place_of_inspection, allow status to be reset to 3
+    if (!resetManagerAndFieldVerifier && existingOrder.current_status_id >= newStatusId) {
       newStatusId = existingOrder.current_status_id;
     }
 
@@ -425,7 +547,7 @@ exports.update = async (req, res, next) => {
       ),
       officer_id: getIntegerValue(officer_id, existingOrder.officer_id),
       manager_id: finalManagerId,
-      field_verifier_id: getIntegerValue(
+      field_verifier_id: resetManagerAndFieldVerifier ? null : getIntegerValue(
         field_verifier_id,
         existingOrder.field_verifier_id
       ),
@@ -456,6 +578,28 @@ exports.update = async (req, res, next) => {
     const changes = [];
     let hasStatusChange = false;
     let hasFieldVerifierChange = false;
+    
+    // Track if manager and field verifier were reset due to place of inspection change
+    if (resetManagerAndFieldVerifier) {
+      // First, log the place of inspection change itself
+      const oldPlace = existingOrder.place_of_inspection || "empty";
+      const newPlace = place_of_inspection || "empty";
+      changes.push(`PLACE OF INSPECTION changed from "${oldPlace}" to "${newPlace}"`);
+      
+      // Then log the consequences of this change
+      if (existingOrder.manager_id) {
+        changes.push(`MANAGER reset (place changed)`);
+      }
+      if (existingOrder.field_verifier_id) {
+        changes.push(`FIELD VERIFIER reset (place changed)`);
+        hasFieldVerifierChange = true; // Mark as changed for status history
+      }
+      // Track that status was reset to 3 (Telecaller Completed)
+      if (newStatusId === 3 && existingOrder.current_status_id !== 3) {
+        changes.push(`STATUS reset to Telecaller Completed (place changed)`);
+        hasStatusChange = true;
+      }
+    }
 
     // Check for field changes and build detailed change descriptions
     const fieldsToCheck = [
@@ -473,6 +617,11 @@ exports.update = async (req, res, next) => {
     ];
 
     for (const field of fieldsToCheck) {
+      // Skip place_of_inspection and manager_id if already logged due to Telecaller reset
+      if ((field === "place_of_inspection" || field === "manager_id") && resetManagerAndFieldVerifier) {
+        continue;
+      }
+      
       const newValue = req.body[field];
       if (newValue !== undefined) {
         const oldValue = existingOrder[field];
@@ -563,10 +712,10 @@ exports.update = async (req, res, next) => {
         };
         await OrderStatusHistory.createStatusHistory(managerStatusHistory);
 
-        // Then create Field Verifier Assigned status (5)
+        // Then create Field Verifier Assigned status (6)
         const fieldVerifierStatusHistory = {
           order_id: orderId,
-          status_id: 5, // Field Verifier Assigned
+          status_id: 6, // Field Verifier Assigned
           changed_by: req.user?.id,
           changed_at: new Date(),
         };
@@ -587,9 +736,15 @@ exports.update = async (req, res, next) => {
 
     // Create detailed field changes record (if there are field changes)
     if (changes.length > 0) {
+      // Join changes and truncate to 255 characters if needed
+      let activityExtra = changes.join("; ");
+      if (activityExtra.length > 255) {
+        activityExtra = activityExtra.substring(0, 252) + "...";
+      }
+      
       const statusHistoryData = {
         order_id: orderId,
-        activity_extra: changes.join("; "),
+        activity_extra: activityExtra,
         changed_by: req.user?.id,
         changed_at: new Date(),
       };
@@ -907,10 +1062,10 @@ exports.updateOrderAttributes = async (req, res, next) => {
 };
 
 /**
- * Update Order Status to 9
- * PATCH /api/orders/:id/update-status-9
+ * Update Order Status to 10
+ * PATCH /api/orders/:id/update-status-unser-review
  */
-exports.updateStatusToNine = async (req, res, next) => {
+exports.updateStatusToUnderReview = async (req, res, next) => {
   try {
     const { id: orderId } = req.params;
     const { id: userId } = req.user;
@@ -921,9 +1076,9 @@ exports.updateStatusToNine = async (req, res, next) => {
       throw new NotFoundError("Order not found");
     }
 
-    // Update order status to 9
+    // Update order status to 10
     await Order.updateOrder(orderId, {
-      current_status_id: 9,
+      current_status_id: 10,
       updated_at: new Date(),
       updated_by: userId,
     });
@@ -931,7 +1086,7 @@ exports.updateStatusToNine = async (req, res, next) => {
     // Create status history entry
     const statusHistoryData = {
       order_id: orderId,
-      status_id: 9,
+      status_id: 10,
       changed_by: userId,
       changed_at: new Date(),
     };
@@ -940,7 +1095,72 @@ exports.updateStatusToNine = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: "Order status updated to 9 successfully",
+      message: "Order status updated to Under Review successfully",
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Update Order Status (Generic - accepts any status_id)
+ * PATCH /api/orders/:id/update-status-after-under-review
+ * Body: { status_id: number }
+ */
+exports.updateOrderStatusAfterUnderReview = async (req, res, next) => {
+  try {
+    const { id: orderId } = req.params;
+    const { status_id } = req.body;
+    const { id: userId } = req.user;
+
+    // Validation
+    if (!status_id) {
+      throw new BadRequestError("status_id is required in request body");
+    }
+
+    if (isNaN(parseInt(status_id))) {
+      throw new BadRequestError("status_id must be a valid number");
+    }
+
+    const statusIdNum = parseInt(status_id);
+
+    // Fetch existing order to check if it exists
+    const existingOrder = await Order.findById(orderId, req.user);
+    if (!existingOrder) {
+      throw new NotFoundError("Order not found");
+    }
+
+    // Validate that the status exists in order_status_master table
+    const statusExists = await OrderStatusMaster.findById(statusIdNum);
+    if (!statusExists) {
+      throw new BadRequestError(`Status ID ${statusIdNum} does not exist`);
+    }
+
+    // Update order status
+    await Order.updateOrder(orderId, {
+      current_status_id: statusIdNum,
+      updated_at: new Date(),
+      updated_by: userId,
+    });
+
+    // Create status history entry
+    const statusHistoryData = {
+      order_id: orderId,
+      status_id: statusIdNum,
+      changed_by: userId,
+      changed_at: new Date(),
+    };
+
+    await OrderStatusHistory.createStatusHistory(statusHistoryData);
+
+    res.status(200).json({
+      success: true,
+      message: `Order status updated to ${statusIdNum} successfully`,
+      data: {
+        order_id: orderId,
+        new_status_id: statusIdNum,
+        status_name: statusExists.name
+      }
     });
   } catch (err) {
     next(err);

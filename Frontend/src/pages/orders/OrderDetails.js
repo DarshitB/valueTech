@@ -13,6 +13,8 @@ import {
   fetchComments,
   addComment,
   updatePaymentStatus,
+  updateOrderToStatus9,
+  updateStatusAfterUnderReview,
 } from "../../redux/reducers/orderReducer";
 import {
   fetchApprovedOrderMediaDocuments,
@@ -45,10 +47,10 @@ import { Link } from "react-router-dom";
 import { usePageTitle } from "../../context/PageTitleContext";
 import { hasPermission } from "../../utils/permissionUtils";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
-import { updateOrderToStatus9 } from "../../redux/reducers/orderReducer";
 import FormModel from "../../components/FormModel";
 import SingleSearchSelect from "../../components/SingleSearchSelect";
 import { toast } from "react-toastify";
+import ConfirmationModal from "../../components/ConfirmationModal";
 
 // Utility: Convert date to 'time ago' string
 function timeAgo(dateString) {
@@ -96,7 +98,12 @@ function OrderDetails() {
   /* get logged user permission */
   const allowedPermissions = useSelector(selectPermissions);
   const currentUser = useSelector((state) => state.auth.user);
-  const isExemptAdmin = currentUser?.role?.name.toUpperCase().includes("SUPER ADMIN") || currentUser?.role?.name === "developer_admin";
+  const isSuperAdmin = currentUser?.role?.name
+    ?.toUpperCase()
+    .includes("SUPER ADMIN");
+  const isExemptAdmin =
+    currentUser?.role?.name.toUpperCase().includes("SUPER ADMIN") ||
+    currentUser?.role?.name === "developer_admin";
 
   // Select order and comments data from Redux store
   const order = useSelector((state) => state.orders.selected);
@@ -128,6 +135,12 @@ function OrderDetails() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [activeTab, setActiveTab] = useState("payment");
   const [showMailModal, setShowMailModal] = useState(false);
+  const [showCompleteConfirmation, setShowCompleteConfirmation] =
+    useState(false);
+  const [showAuthenticateConfirmation, setShowAuthenticateConfirmation] =
+    useState(false);
+  const [showRevisionConfirmation, setShowRevisionConfirmation] =
+    useState(false);
 
   // Form data state for payment details
   const [paymentFormData, setPaymentFormData] = useState({
@@ -1313,7 +1326,7 @@ function OrderDetails() {
                       <>
                         {order?.valuer_name &&
                         order.valuer_name.trim() !== "" ? (
-                          order?.current_status_id === 9 && !isExemptAdmin ? (
+                          order?.current_status_id === 10 && !isExemptAdmin ? (
                             <span
                               title="CV Report (Disabled)"
                               className="tooltip-link disabled"
@@ -1376,7 +1389,7 @@ function OrderDetails() {
                       <>
                         {order?.valuer_name &&
                         order.valuer_name.trim() !== "" ? (
-                          order?.current_status_id === 9 && !isExemptAdmin ? (
+                          order?.current_status_id === 10 && !isExemptAdmin ? (
                             <span
                               title="CE Report (Disabled)"
                               className="tooltip-link disabled"
@@ -1419,7 +1432,8 @@ function OrderDetails() {
                         <>
                           {order?.valuer_name &&
                           order.valuer_name.trim() !== "" ? (
-                            order?.current_status_id === 9 && !isExemptAdmin ? (
+                            order?.current_status_id === 10 &&
+                            !isExemptAdmin ? (
                               <span
                                 title="AVR Report (Disabled)"
                                 className="tooltip-link disabled"
@@ -1461,7 +1475,7 @@ function OrderDetails() {
                       <>
                         {order?.valuer_name &&
                         order.valuer_name.trim() !== "" ? (
-                          order?.current_status_id === 9 && !isExemptAdmin ? (
+                          order?.current_status_id === 10 && !isExemptAdmin ? (
                             <span
                               title="Machinery Report (Disabled)"
                               className="tooltip-link disabled"
@@ -1512,7 +1526,7 @@ function OrderDetails() {
                 ) && (
                   <>
                     {order?.valuer_name && order.valuer_name.trim() !== "" ? (
-                      order?.current_status_id === 9 && !isExemptAdmin ? (
+                      order?.current_status_id === 10 && !isExemptAdmin ? (
                         <span
                           title="Images (Disabled)"
                           className="tooltip-link disabled"
@@ -1560,7 +1574,7 @@ function OrderDetails() {
                     allowedPermissions,
                     "view_order_complete_button"
                   );
-                  const hasCorrectStatus = order?.current_status_id === 8;
+                  const hasCorrectStatus = order?.current_status_id === 9;
 
                   // Get all documents from the Redux state
                   const allDocs =
@@ -1593,20 +1607,19 @@ function OrderDetails() {
                     hasCorrectStatus &&
                     hasApprovedReport &&
                     hasApprovedCollage && (
-                      <Link
+                      <button
                         title="Complete"
-                        className="tooltip-link"
-                        onClick={() => {
-                          dispatch(updateOrderToStatus9(id)).then((result) => {
-                            if (result.meta.requestStatus === "fulfilled") {
-                              // Status updated to 9 successfully
-                              dispatch(fetchOrderById(id)); // Refresh order data
-                            }
-                          });
+                        className="tooltip-link button"
+                        style={{
+                          background: "none",
+                          border: "none",
+                          padding: 0,
+                          cursor: "pointer",
                         }}
+                        onClick={() => setShowCompleteConfirmation(true)}
                       >
                         <ValidateIcon />
-                      </Link>
+                      </button>
                     )
                   );
                 })()}
@@ -1615,10 +1628,36 @@ function OrderDetails() {
                     allowedPermissions,
                     "view_order_authenticate_button"
                   ) &&
-                  order?.current_status_id === 9 && (
-                    <Link title="Authenticate" className="tooltip-link">
-                      <ApprovedIcon />
-                    </Link>
+                  isSuperAdmin &&
+                  order?.current_status_id === 10 && (
+                    <>
+                      <button
+                        title="Authenticate"
+                        className="tooltip-link button"
+                        style={{
+                          background: "none",
+                          border: "none",
+                          padding: 0,
+                          cursor: "pointer",
+                        }}
+                        onClick={() => setShowAuthenticateConfirmation(true)}
+                      >
+                        <ApprovedIcon />
+                      </button>
+                      <button
+                        title="Revisions Required"
+                        className="tooltip-link button"
+                        style={{
+                          background: "none",
+                          border: "none",
+                          padding: 0,
+                          cursor: "pointer",
+                        }}
+                        onClick={() => setShowRevisionConfirmation(true)}
+                      >
+                        <RevalidateIcon />
+                      </button>
+                    </>
                   )}
                 {hasPermission(
                   allowedPermissions,
@@ -2128,6 +2167,70 @@ function OrderDetails() {
             },
           }}
         </FormModel>
+      )}
+
+      {/* Complete Confirmation Modal */}
+      {showCompleteConfirmation && (
+        <ConfirmationModal
+          title="Confirm Complete"
+          message={`Are you sure you want to complete this order <span class="danger">${order?.order_number}</span>?`}
+          onConfirm={() => {
+            dispatch(updateOrderToStatus9(id)).then((result) => {
+              if (result.meta.requestStatus === "fulfilled") {
+                // Status updated successfully
+                dispatch(fetchOrderById(id)); // Refresh order data
+                setShowCompleteConfirmation(false);
+              }
+            });
+          }}
+          onCancel={() => setShowCompleteConfirmation(false)}
+        />
+      )}
+
+      {/* Authenticate Confirmation Modal */}
+      {showAuthenticateConfirmation && (
+        <ConfirmationModal
+          title="Confirm Authentication"
+          message={`Are you sure you want to authenticate this order <span class="danger">${order?.order_number}</span>?`}
+          onConfirm={() => {
+            dispatch(
+              updateStatusAfterUnderReview({
+                id,
+                data: { status_id: 12 },
+              })
+            ).then((result) => {
+              if (result.meta.requestStatus === "fulfilled") {
+                // Status updated successfully
+                dispatch(fetchOrderById(id)); // Refresh order data
+                setShowAuthenticateConfirmation(false);
+              }
+            });
+          }}
+          onCancel={() => setShowAuthenticateConfirmation(false)}
+        />
+      )}
+
+      {/* Revision Required Confirmation Modal */}
+      {showRevisionConfirmation && (
+        <ConfirmationModal
+          title="Confirm Revision Required"
+          message={`Are you sure you want to mark this order <span class="danger">${order?.order_number}</span> for revision?`}
+          onConfirm={() => {
+            dispatch(
+              updateStatusAfterUnderReview({
+                id,
+                data: { status_id: 11 },
+              })
+            ).then((result) => {
+              if (result.meta.requestStatus === "fulfilled") {
+                // Status updated successfully
+                dispatch(fetchOrderById(id)); // Refresh order data
+                setShowRevisionConfirmation(false);
+              }
+            });
+          }}
+          onCancel={() => setShowRevisionConfirmation(false)}
+        />
       )}
     </section>
   );
