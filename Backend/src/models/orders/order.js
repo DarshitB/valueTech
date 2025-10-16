@@ -96,26 +96,31 @@ const order = {
         "sub_category.name as sub_category_name",
         "category.id as category_id",
         "category.name as category_name",
-        "orders.valuer_name"
+        "orders.valuer_name",
+        "orders.job_started_at",
+        "orders.job_started_by",
+        "orders.covered_distance_by_verifier"
       )
       .whereNull("orders.deleted_at");
 
     // Role-based filters - check if role contains specific keywords
     const roleName = (user.role_name || "").toUpperCase();
-    
+
     // Roles that should see all orders (no filtering)
     const privilegedRoles = [
       "DEVELOPER_ADMIN",
-      "SUPER ADMIN", 
+      "SUPER ADMIN",
       "MANAGER",
       "TELECALLER",
       "BANK AUTHORITY",
-      "BANK OFFICER"
+      "BANK OFFICER",
     ];
-    
+
     // Check if user role contains any of the privileged keywords
-    const hasPrivilegedRole = privilegedRoles.some(keyword => roleName.includes(keyword));
-    
+    const hasPrivilegedRole = privilegedRoles.some((keyword) =>
+      roleName.includes(keyword)
+    );
+
     // If user doesn't have a privileged role, apply order assignment filtering
     if (!hasPrivilegedRole) {
       // Get orders that are assigned to this user
@@ -123,26 +128,30 @@ const order = {
         .select("order_id")
         .where("user_id", user.id)
         .whereNull("deleted_at");
-      
-      const userAssignedOrderIds = assignedOrderIds.map(o => o.order_id);
-      
+
+      const userAssignedOrderIds = assignedOrderIds.map((o) => o.order_id);
+
       // Get all orders that have ANY user assignments
       const ordersWithAssignments = await db("order_users")
         .select("order_id")
         .whereNull("deleted_at")
         .distinct();
-      
-      const ordersWithAnyAssignment = ordersWithAssignments.map(o => o.order_id);
-      
+
+      const ordersWithAnyAssignment = ordersWithAssignments.map(
+        (o) => o.order_id
+      );
+
       // Show orders that:
       // 1. Are assigned to this user, OR
       // 2. Have NO user assignments at all (available to everyone)
-      baseQuery.where(function() {
-        this.whereIn("orders.id", userAssignedOrderIds)
-          .orWhereNotIn("orders.id", ordersWithAnyAssignment);
+      baseQuery.where(function () {
+        this.whereIn("orders.id", userAssignedOrderIds).orWhereNotIn(
+          "orders.id",
+          ordersWithAnyAssignment
+        );
       });
     }
-    
+
     // Additional role-specific filters (these work alongside assigned orders)
     if ((user.role_name || "").toUpperCase().includes("BANK AUTHORITY")) {
       baseQuery.andWhere(function () {
@@ -166,11 +175,11 @@ const order = {
     baseQuery.orderBy("orders.created_at", "asc");
 
     const orders = await baseQuery;
-    
+
     // Get assigned users for each order
-    const orderIds = orders.map(order => order.id);
+    const orderIds = orders.map((order) => order.id);
     let assignedUsersMap = {};
-    
+
     if (orderIds.length > 0) {
       const assignedUsers = await db("order_users")
         .leftJoin("users", "order_users.user_id", "users.id")
@@ -185,7 +194,7 @@ const order = {
         )
         .whereIn("order_users.order_id", orderIds)
         .whereNull("order_users.deleted_at");
-      
+
       // Group assigned users by order_id
       assignedUsersMap = assignedUsers.reduce((acc, user) => {
         if (!acc[user.order_id]) {
@@ -196,18 +205,18 @@ const order = {
           name: user.name,
           email: user.email,
           mobile: user.mobile,
-          role_name: user.role_name
+          role_name: user.role_name,
         });
         return acc;
       }, {});
     }
-    
+
     // Add assigned_users to each order
-    const ordersWithAssignedUsers = orders.map(order => ({
+    const ordersWithAssignedUsers = orders.map((order) => ({
       ...order,
-      assigned_users: assignedUsersMap[order.id] || []
+      assigned_users: assignedUsersMap[order.id] || [],
     }));
-    
+
     return ordersWithAssignedUsers;
   },
 
@@ -285,6 +294,9 @@ const order = {
         "updated_user.name as updated_by",
         "orders.field_verifier_id",
         "field_verifiers.name as field_verifier_name",
+        "orders.job_started_at",
+        "orders.job_started_by",
+        "orders.covered_distance_by_verifier",
         "child_category.id as child_category_id",
         "child_category.name as child_category_name",
         "sub_category.id as sub_category_id",
@@ -383,7 +395,10 @@ const order = {
         "sub_category.name as sub_category_name",
         "category.id as category_id",
         "category.name as category_name",
-        "orders.valuer_name"
+        "orders.valuer_name",
+        "orders.job_started_at",
+        "orders.job_started_by",
+        "orders.covered_distance_by_verifier"
       )
       .whereNull("orders.deleted_at")
       .where("orders.id", id)
@@ -393,20 +408,22 @@ const order = {
 
     // Check user access permissions - now we have officer_user_id in the order data
     const roleName = (user.role_name || "").toUpperCase();
-    
+
     // Roles that should see all orders (no filtering)
     const privilegedRoles = [
       "DEVELOPER_ADMIN",
-      "SUPER ADMIN", 
+      "SUPER ADMIN",
       "MANAGER",
       "TELECALLER",
       "BANK AUTHORITY",
-      "BANK OFFICER"
+      "BANK OFFICER",
     ];
-    
+
     // Check if user role contains any of the privileged keywords
-    const hasPrivilegedRole = privilegedRoles.some(keyword => roleName.includes(keyword));
-    
+    const hasPrivilegedRole = privilegedRoles.some((keyword) =>
+      roleName.includes(keyword)
+    );
+
     // If user doesn't have a privileged role, check order assignment
     if (!hasPrivilegedRole) {
       // Check if this order is assigned to the user
@@ -414,30 +431,35 @@ const order = {
         .where({ order_id: id, user_id: user.id })
         .whereNull("deleted_at")
         .first();
-      
+
       // Check if this order has ANY user assignments
       const hasAnyAssignment = await db("order_users")
         .where({ order_id: id })
         .whereNull("deleted_at")
         .first();
-      
+
       // If order has assignments but user is not assigned, deny access
       if (hasAnyAssignment && !isAssigned) {
         return null; // User can only see orders assigned to them
       }
-      
+
       // If order has no assignments, allow access to everyone
       // If user is assigned, allow access
     }
-    
+
     // Additional role-specific access checks (these work alongside assigned orders)
     if ((user.role_name || "").toUpperCase().includes("BANK OFFICER")) {
       if (order.officer_user_id !== user.id) {
         return null; // Officer can only see orders assigned to them
       }
-    } else if ((user.role_name || "").toUpperCase().includes("MANAGER") && order.manager_id !== user.id) {
+    } else if (
+      (user.role_name || "").toUpperCase().includes("MANAGER") &&
+      order.manager_id !== user.id
+    ) {
       return null; // Manager can only see their own orders
-    } else if ((user.role_name || "").toUpperCase().includes("BANK AUTHORITY")) {
+    } else if (
+      (user.role_name || "").toUpperCase().includes("BANK AUTHORITY")
+    ) {
       // BANK AUTHORITY can see orders they created, are assigned to, or manage
       if (
         order.created_by !== user.id &&
@@ -456,7 +478,11 @@ const order = {
         "order_status_master.id"
       )
       .leftJoin("users", "order_status_history.changed_by", "users.id")
-      .leftJoin("field_verifiers", "order_status_history.changed_by", "field_verifiers.id")
+      .leftJoin(
+        "field_verifiers",
+        "order_status_history.changed_by",
+        "field_verifiers.id"
+      )
       .select(
         "order_status_history.id",
         "order_status_history.status_id",
@@ -464,7 +490,9 @@ const order = {
         "order_status_history.changed_by",
         "order_status_history.activity_extra",
         "order_status_history.user_type",
-        db.raw("CASE WHEN order_status_history.user_type = 'field_verifier' THEN field_verifiers.name ELSE users.name END as changed_by_name"),
+        db.raw(
+          "CASE WHEN order_status_history.user_type = 'field_verifier' THEN field_verifiers.name ELSE users.name END as changed_by_name"
+        ),
         "order_status_history.changed_at"
       )
       .where("order_status_history.order_id", id)
@@ -484,7 +512,11 @@ const order = {
       .where("order_users.order_id", id)
       .whereNull("order_users.deleted_at");
 
-    return { ...order, status_history: statusHistory, assigned_users: assignedUsers };
+    return {
+      ...order,
+      status_history: statusHistory,
+      assigned_users: assignedUsers,
+    };
   },
 
   // Get orders by officer ID
@@ -642,18 +674,14 @@ const order = {
   replaceOrderUsers: async (order_id, newUserData, trx = db) => {
     // Guard clause - ensure newUserData is an array
     if (!Array.isArray(newUserData)) return [];
-    
+
     // Hard delete ALL existing assignments for this order (always do this)
-    await trx("order_users")
-      .where({ order_id })
-      .del();
-    
+    await trx("order_users").where({ order_id }).del();
+
     // Insert new assignments only if there are any
     if (newUserData.length === 0) return [];
-    
-    return await trx("order_users")
-      .insert(newUserData)
-      .returning("*");
+
+    return await trx("order_users").insert(newUserData).returning("*");
   },
 
   // Get assigned users for an order

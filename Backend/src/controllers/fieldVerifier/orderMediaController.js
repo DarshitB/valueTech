@@ -100,6 +100,19 @@ async function uploadMultipart(req, res, next) {
     const orderRow = await getOrderByNumber(order_number);
     if (!orderRow) throw new BadRequestError('Order not found with provided order_number');
 
+    // Check if order already has images/videos and update rejected ones (status 2 -> 3)
+    const existingMedia = await db('order_media_image_video')
+      .where('order_id', orderRow.id)
+      .where('status', 2);
+    
+    if (existingMedia.length > 0) {
+      // Update all rejected media (status 2) to status 3
+      await db('order_media_image_video')
+        .where('order_id', orderRow.id)
+        .where('status', 2)
+        .update({ status: 3 });
+    }
+
     // Ensure order folders (this is now cached and optimized)
     const { orderPath } = await ensureOrderFolders(order_number);
     const { imagesPath, videosPath } = await ensureMediaSubfolders(orderPath);
@@ -200,6 +213,19 @@ async function uploadBase64(req, res, next) {
     
     const orderRow = await getOrderByNumber(order_number);
     if (!orderRow) throw new BadRequestError('Order not found with provided order_number');
+
+    // Check if order already has images/videos and update rejected ones (status 2 -> 3)
+    const existingMedia = await db('order_media_image_video')
+      .where('order_id', orderRow.id)
+      .where('status', 2);
+    
+    if (existingMedia.length > 0) {
+      // Update all rejected media (status 2) to status 3
+      await db('order_media_image_video')
+        .where('order_id', orderRow.id)
+        .where('status', 2)
+        .update({ status: 3 });
+    }
 
     // Ensure order folders (this is now cached and optimized)
     const { orderPath } = await ensureOrderFolders(order_number);

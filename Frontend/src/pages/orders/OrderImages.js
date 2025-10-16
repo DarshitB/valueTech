@@ -14,6 +14,7 @@
  * - 0: Pending
  * - 1: Approved
  * - 2: Rejected
+ * - 3: Terminated
  */
 import React, { useEffect, useLayoutEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -688,6 +689,8 @@ function OrderImages() {
         return { text: "Approved", color: "text-success" };
       case 2:
         return { text: "Rejected", color: "text-danger" };
+      case 3:
+        return { text: "Terminated", color: "text-info" }; // light blue sky color
       default:
         return { text: "Unknown", color: "text-muted" };
     }

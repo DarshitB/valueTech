@@ -97,10 +97,47 @@ exports.getForMobile = async (req, res, next) => {
     const orders = await Order.getForMobile(fieldVerifierId);
 
     if (orders && orders.length > 0) {
+      // Add mobile_job_status to each order
+      const ordersWithStatus = await Promise.all(
+        orders.map(async (order) => {
+          let mobile_job_status = 0; // Default: Pending
+
+          // Check if job is started (job_started_at is not null)
+          if (order.job_started_at) {
+            mobile_job_status = 1; // Accepted
+          }
+
+          // Check if current_status_id is 7 (Images Uploaded)
+          if (order.current_status_id === 7) {
+            mobile_job_status = 2; // Images Uploaded
+          }
+
+          // Check if current_status_id is 8 or above (Images Verified)
+          if (order.current_status_id >= 8) {
+            mobile_job_status = 3; // Images Verified
+          }
+
+          // Check if any media is rejected (status = 2 in order_media_image_video)
+          const rejectedMedia = await db("order_media_image_video")
+            .where("order_id", order.id)
+            .where("status", 2)
+            .first();
+
+          if (rejectedMedia) {
+            mobile_job_status = 4; // Images Rejected
+          }
+
+          return {
+            ...order,
+            mobile_job_status
+          };
+        })
+      );
+
       res.json({
         state: 1,
         message: "orders fetch successfully",
-        orders: orders,
+        orders: ordersWithStatus,
         verifier: {
           id: completeVerifier.id,
           name: completeVerifier.name,
@@ -187,12 +224,19 @@ exports.mobileOrderAction = async (req, res, next) => {
         message: "Order status updated to Reassign Telecaller successfully",
       });
     } else if (action === "Job started") {
-      // Just add status history entry, don't change order status
+      // Update orders table with job started timestamp and field verifier
+      const currentTime = new Date();
+      await Order.updateOrder(order_id, {
+        job_started_at: currentTime,
+        job_started_by: fieldVerifierId,
+      }, fieldVerifierId);
+
+      // Add status history entry
       const statusHistoryData = {
         order_id: order_id,
         user_type: 'field_verifier',
         changed_by: fieldVerifierId,
-        changed_at: new Date(),
+        changed_at: currentTime,
         activity_extra: "Order approved (Job started)"
       };
 
