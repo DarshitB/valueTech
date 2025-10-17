@@ -574,7 +574,7 @@ function Orders() {
                     <option value="Low">Low</option>
                   </select>
                 )}
-                {hasPermission(allowedPermissions, "add_order_db") && (
+                {hasPermission(allowedPermissions, "add_order") && (
                   <button className="btn" onClick={openAddModal}>
                     Add Order
                   </button>
