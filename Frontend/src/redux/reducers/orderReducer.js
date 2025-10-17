@@ -212,7 +212,7 @@ const orderSlice = createSlice({
       .addCase(addOrder.fulfilled, (state, action) => {
         state.list.push(action.payload);
         console.log("action.payload", action.payload);
-        toast.success("Order added successfully");
+        toast.success(`Order added successfully: Order ID ${action.payload.order_number}`);
       })
       .addCase(addOrder.rejected, (state, action) => {
         toast.error(`Failed to add order: ${action.payload}`);
