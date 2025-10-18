@@ -169,7 +169,9 @@ function Cities() {
                         className="input-filed"
                         placeholder="Add city"
                         value={newCityName}
-                        onChange={(e) => setNewCityName(e.target.value.toUpperCase())}
+                        onChange={(e) =>
+                          setNewCityName(e.target.value.toUpperCase())
+                        }
                       />
                       <button className="btn" type="submit">
                         Add City
@@ -200,7 +202,10 @@ function Cities() {
                   {hasPermission(allowedPermissions, "edit_cities") && (
                     <button
                       className="action-icons"
-                      onClick={() => openEditModal(item.id, item.name)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEditModal(item.id, item.name);
+                      }}
                     >
                       <EditIcon />
                     </button>
@@ -208,7 +213,10 @@ function Cities() {
                   {hasPermission(allowedPermissions, "delete_cities") && (
                     <button
                       className="action-icons"
-                      onClick={() => confirmDelete(item.id, item.name)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        confirmDelete(item.id, item.name);
+                      }}
                     >
                       <DeleteIcon />
                     </button>
@@ -241,7 +249,9 @@ function Cities() {
                       className="form-field"
                       id="city_input"
                       value={editCityName}
-                      onChange={(e) => setEditCityName(e.target.value.toUpperCase())}
+                      onChange={(e) =>
+                        setEditCityName(e.target.value.toUpperCase())
+                      }
                     />
                   </div>
                   <div className="form-buttons">

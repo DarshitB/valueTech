@@ -170,7 +170,10 @@ function ChildCategories() {
                   {hasPermission(allowedPermissions, "edit_child_category") && (
                     <button
                       className="action-icons"
-                      onClick={() => openEditModal(child)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEditModal(child);
+                      }}
                     >
                       <EditIcon />
                     </button>
@@ -181,7 +184,10 @@ function ChildCategories() {
                   ) && (
                     <button
                       className="action-icons"
-                      onClick={() => confirmDelete(child.id, child.name)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        confirmDelete(child.id, child.name);
+                      }}
                     >
                       <DeleteIcon />
                     </button>

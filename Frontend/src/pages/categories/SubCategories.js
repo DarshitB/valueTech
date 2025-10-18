@@ -186,7 +186,10 @@ function SubCategories() {
                   {hasPermission(allowedPermissions, "edit_sub_category") && (
                     <button
                       className="action-icons"
-                      onClick={() => openEditModal(sub)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEditModal(sub);
+                      }}
                     >
                       <EditIcon />
                     </button>
@@ -194,7 +197,10 @@ function SubCategories() {
                   {hasPermission(allowedPermissions, "delete_sub_category") && (
                     <button
                       className="action-icons"
-                      onClick={() => confirmDelete(sub.id, sub.name)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        confirmDelete(sub.id, sub.name);
+                      }}
                     >
                       <DeleteIcon />
                     </button>

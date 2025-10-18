@@ -172,7 +172,10 @@ function States() {
                   {hasPermission(allowedPermissions, "edit_state") && (
                     <button
                       className="action-icons"
-                      onClick={() => openEditModal(item.id, item.name)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEditModal(item.id, item.name);
+                      }}
                     >
                       <EditIcon />
                     </button>
@@ -180,7 +183,10 @@ function States() {
                   {hasPermission(allowedPermissions, "delete_state") && (
                     <button
                       className="action-icons"
-                      onClick={() => confirmDelete(item.id, item.name)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        confirmDelete(item.id, item.name);
+                      }}
                     >
                       <DeleteIcon />
                     </button>

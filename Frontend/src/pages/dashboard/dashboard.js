@@ -760,8 +760,7 @@ function Dashboard() {
                                         {formatTwoDigits(
                                           orders.filter(
                                             (order) =>
-                                              order.current_status_name ===
-                                              "Ongoing"
+                                              order.current_status_id < 7
                                           ).length
                                         )}
                                       </p>
@@ -776,8 +775,7 @@ function Dashboard() {
                                         {formatTwoDigits(
                                           orders.filter(
                                             (order) =>
-                                              order.current_status_name ===
-                                              "Submitted"
+                                              order.current_status_id === 7
                                           ).length
                                         )}
                                       </p>
@@ -792,8 +790,7 @@ function Dashboard() {
                                         {formatTwoDigits(
                                           orders.filter(
                                             (order) =>
-                                              order.current_status_name ===
-                                              "Validate"
+                                              order.current_status_id === 8
                                           ).length
                                         )}
                                       </p>
@@ -808,8 +805,7 @@ function Dashboard() {
                                         {formatTwoDigits(
                                           orders.filter(
                                             (order) =>
-                                              order.current_status_name ===
-                                              "re-validate"
+                                              order.has_rejected_media === true || order.has_rejected_images === true
                                           ).length
                                         )}
                                       </p>
@@ -923,8 +919,7 @@ function Dashboard() {
                                         {formatTwoDigits(
                                           orders.filter(
                                             (order) =>
-                                              order.current_status_name ===
-                                              "Ongoing"
+                                              order.current_status_id < 7
                                           ).length
                                         )}
                                       </p>
@@ -939,8 +934,7 @@ function Dashboard() {
                                         {formatTwoDigits(
                                           orders.filter(
                                             (order) =>
-                                              order.current_status_name ===
-                                              "Submitted"
+                                              order.current_status_id === 7
                                           ).length
                                         )}
                                       </p>
@@ -955,8 +949,7 @@ function Dashboard() {
                                         {formatTwoDigits(
                                           orders.filter(
                                             (order) =>
-                                              order.current_status_name ===
-                                              "Validate"
+                                              order.current_status_id === 8
                                           ).length
                                         )}
                                       </p>
@@ -971,8 +964,7 @@ function Dashboard() {
                                         {formatTwoDigits(
                                           orders.filter(
                                             (order) =>
-                                              order.current_status_name ===
-                                              "re-validate"
+                                              order.has_rejected_media === true || order.has_rejected_images === true
                                           ).length
                                         )}
                                       </p>
