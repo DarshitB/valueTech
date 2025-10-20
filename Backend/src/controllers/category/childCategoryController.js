@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const ChildCategory = require("../../models/category/child_category");
+const SubCategory = require("../../models/category/sub_category");
 const User = require("../../models/user/user");
 const { ensureDirectoryExists } = require("../../utils/localFileHelper");
 const {
@@ -81,6 +82,11 @@ exports.create = async (req, res, next) => {
         "ChildCategory with the same name already exists in this sub-category"
       );
 
+    // Get subcategory details (includes category name)
+    const subCategory = await SubCategory.findById(sub_category_id);
+    if (!subCategory)
+      throw new BadRequestError("Invalid sub_category_id");
+
     const [created] = await ChildCategory.create({
       name,
       sub_category_id,
@@ -93,12 +99,20 @@ exports.create = async (req, res, next) => {
     // Handle image uploads if any
     const savedImages = [];
     if (uploadedFiles.length > 0) {
-      // Create upload directory: uploads/subcategory/{child_category_name}
+      // Sanitize folder names
+      const sanitize = (str) => str.replace(/[^a-zA-Z0-9]/g, "_");
+      const categoryName = sanitize(subCategory.category_name);
+      const subCategoryName = sanitize(subCategory.name);
+      const childCategoryName = sanitize(name);
+
+      // Create upload directory: uploads/childCategory/{category}/{subcategory}/{childcategoryname}
       const uploadDir = path.join(
         process.cwd(),
         "uploads",
-        "subcategory",
-        name.replace(/[^a-zA-Z0-9]/g, "_") // Sanitize folder name
+        "childCategory",
+        categoryName,
+        subCategoryName,
+        childCategoryName
       );
       ensureDirectoryExists(uploadDir);
 
@@ -116,7 +130,7 @@ exports.create = async (req, res, next) => {
           tempPaths.push(file.path);
 
           // Save image record to database
-          const imageUrl = `/uploads/subcategory/${name.replace(/[^a-zA-Z0-9]/g, "_")}/${fileName}`;
+          const imageUrl = `/uploads/childCategory/${categoryName}/${subCategoryName}/${childCategoryName}/${fileName}`;
           await ChildCategory.addImage({
             child_category_id: created.id,
             image_url: imageUrl,
@@ -174,6 +188,11 @@ exports.update = async (req, res, next) => {
       );
     }
 
+    // Get subcategory details (includes category name)
+    const subCategory = await SubCategory.findById(sub_category_id);
+    if (!subCategory)
+      throw new BadRequestError("Invalid sub_category_id");
+
     const [updated] = await ChildCategory.update(id, {
       name,
       sub_category_id,
@@ -184,12 +203,20 @@ exports.update = async (req, res, next) => {
     // Handle image uploads if any
     const savedImages = [];
     if (uploadedFiles.length > 0) {
-      // Create upload directory: uploads/subcategory/{child_category_name}
+      // Sanitize folder names
+      const sanitize = (str) => str.replace(/[^a-zA-Z0-9]/g, "_");
+      const categoryName = sanitize(subCategory.category_name);
+      const subCategoryName = sanitize(subCategory.name);
+      const childCategoryName = sanitize(name);
+
+      // Create upload directory: uploads/childCategory/{category}/{subcategory}/{childcategoryname}
       const uploadDir = path.join(
         process.cwd(),
         "uploads",
-        "subcategory",
-        name.replace(/[^a-zA-Z0-9]/g, "_") // Sanitize folder name
+        "childCategory",
+        categoryName,
+        subCategoryName,
+        childCategoryName
       );
       ensureDirectoryExists(uploadDir);
 
@@ -207,7 +234,7 @@ exports.update = async (req, res, next) => {
           tempPaths.push(file.path);
 
           // Save image record to database
-          const imageUrl = `/uploads/subcategory/${name.replace(/[^a-zA-Z0-9]/g, "_")}/${fileName}`;
+          const imageUrl = `/uploads/childCategory/${categoryName}/${subCategoryName}/${childCategoryName}/${fileName}`;
           await ChildCategory.addImage({
             child_category_id: id,
             image_url: imageUrl,
