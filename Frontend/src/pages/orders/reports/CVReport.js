@@ -886,8 +886,27 @@ function CVReport() {
         return;
       }
 
+      // Compute and validate amount_in_words centrally based on fair_market_value
+      const fmvRaw = reportFormData.fair_market_value;
+      const fmvAmount = parseCurrency(fmvRaw);
+      const computedAmountInWords = fmvRaw ? convertNumberToWordsIndian(fmvAmount) : "";
+
+      // If FMV is present but amount_in_words couldn't be computed, block submit
+      if (fmvRaw && !computedAmountInWords) {
+        toast.error("Amount in words missing. Please enter a valid Fair Market Value.");
+        if (preOpenedTab && !preOpenedTab.closed) {
+          preOpenedTab.close();
+        }
+        return;
+      }
+
       // Create FormData for multipart/form-data submission
       const formData = new FormData();
+
+      // Ensure amount_in_words is present in payload when FMV exists
+      if (fmvRaw) {
+        formData.set("amount_in_words", computedAmountInWords);
+      }
 
       // Ensure invoice_no_date is properly combined before sending
       const invoiceNo = reportFormData.invoice_no || "";
@@ -925,17 +944,9 @@ function CVReport() {
           return; // Skip adding asset_make to payload if new_asset_make exists
         }
 
-        // Special handling for amount_in_words - compute from fair_market_value
+        // Skip here; amount_in_words is handled centrally above
         if (key === "amount_in_words") {
-          const fmv = reportFormData.fair_market_value;
-          console.log('🔍 CVReport Generate - fair_market_value raw:', fmv);
-          const amount = parseCurrency(fmv);
-          console.log('🔍 CVReport Generate - parsed amount:', amount);
-          value = amount > 0 ? convertNumberToWordsIndian(amount) : "";
-          console.log('🔍 CVReport Generate - amount_in_words computed:', value);
-          // Force include even if empty
-          formData.append(key, value);
-          return; // Skip the normal flow for this field
+          return;
         }
 
         // Special handling for no_of_tyres - compute from tyre numbers
@@ -1101,6 +1112,17 @@ function CVReport() {
       return;
     }
 
+    // Compute and validate amount_in_words centrally based on fair_market_value
+    const fmvRaw = reportFormData.fair_market_value;
+    const fmvAmount = parseCurrency(fmvRaw);
+    const computedAmountInWords = fmvRaw ? convertNumberToWordsIndian(fmvAmount) : "";
+
+    // If FMV is present but amount_in_words couldn't be computed, block save
+    if (fmvRaw && !computedAmountInWords) {
+      toast.error("Amount in words missing. Please enter a valid Fair Market Value.");
+      return;
+    }
+
     // Create report data object with only non-empty fields
     const reportData = {};
 
@@ -1114,17 +1136,9 @@ function CVReport() {
       if (alwaysIncludeFields.includes(key)) {
         // Always include these fields, even if empty
         let defaultValue = value || "";
-        // Use computed amountInWords value if this is amount_in_words field
-        if (key === 'amount_in_words') {
-          // Compute amount in words from fair_market_value
-          const fmv = reportFormData.fair_market_value;
-          console.log('🔍 CVReport Save - fair_market_value raw:', fmv);
-          const amount = parseCurrency(fmv);
-          console.log('🔍 CVReport Save - parsed amount:', amount);
-          defaultValue = amount > 0 ? convertNumberToWordsIndian(amount) : "";
-          console.log('🔍 CVReport Save - amount_in_words - Computed value:', defaultValue);
-          // Force include even if empty
-          reportData[key] = defaultValue;
+        // amount_in_words: use centralized computed value
+        if (key === "amount_in_words") {
+          reportData[key] = computedAmountInWords;
           return; // Skip the normal flow for this field
         }
         // Use computed no_of_tyres value if this is no_of_tyres field
