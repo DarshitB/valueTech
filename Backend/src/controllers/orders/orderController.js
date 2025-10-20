@@ -464,7 +464,7 @@ exports.update = async (req, res, next) => {
       place_of_inspection,
       date_of_inspection,
     } = req.body;
-    console.log("req.body", req.body);
+    /* console.log("req.body", req.body); */
     /* console.log(req.body); */
     // Fetch existing order to check permissions
     const existingOrder = await Order.findById(orderId, req.user);

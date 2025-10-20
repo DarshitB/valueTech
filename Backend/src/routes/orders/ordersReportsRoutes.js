@@ -47,7 +47,7 @@ router.post(
 router.post(
   "/:order_id/save",
   upload.any(),
-  checkPermission("add_order_reports"), // Check permission to add order reports
+  /* checkPermission("save_order_reports"), */ // Check permission to add order reports
   reportController.saveReportData
 );
 

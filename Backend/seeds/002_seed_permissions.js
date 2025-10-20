@@ -119,7 +119,8 @@ exports.seed = async function (knex) {
     "view_order_add_edit_subcategory_filed",
     "view_order_add_edit_officer_filed",
     "view_order_add_edit_manager_filed",
-
+    "upload_order_media_files",
+    
     "view_order_approve_button",
     "view_order_validate_button",
     "view_order_payment_button",
