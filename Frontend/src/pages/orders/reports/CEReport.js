@@ -2068,7 +2068,6 @@ function CEReport() {
                           }
                         }}
                         isLoading={assetMakesLoading}
-                        required
                       />
                       {showOtherAssetMake && (
                         <input

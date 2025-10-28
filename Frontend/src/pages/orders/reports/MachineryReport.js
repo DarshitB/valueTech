@@ -1913,7 +1913,6 @@ function MachineryReport() {
                           }
                         }}
                         isLoading={assetMakesLoading}
-                        required
                       />
                       {showOtherAssetMake && (
                         <input

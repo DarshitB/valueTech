@@ -2002,7 +2002,6 @@ function CVReport() {
                           }
                         }}
                         isLoading={assetMakesLoading}
-                        required
                       />
                       {showOtherAssetMake && (
                         <input
