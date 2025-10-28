@@ -1381,6 +1381,13 @@ function OrderDetails() {
                         >
                           <ReportIcon />
                         </Link> */}
+                        {/* <Link
+                          to={`/orders/${id}/details/marine-report`}
+                          title="Marine Report"
+                          className="tooltip-link"
+                        >
+                          <ReportIcon />
+                        </Link> */}
                       </>
                     )}
 
