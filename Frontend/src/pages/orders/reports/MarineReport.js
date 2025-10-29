@@ -648,7 +648,29 @@ function MarineReport() {
     );
   };
 
-  // Add flexible fields (Add One - 2 fields only)
+  // Handle image selection for flexible fields (stores file and preview URL)
+  const handleFlexibleFieldImageChange = useCallback((fieldId, file) => {
+    if (!file) {
+      setFlexibleFields((prev) =>
+        prev.map((field) =>
+          field.id === fieldId
+            ? { ...field, image_file: null, image_preview: "" }
+            : field
+        )
+      );
+      return;
+    }
+    const previewUrl = URL.createObjectURL(file);
+    setFlexibleFields((prev) =>
+      prev.map((field) =>
+        field.id === fieldId
+          ? { ...field, image_file: file, image_preview: previewUrl }
+          : field
+      )
+    );
+  }, []);
+
+  // Add flexible fields (default: Add One - 2 fields; plus custom types)
   const addFlexibleFields = (sectionName) => {
     // Calculate the next order by counting total fields in this section
     let nextOrder = 1;
@@ -660,14 +682,81 @@ function MarineReport() {
 
     const fieldId = `${sectionName}_${Date.now()}`;
 
-    const newField = {
-      id: fieldId,
-      section_name: sectionName,
-      col_span: 1, // Only Add One (2 fields)
-      field_label: "",
-      field_value: "",
-      field_order: nextOrder, // This will be the order for the first field
-    };
+    let newField;
+    if (sectionName === "HEADING_DESCRIPTION_IMAGE") {
+      newField = {
+        id: fieldId,
+        section_name: sectionName,
+        col_span: 1,
+        heading: "",
+        description: "",
+        image_file: null,
+        image_preview: "",
+        // keep these to avoid breaking existing validation/payload paths
+        field_label: "",
+        field_value: "",
+        field_order: nextOrder,
+      };
+    } else if (sectionName === "HEADING_DESCRIPTION_IMAGE_2") {
+      newField = {
+        id: fieldId,
+        section_name: sectionName,
+        col_span: 1,
+        heading: "",
+        description: "",
+        image_file: null,
+        image_preview: "",
+        field_label: "",
+        field_value: "",
+        field_order: nextOrder,
+      };
+    } else if (sectionName === "HEADING_DESCRIPTION_IMAGE_3") {
+      newField = {
+        id: fieldId,
+        section_name: sectionName,
+        col_span: 1,
+        heading: "",
+        description: "",
+        image_file: null,
+        image_preview: "",
+        field_label: "",
+        field_value: "",
+        field_order: nextOrder,
+      };
+    } else if (sectionName === "EQUIPMENT_MAKE_MODEL") {
+      newField = {
+        id: fieldId,
+        section_name: sectionName,
+        col_span: 1,
+        name_of_equipment: "",
+        make: "",
+        model: "",
+        field_label: "",
+        field_value: "",
+        field_order: nextOrder,
+      };
+    } else if (sectionName === "EQUIPMENT_MAKE_MODEL_2") {
+      newField = {
+        id: fieldId,
+        section_name: sectionName,
+        col_span: 1,
+        name_of_equipment: "",
+        make: "",
+        model: "",
+        field_label: "",
+        field_value: "",
+        field_order: nextOrder,
+      };
+    } else {
+      newField = {
+        id: fieldId,
+        section_name: sectionName,
+        col_span: 1, // Only Add One (2 fields)
+        field_label: "",
+        field_value: "",
+        field_order: nextOrder, // This will be the order for the first field
+      };
+    }
 
     setFlexibleFields((prev) => [...prev, newField]);
   };
@@ -682,7 +771,17 @@ function MarineReport() {
     const errors = [];
 
     flexibleFields.forEach((field, index) => {
-      if (!field.field_label.trim() || !field.field_value.trim()) {
+      // Skip validation for custom sections; payload rules can be defined later
+      if (
+        field.section_name === "HEADING_DESCRIPTION_IMAGE" ||
+        field.section_name === "HEADING_DESCRIPTION_IMAGE_2" ||
+        field.section_name === "HEADING_DESCRIPTION_IMAGE_3" ||
+        field.section_name === "EQUIPMENT_MAKE_MODEL" ||
+        field.section_name === "EQUIPMENT_MAKE_MODEL_2"
+      ) {
+        return;
+      }
+      if (!field.field_label || !field.field_value) {
         errors.push(
           `Flexible field ${index + 1}: Label and Value are required`
         );
@@ -697,6 +796,172 @@ function MarineReport() {
     const sectionFields = flexibleFields.filter(
       (field) => field.section_name === sectionName
     );
+
+    if (sectionName === "EQUIPMENT_MAKE_MODEL" || sectionName === "EQUIPMENT_MAKE_MODEL_2") {
+      return sectionFields.map((field) => (
+        <div
+          key={field.id}
+          className="row mt-3"
+          style={{
+            border: "1px dashed #ccc",
+            padding: "10px",
+            borderRadius: "5px",
+            position: "relative",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => removeFlexibleField(field.id)}
+            className="flexible-field-remove-button"
+          >
+            <DeleteIcon />
+          </button>
+
+          <div className="col-md-6">
+            <div className="form-group">
+              <label>
+                NAME OF EQUIPMENT <span className="text-danger">*</span>
+              </label>
+              <input
+                type="text"
+                className="form-field"
+                value={field.name_of_equipment || ""}
+                onChange={(e) =>
+                  handleFlexibleFieldChange(
+                    field.id,
+                    "name_of_equipment",
+                    e.target.value
+                  )
+                }
+                placeholder="Enter Name of Equipment"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="col-md-3">
+            <div className="form-group">
+              <label>MAKE</label>
+              <input
+                type="text"
+                className="form-field"
+                value={field.make || ""}
+                onChange={(e) =>
+                  handleFlexibleFieldChange(field.id, "make", e.target.value)
+                }
+                placeholder="Enter Make"
+              />
+            </div>
+          </div>
+
+          <div className="col-md-3">
+            <div className="form-group">
+              <label>MODEL</label>
+              <input
+                type="text"
+                className="form-field"
+                value={field.model || ""}
+                onChange={(e) =>
+                  handleFlexibleFieldChange(field.id, "model", e.target.value)
+                }
+                placeholder="Enter Model"
+              />
+            </div>
+          </div>
+        </div>
+      ));
+    }
+
+    if (sectionName === "HEADING_DESCRIPTION_IMAGE" || sectionName === "HEADING_DESCRIPTION_IMAGE_2" || sectionName === "HEADING_DESCRIPTION_IMAGE_3") {
+      return sectionFields.map((field) => (
+        <div
+          key={field.id}
+          className="row mt-3"
+          style={{
+            border: "1px dashed #ccc",
+            padding: "10px",
+            borderRadius: "5px",
+            position: "relative",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => removeFlexibleField(field.id)}
+            className="flexible-field-remove-button"
+          >
+            <DeleteIcon />
+          </button>
+
+          <div className="col-md-12">
+            <div className="form-group">
+              <label>
+                Heading <span className="text-danger">*</span>
+              </label>
+              <input
+                type="text"
+                className="form-field"
+                value={field.heading || ""}
+                onChange={(e) =>
+                  handleFlexibleFieldChange(field.id, "heading", e.target.value)
+                }
+                placeholder="Enter heading"
+              />
+            </div>
+          </div>
+
+          <div className="col-md-12">
+            <div className="form-group">
+              <label>Description</label>
+              <textarea
+                className="form-field"
+                rows="4"
+                value={field.description || ""}
+                onChange={(e) =>
+                  handleFlexibleFieldChange(
+                    field.id,
+                    "description",
+                    e.target.value
+                  )
+                }
+                placeholder="Enter description"
+              ></textarea>
+            </div>
+          </div>
+
+          <div className="col-md-12">
+            <div className="form-group">
+              <label>Image</label>
+              <input
+                type="file"
+                accept="image/*"
+                className="form-field"
+                onChange={(e) =>
+                  handleFlexibleFieldImageChange(
+                    field.id,
+                    e.target.files && e.target.files[0]
+                      ? e.target.files[0]
+                      : null
+                  )
+                }
+              />
+              {field.image_preview ? (
+                <div style={{ marginTop: "8px" }}>
+                  <img
+                    src={field.image_preview}
+                    alt="preview"
+                    style={{
+                      maxWidth: "100%",
+                      height: "auto",
+                      borderRadius: 4,
+                    }}
+                  />
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ));
+    }
 
     if (sectionName === "CERTIFICATIONS_OF_THE_VESSEL") {
       return sectionFields.map((field) => (
@@ -9469,6 +9734,376 @@ function MarineReport() {
 
                 <div className="col-md-12">
                   <h6>11.3. EMISSIONS</h6>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>Main engine IMO NOx emission standard</label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="main_engine_imo_nox_emission_standard"
+                      value={
+                        reportFormData.main_engine_imo_nox_emission_standard
+                      }
+                      onChange={handleFormChange}
+                      placeholder="Enter Main Engine IMO NOx Emission Standard"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Energy Efficiency Design Index (EEDI) rating number
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="energy_efficiency_design_index_eedi_rating_number"
+                      value={
+                        reportFormData.energy_efficiency_design_index_eedi_rating_number
+                      }
+                      onChange={handleFormChange}
+                      placeholder="Enter Energy Efficiency Design Index (EEDI) Rating Number"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-12">
+                  <h4>11.0. SHIP TO SHIP TRANSFER</h4>
+                  <hr />
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Does vessel comply with recommendations contained in
+                      OCIMF/ICS Ship To Ship
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <SingleSearchSelect
+                      options={[
+                        {
+                          value: "Yes",
+                          label: "Yes",
+                        },
+                        {
+                          value: "No",
+                          label: "No",
+                        },
+                      ]}
+                      value={
+                        reportFormData.does_vessel_comply_with_recommendations_contained_in_ocimf_ics_ship_to_ship ||
+                        "Yes"
+                      }
+                      onChange={(value) =>
+                        handleSelectChange(
+                          "does_vessel_comply_with_recommendations_contained_in_ocimf_ics_ship_to_ship",
+                          value
+                        )
+                      }
+                      placeholder="Enter Does Vessel Comply with Recommendations Contained in OCIMF/ICS Ship To Ship"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      What is maximum outreach of cranes/derricks outboard of
+                      the ship's side
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      <small>(in Metres)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="what_is_maximum_outreach_of_cranes_derricks_outboard_of_the_ship_s_side"
+                      value={
+                        reportFormData.what_is_maximum_outreach_of_cranes_derricks_outboard_of_the_ship_s_side
+                      }
+                      onChange={handleDimensionChange}
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>Date/place of last STS operation</label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="date_place_of_last_sts_operation"
+                      value={reportFormData.date_place_of_last_sts_operation}
+                      onChange={handleFormChange}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-12">
+                  <h4>12.0. RECENT OPERATIONAL HISTORY</h4>
+                  <hr />
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Last three cargoes/charterers/voyages (Last/2nd Last/3rd
+                      Last)
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="last_three_cargoes_charterers_voyages"
+                      value={
+                        reportFormData.last_three_cargoes_charterers_voyages
+                      }
+                      onChange={handleFormChange}
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Has vessel been involved in a pollution, grounding,
+                      serious casualty, unscheduled repair or collision incident
+                      during the past 12 months? If yes, provide details
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="has_vessel_been_involved_in_a_pollution"
+                      value={
+                        reportFormData.has_vessel_been_involved_in_a_pollution
+                      }
+                      onChange={handleFormChange}
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Date and place of last Port State Control inspection
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="date_and_place_of_last_port_state_control_inspection"
+                      value={
+                        reportFormData.date_and_place_of_last_port_state_control_inspection
+                      }
+                      onChange={handleFormChange}
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Any outstanding deficiencies as reported by any Port State
+                      Control? If yes, provide details
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="any_outstanding_deficiencies_as_reported_by_any_port_state_control"
+                      value={
+                        reportFormData.any_outstanding_deficiencies_as_reported_by_any_port_state_control
+                      }
+                      onChange={handleFormChange}
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Recent Oil company inspections/screenings (To the best of
+                      owners knowledge and
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="recent_oil_company_inspections_screenings"
+                      value={
+                        reportFormData.recent_oil_company_inspections_screenings
+                      }
+                      onChange={handleFormChange}
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>Date/Place of last SIRE inspection</label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="date_place_of_last_sire_inspection"
+                      value={reportFormData.date_place_of_last_sire_inspection}
+                      onChange={handleFormChange}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Custom Media Blocks: Heading + Description + Image */}
+              <div className="row">
+                <div className="col-md-12">
+                  <h4>Custom Media Blocks</h4>
+                  <hr />
+                </div>
+                <div className="col-md-12">
+                  <div className="row">
+                    <div className="col-md-12">
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() =>
+                          addFlexibleFields("HEADING_DESCRIPTION_IMAGE")
+                        }
+                      >
+                        Add Heading / Description / Image
+                      </button>
+                    </div>
+                  </div>
+                  {renderFlexibleFields("HEADING_DESCRIPTION_IMAGE")}
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-12">
+                  <h4>19.0. NAVIGATION EQUIPMENT</h4>
+                  <hr />
+                </div>
+                <div className="col-md-12">
+                  <div className="row">
+                    <div className="col-md-12">
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() =>
+                          addFlexibleFields("EQUIPMENT_MAKE_MODEL")
+                        }
+                      >
+                        Add Equipment (Name / Make / Model)
+                      </button>
+                    </div>
+                  </div>
+                  {renderFlexibleFields("EQUIPMENT_MAKE_MODEL")}
+                </div>
+              </div>
+
+              {/* Custom Media Blocks under Communication & Navigational Equipment */}
+              <div className="row">
+                <div className="col-md-12">
+                  <h5>Custom Media Blocks</h5>
+                  <hr />
+                </div>
+                <div className="col-md-12">
+                  <div className="row">
+                    <div className="col-md-12">
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() =>
+                          addFlexibleFields("HEADING_DESCRIPTION_IMAGE_2")
+                        }
+                      >
+                        Add Heading / Description / Image
+                      </button>
+                    </div>
+                  </div>
+                  {renderFlexibleFields("HEADING_DESCRIPTION_IMAGE_2")}
+                </div>
+              </div>
+
+              {/* Equipment (separate set) under second media block */}
+              <div className="row">
+                <div className="col-md-12">
+                  <h4>FRESH WATER GENERATOR</h4>
+                  <hr />
+                </div>
+                <div className="col-md-12">
+                  <div className="row">
+                    <div className="col-md-12">
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() => addFlexibleFields("EQUIPMENT_MAKE_MODEL_2")}
+                      >
+                        Add Equipment (Name / Make / Model)
+                      </button>
+                    </div>
+                  </div>
+                  {renderFlexibleFields("EQUIPMENT_MAKE_MODEL_2")}
+                </div>
+              </div>
+
+              {/* Custom Media Blocks under Communication & Navigational Equipment */}
+              <div className="row mb-4">
+                <div className="col-md-12">
+                  <h5>Custom Media Blocks</h5>
+                  <hr />
+                </div>
+                <div className="col-md-12">
+                  <div className="row">
+                    <div className="col-md-12">
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() =>
+                          addFlexibleFields("HEADING_DESCRIPTION_IMAGE_3")
+                        }
+                      >
+                        Add Heading / Description / Image
+                      </button>
+                    </div>
+                  </div>
+                  {renderFlexibleFields("HEADING_DESCRIPTION_IMAGE_3")}
                 </div>
               </div>
 
