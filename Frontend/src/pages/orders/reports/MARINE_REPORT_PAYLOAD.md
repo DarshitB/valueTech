@@ -261,17 +261,16 @@ Flexible fields are submitted as an array. Each entry can have different propert
 - `section_name` (string): Identifies the type of flexible field
 - `col_span` (number): Column span for layout (usually 1)
 - `field_order` (number): Order/index of the field within its section (starts at 1)
-- `field_label` (string): Label field (only visible for standard "Add One" sections, empty for custom sections)
-- `field_value` (string): Value field (only visible for standard "Add One" sections, empty for custom sections)
+  
 
-### Flexible Field Types
+### Flexible Field Types (Generic field_1..N)
 
 #### 1. Standard Flexible Fields (Generic "Add One")
 **Section Names**: Generic sections like `TANK_STORAGE_CAPACITIES` and other standard sections
 
 **Visible UI Fields:**
-- `field_label` (string): Label text (user enters this)
-- `field_value` (string): Value text (user enters this)
+- `field_1` (string): First input
+- `field_2` (string): Second input
 
 **Complete Payload Example:**
 ```json
@@ -279,8 +278,8 @@ Flexible fields are submitted as an array. Each entry can have different propert
   "flexible_fields[0][section_name]": "TANK_STORAGE_CAPACITIES",
   "flexible_fields[0][col_span]": 1,
   "flexible_fields[0][field_order]": 1,
-  "flexible_fields[0][field_label]": "Fuel Tank",
-  "flexible_fields[0][field_value]": "5000 liters capacity"
+  "flexible_fields[0][field_1]": "Fuel Tank",
+  "flexible_fields[0][field_2]": "5000 liters capacity"
 }
 ```
 
@@ -288,10 +287,10 @@ Flexible fields are submitted as an array. Each entry can have different propert
 **Section Name**: `DECK_EQUIPMENT_SPECIAL_FEATURES`
 
 **Visible UI Fields:**
-- `particulars` (string): Particulars text (user enters this)
-- `specifications` (string): Specifications text (user enters this)
+- `field_1` (string): Particulars
+- `field_2` (string): Specifications
 
-**Note:** `field_label` and `field_value` are also sent but will be empty strings (not visible in UI).
+**Note:** `field_label` and `field_value` are not sent; all user inputs use generic `field_1..N`.
 
 **Complete Payload Example:**
 ```json
@@ -299,10 +298,8 @@ Flexible fields are submitted as an array. Each entry can have different propert
   "flexible_fields[0][section_name]": "DECK_EQUIPMENT_SPECIAL_FEATURES",
   "flexible_fields[0][col_span]": 1,
   "flexible_fields[0][field_order]": 1,
-  "flexible_fields[0][field_label]": "",
-  "flexible_fields[0][field_value]": "",
-  "flexible_fields[0][particulars]": "Deck Crane",
-  "flexible_fields[0][specifications]": "Hydraulic, 5 ton capacity"
+  "flexible_fields[0][field_1]": "Deck Crane",
+  "flexible_fields[0][field_2]": "Hydraulic, 5 ton capacity"
 }
 ```
 
@@ -310,13 +307,13 @@ Flexible fields are submitted as an array. Each entry can have different propert
 **Section Name**: `CERTIFICATIONS_OF_THE_VESSEL`
 
 **Visible UI Fields:**
-- `certificates` (string): Name of the certificate
-- `issued` (string): Date in DD-MM-YYYY format
-- `last_annual` (string): Date in DD-MM-YYYY format
-- `last_intermediate` (string): Date in DD-MM-YYYY format
-- `expires` (string): Date in DD-MM-YYYY format
+- `field_1` (string): Certificates
+- `field_2` (string): Issued (DD-MM-YYYY)
+- `field_3` (string): Last Annual (DD-MM-YYYY)
+- `field_4` (string): Last Intermediate (DD-MM-YYYY)
+- `field_5` (string): Expires (DD-MM-YYYY)
 
-**Note:** `field_label` and `field_value` are also sent but will be empty strings (not visible in UI).
+**Note:** `field_label` and `field_value` are not sent; all user inputs use generic `field_1..N`.
 
 **Complete Payload Example:**
 ```json
@@ -324,13 +321,11 @@ Flexible fields are submitted as an array. Each entry can have different propert
   "flexible_fields[0][section_name]": "CERTIFICATIONS_OF_THE_VESSEL",
   "flexible_fields[0][col_span]": 1,
   "flexible_fields[0][field_order]": 1,
-  "flexible_fields[0][field_label]": "",
-  "flexible_fields[0][field_value]": "",
-  "flexible_fields[0][certificates]": "Cargo Ship Safety Certificate",
-  "flexible_fields[0][issued]": "01-01-2023",
-  "flexible_fields[0][last_annual]": "01-01-2024",
-  "flexible_fields[0][last_intermediate]": "01-07-2024",
-  "flexible_fields[0][expires]": "01-01-2025"
+  "flexible_fields[0][field_1]": "Cargo Ship Safety Certificate",
+  "flexible_fields[0][field_2]": "01-01-2023",
+  "flexible_fields[0][field_3]": "01-01-2024",
+  "flexible_fields[0][field_4]": "01-07-2024",
+  "flexible_fields[0][field_5]": "01-01-2025"
 }
 ```
 
@@ -338,12 +333,12 @@ Flexible fields are submitted as an array. Each entry can have different propert
 **Section Names**: `HEADING_DESCRIPTION_IMAGE`, `HEADING_DESCRIPTION_IMAGE_2`, `HEADING_DESCRIPTION_IMAGE_3`
 
 **Visible UI Fields:**
-- `heading` (string): Heading text (user enters this)
-- `description` (string): Description text (user enters this)
-- `image_path` (string): Image path from API (can be JSON string or direct path)
-- `image_id` (number, optional): Media ID from order media
+- `field_1` (string): Heading
+- `field_2` (string): Description
+- `field_3` (string): Image path (JSON or direct path)
+- `field_4` (number, optional): Image ID
 
-**Note:** `field_label` and `field_value` are also sent but will be empty strings (not visible in UI).
+**Note:** `field_label` and `field_value` are not sent; all user inputs use generic `field_1..N`.
 
 **Complete Payload Example:**
 ```json
@@ -351,12 +346,10 @@ Flexible fields are submitted as an array. Each entry can have different propert
   "flexible_fields[0][section_name]": "HEADING_DESCRIPTION_IMAGE",
   "flexible_fields[0][col_span]": 1,
   "flexible_fields[0][field_order]": 1,
-  "flexible_fields[0][field_label]": "",
-  "flexible_fields[0][field_value]": "",
-  "flexible_fields[0][heading]": "Navigation Equipment",
-  "flexible_fields[0][description]": "Complete navigation system installation",
-  "flexible_fields[0][image_path]": "{\"path\":\"/uploads/media/image123.jpg\"}",
-  "flexible_fields[0][image_id]": 123
+  "flexible_fields[0][field_1]": "Navigation Equipment",
+  "flexible_fields[0][field_2]": "Complete navigation system installation",
+  "flexible_fields[0][field_3]": "{\"path\":\"/uploads/media/image123.jpg\"}",
+  "flexible_fields[0][field_4]": 123
 }
 ```
 
@@ -364,11 +357,11 @@ Flexible fields are submitted as an array. Each entry can have different propert
 **Section Names**: `EQUIPMENT_MAKE_MODEL`, `EQUIPMENT_MAKE_MODEL_2`
 
 **Visible UI Fields:**
-- `name_of_equipment` (string): Name of the equipment (user enters this)
-- `make` (string): Manufacturer name (user enters this)
-- `model` (string): Model number/name (user enters this)
+- `field_1` (string): Name of equipment
+- `field_2` (string): Make
+- `field_3` (string): Model
 
-**Note:** `field_label` and `field_value` are also sent but will be empty strings (not visible in UI).
+**Note:** only `field_1..N` are sent for user inputs.
 
 **Complete Payload Example:**
 ```json
@@ -376,11 +369,9 @@ Flexible fields are submitted as an array. Each entry can have different propert
   "flexible_fields[0][section_name]": "EQUIPMENT_MAKE_MODEL",
   "flexible_fields[0][col_span]": 1,
   "flexible_fields[0][field_order]": 1,
-  "flexible_fields[0][field_label]": "",
-  "flexible_fields[0][field_value]": "",
-  "flexible_fields[0][name_of_equipment]": "GPS Navigation System",
-  "flexible_fields[0][make]": "Garmin",
-  "flexible_fields[0][model]": "GPSMAP 8616"
+  "flexible_fields[0][field_1]": "GPS Navigation System",
+  "flexible_fields[0][field_2]": "Garmin",
+  "flexible_fields[0][field_3]": "GPSMAP 8616"
 }
 ```
 
@@ -410,53 +401,47 @@ Flexible fields are submitted as an array. Each entry can have different propert
   "flexible_fields[0][section_name]": "CERTIFICATIONS_OF_THE_VESSEL",
   "flexible_fields[0][col_span]": 1,
   "flexible_fields[0][field_order]": 1,
-  "flexible_fields[0][certificates]": "Cargo Ship Safety Certificate",
-  "flexible_fields[0][issued]": "01-01-2023",
-  "flexible_fields[0][last_annual]": "01-01-2024",
-  "flexible_fields[0][last_intermediate]": "01-07-2024",
-  "flexible_fields[0][expires]": "01-01-2025",
+  "flexible_fields[0][field_1]": "Cargo Ship Safety Certificate",
+  "flexible_fields[0][field_2]": "01-01-2023",
+  "flexible_fields[0][field_3]": "01-01-2024",
+  "flexible_fields[0][field_4]": "01-07-2024",
+  "flexible_fields[0][field_5]": "01-01-2025",
   
   "flexible_fields[1][section_name]": "HEADING_DESCRIPTION_IMAGE",
   "flexible_fields[1][col_span]": 1,
   "flexible_fields[1][field_order]": 1,
-  "flexible_fields[1][heading]": "Navigation Equipment",
-  "flexible_fields[1][description]": "Complete navigation system",
-  "flexible_fields[1][image_path]": "{\"path\":\"/uploads/media/nav.jpg\"}",
-  "flexible_fields[1][image_id]": 789,
+  "flexible_fields[1][field_1]": "Navigation Equipment",
+  "flexible_fields[1][field_2]": "Complete navigation system",
+  "flexible_fields[1][field_3]": "{\"path\":\"/uploads/media/nav.jpg\"}",
+  "flexible_fields[1][field_4]": 789,
   
   "flexible_fields[2][section_name]": "EQUIPMENT_MAKE_MODEL",
   "flexible_fields[2][col_span]": 1,
   "flexible_fields[2][field_order]": 1,
-  "flexible_fields[2][name_of_equipment]": "GPS System",
-  "flexible_fields[2][make]": "Garmin",
-  "flexible_fields[2][model]": "GPSMAP 8616",
+  "flexible_fields[2][field_1]": "GPS System",
+  "flexible_fields[2][field_2]": "Garmin",
+  "flexible_fields[2][field_3]": "GPSMAP 8616",
   
   "flexible_fields[3][section_name]": "DECK_EQUIPMENT_SPECIAL_FEATURES",
   "flexible_fields[3][col_span]": 1,
   "flexible_fields[3][field_order]": 1,
-  "flexible_fields[3][field_label]": "",
-  "flexible_fields[3][field_value]": "",
-  "flexible_fields[3][particulars]": "Deck Crane",
-  "flexible_fields[3][specifications]": "Hydraulic, 5 ton capacity",
+  "flexible_fields[3][field_1]": "Deck Crane",
+  "flexible_fields[3][field_2]": "Hydraulic, 5 ton capacity",
   
   "flexible_fields[4][section_name]": "HEADING_DESCRIPTION_IMAGE_2",
   "flexible_fields[4][col_span]": 1,
   "flexible_fields[4][field_order]": 1,
-  "flexible_fields[4][field_label]": "",
-  "flexible_fields[4][field_value]": "",
-  "flexible_fields[4][heading]": "Additional Section",
-  "flexible_fields[4][description]": "Another navigation system",
-  "flexible_fields[4][image_path]": "{\"path\":\"/uploads/media/nav2.jpg\"}",
-  "flexible_fields[4][image_id]": 790,
+  "flexible_fields[4][field_1]": "Additional Section",
+  "flexible_fields[4][field_2]": "Another navigation system",
+  "flexible_fields[4][field_3]": "{\"path\":\"/uploads/media/nav2.jpg\"}",
+  "flexible_fields[4][field_4]": 790,
   
   "flexible_fields[5][section_name]": "EQUIPMENT_MAKE_MODEL_2",
   "flexible_fields[5][col_span]": 1,
   "flexible_fields[5][field_order]": 1,
-  "flexible_fields[5][field_label]": "",
-  "flexible_fields[5][field_value]": "",
-  "flexible_fields[5][name_of_equipment]": "Radar System",
-  "flexible_fields[5][make]": "Raymarine",
-  "flexible_fields[5][model]": "Axiom 12"
+  "flexible_fields[5][field_1]": "Radar System",
+  "flexible_fields[5][field_2]": "Raymarine",
+  "flexible_fields[5][field_3]": "Axiom 12"
 }
 ```
 
@@ -476,27 +461,23 @@ name_of_the_vessel: MV EXAMPLE SHIP
 flexible_fields[0][section_name]: CERTIFICATIONS_OF_THE_VESSEL
 flexible_fields[0][col_span]: 1
 flexible_fields[0][field_order]: 1
-flexible_fields[0][certificates]: Cargo Ship Safety Certificate
-flexible_fields[0][issued]: 01-01-2023
+flexible_fields[0][field_1]: Cargo Ship Safety Certificate
+flexible_fields[0][field_2]: 01-01-2023
 ...
 
 flexible_fields[1][section_name]: HEADING_DESCRIPTION_IMAGE
 flexible_fields[1][col_span]: 1
 flexible_fields[1][field_order]: 1
-flexible_fields[1][field_label]: ""
-flexible_fields[1][field_value]: ""
-flexible_fields[1][heading]: Navigation Equipment
-flexible_fields[1][description]: Complete navigation system
-flexible_fields[1][image_path]: {"path":"/uploads/media/nav.jpg"}
-flexible_fields[1][image_id]: 789
+flexible_fields[1][field_1]: Navigation Equipment
+flexible_fields[1][field_2]: Complete navigation system
+flexible_fields[1][field_3]: {"path":"/uploads/media/nav.jpg"}
+flexible_fields[1][field_4]: 789
 
 flexible_fields[3][section_name]: DECK_EQUIPMENT_SPECIAL_FEATURES
 flexible_fields[3][col_span]: 1
 flexible_fields[3][field_order]: 1
-flexible_fields[3][field_label]: ""
-flexible_fields[3][field_value]: ""
-flexible_fields[3][particulars]: Deck Crane
-flexible_fields[3][specifications]: Hydraulic, 5 ton capacity
+flexible_fields[3][field_1]: Deck Crane
+flexible_fields[3][field_2]: Hydraulic, 5 ton capacity
 ...
 ```
 
@@ -522,19 +503,17 @@ flexible_fields[3][specifications]: Hydraulic, 5 ton capacity
 
 6. **Flexible field ordering**: `field_order` starts at 1 and increments for each entry within the same section. Multiple sections can have entries with `field_order: 1` as ordering is scoped to each `section_name`.
 
-7. **Section names**: Used to determine which visible UI fields are present:
-   - `DECK_EQUIPMENT_SPECIAL_FEATURES` → includes `particulars`, `specifications` (plus system fields: `section_name`, `col_span`, `field_order`, `field_label`, `field_value`)
-   - `CERTIFICATIONS_OF_THE_VESSEL` → includes `certificates`, `issued`, `last_annual`, `last_intermediate`, `expires` (plus system fields)
-   - `HEADING_DESCRIPTION_IMAGE`, `HEADING_DESCRIPTION_IMAGE_2`, `HEADING_DESCRIPTION_IMAGE_3` → includes `heading`, `description`, `image_path`, `image_id` (plus system fields)
-   - `EQUIPMENT_MAKE_MODEL`, `EQUIPMENT_MAKE_MODEL_2` → includes `name_of_equipment`, `make`, `model` (plus system fields)
-   - Generic sections (e.g., `TANK_STORAGE_CAPACITIES`) → includes `field_label` and `field_value` (which are the visible fields)
+7. **Section names**: Used to determine which visible UI fields are present (all use `field_1..N`):
+   - `DECK_EQUIPMENT_SPECIAL_FEATURES` → `field_1` (Particulars), `field_2` (Specifications)
+   - `CERTIFICATIONS_OF_THE_VESSEL` → `field_1` (Certificates), `field_2` (Issued), `field_3` (Last Annual), `field_4` (Last Intermediate), `field_5` (Expires)
+   - `HEADING_DESCRIPTION_IMAGE*` → `field_1` (Heading), `field_2` (Description), `field_3` (Image Path), `field_4` (Image ID)
+   - `EQUIPMENT_MAKE_MODEL*` → `field_1` (Name), `field_2` (Make), `field_3` (Model)
+   - Generic sections (e.g., `TANK_STORAGE_CAPACITIES`) → `field_1`, `field_2`
 
 8. **System Fields Always Present**: Every flexible field entry will ALWAYS include these system fields (even if empty):
    - `section_name` (string, required): Identifies the type of flexible field
    - `col_span` (number, required): Column span for layout (usually 1)
    - `field_order` (number, required): Order/index within section (starts at 1)
-   - `field_label` (string): Label field - empty for custom sections, populated for generic "Add One" sections
-   - `field_value` (string): Value field - empty for custom sections, populated for generic "Add One" sections
 
 ---
 
@@ -545,13 +524,13 @@ flexible_fields[3][specifications]: Hydraulic, 5 ton capacity
 2. **Validate section_name**: Use `section_name` to determine which additional fields to expect:
    - `DECK_EQUIPMENT_SPECIAL_FEATURES` → expect `particulars` and `specifications`
    - `CERTIFICATIONS_OF_THE_VESSEL` → expect `certificates`, `issued`, `last_annual`, `last_intermediate`, `expires`
-   - `HEADING_DESCRIPTION_IMAGE*` → expect `heading`, `description`, `image_path`, `image_id` (optional)
-   - `EQUIPMENT_MAKE_MODEL*` → expect `name_of_equipment`, `make`, `model`
-   - Generic sections → expect only `field_label` and `field_value`
+   - `HEADING_DESCRIPTION_IMAGE*` → expect `field_1`, `field_2`, `field_3`, `field_4` (optional)
+   - `EQUIPMENT_MAKE_MODEL*` → expect `field_1`, `field_2`, `field_3`
+   - Generic sections → expect `field_1`, `field_2`
 
 3. **Handle image paths**: Check if `image_path` is JSON and parse accordingly. Both JSON string format (`{"path":"..."}`) and direct path format (`/uploads/...`) should be supported.
 
-4. **Store flexible fields**: Consider storing as JSON in database or as separate table rows. Ensure all system fields (`section_name`, `col_span`, `field_order`, `field_label`, `field_value`) are stored even if empty.
+4. **Store flexible fields**: Consider storing as JSON in database or as separate table rows. Ensure system fields (`section_name`, `col_span`, `field_order`) plus generic `field_1..N` are stored.
 
 5. **Date validation**: Validate DD-MM-YYYY format for date fields. Dates are sent as strings in this format.
 

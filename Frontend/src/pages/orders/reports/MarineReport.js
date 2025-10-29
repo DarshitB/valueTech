@@ -390,27 +390,27 @@ function MarineReport() {
     });
 
     if (Array.isArray(report.flexible_fields)) {
-      // Process flexible fields to regenerate image previews from image_path
+      // Process flexible fields to regenerate image previews from generic field_3 (image path)
       const baseUrl =
         process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
       const processedFields = report.flexible_fields.map((field) => {
-        // If field has image_path but no image_preview, regenerate preview from path
-        if (field.image_path && !field.image_preview) {
+        // If field has image path (field_3) but no image_preview, regenerate preview from path
+        if (field.field_3 && !field.image_preview) {
           let imageUrl = "";
           try {
-            const parsed = JSON.parse(field.image_path);
+            const parsed = JSON.parse(field.field_3);
             if (parsed.path) {
               imageUrl = `${baseUrl}/${parsed.path}`;
             } else if (parsed.link) {
               imageUrl = parsed.link;
             } else {
-              imageUrl = field.image_path;
+              imageUrl = field.field_3;
             }
           } catch (error) {
-            if (field.image_path.startsWith("/")) {
-              imageUrl = `${baseUrl}${field.image_path}`;
+            if (field.field_3.startsWith("/")) {
+              imageUrl = `${baseUrl}${field.field_3}`;
             } else {
-              imageUrl = field.image_path;
+              imageUrl = field.field_3;
             }
           }
           return {
@@ -695,8 +695,8 @@ function MarineReport() {
                 ...field,
                 image_file: null, // Clear file since we're using API path
                 image_preview: imageUrl,
-                image_path: mediaItem.media_url, // Store original path from API
-                image_id: mediaItem.id, // Store media ID for reference
+                field_3: mediaItem.media_url, // Store original path from API
+                field_4: mediaItem.id, // Store media ID for reference
               }
             : field
         )
@@ -726,8 +726,6 @@ function MarineReport() {
     id: `${sectionName}_${Date.now()}`,
     section_name: sectionName,
     col_span: 1,
-    field_label: "",
-    field_value: "",
     field_order: nextOrder,
   });
 
@@ -1415,14 +1413,7 @@ function MarineReport() {
         `flexible_fields[${formDataIndex}][col_span]`,
         field.col_span
       );
-      formData.append(
-        `flexible_fields[${formDataIndex}][field_label]`,
-        field.field_label || ""
-      );
-      formData.append(
-        `flexible_fields[${formDataIndex}][field_value]`,
-        field.field_value || ""
-      );
+      // Do not send field_label/field_value; generic inputs are standardized as field_1..N
       formData.append(
         `flexible_fields[${formDataIndex}][field_order]`,
         field.field_order
@@ -1509,17 +1500,7 @@ function MarineReport() {
         );
       }
 
-      // Add deck equipment fields (particulars, specifications)
-      if (field.section_name === "DECK_EQUIPMENT_SPECIAL_FEATURES") {
-        formData.append(
-          `flexible_fields[${formDataIndex}][particulars]`,
-          field.particulars || ""
-        );
-        formData.append(
-          `flexible_fields[${formDataIndex}][specifications]`,
-          field.specifications || ""
-        );
-      }
+      // (deprecated keys removed) particulars/specifications are standardized to field_1/field_2
 
       formDataIndex++;
     });
@@ -1571,10 +1552,7 @@ function MarineReport() {
         field.section_name;
       reportData[`flexible_fields[${formDataIndex}][col_span]`] =
         field.col_span;
-      reportData[`flexible_fields[${formDataIndex}][field_label]`] =
-        field.field_label || "";
-      reportData[`flexible_fields[${formDataIndex}][field_value]`] =
-        field.field_value || "";
+      // Do not send field_label/field_value; generic inputs are standardized as field_1..N
       reportData[`flexible_fields[${formDataIndex}][field_order]`] =
         field.field_order;
 
