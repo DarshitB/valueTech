@@ -7,7 +7,10 @@ import React, {
 } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchOrderById } from "../../../redux/reducers/orderReducer";
+import {
+  fetchOrderById,
+  fetchOrderMedia,
+} from "../../../redux/reducers/orderReducer";
 import {
   fetchOrderReport,
   generateOrderReport,
@@ -18,7 +21,7 @@ import { usePageTitle } from "../../../context/PageTitleContext";
 import SingleSearchSelect from "../../../components/SingleSearchSelect";
 import { toast } from "react-toastify";
 import "../order.scss";
-import { DeleteIcon } from "../../../components/icons";
+import { DeleteIcon, CloseIcon } from "../../../components/icons";
 
 function MarineReport() {
   const { id } = useParams();
@@ -26,6 +29,8 @@ function MarineReport() {
 
   // Select order data from Redux store
   const order = useSelector((state) => state.orders.selected);
+  const media = useSelector((state) => state.orders.media);
+  const mediaLoading = useSelector((state) => state.orders.mediaLoading);
 
   // Select order report data from Redux store
   const {
@@ -214,10 +219,16 @@ function MarineReport() {
     valuer_name: "V.K. ASSOCIATES",
     license_no: "SLA-60827",
     surveyor_location: "MUMBAI, MAHARASHTRA",
+    vessel_photo: "",
+    vessel_photo_preview: "",
+    vessel_photo_id: null,
   });
 
   // State for flexible fields
   const [flexibleFields, setFlexibleFields] = useState([]);
+
+  // State for image selection modal (fieldId => boolean)
+  const [imageModalOpen, setImageModalOpen] = useState({});
 
   // Reset form data when component mounts or order ID changes
   useEffect(() => {
@@ -271,6 +282,9 @@ function MarineReport() {
       valuer_name: "V.K. ASSOCIATES",
       license_no: "SLA-60827",
       surveyor_location: "MUMBAI, MAHARASHTRA",
+      vessel_photo: "",
+      vessel_photo_preview: "",
+      vessel_photo_id: null,
     });
 
     // Reset flexible fields
@@ -350,11 +364,63 @@ function MarineReport() {
         updated[key] = fieldValue;
       });
 
+      // Regenerate vessel photo preview if vessel_photo exists
+      if (report.vessel_photo && !updated.vessel_photo_preview) {
+        const baseUrl =
+          process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
+        try {
+          const parsed = JSON.parse(report.vessel_photo);
+          if (parsed.path) {
+            updated.vessel_photo_preview = `${baseUrl}/${parsed.path}`;
+          } else if (parsed.link) {
+            updated.vessel_photo_preview = parsed.link;
+          } else {
+            updated.vessel_photo_preview = report.vessel_photo;
+          }
+        } catch (error) {
+          if (report.vessel_photo.startsWith("/")) {
+            updated.vessel_photo_preview = `${baseUrl}${report.vessel_photo}`;
+          } else {
+            updated.vessel_photo_preview = report.vessel_photo;
+          }
+        }
+      }
+
       return updated;
     });
 
     if (Array.isArray(report.flexible_fields)) {
-      setFlexibleFields(report.flexible_fields);
+      // Process flexible fields to regenerate image previews from image_path
+      const baseUrl =
+        process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
+      const processedFields = report.flexible_fields.map((field) => {
+        // If field has image_path but no image_preview, regenerate preview from path
+        if (field.image_path && !field.image_preview) {
+          let imageUrl = "";
+          try {
+            const parsed = JSON.parse(field.image_path);
+            if (parsed.path) {
+              imageUrl = `${baseUrl}/${parsed.path}`;
+            } else if (parsed.link) {
+              imageUrl = parsed.link;
+            } else {
+              imageUrl = field.image_path;
+            }
+          } catch (error) {
+            if (field.image_path.startsWith("/")) {
+              imageUrl = `${baseUrl}${field.image_path}`;
+            } else {
+              imageUrl = field.image_path;
+            }
+          }
+          return {
+            ...field,
+            image_preview: imageUrl,
+          };
+        }
+        return field;
+      });
+      setFlexibleFields(processedFields);
     }
   }, [currentReport, id]);
 
@@ -396,13 +462,6 @@ function MarineReport() {
     [parseCurrency, convertNumberToWordsIndian]
   );
 
-  // Custom hook to create a memoized amount in words for a specific field
-  const useAmountInWords = (fieldName) => {
-    return useMemo(() => {
-      return getAmountInWords(reportFormData[fieldName]);
-    }, [fieldName, reportFormData[fieldName], getAmountInWords]);
-  };
-
   // Handle currency input formatting (Indian number format)
   const handleCurrencyChange = useCallback(
     (e) => {
@@ -410,146 +469,72 @@ function MarineReport() {
       const formattedValue = formatIndianCurrency(value);
 
       // Update form data with formatted value
-      setReportFormData((prev) => ({
-        ...prev,
-        [name]: formattedValue,
-      }));
+      setReportFormData((prev) => {
+        const updated = {
+          ...prev,
+          [name]: formattedValue,
+        };
+
+        // Auto-update corresponding "in words" field
+        const wordsFieldName = `${name}_in_words`;
+        const amountInWords = getAmountInWords(formattedValue);
+        updated[wordsFieldName] = amountInWords;
+
+        return updated;
+      });
     },
-    [formatIndianCurrency]
+    [formatIndianCurrency, getAmountInWords]
   );
 
-  // Handle form input changes
-  const handleFormChange = (e) => {
+  // Handle form input changes with optional uppercase conversion for specific fields
+  const handleFormChange = useCallback((e) => {
     const { name, value } = e.target;
+    
+    // Fields that should be converted to uppercase
+    const uppercaseFields = [
+      "name_of_the_vessel",
+      "customer_name",
+      "client_city_state_name",
+      "inspection_location_front_page",
+      "registered_or_proposed_owner",
+      "marine_vessel_name",
+      "type_or_description_of_vessel",
+      "classification_of_registry",
+      "present_flag",
+      "port_of_registry",
+      "registered_under",
+      "ex_name_flag",
+      "previous_registry",
+      "classification_society",
+      "technical_operator",
+      "commercial_operator",
+      "registered_owner",
+      "disponent_owner",
+    ];
+
+    const finalValue = uppercaseFields.includes(name)
+      ? value.toUpperCase()
+      : value;
+
     setReportFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: finalValue,
     }));
-  };
-
-  // Function to format currency input (Indian number format)
-  const handleCurrencyFormatting = useCallback((value) => {
-    // Remove everything except digits and one dot
-    let inputVal = value.replace(/[^0-9.]/g, "");
-
-    // Allow only one decimal
-    const parts = inputVal.split(".");
-    let integerPart = parts[0];
-    let decimalPart = parts[1] ? parts[1].slice(0, 2) : ""; // limit to 2 decimal digits
-
-    // Format integer part in Indian number format
-    let lastThree = integerPart.slice(-3);
-    let otherNumbers = integerPart.slice(0, -3);
-    if (otherNumbers !== "") {
-      lastThree = "," + lastThree;
-    }
-    let formattedInteger =
-      otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + lastThree;
-
-    let formattedValue = formattedInteger;
-    if (decimalPart.length > 0 || inputVal.includes(".")) {
-      formattedValue += "." + decimalPart;
-    }
-
-    return formattedValue;
   }, []);
 
   // Use memoized amount in words for each currency field
-  const insurancePolicyAmountInWords = useAmountInWords(
-    "insured_value_insurance_policy"
+  const insurancePolicyAmountInWords = useMemo(
+    () => getAmountInWords(reportFormData.insured_value_insurance_policy),
+    [getAmountInWords, reportFormData.insured_value_insurance_policy]
   );
-  const warRiskPolicyAmountInWords = useAmountInWords(
-    "insured_value_war_risk_policy"
+  const warRiskPolicyAmountInWords = useMemo(
+    () => getAmountInWords(reportFormData.insured_value_war_risk_policy),
+    [getAmountInWords, reportFormData.insured_value_war_risk_policy]
   );
-  const hullMachineryPolicyAmountInWords = useAmountInWords(
-    "insured_value_hull_machinery_policy"
+  const hullMachineryPolicyAmountInWords = useMemo(
+    () => getAmountInWords(reportFormData.insured_value_hull_machinery_policy),
+    [getAmountInWords, reportFormData.insured_value_hull_machinery_policy]
   );
-
-  // Convert number to words
-  const convertToWords = (number) => {
-    const units = [
-      "",
-      "One",
-      "Two",
-      "Three",
-      "Four",
-      "Five",
-      "Six",
-      "Seven",
-      "Eight",
-      "Nine",
-      "Ten",
-    ];
-    const teens = [
-      "Eleven",
-      "Twelve",
-      "Thirteen",
-      "Fourteen",
-      "Fifteen",
-      "Sixteen",
-      "Seventeen",
-      "Eighteen",
-      "Nineteen",
-    ];
-    const tens = [
-      "",
-      "",
-      "Twenty",
-      "Thirty",
-      "Forty",
-      "Fifty",
-      "Sixty",
-      "Seventy",
-      "Eighty",
-      "Ninety",
-    ];
-    const scales = ["", "Thousand", "Lakh", "Crore"];
-
-    // Handle decimal numbers
-    const parts = number.toString().split(".");
-    const wholePart = parseInt(parts[0]);
-    const decimalPart = parts[1] ? parseInt(parts[1]) : 0;
-
-    function convertGroup(n) {
-      if (n === 0) return "";
-      else if (n <= 10) return units[n];
-      else if (n <= 19) return teens[n - 11];
-      else if (n <= 99) {
-        const ten = Math.floor(n / 10);
-        const one = n % 10;
-        return tens[ten] + (one > 0 ? " " + units[one] : "");
-      }
-      return (
-        units[Math.floor(n / 100)] +
-        " Hundred" +
-        (n % 100 > 0 ? " " + convertGroup(n % 100) : "")
-      );
-    }
-
-    function convertWholeNumber(n) {
-      if (n === 0) return "Zero";
-
-      let words = "";
-      let scaleIndex = 0;
-
-      while (n > 0) {
-        const group = n % 1000;
-        if (group > 0) {
-          words = convertGroup(group) + " " + scales[scaleIndex] + " " + words;
-        }
-        n = Math.floor(n / 1000);
-        scaleIndex++;
-      }
-
-      return words.trim();
-    }
-
-    let result = convertWholeNumber(wholePart);
-    if (decimalPart > 0) {
-      result += " Point " + convertWholeNumber(decimalPart);
-    }
-    return result + " Only";
-  };
 
   // Handle SingleSearchSelect changes
   const handleSelectChange = (name, value) => {
@@ -559,8 +544,8 @@ function MarineReport() {
         [name]: value,
       };
 
-      // Auto-update license_no when surveyor changes
-      if (name === "surveyor") {
+      // Auto-update license_no when valuer_name changes
+      if (name === "valuer_name") {
         updated.license_no = getLicenseNumber(value);
       }
 
@@ -648,113 +633,170 @@ function MarineReport() {
     );
   };
 
-  // Handle image selection for flexible fields (stores file and preview URL)
-  const handleFlexibleFieldImageChange = useCallback((fieldId, file) => {
-    if (!file) {
+  // Parse media URL to get the actual image link (same as OrderImages)
+  const getImageUrl = useCallback((mediaUrl) => {
+    const baseUrl =
+      process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
+    try {
+      const parsed = JSON.parse(mediaUrl);
+      if (parsed.path) {
+        return `${baseUrl}/${parsed.path}`;
+      }
+      if (parsed.link) {
+        return parsed.link;
+      }
+      return mediaUrl;
+    } catch (error) {
+      if (mediaUrl.startsWith("/")) {
+        return `${baseUrl}${mediaUrl}`;
+      }
+      return mediaUrl;
+    }
+  }, []);
+
+  // Check if media is an image
+  const isImage = useCallback((mediaUrl) => {
+    try {
+      const parsed = JSON.parse(mediaUrl);
+      const path = parsed.path || "";
+      return path.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/);
+    } catch (error) {
+      return mediaUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/);
+    }
+  }, []);
+
+  // Memoize approved images for performance (must be after isImage is defined)
+  const approvedImages = useMemo(() => {
+    return (
+      media?.media?.filter(
+        (item) => item.status === 1 && isImage(item.media_url)
+      ) || []
+    );
+  }, [media?.media, isImage]);
+
+  // Open image selection modal for a specific field
+  const openImageModal = useCallback((fieldId) => {
+    setImageModalOpen((prev) => ({ ...prev, [fieldId]: true }));
+  }, []);
+
+  // Close image selection modal for a specific field
+  const closeImageModal = useCallback((fieldId) => {
+    setImageModalOpen((prev) => ({ ...prev, [fieldId]: false }));
+  }, []);
+
+  // Handle image selection from API (stores image path and preview URL)
+  const handleFlexibleFieldImageSelect = useCallback(
+    (fieldId, mediaItem) => {
+      const imageUrl = getImageUrl(mediaItem.media_url);
       setFlexibleFields((prev) =>
         prev.map((field) =>
           field.id === fieldId
-            ? { ...field, image_file: null, image_preview: "" }
+            ? {
+                ...field,
+                image_file: null, // Clear file since we're using API path
+                image_preview: imageUrl,
+                image_path: mediaItem.media_url, // Store original path from API
+                image_id: mediaItem.id, // Store media ID for reference
+              }
             : field
         )
       );
-      return;
-    }
-    const previewUrl = URL.createObjectURL(file);
-    setFlexibleFields((prev) =>
-      prev.map((field) =>
-        field.id === fieldId
-          ? { ...field, image_file: file, image_preview: previewUrl }
-          : field
-      )
-    );
-  }, []);
+      closeImageModal(fieldId);
+    },
+    [getImageUrl, closeImageModal]
+  );
+
+  // Handle vessel photo image selection
+  const handleVesselPhotoSelect = useCallback(
+    (mediaItem) => {
+      const imageUrl = getImageUrl(mediaItem.media_url);
+      setReportFormData((prev) => ({
+        ...prev,
+        vessel_photo: mediaItem.media_url, // Store original path from API
+        vessel_photo_preview: imageUrl,
+        vessel_photo_id: mediaItem.id, // Store media ID for reference
+      }));
+      closeImageModal("vessel_photo");
+    },
+    [getImageUrl, closeImageModal]
+  );
+
+  // Helper function to create flexible field base structure
+  const createFlexibleFieldBase = (sectionName, nextOrder) => ({
+    id: `${sectionName}_${Date.now()}`,
+    section_name: sectionName,
+    col_span: 1,
+    field_label: "",
+    field_value: "",
+    field_order: nextOrder,
+  });
 
   // Add flexible fields (default: Add One - 2 fields; plus custom types)
   const addFlexibleFields = (sectionName) => {
     // Calculate the next order by counting total fields in this section
-    let nextOrder = 1;
-    flexibleFields
-      .filter((f) => f.section_name === sectionName)
-      .forEach((field) => {
-        nextOrder += 1; // Add One contributes 1 field
-      });
-
-    const fieldId = `${sectionName}_${Date.now()}`;
+    const nextOrder =
+      flexibleFields.filter((f) => f.section_name === sectionName).length + 1;
 
     let newField;
-    if (sectionName === "HEADING_DESCRIPTION_IMAGE") {
+
+    // Handle HEADING_DESCRIPTION_IMAGE variants (all have same structure)
+    if (
+      sectionName === "HEADING_DESCRIPTION_IMAGE" ||
+      sectionName === "HEADING_DESCRIPTION_IMAGE_2" ||
+      sectionName === "HEADING_DESCRIPTION_IMAGE_3"
+    ) {
       newField = {
-        id: fieldId,
-        section_name: sectionName,
-        col_span: 1,
-        heading: "",
-        description: "",
+        ...createFlexibleFieldBase(sectionName, nextOrder),
+        // field_1: heading, field_2: description, field_3: image_path, field_4: image_id
+        field_1: "",
+        field_2: "",
+        field_3: "",
+        field_4: null,
         image_file: null,
         image_preview: "",
-        // keep these to avoid breaking existing validation/payload paths
-        field_label: "",
-        field_value: "",
-        field_order: nextOrder,
       };
-    } else if (sectionName === "HEADING_DESCRIPTION_IMAGE_2") {
+    }
+    // Handle EQUIPMENT_MAKE_MODEL variants (all have same structure)
+    else if (
+      sectionName === "EQUIPMENT_MAKE_MODEL" ||
+      sectionName === "EQUIPMENT_MAKE_MODEL_2"
+    ) {
       newField = {
-        id: fieldId,
-        section_name: sectionName,
-        col_span: 1,
-        heading: "",
-        description: "",
-        image_file: null,
-        image_preview: "",
-        field_label: "",
-        field_value: "",
-        field_order: nextOrder,
+        ...createFlexibleFieldBase(sectionName, nextOrder),
+        // field_1: name_of_equipment, field_2: make, field_3: model
+        field_1: "",
+        field_2: "",
+        field_3: "",
       };
-    } else if (sectionName === "HEADING_DESCRIPTION_IMAGE_3") {
+    }
+    // Handle CERTIFICATIONS_OF_THE_VESSEL
+    else if (sectionName === "CERTIFICATIONS_OF_THE_VESSEL") {
       newField = {
-        id: fieldId,
-        section_name: sectionName,
-        col_span: 1,
-        heading: "",
-        description: "",
-        image_file: null,
-        image_preview: "",
-        field_label: "",
-        field_value: "",
-        field_order: nextOrder,
+        ...createFlexibleFieldBase(sectionName, nextOrder),
+        // field_1: certificates, field_2: issued, field_3: last_annual, field_4: last_intermediate, field_5: expires
+        field_1: "",
+        field_2: "",
+        field_3: "",
+        field_4: "",
+        field_5: "",
       };
-    } else if (sectionName === "EQUIPMENT_MAKE_MODEL") {
+    }
+    // Handle DECK_EQUIPMENT_SPECIAL_FEATURES
+    else if (sectionName === "DECK_EQUIPMENT_SPECIAL_FEATURES") {
       newField = {
-        id: fieldId,
-        section_name: sectionName,
-        col_span: 1,
-        name_of_equipment: "",
-        make: "",
-        model: "",
-        field_label: "",
-        field_value: "",
-        field_order: nextOrder,
+        ...createFlexibleFieldBase(sectionName, nextOrder),
+        // field_1: particulars, field_2: specifications
+        field_1: "",
+        field_2: "",
       };
-    } else if (sectionName === "EQUIPMENT_MAKE_MODEL_2") {
+    }
+    // Default: Standard flexible field (Add One)
+    else {
+      // Generic Add One: two inputs mapped to field_1 and field_2
       newField = {
-        id: fieldId,
-        section_name: sectionName,
-        col_span: 1,
-        name_of_equipment: "",
-        make: "",
-        model: "",
-        field_label: "",
-        field_value: "",
-        field_order: nextOrder,
-      };
-    } else {
-      newField = {
-        id: fieldId,
-        section_name: sectionName,
-        col_span: 1, // Only Add One (2 fields)
-        field_label: "",
-        field_value: "",
-        field_order: nextOrder, // This will be the order for the first field
+        ...createFlexibleFieldBase(sectionName, nextOrder),
+        field_1: "",
+        field_2: "",
       };
     }
 
@@ -771,20 +813,9 @@ function MarineReport() {
     const errors = [];
 
     flexibleFields.forEach((field, index) => {
-      // Skip validation for custom sections; payload rules can be defined later
-      if (
-        field.section_name === "HEADING_DESCRIPTION_IMAGE" ||
-        field.section_name === "HEADING_DESCRIPTION_IMAGE_2" ||
-        field.section_name === "HEADING_DESCRIPTION_IMAGE_3" ||
-        field.section_name === "EQUIPMENT_MAKE_MODEL" ||
-        field.section_name === "EQUIPMENT_MAKE_MODEL_2"
-      ) {
-        return;
-      }
-      if (!field.field_label || !field.field_value) {
-        errors.push(
-          `Flexible field ${index + 1}: Label and Value are required`
-        );
+      // Validation: for all sections, check field_1 exists; for two-column generic sections, also field_2
+      if (!field.field_1 || (field.section_name === "DECK_EQUIPMENT_SPECIAL_FEATURES" && !field.field_2)) {
+        errors.push(`Flexible field ${index + 1}: Required fields are missing`);
       }
     });
 
@@ -797,7 +828,10 @@ function MarineReport() {
       (field) => field.section_name === sectionName
     );
 
-    if (sectionName === "EQUIPMENT_MAKE_MODEL" || sectionName === "EQUIPMENT_MAKE_MODEL_2") {
+    if (
+      sectionName === "EQUIPMENT_MAKE_MODEL" ||
+      sectionName === "EQUIPMENT_MAKE_MODEL_2"
+    ) {
       return sectionFields.map((field) => (
         <div
           key={field.id}
@@ -825,11 +859,11 @@ function MarineReport() {
               <input
                 type="text"
                 className="form-field"
-                value={field.name_of_equipment || ""}
+                value={field.field_1 || ""}
                 onChange={(e) =>
                   handleFlexibleFieldChange(
                     field.id,
-                    "name_of_equipment",
+                    "field_1",
                     e.target.value
                   )
                 }
@@ -845,9 +879,9 @@ function MarineReport() {
               <input
                 type="text"
                 className="form-field"
-                value={field.make || ""}
+                value={field.field_2 || ""}
                 onChange={(e) =>
-                  handleFlexibleFieldChange(field.id, "make", e.target.value)
+                  handleFlexibleFieldChange(field.id, "field_2", e.target.value)
                 }
                 placeholder="Enter Make"
               />
@@ -860,9 +894,9 @@ function MarineReport() {
               <input
                 type="text"
                 className="form-field"
-                value={field.model || ""}
+                value={field.field_3 || ""}
                 onChange={(e) =>
-                  handleFlexibleFieldChange(field.id, "model", e.target.value)
+                  handleFlexibleFieldChange(field.id, "field_3", e.target.value)
                 }
                 placeholder="Enter Model"
               />
@@ -872,7 +906,11 @@ function MarineReport() {
       ));
     }
 
-    if (sectionName === "HEADING_DESCRIPTION_IMAGE" || sectionName === "HEADING_DESCRIPTION_IMAGE_2" || sectionName === "HEADING_DESCRIPTION_IMAGE_3") {
+    if (
+      sectionName === "HEADING_DESCRIPTION_IMAGE" ||
+      sectionName === "HEADING_DESCRIPTION_IMAGE_2" ||
+      sectionName === "HEADING_DESCRIPTION_IMAGE_3"
+    ) {
       return sectionFields.map((field) => (
         <div
           key={field.id}
@@ -900,9 +938,9 @@ function MarineReport() {
               <input
                 type="text"
                 className="form-field"
-                value={field.heading || ""}
+                value={field.field_1 || ""}
                 onChange={(e) =>
-                  handleFlexibleFieldChange(field.id, "heading", e.target.value)
+                  handleFlexibleFieldChange(field.id, "field_1", e.target.value)
                 }
                 placeholder="Enter heading"
               />
@@ -915,13 +953,9 @@ function MarineReport() {
               <textarea
                 className="form-field"
                 rows="4"
-                value={field.description || ""}
+                value={field.field_2 || ""}
                 onChange={(e) =>
-                  handleFlexibleFieldChange(
-                    field.id,
-                    "description",
-                    e.target.value
-                  )
+                  handleFlexibleFieldChange(field.id, "field_2", e.target.value)
                 }
                 placeholder="Enter description"
               ></textarea>
@@ -931,32 +965,87 @@ function MarineReport() {
           <div className="col-md-12">
             <div className="form-group">
               <label>Image</label>
-              <input
-                type="file"
-                accept="image/*"
-                className="form-field"
-                onChange={(e) =>
-                  handleFlexibleFieldImageChange(
-                    field.id,
-                    e.target.files && e.target.files[0]
-                      ? e.target.files[0]
-                      : null
-                  )
-                }
-              />
-              {field.image_preview ? (
-                <div style={{ marginTop: "8px" }}>
-                  <img
-                    src={field.image_preview}
-                    alt="preview"
-                    style={{
-                      maxWidth: "100%",
-                      height: "auto",
-                      borderRadius: 4,
-                    }}
-                  />
-                </div>
-              ) : null}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "10px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => openImageModal(field.id)}
+                  style={{ marginBottom: "8px" }}
+                >
+                  Select Image
+                </button>
+                {field.image_preview ? (
+                  <div
+                    style={{ position: "relative", display: "inline-block" }}
+                  >
+                    <img
+                      src={field.image_preview}
+                      alt="preview"
+                      style={{
+                        maxWidth: "150px",
+                        height: "auto",
+                        borderRadius: 4,
+                        border: "1px solid #ddd",
+                        display: "block",
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const fieldIdToRemove = field.id;
+                        setFlexibleFields((prev) =>
+                          prev.map((f) =>
+                            f.id === fieldIdToRemove
+                              ? {
+                                  ...f,
+                                  image_preview: "",
+                                  field_3: "",
+                                  field_4: null,
+                                }
+                              : f
+                          )
+                        );
+                      }}
+                      style={{
+                        position: "absolute",
+                        top: "-8px",
+                        right: "-8px",
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                        cursor: "pointer",
+                        zIndex: 10,
+                      }}
+                      title="Remove image"
+                    >
+                      <DeleteIcon />
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+              {/* Hidden input fields for image path to include in payload */}
+              {field.field_3 && (
+                <input
+                  type="hidden"
+                  name={`flexible_image_path_${field.id}`}
+                  value={field.field_3}
+                />
+              )}
+              {field.field_4 && (
+                <input
+                  type="hidden"
+                  name={`flexible_image_id_${field.id}`}
+                  value={field.field_4}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -992,11 +1081,11 @@ function MarineReport() {
               <input
                 type="text"
                 className="form-field"
-                value={field.certificates || ""}
+                value={field.field_1 || ""}
                 onChange={(e) =>
                   handleFlexibleFieldChange(
                     field.id,
-                    "certificates",
+                    "field_1",
                     e.target.value
                   )
                 }
@@ -1013,7 +1102,7 @@ function MarineReport() {
               <input
                 type="text"
                 className="form-field"
-                value={field.issued || ""}
+                value={field.field_2 || ""}
                 onChange={(e) => {
                   const value = e.target.value;
                   let numericValue = value.replace(/\D/g, "");
@@ -1037,7 +1126,7 @@ function MarineReport() {
                     formattedValue = numericValue;
                   }
 
-                  handleFlexibleFieldChange(field.id, "issued", formattedValue);
+                  handleFlexibleFieldChange(field.id, "field_2", formattedValue);
                 }}
                 placeholder="DD-MM-YYYY"
                 required
@@ -1052,7 +1141,7 @@ function MarineReport() {
               <input
                 type="text"
                 className="form-field"
-                value={field.last_annual || ""}
+                value={field.field_3 || ""}
                 onChange={(e) => {
                   const value = e.target.value;
                   let numericValue = value.replace(/\D/g, "");
@@ -1076,11 +1165,7 @@ function MarineReport() {
                     formattedValue = numericValue;
                   }
 
-                  handleFlexibleFieldChange(
-                    field.id,
-                    "last_annual",
-                    formattedValue
-                  );
+                  handleFlexibleFieldChange(field.id, "field_3", formattedValue);
                 }}
                 placeholder="DD-MM-YYYY"
                 required
@@ -1095,7 +1180,7 @@ function MarineReport() {
               <input
                 type="text"
                 className="form-field"
-                value={field.last_intermediate || ""}
+                value={field.field_4 || ""}
                 onChange={(e) => {
                   const value = e.target.value;
                   let numericValue = value.replace(/\D/g, "");
@@ -1119,11 +1204,7 @@ function MarineReport() {
                     formattedValue = numericValue;
                   }
 
-                  handleFlexibleFieldChange(
-                    field.id,
-                    "last_intermediate",
-                    formattedValue
-                  );
+                  handleFlexibleFieldChange(field.id, "field_4", formattedValue);
                 }}
                 placeholder="DD-MM-YYYY"
                 required
@@ -1138,7 +1219,7 @@ function MarineReport() {
               <input
                 type="text"
                 className="form-field"
-                value={field.expires || ""}
+                value={field.field_5 || ""}
                 onChange={(e) => {
                   const value = e.target.value;
                   let numericValue = value.replace(/\D/g, "");
@@ -1162,11 +1243,7 @@ function MarineReport() {
                     formattedValue = numericValue;
                   }
 
-                  handleFlexibleFieldChange(
-                    field.id,
-                    "expires",
-                    formattedValue
-                  );
+                  handleFlexibleFieldChange(field.id, "field_5", formattedValue);
                 }}
                 placeholder="DD-MM-YYYY"
                 required
@@ -1205,11 +1282,11 @@ function MarineReport() {
             <input
               type="text"
               className="form-field"
-              value={field.particulars}
+              value={field.field_1}
               onChange={(e) =>
                 handleFlexibleFieldChange(
                   field.id,
-                  "particulars",
+                  "field_1",
                   e.target.value
                 )
               }
@@ -1226,11 +1303,11 @@ function MarineReport() {
             <input
               type="text"
               className="form-field"
-              value={field.specifications}
+              value={field.field_2}
               onChange={(e) =>
                 handleFlexibleFieldChange(
                   field.id,
-                  "specifications",
+                  "field_2",
                   e.target.value
                 )
               }
@@ -1255,6 +1332,7 @@ function MarineReport() {
   useEffect(() => {
     if (id) {
       dispatch(fetchOrderById(id));
+      dispatch(fetchOrderMedia(id)); // Fetch media for image selection
       dispatch(
         fetchOrderReport({
           orderId: id,
@@ -1339,16 +1417,110 @@ function MarineReport() {
       );
       formData.append(
         `flexible_fields[${formDataIndex}][field_label]`,
-        field.field_label
+        field.field_label || ""
       );
       formData.append(
         `flexible_fields[${formDataIndex}][field_value]`,
-        field.field_value
+        field.field_value || ""
       );
       formData.append(
         `flexible_fields[${formDataIndex}][field_order]`,
         field.field_order
       );
+
+      // Add custom media block fields using generic field_ keys
+      if (
+        field.section_name === "HEADING_DESCRIPTION_IMAGE" ||
+        field.section_name === "HEADING_DESCRIPTION_IMAGE_2" ||
+        field.section_name === "HEADING_DESCRIPTION_IMAGE_3"
+      ) {
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_1]`,
+          field.field_1 || ""
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_2]`,
+          field.field_2 || ""
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_3]`,
+          field.field_3 || ""
+        );
+        if (field.field_4) {
+          formData.append(
+            `flexible_fields[${formDataIndex}][field_4]`,
+            field.field_4
+          );
+        }
+      }
+
+      // Add equipment fields using generic field_ keys
+      if (
+        field.section_name === "EQUIPMENT_MAKE_MODEL" ||
+        field.section_name === "EQUIPMENT_MAKE_MODEL_2"
+      ) {
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_1]`,
+          field.field_1 || ""
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_2]`,
+          field.field_2 || ""
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_3]`,
+          field.field_3 || ""
+        );
+      }
+
+      // Add certifications fields using generic field_ keys (1..5)
+      if (field.section_name === "CERTIFICATIONS_OF_THE_VESSEL") {
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_1]`,
+          field.field_1 || ""
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_2]`,
+          field.field_2 || ""
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_3]`,
+          field.field_3 || ""
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_4]`,
+          field.field_4 || ""
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_5]`,
+          field.field_5 || ""
+        );
+      }
+
+      // Add deck equipment fields using generic field_ keys
+      if (field.section_name === "DECK_EQUIPMENT_SPECIAL_FEATURES") {
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_1]`,
+          field.field_1 || ""
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_2]`,
+          field.field_2 || ""
+        );
+      }
+
+      // Add deck equipment fields (particulars, specifications)
+      if (field.section_name === "DECK_EQUIPMENT_SPECIAL_FEATURES") {
+        formData.append(
+          `flexible_fields[${formDataIndex}][particulars]`,
+          field.particulars || ""
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][specifications]`,
+          field.specifications || ""
+        );
+      }
+
       formDataIndex++;
     });
 
@@ -1381,53 +1553,94 @@ function MarineReport() {
 
   // Handle save report data
   const handleSaveReport = () => {
-    // Create report data object with only non-empty fields
+    // Create report data object with ALL fields (including empty ones)
     const reportData = {};
 
-    // Add report form data - only include fields with actual values
+    // Add ALL report form data fields to payload (even if empty)
     Object.keys(reportFormData).forEach((key) => {
-      const value = reportFormData[key];
-
-      // Always include important read-only fields even if empty
-      const alwaysIncludeFields = []; // Marine report may not have many read-only fields
-
-      if (alwaysIncludeFields.includes(key)) {
-        // Always include these fields, even if empty
-        reportData[key] = value || "";
-      } else {
-        // Only include fields that have meaningful values (not null, undefined, or empty string)
-        if (value !== null && value !== undefined && value !== "") {
-          reportData[key] = value;
-        }
-      }
+      let value = reportFormData[key];
+      // Always include the field, convert null/undefined to empty string
+      reportData[key] = value !== null && value !== undefined ? value : "";
     });
 
-    // Add flexible fields in the same format as report generation
+    // Add ALL flexible fields to payload (same format as report generation)
     let formDataIndex = 0;
     flexibleFields.forEach((field) => {
-      // Only include fields with actual values
-      if (field.field_value && field.field_value.trim() !== "") {
-        reportData[`flexible_fields[${formDataIndex}][section_name]`] =
-          field.section_name;
-        reportData[`flexible_fields[${formDataIndex}][col_span]`] =
-          field.col_span;
-        reportData[`flexible_fields[${formDataIndex}][field_label]`] =
-          field.field_label;
-        reportData[`flexible_fields[${formDataIndex}][field_value]`] =
-          field.field_value;
-        reportData[`flexible_fields[${formDataIndex}][field_order]`] =
-          field.field_order;
-        formDataIndex++;
-      }
-    });
+      // Add ALL flexible fields, even if empty
+      reportData[`flexible_fields[${formDataIndex}][section_name]`] =
+        field.section_name;
+      reportData[`flexible_fields[${formDataIndex}][col_span]`] =
+        field.col_span;
+      reportData[`flexible_fields[${formDataIndex}][field_label]`] =
+        field.field_label || "";
+      reportData[`flexible_fields[${formDataIndex}][field_value]`] =
+        field.field_value || "";
+      reportData[`flexible_fields[${formDataIndex}][field_order]`] =
+        field.field_order;
 
-    // Only proceed if there's actual data to save
-    if (Object.keys(reportData).length === 0) {
-      toast.warning(
-        "No data to save. Please fill in some fields before saving."
-      );
-      return;
-    }
+      // Add custom media block fields using generic field_ keys
+      if (
+        field.section_name === "HEADING_DESCRIPTION_IMAGE" ||
+        field.section_name === "HEADING_DESCRIPTION_IMAGE_2" ||
+        field.section_name === "HEADING_DESCRIPTION_IMAGE_3"
+      ) {
+        reportData[`flexible_fields[${formDataIndex}][field_1]`] =
+          field.field_1 || "";
+        reportData[`flexible_fields[${formDataIndex}][field_2]`] =
+          field.field_2 || "";
+        reportData[`flexible_fields[${formDataIndex}][field_3]`] =
+          field.field_3 || "";
+        if (field.field_4) {
+          reportData[`flexible_fields[${formDataIndex}][field_4]`] =
+            field.field_4;
+        }
+      }
+
+      // Add equipment fields using generic field_ keys
+      if (
+        field.section_name === "EQUIPMENT_MAKE_MODEL" ||
+        field.section_name === "EQUIPMENT_MAKE_MODEL_2"
+      ) {
+        reportData[`flexible_fields[${formDataIndex}][field_1]`] =
+          field.field_1 || "";
+        reportData[`flexible_fields[${formDataIndex}][field_2]`] =
+          field.field_2 || "";
+        reportData[`flexible_fields[${formDataIndex}][field_3]`] =
+          field.field_3 || "";
+      }
+
+      // Add certifications fields using generic field_ keys
+      if (field.section_name === "CERTIFICATIONS_OF_THE_VESSEL") {
+        reportData[`flexible_fields[${formDataIndex}][field_1]`] =
+          field.field_1 || "";
+        reportData[`flexible_fields[${formDataIndex}][field_2]`] =
+          field.field_2 || "";
+        reportData[`flexible_fields[${formDataIndex}][field_3]`] =
+          field.field_3 || "";
+        reportData[`flexible_fields[${formDataIndex}][field_4]`] =
+          field.field_4 || "";
+        reportData[`flexible_fields[${formDataIndex}][field_5]`] =
+          field.field_5 || "";
+      }
+
+      // Add deck equipment fields using generic field_ keys
+      if (field.section_name === "DECK_EQUIPMENT_SPECIAL_FEATURES") {
+        reportData[`flexible_fields[${formDataIndex}][field_1]`] =
+          field.field_1 || "";
+        reportData[`flexible_fields[${formDataIndex}][field_2]`] =
+          field.field_2 || "";
+      }
+
+      // Add deck equipment fields (particulars, specifications)
+      if (field.section_name === "DECK_EQUIPMENT_SPECIAL_FEATURES") {
+        reportData[`flexible_fields[${formDataIndex}][particulars]`] =
+          field.particulars || "";
+        reportData[`flexible_fields[${formDataIndex}][specifications]`] =
+          field.specifications || "";
+      }
+
+      formDataIndex++;
+    });
 
     // Dispatch save action with JSON data
     dispatch(
@@ -1585,6 +1798,90 @@ function MarineReport() {
                       placeholder="132132"
                       required
                     />
+                  </div>
+                </div>
+                <div className="col-md-12">
+                  <div className="form-group">
+                    <label>VESSEL PHOTO</label>
+                    <div className="vessel-photo-container">
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: "10px",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => openImageModal("vessel_photo")}
+                          style={{ marginBottom: "8px" }}
+                        >
+                          Select Image
+                        </button>
+                        {reportFormData.vessel_photo_preview ? (
+                          <div
+                            style={{
+                              position: "relative",
+                              display: "inline-block",
+                            }}
+                          >
+                            <img
+                              src={reportFormData.vessel_photo_preview}
+                              alt="Vessel photo preview"
+                              style={{
+                                maxWidth: "150px",
+                                height: "auto",
+                                borderRadius: 4,
+                                border: "1px solid #ddd",
+                                display: "block",
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setReportFormData((prev) => ({
+                                  ...prev,
+                                  vessel_photo: "",
+                                  vessel_photo_preview: "",
+                                  vessel_photo_id: null,
+                                }));
+                              }}
+                              style={{
+                                position: "absolute",
+                                top: "-8px",
+                                right: "-8px",
+                                background: "none",
+                                border: "none",
+                                padding: 0,
+                                cursor: "pointer",
+                                zIndex: 10,
+                              }}
+                              title="Remove image"
+                            >
+                              <DeleteIcon />
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                      {/* Hidden input field for vessel photo path to include in payload */}
+                      {reportFormData.vessel_photo && (
+                        <input
+                          type="hidden"
+                          name="vessel_photo"
+                          value={reportFormData.vessel_photo}
+                        />
+                      )}
+                      {reportFormData.vessel_photo_id && (
+                        <input
+                          type="hidden"
+                          name="vessel_photo_id"
+                          value={reportFormData.vessel_photo_id}
+                        />
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="col-md-12">
@@ -3271,23 +3568,7 @@ function MarineReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-6">
-                  <div className="form-group">
-                    <label>Policy No.</label>
-                  </div>
-                </div>
-                <div className="col-md-6">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      name="policy_no_war_risk_policy"
-                      value={reportFormData.policy_no_war_risk_policy}
-                      onChange={handleFormChange}
-                      placeholder="Enter Policy No."
-                    />
-                  </div>
-                </div>
+
                 <div className="col-md-6">
                   <div className="form-group">
                     <label>Period of Insurance</label>
@@ -10073,7 +10354,9 @@ function MarineReport() {
                       <button
                         type="button"
                         className="btn"
-                        onClick={() => addFlexibleFields("EQUIPMENT_MAKE_MODEL_2")}
+                        onClick={() =>
+                          addFlexibleFields("EQUIPMENT_MAKE_MODEL_2")
+                        }
                       >
                         Add Equipment (Name / Make / Model)
                       </button>
@@ -10123,8 +10406,8 @@ function MarineReport() {
                     <button
                       type="button"
                       className="btn save-report"
-                      /* onClick={handleSaveReport}
-                      disabled={saving} */
+                      onClick={handleSaveReport}
+                      disabled={saving}
                       style={{ marginRight: "10px" }}
                     >
                       {saving ? "Saving..." : "Save"}
@@ -10136,8 +10419,143 @@ function MarineReport() {
           </div>
         </div>
       </div>
+
+      {/* Image Selection Modals - One per field */}
+      {Object.entries(imageModalOpen)
+        .filter(([_, isOpen]) => isOpen)
+        .map(([fieldId, _]) => {
+          return (
+            <div
+              key={fieldId}
+              className="modal"
+              style={{
+                display: "block",
+                backgroundColor: "rgba(0, 0, 0, 0.5)",
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 1050,
+              }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                  closeImageModal(fieldId);
+                }
+              }}
+            >
+              <div
+                className="modal-dialog modal-lg"
+                style={{
+                  maxWidth: "90%",
+                  margin: "50px auto",
+                  position: "relative",
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="modal-content">
+                  <div className="modal-header">
+                    <h5 className="modal-title">
+                      {fieldId === "vessel_photo"
+                        ? "Select Vessel Photo"
+                        : "Select Image"}
+                    </h5>
+                    <button
+                      type="button"
+                      className="close-button"
+                      onClick={() => closeImageModal(fieldId)}
+                      aria-label="Close"
+                      style={{
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <CloseIcon />
+                    </button>
+                  </div>
+                  <div className="modal-body">
+                    {mediaLoading ? (
+                      <div className="text-center">
+                        <div className="spinner-border" role="status">
+                          <span className="visually-hidden">Loading...</span>
+                        </div>
+                      </div>
+                    ) : approvedImages.length === 0 ? (
+                      <div className="text-center text-muted">
+                        <p>No approved images available.</p>
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fill, minmax(150px, 1fr))",
+                          gap: "15px",
+                          maxHeight: "70vh",
+                          overflowY: "auto",
+                          padding: "10px",
+                        }}
+                      >
+                        {approvedImages.map((imageItem) => {
+                          const imageUrl = getImageUrl(imageItem.media_url);
+                          return (
+                            <div
+                              key={imageItem.id}
+                              style={{
+                                border: "2px solid #ddd",
+                                borderRadius: "8px",
+                                overflow: "hidden",
+                                cursor: "pointer",
+                                transition: "all 0.2s",
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = "#007bff";
+                                e.currentTarget.style.transform = "scale(1.05)";
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = "#ddd";
+                                e.currentTarget.style.transform = "scale(1)";
+                              }}
+                              onClick={() => {
+                                if (fieldId === "vessel_photo") {
+                                  handleVesselPhotoSelect(imageItem);
+                                } else {
+                                  handleFlexibleFieldImageSelect(
+                                    fieldId,
+                                    imageItem
+                                  );
+                                }
+                              }}
+                            >
+                              <img
+                                src={imageUrl}
+                                alt={`Image ${imageItem.id}`}
+                                style={{
+                                  width: "100%",
+                                  height: "150px",
+                                  objectFit: "cover",
+                                }}
+                                onError={(e) => {
+                                  e.target.src =
+                                    "https://via.placeholder.com/150x150?text=Image+Not+Found";
+                                }}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
     </section>
   );
 }
 
 export default MarineReport;
+
