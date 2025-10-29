@@ -1381,13 +1381,13 @@ function OrderDetails() {
                         >
                           <ReportIcon />
                         </Link> */}
-                        {/* <Link
+                        <Link
                           to={`/orders/${id}/details/marine-report`}
                           title="Marine Report"
                           className="tooltip-link"
                         >
                           <ReportIcon />
-                        </Link> */}
+                        </Link>
                       </>
                     )}
 
@@ -1518,7 +1518,7 @@ function OrderDetails() {
                         )}
                       </>
                     )}
-                    {order?.category_name === "MACHINERY" && (
+                    {order?.category_name === "MARINE" && (
                       <>
                         {order?.valuer_name &&
                         order.valuer_name.trim() !== "" ? (

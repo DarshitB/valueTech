@@ -6010,7 +6010,7 @@ function MarineReport() {
                   </div>
                   <div className="col-md-6">
                     <div className="form-group">
-                      <input  
+                      <input
                         type="text"
                         className="form-field"
                         name="number_of_portable_gauging_units_on_board"
@@ -6022,8 +6022,3456 @@ function MarineReport() {
                       />
                     </div>
                   </div>
+
+                  <div className="col-md-12">
+                    <h5>9.9 Vapor Emission Control System (VECS)</h5>
+                    <hr />
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        Is a Vapour Emission Control System (VECS) fitted?
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <SingleSearchSelect
+                        options={[
+                          {
+                            value: "Yes",
+                            label: "Yes",
+                          },
+                          {
+                            value: "No",
+                            label: "No",
+                          },
+                        ]}
+                        value={
+                          reportFormData.is_a_vapour_emission_control_system_vecs_fitted ||
+                          "Yes"
+                        }
+                        onChange={(value) =>
+                          handleSelectChange(
+                            "is_a_vapour_emission_control_system_vecs_fitted",
+                            value
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Number/size of VECS manifolds (per side):</label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="row">
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          <input
+                            type="text"
+                            className="form-field"
+                            name="number_of_vecs_manifolds_per_side"
+                            value={
+                              reportFormData.number_of_vecs_manifolds_per_side
+                            }
+                            onChange={handleDimensionChange}
+                            placeholder="Enter Number Of VES Manifolds Per Side"
+                          />
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          <input
+                            type="text"
+                            className="form-field"
+                            name="size_of_vecs_manifolds_per_side"
+                            value={
+                              reportFormData.size_of_vecs_manifolds_per_side
+                            }
+                            onChange={handleDimensionChange}
+                            placeholder="Enter Size Of VES Manifolds Per Side (in Millimetres)"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Number/size/type of VECS reducers:</label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="number_of_vecs_reducers_per_side"
+                        value={reportFormData.number_of_vecs_reducers_per_side}
+                        onChange={handleFormChange}
+                        placeholder="Enter Number Of VES Reducers Per Side"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-12">
+                    <h5>9.10 VENTING</h5>
+                    <hr />
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        State what type of venting system is fitted:
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="state_what_type_of_venting_system_is_fitted"
+                        value={
+                          reportFormData.state_what_type_of_venting_system_is_fitted
+                        }
+                        onChange={handleFormChange}
+                        placeholder="Enter State What Type Of Venting System Is Fitted"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-12">
+                    <h5>9.11 CARGO MANIFOLDS & REDUCERS</h5>
+                    <hr />
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        Total number/size of cargo manifold connections on each
+                        side:
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        <small>(in Millimetres)</small>
+                      </label>
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="total_number_of_cargo_manifold_connections_on_each_side"
+                        value={
+                          reportFormData.total_number_of_cargo_manifold_connections_on_each_side
+                        }
+                        onChange={handleDimensionChange}
+                        placeholder="Enter Total Number Of Cargo Manifold Connections On Each Side"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>What type of valves are fitted at manifold:</label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="what_type_of_valves_are_fitted_at_manifold"
+                        value={
+                          reportFormData.what_type_of_valves_are_fitted_at_manifold
+                        }
+                        onChange={handleFormChange}
+                        placeholder="Enter What Type Of Valves Are Fitted At Manifold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        What is the material/rating of the manifold:
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="what_is_the_material_rating_of_the_manifold"
+                        value={
+                          reportFormData.what_is_the_material_rating_of_the_manifold
+                        }
+                        onChange={handleFormChange}
+                        placeholder="Enter What Is The Material Rating Of The Manifold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        Does vessel comply with the latest edition of the OCIMF
+                        'Recommendations for Oil Tanker Manifolds and Associated
+                        Equipment?
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <SingleSearchSelect
+                        options={[
+                          {
+                            value: "Yes",
+                            label: "Yes",
+                          },
+                          {
+                            value: "No",
+                            label: "No",
+                          },
+                        ]}
+                        value={reportFormData.does_vessel_comply || "Yes"}
+                        onChange={(value) =>
+                          handleSelectChange("does_vessel_comply", value)
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Distance between cargo manifold centers:</label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        <small>(in Millimetres)</small>
+                      </label>
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="distance_between_cargo_manifold_centers"
+                        value={
+                          reportFormData.distance_between_cargo_manifold_centers
+                        }
+                        onChange={handleDimensionChange}
+                        placeholder="Enter Distance Between Cargo Manifold Centers"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Distance ships rail to manifold</label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        <small>(in Millimetres)</small>
+                      </label>
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="distance_ships_rail_to_manifold"
+                        value={reportFormData.distance_ships_rail_to_manifold}
+                        onChange={handleDimensionChange}
+                        placeholder="Enter Distance Ships Rail To Manifold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Distance manifold to ships side</label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        <small>(in Millimetres)</small>
+                      </label>
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="distance_manifold_to_ships_side"
+                        value={reportFormData.distance_manifold_to_ships_side}
+                        onChange={handleDimensionChange}
+                        placeholder="Enter Distance Manifold To Ships Side"
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Top of rail to center of manifold</label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        <small>(in Millimetres)</small>
+                      </label>
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="distance_top_of_rail_to_center_of_manifold"
+                        value={
+                          reportFormData.distance_top_of_rail_to_center_of_manifold
+                        }
+                        onChange={handleDimensionChange}
+                        placeholder="Enter Distance Top Of Rail To Center Of Manifold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Distance main deck to center of manifold</label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        <small>(in Millimetres)</small>
+                      </label>
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="distance_main_deck_to_center_of_manifold"
+                        value={
+                          reportFormData.distance_main_deck_to_center_of_manifold
+                        }
+                        onChange={handleDimensionChange}
+                        placeholder="Enter Distance Main Deck To Center Of Manifold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Spill tank grating to center of manifold</label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        <small>(in Millimetres)</small>
+                      </label>
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="distance_spill_tank_grating_to_center_of_manifold"
+                        value={
+                          reportFormData.distance_spill_tank_grating_to_center_of_manifold
+                        }
+                        onChange={handleDimensionChange}
+                        placeholder="Enter Distance Spill Tank Grating To Center Of Manifold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        Manifold height above the waterline in normal ballast/at
+                        SDWT condition
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="row">
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          <input
+                            type="text"
+                            className="form-field"
+                            name="manifold_height_above_the_waterline_in_normal_ballast_at_sdwt_condition"
+                            value={
+                              reportFormData.manifold_height_above_the_waterline_in_normal_ballast_at_sdwt_condition
+                            }
+                            onChange={handleDimensionChange}
+                            placeholder="Enter Manifold Height Above The Waterline In Normal Ballast At SDWT Condition (in Metres)"
+                          />
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          <input
+                            type="text"
+                            className="form-field"
+                            name="manifold_height_above_the_waterline_in_lightship_condition"
+                            value={
+                              reportFormData.manifold_height_above_the_waterline_in_lightship_condition
+                            }
+                            onChange={handleDimensionChange}
+                            placeholder="Enter Manifold Height Above The Waterline In Lightship Condition (in Metres)"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Number/size / type of reducers:</label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="number_of_reducers_per_side"
+                        value={reportFormData.number_of_reducers_per_side}
+                        onChange={handleFormChange}
+                        placeholder="Enter Number Of Reducers Per Side"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        Is vessel fitted with a stern manifold? If yes, state
+                        size
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="is_vessel_fitted_with_a_stern_manifold_if_yes_state_size"
+                        value={
+                          reportFormData.is_vessel_fitted_with_a_stern_manifold_if_yes_state_size
+                        }
+                        onChange={handleFormChange}
+                        placeholder="Enter Is Vessel Fitted With A Stern Manifold If Yes State Size"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
+
+              {/** 10.1 HEATING */}
+              <div className="row">
+                <div className="col-md-12">
+                  <h4>10.1 HEATING</h4>
+                  <hr />
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label>Cargo Tanks</label>
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>TYPE</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="type_of_cargo_tanks_heating"
+                      value={reportFormData.type_of_cargo_tanks_heating}
+                      onChange={handleFormChange}
+                      placeholder="Enter Type of Cargo Tanks"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>COILED</small>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        {
+                          value: "Yes",
+                          label: "Yes",
+                        },
+                        {
+                          value: "No",
+                          label: "No",
+                        },
+                      ]}
+                      value={reportFormData.coiled_cargo_tanks_heating || "Yes"}
+                      onChange={(value) =>
+                        handleSelectChange("coiled_cargo_tanks_heating", value)
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label>
+                      <small>MATERIAL</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="material_of_cargo_tanks_heating"
+                      value={reportFormData.material_of_cargo_tanks_heating}
+                      onChange={handleFormChange}
+                      placeholder="Enter Material of Cargo Tanks"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label>Slop Tanks</label>
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>TYPE</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="type_of_slop_tanks_heating"
+                      value={reportFormData.type_of_slop_tanks_heating}
+                      onChange={handleFormChange}
+                      placeholder="Enter Type of Slop Tanks"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>COILED</small>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        {
+                          value: "Yes",
+                          label: "Yes",
+                        },
+                        {
+                          value: "No",
+                          label: "No",
+                        },
+                      ]}
+                      value={reportFormData.coiled_slop_tanks_heating || "Yes"}
+                      onChange={(value) =>
+                        handleSelectChange("coiled_slop_tanks_heating", value)
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label>
+                      <small>MATERIAL</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="material_of_slop_tanks_heating"
+                      value={reportFormData.material_of_slop_tanks_heating}
+                      onChange={handleFormChange}
+                      placeholder="Enter Material of Slop Tanks"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Maximum temperature cargo can be loaded/maintained
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="row">
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          name="maximum_temperature_cargo_can_be_loaded_maintained_1"
+                          value={
+                            reportFormData.maximum_temperature_cargo_can_be_loaded_maintained_1
+                          }
+                          onChange={handleDimensionChange}
+                          placeholder="Enter Maximum Temperature Cargo Can Be Loaded/Maintained (in Celsius)"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          name="maximum_temperature_cargo_can_be_loaded_maintained_2"
+                          value={
+                            reportFormData.maximum_temperature_cargo_can_be_loaded_maintained_2
+                          }
+                          onChange={handleDimensionChange}
+                          placeholder="Enter Maximum Temperature Cargo Can Be Loaded/Maintained (in Celsius)"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/** 10.2 INERT GAS & CRUDE OIL WASHING */}
+              <div className="row">
+                <div className="col-md-12">
+                  <h4>10.2 INERT GAS & CRUDE OIL WASHING</h4>
+                  <hr />
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Is an Inert Gas System (IGS) fitted/operational?
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="is_an_inert_gas_system_igs_fitted_operational"
+                      value={
+                        reportFormData.is_an_inert_gas_system_igs_fitted_operational
+                      }
+                      onChange={handleFormChange}
+                      placeholder="Enter Is An Inert Gas System (IGS) Fitted/Operational"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Is IGS supplied by flue gas, inert gas (IG) generator
+                      and/or nitrogen
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="is_igs_supplied_by_flue_gas_inert_gas_ig_generator_and_or_nitrogen"
+                      value={
+                        reportFormData.is_igs_supplied_by_flue_gas_inert_gas_ig_generator_and_or_nitrogen
+                      }
+                      onChange={handleFormChange}
+                      placeholder="Enter Is IGS Supplied By Flue Gas, Inert Gas (IG) Generator And/Or Nitrogen"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      If nitrogen generator, specify the applicable flow rate
+                      for each of the designed purity modes
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="if_nitrogen_generator_specify"
+                      value={reportFormData.if_nitrogen_generator_specify}
+                      onChange={handleFormChange}
+                      placeholder="Enter If Nitrogen Generator, Specify The Applicable Flow Rate For Each Of The Designed Purity Modes"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-12">
+                  <h4>10.3 CARGO PUMPS</h4>
+                  <hr />
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      How many cargo pumps can be run simultaneously at full
+                      capacity
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="how_many_cargo_pumps_can_be_run_simultaneously_at_full_capacity"
+                      value={
+                        reportFormData.how_many_cargo_pumps_can_be_run_simultaneously_at_full_capacity
+                      }
+                      onChange={handleFormChange}
+                      placeholder="Enter How Many Cargo Pumps Can Be Run Simultaneously At Full Capacity"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label>Cargo Pumps</label>
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>SR No</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="sr_no_of_cargo_pumps"
+                      value={reportFormData.sr_no_of_cargo_pumps}
+                      onChange={handleFormChange}
+                      placeholder="Enter SR No of Cargo Pumps"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>TYPE</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="type_of_cargo_pumps"
+                      value={reportFormData.type_of_cargo_pumps}
+                      onChange={handleFormChange}
+                      placeholder="Enter Type of Cargo Pumps"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>CAPACITY (Cu.Metres/Hour)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="capacity_of_cargo_pumps"
+                      value={reportFormData.capacity_of_cargo_pumps}
+                      onChange={handleFormChange}
+                      placeholder="Enter Material of Slop Tanks"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>At What Head (sg=1.0) (in Metres)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="at_what_head_cargo_pumps"
+                      value={reportFormData.at_what_head_cargo_pumps}
+                      onChange={handleFormChange}
+                      placeholder="Enter At What Head Cargo Pumps"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label>Cargo Eductors</label>
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>SR No</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="sr_no_of_cargo_eductors"
+                      value={reportFormData.sr_no_of_cargo_eductors}
+                      onChange={handleFormChange}
+                      placeholder="Enter SR No of Cargo Eductors"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>TYPE</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="type_of_cargo_eductors"
+                      value={reportFormData.type_of_cargo_eductors}
+                      onChange={handleFormChange}
+                      placeholder="Enter Type of Cargo Eductors"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>CAPACITY (Cu.Metres/Hour)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="capacity_of_cargo_eductors"
+                      value={reportFormData.capacity_of_cargo_eductors}
+                      onChange={handleFormChange}
+                      placeholder="Enter Capacity of Cargo Eductors"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>At What Head (sg=1.0) (in Metres)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="at_what_head_cargo_eductors"
+                      value={reportFormData.at_what_head_cargo_eductors}
+                      onChange={handleFormChange}
+                      placeholder="Enter At What Head Cargo Eductors"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label>Stripping</label>
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>SR No</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="sr_no_of_stripping"
+                      value={reportFormData.sr_no_of_stripping}
+                      onChange={handleFormChange}
+                      placeholder="Enter SR No of Cargo Eductors"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>TYPE</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="type_of_stripping"
+                      value={reportFormData.type_of_stripping}
+                      onChange={handleFormChange}
+                      placeholder="Enter Type of Stripping"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>CAPACITY (Cu.Metres/Hour)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="capacity_of_stripping"
+                      value={reportFormData.capacity_of_stripping}
+                      onChange={handleFormChange}
+                      placeholder="Enter Capacity of Stripping"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>At What Head (sg=1.0) (in Metres)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="at_what_head_stripping"
+                      value={reportFormData.at_what_head_stripping}
+                      onChange={handleFormChange}
+                      placeholder="Enter At What Head Stripping"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Is at least one emergency portable cargo pump provided?
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="is_at_least_one_emergency_portable_cargo_pump_provided"
+                      value={
+                        reportFormData.is_at_least_one_emergency_portable_cargo_pump_provided
+                      }
+                      onChange={handleFormChange}
+                      placeholder="Enter Is At Least One Emergency Portable Cargo Pump Provided"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-12">
+                  <h4>10.4 MOORING</h4>
+                  <hr />
+                </div>
+                <div className="col-md-12">
+                  <h6>10.4.1 WIRES ( ON DRUMS)</h6>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>Forecastle</label>
+                  </div>
+                </div>
+                <div className="col-md-1">
+                  <div className="form-group">
+                    <label>
+                      <small>NO</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_forecastle"
+                      value={reportFormData.no_of_forecastle}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Forecastle"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>DIAMETER (in Millimetres)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="diameter_of_forecastle"
+                      value={reportFormData.diameter_of_forecastle}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter Diameter of Forecastle"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>MATERIAL</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="material_of_forecastle"
+                      value={reportFormData.material_of_forecastle}
+                      onChange={handleFormChange}
+                      placeholder="Enter Material of Forecastle"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>LENGTH (in Metres)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="length_of_forecastle"
+                      value={reportFormData.length_of_forecastle}
+                      onChange={handleFormChange}
+                      placeholder="Enter Length of Forecastle"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>BREAKING (in Metric Tons)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="breaking_of_forecastle"
+                      value={reportFormData.breaking_of_forecastle}
+                      onChange={handleFormChange}
+                      placeholder="Enter Breaking of Forecastle"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>Main deck fwd</label>
+                  </div>
+                </div>
+                <div className="col-md-1">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_main_deck_fwd"
+                      value={reportFormData.no_of_main_deck_fwd}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Main Deck Fwd"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="diameter_of_main_deck_fwd"
+                      value={reportFormData.diameter_of_main_deck_fwd}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter Diameter of Main Deck Fwd"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="material_of_main_deck_fwd"
+                      value={reportFormData.material_of_main_deck_fwd}
+                      onChange={handleFormChange}
+                      placeholder="Enter Material of Main Deck Fwd"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="length_of_main_deck_fwd"
+                      value={reportFormData.length_of_main_deck_fwd}
+                      onChange={handleFormChange}
+                      placeholder="Enter Length of Main Deck Fwd"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="breaking_of_main_deck_fwd"
+                      value={reportFormData.breaking_of_main_deck_fwd}
+                      onChange={handleFormChange}
+                      placeholder="Enter Breaking of Main Deck Fwd"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>Main deck aft</label>
+                  </div>
+                </div>
+                <div className="col-md-1">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_main_deck_aft"
+                      value={reportFormData.no_of_main_deck_aft}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Main Deck Aft"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="diameter_of_main_deck_aft"
+                      value={reportFormData.diameter_of_main_deck_aft}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter Diameter of Main Deck Aft"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="material_of_main_deck_aft"
+                      value={reportFormData.material_of_main_deck_aft}
+                      onChange={handleFormChange}
+                      placeholder="Enter Material of Main Deck Aft"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="length_of_main_deck_aft"
+                      value={reportFormData.length_of_main_deck_aft}
+                      onChange={handleFormChange}
+                      placeholder="Enter Length of Main Deck Aft"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="breaking_of_main_deck_aft"
+                      value={reportFormData.breaking_of_main_deck_aft}
+                      onChange={handleFormChange}
+                      placeholder="Enter Breaking of Main Deck Aft"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>Poop deck</label>
+                  </div>
+                </div>
+                <div className="col-md-1">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_poop_deck"
+                      value={reportFormData.no_of_poop_deck}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Poop Deck"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="diameter_of_poop_deck"
+                      value={reportFormData.diameter_of_poop_deck}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter Diameter of Poop Deck"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="material_of_poop_deck"
+                      value={reportFormData.material_of_poop_deck}
+                      onChange={handleFormChange}
+                      placeholder="Enter Material of Poop Deck"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="length_of_poop_deck"
+                      value={reportFormData.length_of_poop_deck}
+                      onChange={handleFormChange}
+                      placeholder="Enter Length of Poop Deck"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="breaking_of_poop_deck"
+                      value={reportFormData.breaking_of_poop_deck}
+                      onChange={handleFormChange}
+                      placeholder="Enter Breaking of Poop Deck"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-12">
+                  <h6>10.4.2 WIRES TAILS</h6>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>Forecastle</label>
+                  </div>
+                </div>
+                <div className="col-md-1">
+                  <div className="form-group">
+                    <label>
+                      <small>NO</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_forecastle_tails"
+                      value={reportFormData.no_of_forecastle_tails}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Forecastle Tails"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>DIAMETER (in Millimetres)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="diameter_of_forecastle_tails"
+                      value={reportFormData.diameter_of_forecastle_tails}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter Diameter of Forecastle Tails"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>MATERIAL</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="material_of_forecastle_tails"
+                      value={reportFormData.material_of_forecastle_tails}
+                      onChange={handleFormChange}
+                      placeholder="Enter Material of Forecastle Tails"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>LENGTH (in Metres)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="length_of_forecastle_tails"
+                      value={reportFormData.length_of_forecastle_tails}
+                      onChange={handleFormChange}
+                      placeholder="Enter Length of Forecastle Tails"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>BREAKING (in Metric Tons)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="breaking_of_forecastle_tails"
+                      value={reportFormData.breaking_of_forecastle_tails}
+                      onChange={handleFormChange}
+                      placeholder="Enter Breaking of Forecastle Tails"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>Main deck fwd</label>
+                  </div>
+                </div>
+                <div className="col-md-1">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_main_deck_fwd_tails"
+                      value={reportFormData.no_of_main_deck_fwd_tails}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Main Deck Fwd Tails"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="diameter_of_main_deck_fwd_tails"
+                      value={reportFormData.diameter_of_main_deck_fwd_tails}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter Diameter of Main Deck Fwd Tails"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="material_of_main_deck_fwd_tails"
+                      value={reportFormData.material_of_main_deck_fwd_tails}
+                      onChange={handleFormChange}
+                      placeholder="Enter Material of Main Deck Fwd Tails"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="length_of_main_deck_fwd_tails"
+                      value={reportFormData.length_of_main_deck_fwd_tails}
+                      onChange={handleFormChange}
+                      placeholder="Enter Length of Main Deck Fwd Tails"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="breaking_of_main_deck_fwd_tails"
+                      value={reportFormData.breaking_of_main_deck_fwd_tails}
+                      onChange={handleFormChange}
+                      placeholder="Enter Breaking of Main Deck Fwd Tails"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>Main deck aft</label>
+                  </div>
+                </div>
+                <div className="col-md-1">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_main_deck_aft_tails"
+                      value={reportFormData.no_of_main_deck_aft_tails}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Main Deck Aft Tails"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="diameter_of_main_deck_aft_tails"
+                      value={reportFormData.diameter_of_main_deck_aft_tails}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter Diameter of Main Deck Aft Tails"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="material_of_main_deck_aft_tails"
+                      value={reportFormData.material_of_main_deck_aft_tails}
+                      onChange={handleFormChange}
+                      placeholder="Enter Material of Main Deck Aft Tails"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="length_of_main_deck_aft_tails"
+                      value={reportFormData.length_of_main_deck_aft_tails}
+                      onChange={handleFormChange}
+                      placeholder="Enter Length of Main Deck Aft Tails"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="breaking_of_main_deck_aft_tails"
+                      value={reportFormData.breaking_of_main_deck_aft_tails}
+                      onChange={handleFormChange}
+                      placeholder="Enter Breaking of Main Deck Aft Tails"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>Poop deck</label>
+                  </div>
+                </div>
+                <div className="col-md-1">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_poop_deck_tails"
+                      value={reportFormData.no_of_poop_deck_tails}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Poop Deck Tails"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="diameter_of_poop_deck_tails"
+                      value={reportFormData.diameter_of_poop_deck_tails}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter Diameter of Poop Deck Tails"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="material_of_poop_deck_tails"
+                      value={reportFormData.material_of_poop_deck_tails}
+                      onChange={handleFormChange}
+                      placeholder="Enter Material of Poop Deck Tails"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="length_of_poop_deck_tails"
+                      value={reportFormData.length_of_poop_deck_tails}
+                      onChange={handleFormChange}
+                      placeholder="Enter Length of Poop Deck Tails"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="breaking_of_poop_deck_tails"
+                      value={reportFormData.breaking_of_poop_deck_tails}
+                      onChange={handleFormChange}
+                      placeholder="Enter Breaking of Poop Deck Tails"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-12">
+                  <h6>10.4.3 ROPES (ON DRUMS)</h6>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>Forecastle</label>
+                  </div>
+                </div>
+                <div className="col-md-1">
+                  <div className="form-group">
+                    <label>
+                      <small>NO</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_forecastle_ropes"
+                      value={reportFormData.no_of_forecastle_ropes}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Forecastle Ropes"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>DIAMETER (in Millimetres)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="diameter_of_forecastle_ropes"
+                      value={reportFormData.diameter_of_forecastle_ropes}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter Diameter of Forecastle Ropes"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>MATERIAL</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="material_of_forecastle_ropes"
+                      value={reportFormData.material_of_forecastle_ropes}
+                      onChange={handleFormChange}
+                      placeholder="Enter Material of Forecastle Ropes"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>LENGTH (in Metres)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="length_of_forecastle_ropes"
+                      value={reportFormData.length_of_forecastle_ropes}
+                      onChange={handleFormChange}
+                      placeholder="Enter Length of Forecastle Ropes"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>BREAKING (in Metric Tons)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="breaking_of_forecastle_ropes"
+                      value={reportFormData.breaking_of_forecastle_ropes}
+                      onChange={handleFormChange}
+                      placeholder="Enter Breaking of Forecastle Ropes"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>Main deck fwd</label>
+                  </div>
+                </div>
+                <div className="col-md-1">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_main_deck_fwd_ropes"
+                      value={reportFormData.no_of_main_deck_fwd_ropes}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Main Deck Fwd Ropes"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="diameter_of_main_deck_fwd_ropes"
+                      value={reportFormData.diameter_of_main_deck_fwd_ropes}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter Diameter of Main Deck Fwd Ropes"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="material_of_main_deck_fwd_ropes"
+                      value={reportFormData.material_of_main_deck_fwd_ropes}
+                      onChange={handleFormChange}
+                      placeholder="Enter Material of Main Deck Fwd Ropes"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="length_of_main_deck_fwd_ropes"
+                      value={reportFormData.length_of_main_deck_fwd_ropes}
+                      onChange={handleFormChange}
+                      placeholder="Enter Length of Main Deck Fwd Ropes"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="breaking_of_main_deck_fwd_ropes"
+                      value={reportFormData.breaking_of_main_deck_fwd_ropes}
+                      onChange={handleFormChange}
+                      placeholder="Enter Breaking of Main Deck Fwd Ropes"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>Main deck aft</label>
+                  </div>
+                </div>
+                <div className="col-md-1">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_main_deck_aft_ropes"
+                      value={reportFormData.no_of_main_deck_aft_ropes}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Main Deck Aft Ropes"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="diameter_of_main_deck_aft_ropes"
+                      value={reportFormData.diameter_of_main_deck_aft_ropes}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter Diameter of Main Deck Aft Ropes"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="material_of_main_deck_aft_ropes"
+                      value={reportFormData.material_of_main_deck_aft_ropes}
+                      onChange={handleFormChange}
+                      placeholder="Enter Material of Main Deck Aft Ropes"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="length_of_main_deck_aft_ropes"
+                      value={reportFormData.length_of_main_deck_aft_ropes}
+                      onChange={handleFormChange}
+                      placeholder="Enter Length of Main Deck Aft Ropes"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="breaking_of_main_deck_aft_ropes"
+                      value={reportFormData.breaking_of_main_deck_aft_ropes}
+                      onChange={handleFormChange}
+                      placeholder="Enter Breaking of Main Deck Aft Ropes"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>Poop deck</label>
+                  </div>
+                </div>
+                <div className="col-md-1">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_poop_deck_ropes"
+                      value={reportFormData.no_of_poop_deck_ropes}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Poop Deck Ropes"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="diameter_of_poop_deck_ropes"
+                      value={reportFormData.diameter_of_poop_deck_ropes}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter Diameter of Poop Deck Ropes"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="material_of_poop_deck_ropes"
+                      value={reportFormData.material_of_poop_deck_ropes}
+                      onChange={handleFormChange}
+                      placeholder="Enter Material of Poop Deck Ropes"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="length_of_poop_deck_ropes"
+                      value={reportFormData.length_of_poop_deck_ropes}
+                      onChange={handleFormChange}
+                      placeholder="Enter Length of Poop Deck Ropes"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="breaking_of_poop_deck_ropes"
+                      value={reportFormData.breaking_of_poop_deck_ropes}
+                      onChange={handleFormChange}
+                      placeholder="Enter Breaking of Poop Deck Ropes"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-12">
+                  <h6>10.4.4 OTHER LINES</h6>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>Forecastle</label>
+                  </div>
+                </div>
+                <div className="col-md-1">
+                  <div className="form-group">
+                    <label>
+                      <small>NO</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_forecastle_other_lines"
+                      value={reportFormData.no_of_forecastle_other_lines}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Forecastle Other Lines"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>DIAMETER (in Millimetres)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="diameter_of_forecastle_other_lines"
+                      value={reportFormData.diameter_of_forecastle_other_lines}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter Diameter of Forecastle Other Lines"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>MATERIAL</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="material_of_forecastle_other_lines"
+                      value={reportFormData.material_of_forecastle_other_lines}
+                      onChange={handleFormChange}
+                      placeholder="Enter Material of Forecastle Other Lines"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>LENGTH (in Metres)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="length_of_forecastle_other_lines"
+                      value={reportFormData.length_of_forecastle_other_lines}
+                      onChange={handleFormChange}
+                      placeholder="Enter Length of Forecastle Other Lines"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>BREAKING (in Metric Tons)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="breaking_of_forecastle_other_lines"
+                      value={reportFormData.breaking_of_forecastle_other_lines}
+                      onChange={handleFormChange}
+                      placeholder="Enter Breaking of Forecastle Other Lines"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>Main deck fwd</label>
+                  </div>
+                </div>
+                <div className="col-md-1">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_main_deck_fwd_other_lines"
+                      value={reportFormData.no_of_main_deck_fwd_other_lines}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Main Deck Fwd Other Lines"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="diameter_of_main_deck_fwd_other_lines"
+                      value={
+                        reportFormData.diameter_of_main_deck_fwd_other_lines
+                      }
+                      onChange={handleDimensionChange}
+                      placeholder="Enter Diameter of Main Deck Fwd Other Lines"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="material_of_main_deck_fwd_other_lines"
+                      value={
+                        reportFormData.material_of_main_deck_fwd_other_lines
+                      }
+                      onChange={handleFormChange}
+                      placeholder="Enter Material of Main Deck Fwd Other Lines"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="length_of_main_deck_fwd_other_lines"
+                      value={reportFormData.length_of_main_deck_fwd_other_lines}
+                      onChange={handleFormChange}
+                      placeholder="Enter Length of Main Deck Fwd Other Lines"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="breaking_of_main_deck_fwd_other_lines"
+                      value={
+                        reportFormData.breaking_of_main_deck_fwd_other_lines
+                      }
+                      onChange={handleFormChange}
+                      placeholder="Enter Breaking of Main Deck Fwd Other Lines"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>Main deck aft</label>
+                  </div>
+                </div>
+                <div className="col-md-1">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_main_deck_aft_other_lines"
+                      value={reportFormData.no_of_main_deck_aft_other_lines}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Main Deck Aft Other Lines"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="diameter_of_main_deck_aft_other_lines"
+                      value={
+                        reportFormData.diameter_of_main_deck_aft_other_lines
+                      }
+                      onChange={handleDimensionChange}
+                      placeholder="Enter Diameter of Main Deck Aft Other Lines"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="material_of_main_deck_aft_other_lines"
+                      value={
+                        reportFormData.material_of_main_deck_aft_other_lines
+                      }
+                      onChange={handleFormChange}
+                      placeholder="Enter Material of Main Deck Aft Other Lines"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="length_of_main_deck_aft_other_lines"
+                      value={reportFormData.length_of_main_deck_aft_other_lines}
+                      onChange={handleFormChange}
+                      placeholder="Enter Length of Main Deck Aft Other Lines"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="breaking_of_main_deck_aft_other_lines"
+                      value={
+                        reportFormData.breaking_of_main_deck_aft_other_lines
+                      }
+                      onChange={handleFormChange}
+                      placeholder="Enter Breaking of Main Deck Aft Other Lines"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>Poop deck</label>
+                  </div>
+                </div>
+                <div className="col-md-1">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_poop_deck_other_lines"
+                      value={reportFormData.no_of_poop_deck_other_lines}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Poop Deck Other Lines"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="diameter_of_poop_deck_other_lines"
+                      value={reportFormData.diameter_of_poop_deck_other_lines}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter Diameter of Poop Deck Other Lines"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="material_of_poop_deck_other_lines"
+                      value={reportFormData.material_of_poop_deck_other_lines}
+                      onChange={handleFormChange}
+                      placeholder="Enter Material of Poop Deck Other Lines"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="length_of_poop_deck_other_lines"
+                      value={reportFormData.length_of_poop_deck_other_lines}
+                      onChange={handleFormChange}
+                      placeholder="Enter Length of Poop Deck Other Lines"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="breaking_of_poop_deck_other_lines"
+                      value={reportFormData.breaking_of_poop_deck_other_lines}
+                      onChange={handleFormChange}
+                      placeholder="Enter Breaking of Poop Deck Other Lines"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-12">
+                  <h6>10.4.5 WINCHES</h6>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>Forecastle</label>
+                  </div>
+                </div>
+                <div className="col-md-1">
+                  <div className="form-group">
+                    <label>
+                      <small>NO</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_forecastle_winches"
+                      value={reportFormData.no_of_forecastle_winches}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Forecastle Winches"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>No. DRUMS</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_drums_of_forecastle_winches"
+                      value={reportFormData.no_of_drums_of_forecastle_winches}
+                      onChange={handleFormChange}
+                      placeholder="Enter No of Drums"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>MOTIVE POWER</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="motive_power_of_forecastle_winches"
+                      value={reportFormData.motive_power_of_forecastle_winches}
+                      onChange={handleFormChange}
+                      placeholder="Enter Motive Power of Forecastle Winches"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>BRAKE CAPACITY (in Metric Tons)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="brake_capacity_of_forecastle_winches"
+                      value={
+                        reportFormData.brake_capacity_of_forecastle_winches
+                      }
+                      onChange={handleFormChange}
+                      placeholder="Enter Brake Capacity of Forecastle Winches"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>TYPE OF BRAKE</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="type_of_brake_of_forecastle_winches"
+                      value={reportFormData.type_of_brake_of_forecastle_winches}
+                      onChange={handleFormChange}
+                      placeholder="Enter Type of Brake of Forecastle Winches"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>Main deck fwd</label>
+                  </div>
+                </div>
+                <div className="col-md-1">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_drums_of_main_deck_fwd_winches"
+                      value={
+                        reportFormData.no_of_drums_of_main_deck_fwd_winches
+                      }
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Drums"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_drums_of_forecastle_winches"
+                      value={reportFormData.no_of_drums_of_forecastle_winches}
+                      onChange={handleFormChange}
+                      placeholder="Enter No of Drums"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="motive_power_of_main_deck_fwd_winches"
+                      value={
+                        reportFormData.motive_power_of_main_deck_fwd_winches
+                      }
+                      onChange={handleFormChange}
+                      placeholder="Enter Motive Power of Main Deck Fwd Winches"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="brake_capacity_of_main_deck_fwd_winches"
+                      value={
+                        reportFormData.brake_capacity_of_main_deck_fwd_winches
+                      }
+                      onChange={handleFormChange}
+                      placeholder="Enter Brake Capacity of Main Deck Fwd Winches"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="type_of_brake_of_main_deck_fwd_winches"
+                      value={
+                        reportFormData.type_of_brake_of_main_deck_fwd_winches
+                      }
+                      onChange={handleFormChange}
+                      placeholder="Enter Type of Brake of Main Deck Fwd Winches"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>Main deck aft</label>
+                  </div>
+                </div>
+                <div className="col-md-1">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_main_deck_aft_winches"
+                      value={reportFormData.no_of_main_deck_aft_winches}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Forecastle Winches"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_drums_of_main_deck_aft_winches"
+                      value={
+                        reportFormData.no_of_drums_of_main_deck_aft_winches
+                      }
+                      onChange={handleFormChange}
+                      placeholder="Enter No of Drums of Main Deck Aft Winches"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="motive_power_of_main_deck_aft_winches"
+                      value={
+                        reportFormData.motive_power_of_main_deck_aft_winches
+                      }
+                      onChange={handleFormChange}
+                      placeholder="Enter Motive Power of Main Deck Aft Winches"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="brake_capacity_of_main_deck_aft_winches"
+                      value={
+                        reportFormData.brake_capacity_of_main_deck_aft_winches
+                      }
+                      onChange={handleFormChange}
+                      placeholder="Enter Brake Capacity of Main Deck Aft Winches"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="type_of_brake_of_main_deck_aft_winches"
+                      value={
+                        reportFormData.type_of_brake_of_main_deck_aft_winches
+                      }
+                      onChange={handleFormChange}
+                      placeholder="Enter Type of Brake of Main Deck Aft Winches"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label>Poop deck</label>
+                  </div>
+                </div>
+                <div className="col-md-1">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_poop_deck_winches"
+                      value={reportFormData.no_of_poop_deck_winches}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Poop Deck Winches"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_drums_of_poop_deck_winches"
+                      value={reportFormData.no_of_drums_of_poop_deck_winches}
+                      onChange={handleFormChange}
+                      placeholder="Enter No of Drums of Poop Deck Winches"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="motive_power_of_poop_deck_winches"
+                      value={reportFormData.motive_power_of_poop_deck_winches}
+                      onChange={handleFormChange}
+                      placeholder="Enter Motive Power of Poop Deck Winches"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="brake_capacity_of_poop_deck_winches"
+                      value={reportFormData.brake_capacity_of_poop_deck_winches}
+                      onChange={handleFormChange}
+                      placeholder="Enter Brake Capacity of Poop Deck Winches"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="type_of_brake_of_poop_deck_winches"
+                      value={reportFormData.type_of_brake_of_poop_deck_winches}
+                      onChange={handleFormChange}
+                      placeholder="Enter Type of Brake of Poop Deck Winches"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-12">
+                  <h6>10.4.6 BITTS, CLOSED CHOKS/FAIRLEADS</h6>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label>Forecastle</label>
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>NO</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_forecastle_bitts"
+                      value={reportFormData.no_of_forecastle_bitts}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Forecastle Bitts"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>SWL Bitts (in Metric Tons)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="swl_bitts_of_forecastle_bitts"
+                      value={reportFormData.swl_bitts_of_forecastle_bitts}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter SWL Bitts of Forecastle Bitts"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>No. Closed Chocks</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_closed_chocks_of_forecastle_bitts"
+                      value={
+                        reportFormData.no_of_closed_chocks_of_forecastle_bitts
+                      }
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Closed Chocks of Forecastle Bitts"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>SWL Closed Chocks (in Metric Tons)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="swl_closed_chocks_of_forecastle_bitts"
+                      value={
+                        reportFormData.swl_closed_chocks_of_forecastle_bitts
+                      }
+                      onChange={handleDimensionChange}
+                      placeholder="Enter SWL Closed Chocks of Forecastle Bitts"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label>Main deck fwd</label>
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_main_deck_fwd_bitts"
+                      value={reportFormData.no_of_main_deck_fwd_bitts}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Forecastle Bitts"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="swl_bitts_of_main_deck_fwd_bitts"
+                      value={reportFormData.swl_bitts_of_main_deck_fwd_bitts}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter SWL Bitts of Main Deck Fwd Bitts"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_closed_chocks_of_main_deck_fwd_bitts"
+                      value={
+                        reportFormData.no_of_closed_chocks_of_main_deck_fwd_bitts
+                      }
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Closed Chocks of Main Deck Fwd Bitts"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="swl_closed_chocks_of_main_deck_fwd_bitts"
+                      value={
+                        reportFormData.swl_closed_chocks_of_main_deck_fwd_bitts
+                      }
+                      onChange={handleDimensionChange}
+                      placeholder="Enter SWL Closed Chocks of Main Deck Fwd Bitts"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label>Main deck aft</label>
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_main_deck_aft_bitts"
+                      value={reportFormData.no_of_main_deck_aft_bitts}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Main Deck Aft Bitts"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="swl_bitts_of_main_deck_aft_bitts"
+                      value={reportFormData.swl_bitts_of_main_deck_aft_bitts}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter SWL Bitts of Main Deck Aft Bitts"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_closed_chocks_of_main_deck_aft_bitts"
+                      value={
+                        reportFormData.no_of_closed_chocks_of_main_deck_aft_bitts
+                      }
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Closed Chocks of Main Deck Aft Bitts"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="swl_closed_chocks_of_main_deck_aft_bitts"
+                      value={
+                        reportFormData.swl_closed_chocks_of_main_deck_aft_bitts
+                      }
+                      onChange={handleDimensionChange}
+                      placeholder="Enter SWL Closed Chocks of Main Deck Aft Bitts"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label>Poop deck</label>
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_poop_deck_bitts"
+                      value={reportFormData.no_of_poop_deck_bitts}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Poop Deck Bitts"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="swl_bitts_of_poop_deck_bitts"
+                      value={reportFormData.swl_bitts_of_poop_deck_bitts}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter SWL Bitts of Poop Deck Bitts"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_closed_chocks_of_poop_deck_bitts"
+                      value={
+                        reportFormData.no_of_closed_chocks_of_poop_deck_bitts
+                      }
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Closed Chocks of Poop Deck Bitts"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="swl_closed_chocks_of_poop_deck_bitts"
+                      value={
+                        reportFormData.swl_closed_chocks_of_poop_deck_bitts
+                      }
+                      onChange={handleDimensionChange}
+                      placeholder="Enter SWL Closed Chocks of Poop Deck Bitts"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-12">
+                  <h4>10.5 ANCHORS/EMERGENCY TOWING SYSTEM</h4>
+                  <hr />
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>Number of shackles on port/starboard cable</label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="number_of_shackles_on_port_starboard_cable"
+                      value={
+                        reportFormData.number_of_shackles_on_port_starboard_cable
+                      }
+                      onChange={handleFormChange}
+                      placeholder="Enter Number of Shackles on Port/Starboard Cable"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>Type/SWL of Emergency Towing system forward:</label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="row">
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          name="type_of_emergency_towing_system_forward_type"
+                          value={
+                            reportFormData.type_of_emergency_towing_system_forward_type
+                          }
+                          onChange={handleFormChange}
+                          placeholder="Enter Type of Emergency Towing System Forward Type"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          name="type_of_emergency_towing_system_forward_swl"
+                          value={
+                            reportFormData.type_of_emergency_towing_system_forward_swl
+                          }
+                          onChange={handleFormChange}
+                          placeholder="Enter Type of Emergency Towing System Forward SWL (in Metric Tons)"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>Type/SWL of Emergency Towing system aft</label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="row">
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          name="type_of_emergency_towing_system_aft_type"
+                          value={
+                            reportFormData.type_of_emergency_towing_system_aft_type
+                          }
+                          onChange={handleFormChange}
+                          placeholder="Enter Type of Emergency Towing System Aft Type"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          name="type_of_emergency_towing_system_aft_swl"
+                          value={
+                            reportFormData.type_of_emergency_towing_system_aft_swl
+                          }
+                          onChange={handleFormChange}
+                          placeholder="Enter Type of Emergency Towing System Aft SWL (in Metric Tons)"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-12">
+                  <h4>10.6 ESCORT TUG</h4>
+                  <hr />
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      What is size/SWL of closed chock and/or fairleads of
+                      enclosed type on stern
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="row">
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          name="type_of_escort_tug_type"
+                          value={reportFormData.type_of_escort_tug_type}
+                          onChange={handleDimensionChange}
+                          placeholder="Enter Type of Escort Tug Type (in Milimeters)"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          name="type_of_escort_tug_swl"
+                          value={reportFormData.type_of_escort_tug_swl}
+                          onChange={handleDimensionChange}
+                          placeholder="Enter Type of Escort Tug SWL (in Metric Tons)"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      What is SWL of bollard on poop deck suitable for escort
+                      tug
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="swl_of_bollard_on_poop_deck_suitable_for_escort_tug"
+                      value={
+                        reportFormData.swl_of_bollard_on_poop_deck_suitable_for_escort_tug
+                      }
+                      onChange={handleDimensionChange}
+                      placeholder="Enter SWL of Bollard on Poop Deck Suitable for Escort Tug (in Metric Tons)"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-12">
+                  <h4>10.7 LIFTING EQUIPMENT/ GANGWAY</h4>
+                  <hr />
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Derrick/Crane description (Number, SWL and location)
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="derrick_crane_description"
+                      value={reportFormData.derrick_crane_description}
+                      onChange={handleFormChange}
+                      placeholder="Enter Derrick/Crane Description (Number, SWL and Location)"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>Accommodation ladder direction</label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="accommodation_ladder_direction"
+                      value={reportFormData.accommodation_ladder_direction}
+                      onChange={handleFormChange}
+                      placeholder="Enter Accommodation Ladder Direction"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Does vessel have a portable gangway? If yes, state length
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="does_vessel_have_a_portable_gangway"
+                      value={reportFormData.does_vessel_have_a_portable_gangway}
+                      onChange={handleFormChange}
+                      placeholder="Enter Does Vessel Have a Portable Gangway? If Yes, State Length"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-12">
+                  <h4>10.8 SINGLE POINT MOORING (SPM) EQUIPMENT</h4>
+                  <hr />
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Does the vessel meet the recommendations in the latest
+                      edition of OCIMF 8Recommendations for Equipment Employed
+                      in the Bow Mooring of Conventional Tankers at Single Point
+                      Moorings (SPM)?
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <SingleSearchSelect
+                      options={[
+                        {
+                          value: "Yes",
+                          label: "Yes",
+                        },
+                        {
+                          value: "No",
+                          label: "No",
+                        },
+                      ]}
+                      value={
+                        reportFormData.does_vessel_meet_the_recommendations ||
+                        "Yes"
+                      }
+                      onChange={(value) =>
+                        handleSelectChange(
+                          "does_vessel_meet_the_recommendations",
+                          value
+                        )
+                      }
+                      placeholder="Enter Does Vessel Meet the Recommendations in the Latest Edition of OCIMF 8 Recommendations for Equipment Employed in the Bow Mooring of Conventional Tankers at Single Point Moorings (SPM)?"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>If fitted, how many chain stoppers:</label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="how_many_chain_stoppers"
+                      value={reportFormData.how_many_chain_stoppers}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter How Many Chain Stoppers"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>State type/SWL of chain stopper(s):</label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="state_type_swl_of_chain_stopper_s"
+                      value={reportFormData.state_type_swl_of_chain_stopper_s}
+                      onChange={handleFormChange}
+                      placeholder="Enter State Type/SWL of Chain Stopper(s)"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      What is the maximum size chain diameter the bow stopper(s)
+                      can handle:
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      <small>(in Millimeters)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="maximum_size_chain_diameter_the_bow_stopper_s_can_handle"
+                      value={
+                        reportFormData.maximum_size_chain_diameter_the_bow_stopper_s_can_handle
+                      }
+                      onChange={handleDimensionChange}
+                      placeholder="Enter Maximum Size Chain Diameter the Bow Stopper(s) Can Handle"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Distance between the bow fairlead and chain
+                      stopper/bracket:
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      <small>(in Metres)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="distance_between_the_bow_fairlead_and_chain_stopper_bracket"
+                      value={
+                        reportFormData.distance_between_the_bow_fairlead_and_chain_stopper_bracket
+                      }
+                      onChange={handleDimensionChange}
+                      placeholder="Enter Distance Between the Bow Fairlead and Chain Stopper/Bracket"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Is bow chock and/or fairlead of enclosed type of OCIMF
+                      recommended size (600mm x 450mm)? If not, give details of
+                      size:
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <SingleSearchSelect
+                      options={[
+                        {
+                          value: "Yes",
+                          label: "Yes",
+                        },
+                        {
+                          value: "No",
+                          label: "No",
+                        },
+                      ]}
+                      value={
+                        reportFormData.does_vessel_meet_the_recommendations ||
+                        "Yes"
+                      }
+                      onChange={(value) =>
+                        handleSelectChange(
+                          "does_vessel_meet_the_recommendations",
+                          value
+                        )
+                      }
+                      placeholder="Enter Does Vessel Meet the Recommendations in the Latest Edition of OCIMF 8 Recommendations for Equipment Employed in the Bow Mooring of Conventional Tankers at Single Point Moorings (SPM)?"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-12">
+                  <h4>10.9 PROPULSION</h4>
+                  <hr />
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>Ballast speed</label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="row">
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <label>
+                          <small>Maximum (in knots)</small>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          name="ballast_speed_maximum"
+                          value={reportFormData.ballast_speed_maximum}
+                          onChange={handleDimensionChange}
+                          placeholder="Enter Ballast Speed Maximum"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <label>
+                          <small>Economical (in knots)</small>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          name="ballast_speed_minimum"
+                          value={reportFormData.ballast_speed_minimum}
+                          onChange={handleDimensionChange}
+                          placeholder="Enter Ballast Speed Minimum"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>Laden speed</label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="row">
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <label>
+                          <small>Maximum (in knots)</small>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          name="laden_speed_maximum"
+                          value={reportFormData.laden_speed_maximum}
+                          onChange={handleDimensionChange}
+                          placeholder="Enter Laden Speed Maximum"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <label>
+                          <small>Economical (in knots)</small>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          name="laden_speed_minimum"
+                          value={reportFormData.laden_speed_minimum}
+                          onChange={handleDimensionChange}
+                          placeholder="Enter Laden Speed Minimum"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      What type of fuel is used for main propulsion/generating
+                      plant
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="row">
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <label>
+                          <small>Maximum</small>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          name="what_type_of_fuel_is_used_for_main_propulsion_generating_plant"
+                          value={
+                            reportFormData.what_type_of_fuel_is_used_for_main_propulsion_generating_plant
+                          }
+                          onChange={handleFormChange}
+                          placeholder="Enter What Type of Fuel is Used for Main Propulsion/Generating Plant"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <label>
+                          <small>Economical</small>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          name="what_type_of_fuel_is_used_for_main_propulsion_generating_plant"
+                          value={
+                            reportFormData.what_type_of_fuel_is_used_for_main_propulsion_generating_plant
+                          }
+                          onChange={handleFormChange}
+                          placeholder="Enter What Type of Fuel is Used for Main Propulsion/Generating Plant"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>Type/Capacity of bunker tanks</label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="type_of_bunker_tanks"
+                      value={reportFormData.type_of_bunker_tanks}
+                      onChange={handleFormChange}
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Is vessel fitted with fixed or controllable pitch
+                      propeller(s)
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="is_vessel_fitted_with_fixed"
+                      value={reportFormData.is_vessel_fitted_with_fixed}
+                      onChange={handleFormChange}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-12">
+                  <h4>11.0. ENGINE EQUIPMENTS</h4>
+                  <hr />
+                </div>
+                <div className="col-md-12">
+                  <h6>11.1. ENGINES</h6>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>Main engine</label>
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>No</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_main_engine"
+                      value={reportFormData.no_of_main_engine}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Main Engine"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>CAPACITY (in kW)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="capacity_of_main_engine"
+                      value={reportFormData.capacity_of_main_engine}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter Capacity (in kW)"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>MAKE/TYPE</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="make_type_of_main_engine"
+                      value={reportFormData.make_type_of_main_engine}
+                      onChange={handleFormChange}
+                      placeholder="Enter Make/Type of Main Engine"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>Aux engine</label>
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>No</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_aux_engine"
+                      value={reportFormData.no_of_aux_engine}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Aux Engine"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>CAPACITY (in kW)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="capacity_of_aux_engine"
+                      value={reportFormData.capacity_of_aux_engine}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter Capacity (in kW)"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <label>
+                      <small>MAKE/TYPE</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="make_type_of_aux_engine"
+                      value={reportFormData.make_type_of_aux_engine}
+                      onChange={handleFormChange}
+                      placeholder="Enter Make/Type of Aux Engine"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>Power packs</label>
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_power_packs"
+                      value={reportFormData.no_of_power_packs}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Power Packs"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="capacity_of_power_packs"
+                      value={reportFormData.capacity_of_power_packs}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter Capacity of Power Packs (in kW)"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="make_type_of_power_packs"
+                      value={reportFormData.make_type_of_power_packs}
+                      onChange={handleFormChange}
+                      placeholder="Enter Make/Type of Power Packs"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>Boilers</label>
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="no_of_boilers"
+                      value={reportFormData.no_of_boilers}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter No of Boilers"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="capacity_of_boilers"
+                      value={reportFormData.capacity_of_boilers}
+                      onChange={handleDimensionChange}
+                      placeholder="Enter Capacity of Boilers (in kW)"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-2">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="make_type_of_boilers"
+                      value={reportFormData.make_type_of_boilers}
+                      onChange={handleFormChange}
+                      placeholder="Enter Make/Type of Boilers"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-12">
+                  <h6>11.2. BOW/STERN THRUSTER</h6>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      What is brake horse power of bow thruster (if fitted)
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <SingleSearchSelect
+                      options={[
+                        {
+                          value: "Yes",
+                          label: "Yes",
+                        },
+                        {
+                          value: "No",
+                          label: "No",
+                        },
+                      ]}
+                      value={
+                        reportFormData.what_is_brake_horse_power_of_bow_thruster ||
+                        "Yes"
+                      }
+                      onChange={(value) =>
+                        handleSelectChange(
+                          "what_is_brake_horse_power_of_bow_thruster",
+                          value
+                        )
+                      }
+                      placeholder="Enter What is Brake Horse Power of Bow Thruster (if fitted)"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      What is brake horse power of stern thruster (if fitted)
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <SingleSearchSelect
+                      options={[
+                        {
+                          value: "Yes",
+                          label: "Yes",
+                        },
+                        {
+                          value: "No",
+                          label: "No",
+                        },
+                      ]}
+                      value={
+                        reportFormData.what_is_brake_horse_power_of_stern_thruster ||
+                        "Yes"
+                      }
+                      onChange={(value) =>
+                        handleSelectChange(
+                          "what_is_brake_horse_power_of_stern_thruster",
+                          value
+                        )
+                      }
+                      placeholder="Enter What is Brake Horse Power of Stern Thruster (if fitted)"
+                    />
+                  </div>
+                </div>
+
+                <div className="col-md-12">
+                  <h6>11.3. EMISSIONS</h6>
+                </div>
+              </div>
+
               {/* Generate and Save Report Buttons */}
               <div className="row">
                 <div className="col-md-12">
