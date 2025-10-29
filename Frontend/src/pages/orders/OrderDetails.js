@@ -1518,6 +1518,46 @@ function OrderDetails() {
                         )}
                       </>
                     )}
+                    {order?.category_name === "MACHINERY" && (
+                      <>
+                        {order?.valuer_name &&
+                        order.valuer_name.trim() !== "" ? (
+                          order?.current_status_id === 10 && !isExemptAdmin ? (
+                            <span
+                              title="Marine Report (Disabled)"
+                              className="tooltip-link disabled"
+                              style={{ cursor: "not-allowed" }}
+                            >
+                              <ReportIcon />
+                            </span>
+                          ) : (
+                            <Link
+                              to={`/orders/${id}/details/marine-report`}
+                              title="Marine Report"
+                              className="tooltip-link"
+                            >
+                              <ReportIcon />
+                            </Link>
+                          )
+                        ) : (
+                          <button
+                            title="Marine Report"
+                            className="tooltip-link"
+                            onClick={() => showValuerNameError("Marine")}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              padding: 0,
+                              cursor: "pointer",
+                              outline: "none",
+                              boxShadow: "none",
+                            }}
+                          >
+                            <ReportIcon />
+                          </button>
+                        )}
+                      </>
+                    )}
                   </>
                 )}
                 {/* <Link

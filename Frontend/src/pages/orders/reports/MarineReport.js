@@ -4887,6 +4887,7 @@ function MarineReport() {
                 </div>
               </div>
 
+              {/* CREW */}
               <div className="row">
                 <div className="col-md-12">
                   <h4>7.0 CREW</h4>
@@ -4993,7 +4994,10 @@ function MarineReport() {
                 </div>
                 <div className="col-md-6">
                   <div className="form-group">
-                    <label>If Officers/ratings employed by a manning agency − Full style</label>
+                    <label>
+                      If Officers/ratings employed by a manning agency − Full
+                      style
+                    </label>
                   </div>
                 </div>
                 <div className="col-md-6">
@@ -5002,10 +5006,1021 @@ function MarineReport() {
                       type="text"
                       className="form-field"
                       name="if_officers_ratings_employed_by_a_manning_agency_full_style"
-                      value={reportFormData.if_officers_ratings_employed_by_a_manning_agency_full_style}
+                      value={
+                        reportFormData.if_officers_ratings_employed_by_a_manning_agency_full_style
+                      }
                       onChange={handleFormChange}
                       placeholder="Enter If Officers/ratings employed by a manning agency − Full style"
                     />
+                  </div>
+                </div>
+              </div>
+
+              {/* SAFETY/HELICOPTER */}
+              <div className="row">
+                <div className="col-md-12">
+                  <h4>8.0 SAFETY/HELICOPTER</h4>
+                  <hr />
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Is the vessel operated under a Quality Management System?
+                      If Yes, what type of system? (ISO9001 or IMO Resolution
+                      A.741(18) as amended)
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <SingleSearchSelect
+                      options={[
+                        {
+                          value: "Yes",
+                          label: "Yes",
+                        },
+                        {
+                          value: "No",
+                          label: "No",
+                        },
+                      ]}
+                      value={
+                        reportFormData.is_the_vessel_operated_under_a_quality_management_system ||
+                        "Yes"
+                      }
+                      onChange={(value) =>
+                        handleSelectChange(
+                          "is_the_vessel_operated_under_a_quality_management_system",
+                          value
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Can the ship comply with the ICS Helicopter Guidelines?
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <SingleSearchSelect
+                      options={[
+                        {
+                          value: "Yes",
+                          label: "Yes",
+                        },
+                        {
+                          value: "No",
+                          label: "No",
+                        },
+                      ]}
+                      value={
+                        reportFormData.can_the_ship_comply_with_the_ics_helicopter_guidelines ||
+                        "Yes"
+                      }
+                      onChange={(value) =>
+                        handleSelectChange(
+                          "can_the_ship_comply_with_the_ics_helicopter_guidelines",
+                          value
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* VESSEL ACCESSORIES & CAPACITIES */}
+              <div className="row">
+                <div className="col-md-12">
+                  <h4>9.0 VESSEL ACCESSORIES & CAPACITIES</h4>
+                  <hr />
+                </div>
+                <div className="row ml-5 w-100">
+                  <div className="col-md-12">
+                    <h5>9.1 COATING/ANODES</h5>
+                    <hr />
+                  </div>
+                  <div className="col-md-4">
+                    <div className="form-group">
+                      <label>Cargo tanks</label>
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <div className="form-group">
+                      <label>
+                        <small>(COATED)</small>
+                      </label>
+                      <SingleSearchSelect
+                        options={[
+                          {
+                            value: "Yes",
+                            label: "Yes",
+                          },
+                          {
+                            value: "No",
+                            label: "No",
+                          },
+                        ]}
+                        value={reportFormData.coated_cargo_tanks || "Yes"}
+                        onChange={(value) =>
+                          handleSelectChange("coated_cargo_tanks", value)
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <div className="form-group">
+                      <label>
+                        <small>(TYPE)</small>
+                      </label>
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="type_of_cargo_tanks"
+                        value={reportFormData.type_of_cargo_tanks}
+                        onChange={handleFormChange}
+                        placeholder="Enter Type of Cargo Tanks"
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <div className="form-group">
+                      <label>
+                        <small>(TO WHAT EXTENT )</small>
+                      </label>
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="to_what_extent_cargo_tanks"
+                        value={reportFormData.to_what_extent_cargo_tanks}
+                        onChange={handleFormChange}
+                        placeholder="Enter To What Extent Cargo Tanks"
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <div className="form-group">
+                      <label>
+                        <small>(ANODES)</small>
+                      </label>
+                      <SingleSearchSelect
+                        options={[
+                          {
+                            value: "Yes",
+                            label: "Yes",
+                          },
+                          {
+                            value: "No",
+                            label: "No",
+                          },
+                        ]}
+                        value={reportFormData.anode_cargo_tanks || "Yes"}
+                        onChange={(value) =>
+                          handleSelectChange("anode_cargo_tanks", value)
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-4">
+                    <div className="form-group">
+                      <label>Ballast tanks</label>
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <div className="form-group">
+                      <SingleSearchSelect
+                        options={[
+                          {
+                            value: "Yes",
+                            label: "Yes",
+                          },
+                          {
+                            value: "No",
+                            label: "No",
+                          },
+                        ]}
+                        value={reportFormData.coated_ballast_tanks || "Yes"}
+                        onChange={(value) =>
+                          handleSelectChange("coated_ballast_tanks", value)
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="type_of_ballast_tanks"
+                        value={reportFormData.type_of_ballast_tanks}
+                        onChange={handleFormChange}
+                        placeholder="Enter Type of Cargo Tanks"
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="to_what_extent_ballast_tanks"
+                        value={reportFormData.to_what_extent_cargo_tanks}
+                        onChange={handleFormChange}
+                        placeholder="Enter To What Extent Ballast Tanks"
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <div className="form-group">
+                      <SingleSearchSelect
+                        options={[
+                          {
+                            value: "Yes",
+                            label: "Yes",
+                          },
+                          {
+                            value: "No",
+                            label: "No",
+                          },
+                        ]}
+                        value={reportFormData.anode_ballast_tanks || "Yes"}
+                        onChange={(value) =>
+                          handleSelectChange("anode_ballast_tanks", value)
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-4">
+                    <div className="form-group">
+                      <label>Slop tanks</label>
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <div className="form-group">
+                      <SingleSearchSelect
+                        options={[
+                          {
+                            value: "Yes",
+                            label: "Yes",
+                          },
+                          {
+                            value: "No",
+                            label: "No",
+                          },
+                        ]}
+                        value={reportFormData.coated_slop_tanks || "Yes"}
+                        onChange={(value) =>
+                          handleSelectChange("coated_slop_tanks", value)
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="type_of_slop_tanks"
+                        value={reportFormData.type_of_slop_tanks}
+                        onChange={handleFormChange}
+                        placeholder="Enter Type of Cargo Tanks"
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="to_what_extent_slop_tanks"
+                        value={reportFormData.to_what_extent_slop_tanks}
+                        onChange={handleFormChange}
+                        placeholder="Enter To What Extent Slop Tanks"
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <div className="form-group">
+                      <SingleSearchSelect
+                        options={[
+                          {
+                            value: "Yes",
+                            label: "Yes",
+                          },
+                          {
+                            value: "No",
+                            label: "No",
+                          },
+                        ]}
+                        value={reportFormData.anode_slop_tanks || "Yes"}
+                        onChange={(value) =>
+                          handleSelectChange("anode_slop_tanks", value)
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-12">
+                    <h5>9.2 BALLAST</h5>
+                    <hr />
+                  </div>
+
+                  <div className="col-md-4">
+                    <div className="form-group">
+                      <label>Ballast Pumps</label>
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <div className="form-group">
+                      <label>
+                        <small>No.</small>
+                      </label>
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="number_of_ballast_pumps"
+                        value={reportFormData.number_of_ballast_pumps}
+                        onChange={handleDimensionChange}
+                        placeholder="Enter Number of Ballast Pumps"
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <div className="form-group">
+                      <label>
+                        <small>Type</small>
+                      </label>
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="type_of_ballast_pumps"
+                        value={reportFormData.type_of_ballast_pumps}
+                        onChange={handleFormChange}
+                        placeholder="Enter Type of Ballast Pumps"
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <div className="form-group">
+                      <label>
+                        <small>Capacity (Cu.Metres/Hour)</small>
+                      </label>
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="capacity_of_ballast_pumps"
+                        value={reportFormData.capacity_of_ballast_pumps}
+                        onChange={handleDimensionChange}
+                        placeholder="Enter Capacity of Ballast Pumps"
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <div className="form-group">
+                      <label>
+                        <small>At What Head (sg=1.0) (Meters)</small>
+                      </label>
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="at_what_head_ballast_pumps"
+                        value={reportFormData.at_what_head_ballast_pumps}
+                        onChange={handleDimensionChange}
+                        placeholder="Enter At What Head Ballast Pumps"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-4">
+                    <div className="form-group">
+                      <label>Ballast Eductors</label>
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="number_of_ballast_eductors"
+                        value={reportFormData.number_of_ballast_eductors}
+                        onChange={handleDimensionChange}
+                        placeholder="Enter Number of Ballast Eductors"
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="type_of_ballast_eductors"
+                        value={reportFormData.type_of_ballast_eductors}
+                        onChange={handleFormChange}
+                        placeholder="Enter Type of Ballast Eductors"
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="capacity_of_ballast_eductors"
+                        value={reportFormData.capacity_of_ballast_eductors}
+                        onChange={handleDimensionChange}
+                        placeholder="Enter Capacity of Ballast Eductors"
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-2">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="at_what_head_ballast_eductors"
+                        value={reportFormData.at_what_head_ballast_eductors}
+                        onChange={handleDimensionChange}
+                        placeholder="Enter At What Head Ballast Eductors"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-12">
+                    <h5>9.3 CARGO</h5>
+                    <hr />
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        Is vessel fitted with centerline bulkhead in all cargo
+                        tanks? If Yes, solid or perforated:
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="is_vessel_fitted_with_centerline_bulkhead_in_all_cargo_tanks"
+                        value={
+                          reportFormData.is_vessel_fitted_with_centerline_bulkhead_in_all_cargo_tanks
+                        }
+                        onChange={handleDimensionChange}
+                        placeholder="Enter Is Vessel Fitted With Centerline Bulkhead In All Cargo Tanks"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-12">
+                    <h5>9.4 Cargo Tank Capacities</h5>
+                    <hr />
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        Number of cargo tanks and total cubic capacity (98%)
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="row">
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          <input
+                            type="text"
+                            className="form-field"
+                            name="number_of_cargo_tanks_and_total_cubic_capacity_98"
+                            value={
+                              reportFormData.number_of_cargo_tanks_and_total_cubic_capacity_98
+                            }
+                            onChange={handleDimensionChange}
+                            placeholder="Enter Cargo Tank Capacity"
+                          />
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          <input
+                            type="text"
+                            className="form-field"
+                            name="total_cubic_capacity_98"
+                            value={reportFormData.total_cubic_capacity_98}
+                            onChange={handleDimensionChange}
+                            placeholder="Enter Total Cubic Capacity 98 (in Cu. Metres)"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        Capacity (max% per company policy: 98%, 97%, 96% or 95%)
+                        of each natural segregation with double valve (specify
+                        tanks)
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="capacity_of_each_natural_segregation_with_double_valve"
+                        value={
+                          reportFormData.capacity_of_each_natural_segregation_with_double_valve
+                        }
+                        onChange={handleFormChange}
+                        placeholder="Enter Capacity of Each Natural Segregation With Double Valve"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        IMO class (Oil/Chemical Ship Type 1, 2 or 3)
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="imo_class"
+                        value={reportFormData.imo_class}
+                        onChange={handleFormChange}
+                        placeholder="Enter IMO Class"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        Number of slop tanks and total cubic capacity (98%)
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="row">
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          <input
+                            type="text"
+                            className="form-field"
+                            name="number_of_slop_tanks_and_total_cubic_capacity_98"
+                            value={
+                              reportFormData.number_of_slop_tanks_and_total_cubic_capacity_98
+                            }
+                            onChange={handleDimensionChange}
+                            placeholder="Enter Slop Tank Capacity"
+                          />
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          <input
+                            type="text"
+                            className="form-field"
+                            name="total_cubic_capacity_98_slop_tanks"
+                            value={
+                              reportFormData.total_cubic_capacity_98_slop_tanks
+                            }
+                            onChange={handleDimensionChange}
+                            placeholder="Enter Total Cubic Capacity 98 Slop Tanks (in Cu. Metres)"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        Specify segregations which slops tanks belong to and
+                        their capacity with double valve
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="specify_segregations_double_valve"
+                        value={reportFormData.specify_segregations_double_valve}
+                        onChange={handleFormChange}
+                        placeholder="Enter Specify Segregations Which Slops Tanks Belong To And Their Capacity With Double Valve"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        Residual/retention oil tank(s) capacity (98%), if
+                        applicable
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="residual_retention_oil_tank_capacity_98"
+                        value={
+                          reportFormData.residual_retention_oil_tank_capacity_98
+                        }
+                        onChange={handleDimensionChange}
+                        placeholder="Enter Residual/Retention Oil Tank Capacity 98 (in Cu. Metres)"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-12">
+                    <h5>9.5 SBT VESSEL</h5>
+                    <hr />
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        What is total SBT capacity and percentage of SDWT vessel
+                        can maintain?
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="row">
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          <input
+                            type="text"
+                            className="form-field"
+                            name="total_sbt_capacity_and_percentage_of_sdwt_vessel_can_maintain"
+                            value={
+                              reportFormData.total_sbt_capacity_and_percentage_of_sdwt_vessel_can_maintain
+                            }
+                            onChange={handleDimensionChange}
+                            placeholder="Enter Total SBT Capacity And Percentage Of SDWT Vessel Can Maintain (in Cu. Metres)"
+                          />
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          <input
+                            type="text"
+                            className="form-field"
+                            name="percentage_of_sdwt_vessel_can_maintain"
+                            value={
+                              reportFormData.percentage_of_sdwt_vessel_can_maintain
+                            }
+                            onChange={handleDimensionChange}
+                            placeholder="Enter Percentage Of SDWT Vessel Can Maintain (in %)"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        Does vessel meet the requirements of MARPOL Annex I Reg
+                        18.2:
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <SingleSearchSelect
+                        options={[
+                          {
+                            value: "Yes",
+                            label: "Yes",
+                          },
+                          {
+                            value: "No",
+                            label: "No",
+                          },
+                        ]}
+                        value={
+                          reportFormData.does_vessel_meet_the_requirements_of_marpol_annex_i_reg_18_2 ||
+                          "Yes"
+                        }
+                        onChange={(value) =>
+                          handleSelectChange(
+                            "does_vessel_meet_the_requirements_of_marpol_annex_i_reg_18_2",
+                            value
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-12">
+                    <h5>9.6 Cargo Handling and Pumping Systems</h5>
+                    <hr />
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        How many grades/products can vessel load/discharge with
+                        double valve segregation
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="how_many_grades_products_can_vessel_load_discharge_with_double_valve_segregation"
+                        value={
+                          reportFormData.how_many_grades_products_can_vessel_load_discharge_with_double_valve_segregation
+                        }
+                        onChange={handleDimensionChange}
+                        placeholder="Enter How Many Grades/Products Can Vessel Load/Discharge With Double Valve Segregation"
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        State type of cargo containment (integral, independent,
+                        gravity or pressure tanks)
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="type_of_cargo_containment"
+                        value={reportFormData.type_of_cargo_containment}
+                        onChange={handleFormChange}
+                        placeholder="Enter Type Of Cargo Containment"
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Loaded per manifold connection</label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="row">
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          <label>
+                            <small>With VECS (in Cu.Metres/Hour)</small>
+                          </label>
+                          <input
+                            type="text"
+                            className="form-field"
+                            name="with_vecs_capacity"
+                            value={reportFormData.with_vecs_capacity}
+                            onChange={handleDimensionChange}
+                            placeholder="Enter With VECS Capacity (in Cu. Metres/Hour)"
+                          />
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          <label>
+                            <small>Without VECS (in Cu.Metres/Hour)</small>
+                          </label>
+                          <input
+                            type="text"
+                            className="form-field"
+                            name="without_vecs_capacity"
+                            value={reportFormData.without_vecs_capacity}
+                            onChange={handleDimensionChange}
+                            placeholder="Enter Without VECS Capacity (in Cu. Metres/Hour)"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Loaded simultaneously through all manifolds</label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="row">
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          <input
+                            type="text"
+                            className="form-field"
+                            name="loaded_simultaneously_through_all_manifolds_with_vecs_capacity"
+                            value={
+                              reportFormData.loaded_simultaneously_through_all_manifolds_with_vecs_capacity
+                            }
+                            onChange={handleDimensionChange}
+                            placeholder="Enter Loaded Simultaneously Through All Manifolds With VECS Capacity (in Cu. Metres/Hour)"
+                          />
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="form-group">
+                          <input
+                            type="text"
+                            className="form-field"
+                            name="loaded_simultaneously_through_all_manifolds_without_vecs_capacity"
+                            value={
+                              reportFormData.loaded_simultaneously_through_all_manifolds_without_vecs_capacity
+                            }
+                            onChange={handleDimensionChange}
+                            placeholder="Enter Loaded Simultaneously Through All Manifolds Without VECS Capacity (in Cu. Metres/Hour)"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="col-md-12">
+                    <h5>9.7 CARGO CONTROL ROOM</h5>
+                    <hr />
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        Is ship fitted with a Cargo Control Room (CCR)?
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <SingleSearchSelect
+                        options={[
+                          {
+                            value: "Yes",
+                            label: "Yes",
+                          },
+                          {
+                            value: "No",
+                            label: "No",
+                          },
+                        ]}
+                        value={
+                          reportFormData.is_ship_fitted_with_a_cargo_control_room_ccr ||
+                          "Yes"
+                        }
+                        onChange={(value) =>
+                          handleSelectChange(
+                            "is_ship_fitted_with_a_cargo_control_room_ccr",
+                            value
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        Can tank innage/ullage be read from the CCR?
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <SingleSearchSelect
+                        options={[
+                          {
+                            value: "Yes",
+                            label: "Yes",
+                          },
+                          {
+                            value: "No",
+                            label: "No",
+                          },
+                        ]}
+                        value={
+                          reportFormData.can_tank_innage_ullage_be_read_from_the_ccr ||
+                          "Yes"
+                        }
+                        onChange={(value) =>
+                          handleSelectChange(
+                            "can_tank_innage_ullage_be_read_from_the_ccr",
+                            value
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-12">
+                    <h5>9.8 GAUGING & SAMPLING</h5>
+                    <hr />
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        Is gauging system certified and calibrated? If no,
+                        specify which ones are not calibrated
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <SingleSearchSelect
+                        options={[
+                          {
+                            value: "Yes",
+                            label: "Yes",
+                          },
+                          {
+                            value: "No",
+                            label: "No",
+                          },
+                        ]}
+                        value={
+                          reportFormData.is_gauging_system_certified_and_calibrated ||
+                          "Yes"
+                        }
+                        onChange={(value) =>
+                          handleSelectChange(
+                            "is_gauging_system_certified_and_calibrated",
+                            value
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        What type of fixed closed tank gauging system is fitted
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="type_of_fixed_closed_tank_gauging_system_fitted"
+                        value={
+                          reportFormData.type_of_fixed_closed_tank_gauging_system_fitted
+                        }
+                        onChange={handleFormChange}
+                        placeholder="Enter Type Of Fixed Closed Tank Gauging System Fitted"
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        Are high level alarms fitted to the cargo tanks? If Yes,
+                        indicate whether to all tanks or partial
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="are_high_level_alarms_fitted_to_the_cargo_tanks"
+                        value={
+                          reportFormData.are_high_level_alarms_fitted_to_the_cargo_tanks
+                        }
+                        onChange={handleFormChange}
+                        placeholder="Enter Are High Level Alarms Fitted To The Cargo Tanks"
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>
+                        Number of portable gauging units (example− MMC) on board
+                      </label>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <input  
+                        type="text"
+                        className="form-field"
+                        name="number_of_portable_gauging_units_on_board"
+                        value={
+                          reportFormData.number_of_portable_gauging_units_on_board
+                        }
+                        onChange={handleDimensionChange}
+                        placeholder="Enter Number Of Portable Gauging Units On Board"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -5014,7 +6029,7 @@ function MarineReport() {
                 <div className="col-md-12">
                   <div className="form-buttons">
                     <button
-                      type="submit"
+                      type="button"
                       className="submit-button"
                       disabled={generating}
                     >
@@ -5025,8 +6040,8 @@ function MarineReport() {
                     <button
                       type="button"
                       className="btn save-report"
-                      onClick={handleSaveReport}
-                      disabled={saving}
+                      /* onClick={handleSaveReport}
+                      disabled={saving} */
                       style={{ marginRight: "10px" }}
                     >
                       {saving ? "Saving..." : "Save"}
