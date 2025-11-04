@@ -36,7 +36,7 @@ import {
   UploadImageIcon,
   ValidateIcon,
 } from "../../components/icons";
-import { ZoomIn } from "lucide-react";
+import { ZoomIn, Copy } from "lucide-react";
 import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
 import { toast } from "react-toastify";
@@ -328,6 +328,19 @@ function OrderImages() {
         return newSeq;
       }
     });
+  };
+
+  // Handle copying video URL to clipboard
+  const handleCopyVideoUrl = async (mediaUrl, e) => {
+    e.stopPropagation(); // Prevent triggering the card selection
+    try {
+      const fullUrl = getImageUrl(mediaUrl);
+      await navigator.clipboard.writeText(fullUrl);
+      toast.success("Video URL copied to clipboard!");
+    } catch (err) {
+      console.error("Failed to copy URL:", err);
+      toast.error("Failed to copy URL to clipboard");
+    }
   };
 
   // Validation function for collage generation
@@ -876,6 +889,18 @@ function OrderImages() {
                                   title="View in lightbox"
                                 >
                                   <ZoomIn size={16} />
+                                </button>
+                              )}
+                              {isVideoFile && (
+                                <button
+                                  onClick={(e) => {
+                                    handleCopyVideoUrl(image.media_url, e);
+                                  }}
+                                  className="copy-video-url-btn"
+                                  title="Copy video URL"
+                                  style={{ marginLeft: "5px" }}
+                                >
+                                  <Copy size={16} />
                                 </button>
                               )}
                               {isSelected && (

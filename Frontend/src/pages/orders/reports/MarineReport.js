@@ -1640,7 +1640,7 @@ function MarineReport() {
                 <div className="col-md-6">
                   <div className="form-group">
                     <label>
-                      Report Type <span className="text-danger">*</span>
+                      Report Title Type <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -1657,9 +1657,9 @@ function MarineReport() {
                           label: "DESKTOP VALUATION REPORT",
                         },
                       ]}
-                      value={reportFormData.report_type || "VALUATION REPORT"}
+                      value={reportFormData.report_title_type || "VALUATION REPORT"}
                       onChange={(value) =>
-                        handleSelectChange("report_type", value)
+                        handleSelectChange("report_title_type", value)
                       }
                       required
                     />
@@ -4492,7 +4492,7 @@ function MarineReport() {
                       name="keel_to_masthead_ktm_dimensions"
                       value={reportFormData.keel_to_masthead_ktm_dimensions}
                       onChange={handleDimensionChange}
-                      placeholder="Enter Keel to masthead (KTM)/ Keel to masthead (KTM) in collapsed condition, if applicable"
+                      placeholder="in Metres"
                     />
                   </div>
                 </div>
@@ -4514,7 +4514,7 @@ function MarineReport() {
                         reportFormData.distance_bridge_front_to_center_of_manifold_dimensions
                       }
                       onChange={handleDimensionChange}
-                      placeholder="Enter Distance bridge front to center of manifold"
+                      placeholder="in Metres"
                     />
                   </div>
                 </div>
@@ -4538,7 +4538,7 @@ function MarineReport() {
                             reportFormData.bow_to_center_manifold_bcm_dimensions
                           }
                           onChange={handleDimensionChange}
-                          placeholder="Enter Bow to center manifold (BCM)"
+                          placeholder="in Metres"
                         />
                       </div>
                     </div>
@@ -4552,7 +4552,7 @@ function MarineReport() {
                             reportFormData.stern_to_center_manifold_scm_dimensions
                           }
                           onChange={handleDimensionChange}
-                          placeholder="Enter Stern to center manifold (SCM)"
+                          placeholder="in Metres"
                         />
                       </div>
                     </div>
@@ -4577,7 +4577,7 @@ function MarineReport() {
                             reportFormData.forward_to_mid_point_manifold_lightship_dimensions
                           }
                           onChange={handleDimensionChange}
-                          placeholder="Lightship"
+                          placeholder="Lightship" 
                         />
                       </div>
                     </div>
@@ -8728,8 +8728,8 @@ function MarineReport() {
                     <input
                       type="text"
                       className="form-field"
-                      name="no_of_drums_of_forecastle_winches"
-                      value={reportFormData.no_of_drums_of_forecastle_winches}
+                      name="no_of_drums_of_main_deck_fwd_winches"
+                      value={reportFormData.no_of_drums_of_main_deck_fwd_winches}
                       onChange={handleFormChange}
                       placeholder="Enter No of Drums"
                     />
@@ -9543,12 +9543,12 @@ function MarineReport() {
                         },
                       ]}
                       value={
-                        reportFormData.does_vessel_meet_the_recommendations ||
+                        reportFormData.is_bow_chock_and_or_fairlead ||
                         "Yes"
                       }
                       onChange={(value) =>
                         handleSelectChange(
-                          "does_vessel_meet_the_recommendations",
+                          "is_bow_chock_and_or_fairlead",
                           value
                         )
                       }
@@ -9659,9 +9659,9 @@ function MarineReport() {
                         <input
                           type="text"
                           className="form-field"
-                          name="what_type_of_fuel_is_used_for_main_propulsion_generating_plant"
+                          name="what_type_of_fuel_is_used_maximum"
                           value={
-                            reportFormData.what_type_of_fuel_is_used_for_main_propulsion_generating_plant
+                            reportFormData.what_type_of_fuel_is_used_maximum
                           }
                           onChange={handleFormChange}
                           placeholder="Enter What Type of Fuel is Used for Main Propulsion/Generating Plant"
@@ -9676,9 +9676,9 @@ function MarineReport() {
                         <input
                           type="text"
                           className="form-field"
-                          name="what_type_of_fuel_is_used_for_main_propulsion_generating_plant"
+                          name="what_type_of_fuel_is_used_economic"
                           value={
-                            reportFormData.what_type_of_fuel_is_used_for_main_propulsion_generating_plant
+                            reportFormData.what_type_of_fuel_is_used_economic
                           }
                           onChange={handleFormChange}
                           placeholder="Enter What Type of Fuel is Used for Main Propulsion/Generating Plant"

@@ -15,6 +15,11 @@ import {
   fetchChildCategoriesByCategoryName,
 } from "../../redux/reducers/childCategoryReducer";
 import { fetchFieldVerifiers } from "../../redux/reducers/fieldVerifierReducer";
+import {
+  fetchLastAttendanceByUserId,
+  addAttendance,
+  updateAttendanceCheckout,
+} from "../../redux/reducers/attendanceReducer";
 import FormModel from "../../components/FormModel";
 import SingleSearchSelect from "../../components/SingleSearchSelect";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
@@ -44,6 +49,8 @@ function Dashboard() {
     (state) => state.childCategories
   );
   const { list: fieldVerifiers } = useSelector((state) => state.fieldVerifier);
+  const { lastRecord: lastAttendance, loading: attendanceLoading } =
+    useSelector((state) => state.attendance);
 
   // Fetch everything on mount
   useEffect(() => {
@@ -53,6 +60,13 @@ function Dashboard() {
     dispatch(fetchChildCategories());
     dispatch(fetchFieldVerifiers());
   }, [dispatch]);
+
+  // Fetch last attendance record on mount
+  useEffect(() => {
+    if (currentUser?.id) {
+      dispatch(fetchLastAttendanceByUserId(currentUser.id));
+    }
+  }, [dispatch, currentUser?.id]);
 
   // Check if current user is TELECALLER (case-insensitive) - matches any role containing "TELECALLER"
   const isTelecaller = currentUser?.role.name
@@ -168,6 +182,10 @@ function Dashboard() {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [confirmDeleteName, setConfirmDeleteName] = useState("");
 
+  // State for checkout remarks modal
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [checkoutRemark, setCheckoutRemark] = useState("");
+
   // State for order attributes modal
   const [showAttributesModal, setShowAttributesModal] = useState(false);
   const [attributesOrderId, setAttributesOrderId] = useState(null);
@@ -226,6 +244,94 @@ function Dashboard() {
 
   const formatTwoDigits = (num) => String(num ?? 0).padStart(2, "0");
 
+  // Format attendance date and time
+  const formatAttendanceDateTime = (dateString) => {
+    const date = new Date(dateString);
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? "PM" : "AM";
+    const displayHours = hours % 12 || 12;
+    const formattedTime = `${String(displayHours).padStart(2, "0")}:${String(
+      minutes
+    ).padStart(2, "0")} ${ampm}`;
+
+    const weekdays = [
+      "Sunday",
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+    ];
+    const weekday = weekdays[date.getDay()];
+
+    const day = date.getDate();
+    const month = date.getMonth() + 1;
+    const year = date.getFullYear();
+
+    // Add ordinal suffix to day (1st, 2nd, 3rd, 4th, etc.)
+    const getOrdinalSuffix = (d) => {
+      if (d > 3 && d < 21) return "th";
+      switch (d % 10) {
+        case 1:
+          return "st";
+        case 2:
+          return "nd";
+        case 3:
+          return "rd";
+        default:
+          return "th";
+      }
+    };
+
+    const formattedDate = `${day}${getOrdinalSuffix(day)}-${String(
+      month
+    ).padStart(2, "0")}-${year}`;
+
+    return `${formattedTime} ${weekday}, ${formattedDate}`;
+  };
+
+  // Format checkout time only (without date)
+  const formatCheckoutTime = (dateString) => {
+    const date = new Date(dateString);
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? "PM" : "AM";
+    const displayHours = hours % 12 || 12;
+    return `${String(displayHours).padStart(2, "0")}:${String(minutes).padStart(
+      2,
+      "0"
+    )} ${ampm}`;
+  };
+
+  // Determine if check-in button should be disabled
+  const isCheckInDisabled = () => {
+    // Check-in is disabled ONLY if checkin time is set but checkout time is not set
+    if (
+      lastAttendance &&
+      lastAttendance.checkin_time &&
+      !lastAttendance.checkout_time
+    ) {
+      return true;
+    }
+    // Otherwise, check-in is enabled (no record, or both times set, or checkout set but not checkin)
+    return false;
+  };
+
+  // Determine if check-out button should be disabled
+  const isCheckOutDisabled = () => {
+    // Check-out is disabled if: 1) no record found, or 2) checkout time is already set
+    if (!lastAttendance) {
+      return true;
+    }
+    if (lastAttendance.checkout_time) {
+      return true;
+    }
+    // Otherwise, check-out is enabled (record exists, checkin is set, checkout is not set)
+    return false;
+  };
+
   // Open Add Order Form
   const openAddModal = () => {
     setIsEdit(false);
@@ -276,6 +382,54 @@ function Dashboard() {
   const handleConfirmDelete = () => {
     dispatch(removeOrder(confirmDeleteId));
     setConfirmDeleteId(null);
+  };
+
+  // Handle Check-in
+  const handleCheckIn = async () => {
+    if (!currentUser?.id) {
+      toast.error("User ID not found");
+      return;
+    }
+
+    try {
+      await dispatch(
+        addAttendance({
+          user_id: currentUser.id,
+          checkin_via: "Portal",
+        })
+      ).unwrap();
+      // Success toast is shown in the reducer
+    } catch (error) {
+      // Error toast is shown in the reducer
+    }
+  };
+
+  // Handle Check-out button click - opens modal
+  const handleCheckOut = () => {
+    setCheckoutRemark("");
+    setShowCheckoutModal(true);
+  };
+
+  // Submit Check-out with optional remarks
+  const handleCheckOutSubmit = async () => {
+    if (!currentUser?.id) {
+      toast.error("User ID not found");
+      return;
+    }
+
+    const payload = { user_id: currentUser.id };
+    if (checkoutRemark.trim()) {
+      payload.checkout_remarks = checkoutRemark.trim();
+    }
+
+    try {
+      await dispatch(updateAttendanceCheckout(payload)).unwrap();
+      setShowCheckoutModal(false);
+      setCheckoutRemark("");
+      // Success toast is shown in the reducer
+    } catch (error) {
+      // Error toast is shown in the reducer
+    }
   };
 
   // Open Order Attributes Modal
@@ -805,7 +959,9 @@ function Dashboard() {
                                         {formatTwoDigits(
                                           orders.filter(
                                             (order) =>
-                                              order.has_rejected_media === true || order.has_rejected_images === true
+                                              order.has_rejected_media ===
+                                                true ||
+                                              order.has_rejected_images === true
                                           ).length
                                         )}
                                       </p>
@@ -964,7 +1120,9 @@ function Dashboard() {
                                         {formatTwoDigits(
                                           orders.filter(
                                             (order) =>
-                                              order.has_rejected_media === true || order.has_rejected_images === true
+                                              order.has_rejected_media ===
+                                                true ||
+                                              order.has_rejected_images === true
                                           ).length
                                         )}
                                       </p>
@@ -983,6 +1141,44 @@ function Dashboard() {
             )}
             {hasCheckinPermission && (
               <div className="col-xl-5 col-lg-12 col-md-12 col-sm-12 col-xs-12">
+                {/* <div className="attendance-card-container">
+                  <div className="attendance-card">
+                    <div className="attendance-card-buttons-container">
+                      <button
+                        className="attendance-card-button check-in-button"
+                        onClick={handleCheckIn}
+                        disabled={attendanceLoading || isCheckInDisabled()}
+                      >
+                        <DashboardIcon /> Checkin
+                      </button>
+                      <button
+                        className="attendance-card-button check-out-button"
+                        onClick={handleCheckOut}
+                        disabled={attendanceLoading || isCheckOutDisabled()}
+                      >
+                        <DashboardIcon /> Checkout
+                      </button>
+                    </div>
+                    <div className="attendance-card-checkin-time">
+                      {lastAttendance?.checkin_time && !lastAttendance?.checkout_time ? (
+                        <>
+                          <p>Your Current Checkin Time was</p>
+                          <h4>{formatAttendanceDateTime(lastAttendance.checkin_time)}</h4>
+                        </>
+                      ) : lastAttendance?.checkout_time ? (
+                        <>
+                          <p>You checked out at</p>
+                          <h4 style={{ color: "#dc3545" }}>{formatCheckoutTime(lastAttendance.checkout_time)}</h4>
+                        </>
+                      ) : (
+                        <>
+                          <p>Your Current Checkin Time was</p>
+                          <h4>No check-in recorded</h4>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div> */}
                 <div className="attendance-card-container">
                   <div className="attendance-card">
                     <div className="attendance-card-buttons-container">
@@ -1411,8 +1607,11 @@ function Dashboard() {
                 <div
                   key={order.id}
                   className={`telecoller-dashboard-order-card clickable-card ${
-                    order.current_status_id === 5 ? 'reassign-order' : 
-                    order.current_status_id >= 7 ? 'complete-order' : ''
+                    order.current_status_id === 5
+                      ? "reassign-order"
+                      : order.current_status_id >= 7
+                      ? "complete-order"
+                      : ""
                   }`}
                   onClick={() => openEditModal(order)}
                   style={{ cursor: "pointer" }}
@@ -1992,6 +2191,48 @@ function Dashboard() {
                 valuer_name: "",
                 admin_user_ids: [],
               });
+            },
+          }}
+        </FormModel>
+      )}
+
+      {/* Checkout Remarks Modal */}
+      {showCheckoutModal && (
+        <FormModel>
+          {{
+            title: "Check Out",
+            body: (
+              <form
+                className="body-form-box"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleCheckOutSubmit();
+                }}
+              >
+                <div className="body-form-box">
+                  <div className="form-group">
+                    <label htmlFor="checkoutRemark">Remark</label>
+                    <textarea
+                      className="form-field"
+                      id="checkoutRemark"
+                      name="checkoutRemark"
+                      rows="4"
+                      value={checkoutRemark}
+                      onChange={(e) => setCheckoutRemark(e.target.value)}
+                      placeholder="Enter remarks (optional)"
+                    />
+                  </div>
+                  <div className="form-buttons">
+                    <button className="submit-button" type="submit">
+                      Check Out
+                    </button>
+                  </div>
+                </div>
+              </form>
+            ),
+            onClose: () => {
+              setShowCheckoutModal(false);
+              setCheckoutRemark("");
             },
           }}
         </FormModel>

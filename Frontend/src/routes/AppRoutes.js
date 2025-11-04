@@ -10,6 +10,7 @@ import Orders from "../pages/orders/Orders";
 import OrderHistory from "../pages/orders/order-history/OrderHistory";
 import FieldVerifier from "../pages/field-verifier/FieldVerifier";
 import Users from "../pages/users/Users";
+import Attendance from "../pages/users/Attendance";
 import Permissions from "../pages/permissions/Permissions";
 import Banks from "../pages/banks/Banks";
 import Categories from "../pages/categories/Categories";
@@ -145,6 +146,22 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute permission="view_user">
               <Users />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="attendance"
+          element={
+            <ProtectedRoute permission="view_dashboard_checkin_checkout">
+              <Attendance />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="users/:userId/attendance"
+          element={
+            <ProtectedRoute permission="show_attendance_of_all_users">
+              <Attendance />
             </ProtectedRoute>
           }
         />

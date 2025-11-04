@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   fetchUsers,
   addUser,
@@ -16,6 +17,7 @@ import {
   EditIcon,
   PasswordIcon,
   ContactIcon,
+  ViewIcon,
 } from "../../components/icons";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import FormModel from "../../components/FormModel";
@@ -26,6 +28,7 @@ import { toast } from "react-toastify";
 
 function Users() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   /* get logged user permission */
   const allowedPermissions = useSelector(selectPermissions);
@@ -92,6 +95,11 @@ function Users() {
       confirm_password: "",
     });
     setShowFormModal(true);
+  };
+
+  // View Attendance
+  const viewAttendance = (userId) => {
+    navigate(`/users/${userId}/attendance`);
   };
 
   // ✅ Submit Add/Edit
@@ -286,6 +294,14 @@ function Users() {
                 <td>{user.created_by}</td>
                 <td>{user.updated_by || "-"}</td>
                 <td style={{ textAlign: "center" }}>
+                  {hasPermission(allowedPermissions, "show_attendance_of_all_users") && (
+                    <button
+                      className="action-icons"
+                      onClick={() => viewAttendance(user.id)}
+                    >
+                      <ViewIcon />
+                    </button>
+                  )}
                   {hasPermission(allowedPermissions, "edit_user") && (
                     <button
                       className="action-icons"

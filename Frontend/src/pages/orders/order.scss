@@ -738,6 +738,33 @@
                   color: $primary-color;
                 }
               }
+              .copy-video-url-btn {
+                position: absolute;
+                top: 5px;
+                left: 35px;
+                width: 28px;
+                height: 28px;
+                background-color: rgba(255, 255, 255, 0.9);
+                border: none;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                z-index: 10;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                transition: all 0.2s ease;
+                outline: none;
+
+                &:hover {
+                  background-color: white;
+                  transform: scale(1.1);
+                }
+
+                svg {
+                  color: $primary-color;
+                }
+              }
               .selection-order {
                 position: absolute;
                 top: 5px;

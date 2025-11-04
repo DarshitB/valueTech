@@ -338,7 +338,7 @@ Flexible fields are submitted as an array. Each entry can have different propert
 - `field_3` (string): Image path (JSON or direct path)
 - `field_4` (number, optional): Image ID
 
-**Note:** `field_label` and `field_value` are not sent; all user inputs use generic `field_1..N`.
+**Note:** `field_label` and `field_value` are not sent; all user inputs use generic `field_1..N` up to 10.
 
 **Complete Payload Example:**
 ```json

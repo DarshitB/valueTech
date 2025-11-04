@@ -17,6 +17,7 @@ import orderReportReducer from "./reducers/orderReportReducer";
 import orderMediaDocumentsReducer from "./reducers/orderMediaDocumentsReducer";
 import collageReducer from "./reducers/collageReducer";
 import assetMakesReducer from "./reducers/assetMakesReducer";
+import attendanceReducer from "./reducers/attendanceReducer";
 
 const store = configureStore({
   reducer: {
@@ -38,6 +39,7 @@ const store = configureStore({
     orderMediaDocuments: orderMediaDocumentsReducer,
     collage: collageReducer,
     assetMakes: assetMakesReducer,
+    attendance: attendanceReducer,
   },
 });
 

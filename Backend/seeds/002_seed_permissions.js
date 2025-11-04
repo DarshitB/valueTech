@@ -166,6 +166,8 @@ exports.seed = async function (knex) {
     "view_order_table_valuer_name_db",
     "view_order_table_status_db",
     "view_order_table_action_db",
+
+    "show_attendance_of_all_users",
   ];
 
   // Insert permissions

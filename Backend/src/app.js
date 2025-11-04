@@ -28,6 +28,9 @@ const stateRoutes = require("./routes/location/stateRoutes");
 const userRoutes = require("./routes/user/userRoutes");
 const officerRouter = require("./routes/user/officerRouter");
 
+// Attendance routes
+const attendanceRoutes = require("./routes/attendance/attendanceRoutes");
+
 // Orders routes
 const orderRoutes = require("./routes/orders/orderRoutes");
 const orderMediaPortalRoutes = require("./routes/orders/orderMediaPortalRoutes");
@@ -154,6 +157,7 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api/subcategories", subcategoryRoutes);
 app.use("/api/child-categories", childCategoryRoutes);
 app.use("/api/officers", officerRouter);
+app.use("/api/attendance", attendanceRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/orders-reports/custom-report", customReportRoutes);
 app.use("/api/orders-reports", ordersReportsRoutes);

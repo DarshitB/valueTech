@@ -213,6 +213,19 @@ function Layout() {
                   </Link>
                 </li>
               )}
+              {/* {hasPermission(allowedPermissions, "view_dashboard_checkin_checkout") &&
+                LoggedInUser?.role?.name?.toUpperCase() !== "DEVELOPER_ADMIN" && (
+                <li
+                  className={`${
+                    location.pathname.startsWith("/attendance") ? "active" : ""
+                  } dropdown`}
+                >
+                  <Link to="attendance" onClick={() => setSidebarOpen(false)}>
+                    <DashboardIcon className="feather feather-monitor" />
+                    Attendance
+                  </Link>
+                </li>
+              )} */}
               {hasPermission(allowedPermissions, "view_permission") && (
                 <li
                   className={`${
