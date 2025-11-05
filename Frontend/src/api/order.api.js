@@ -28,3 +28,33 @@ export const updateStatusAfterUnderReview = (id, payload) =>
 
 export const getAssetMakesForReports = (orderType) =>
   axios.get(`/api/asset-makes-of-reports/${orderType}/order-types`); // Get asset makes for specific report type
+
+/**
+ * Send mail with order documents to recipients
+ * @param {number} orderId - The order ID
+ * @param {Object} payload - Mail payload object
+ * @param {string[]} payload.to - Array of recipient email addresses (required)
+ * @param {string[]} payload.cc - Array of CC email addresses (optional)
+ * @param {string[]} payload.bcc - Array of BCC email addresses (optional)
+ * @param {string} payload.subject - Email subject (optional)
+ * @param {string} payload.comments - Email body/comments (optional)
+ * @param {number[]} payload.document_ids - Array of approved document IDs to attach (collages and reports)
+ * @param {number[]} payload.video_ids - Array of approved video IDs to attach (optional, only included if videos exist)
+ * @returns {Promise} Axios response
+ * 
+ * Example payload:
+ * {
+ *   to: ["officer1@bank.com", "officer2@bank.com"],
+ *   cc: ["manager@bank.com"],
+ *   bcc: [],
+ *   subject: "Order Documents - #12345",
+ *   comments: "Please find attached the approved documents for order #12345",
+ *   document_ids: [1, 2, 3, 4],
+ *   video_ids: [5, 6]  // Optional: only included if videos are selected
+ * }
+ * 
+ * Expected backend endpoint: POST /api/orders/:orderId/send-mail
+ * Expected response: { success: true, message: "Mail sent successfully", ... }
+ */
+export const sendOrderMail = (orderId, payload) =>
+  axios.post(`${ENDPOINT}/${orderId}/send-mail`, payload);

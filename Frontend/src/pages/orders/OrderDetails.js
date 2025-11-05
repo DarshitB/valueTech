@@ -15,6 +15,7 @@ import {
   updatePaymentStatus,
   updateOrderToStatus9,
   updateStatusAfterUnderReview,
+  fetchOrderMedia,
 } from "../../redux/reducers/orderReducer";
 import {
   fetchApprovedOrderMediaDocuments,
@@ -22,6 +23,7 @@ import {
 } from "../../redux/reducers/orderMediaDocumentsReducer";
 import { fetchOfficers } from "../../redux/reducers/officerReducer";
 import { getUsers } from "../../api/user.api";
+import { sendOrderMail } from "../../api/order.api";
 import { MentionsInput, Mention } from "react-mentions";
 import mentionsStyle from "./mentionsStyle";
 import "./order.scss";
@@ -109,6 +111,8 @@ function OrderDetails() {
   const order = useSelector((state) => state.orders.selected);
   const comments = useSelector((state) => state.orders.comments);
   const paymentUpdating = useSelector((state) => state.orders.paymentUpdating);
+  // Get media from Redux store (like OrderImages component)
+  const media = useSelector((state) => state.orders.media);
   // Get media documents from Redux store
   const orderMediaDocumentsState = useSelector(
     (state) => state.orderMediaDocuments
@@ -135,6 +139,7 @@ function OrderDetails() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [activeTab, setActiveTab] = useState("payment");
   const [showMailModal, setShowMailModal] = useState(false);
+  const [isSendingMail, setIsSendingMail] = useState(false);
   const [showCompleteConfirmation, setShowCompleteConfirmation] =
     useState(false);
   const [showAuthenticateConfirmation, setShowAuthenticateConfirmation] =
@@ -164,6 +169,9 @@ function OrderDetails() {
     comments: "",
   });
 
+  // Track removed documents (by ID) - documents user removes from mail attachments
+  const [removedDocumentIds, setRemovedDocumentIds] = useState([]);
+
   // Fetch order details, comments, and media documents when component mounts or ID changes
   useEffect(() => {
     if (id) {
@@ -174,10 +182,11 @@ function OrderDetails() {
     }
   }, [dispatch, id]);
 
-  // Fetch approved documents when mail modal is opened
+  // Fetch approved documents and media when mail modal is opened
   useEffect(() => {
     if (showMailModal && id) {
       dispatch(fetchApprovedOrderMediaDocuments(id));
+      dispatch(fetchOrderMedia(id)); // Fetch media like OrderImages does
     }
   }, [dispatch, id, showMailModal]);
 
@@ -552,6 +561,109 @@ function OrderDetails() {
     return `${Math.round(size * 10) / 10} ${sizes[unitIndex]}`;
   };
 
+  // Parse media URL to get the actual document URL - Secure implementation
+  const parseMediaUrl = (mediaUrl) => {
+    if (!mediaUrl || typeof mediaUrl !== "string") return null;
+
+    const baseUrl =
+      process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
+
+    try {
+      // Try to parse as JSON first
+      const parsed = JSON.parse(mediaUrl);
+      if (parsed.path && typeof parsed.path === "string") {
+        const cleanPath = parsed.path.startsWith("/")
+          ? parsed.path
+          : `/${parsed.path}`;
+        return `${baseUrl}${cleanPath}`;
+      }
+      if (parsed.link && typeof parsed.link === "string") {
+        return parsed.link;
+      }
+      return null;
+    } catch {
+      // If not JSON, treat as direct path
+      if (typeof mediaUrl === "string") {
+        if (mediaUrl.startsWith("http://") || mediaUrl.startsWith("https://")) {
+          return mediaUrl;
+        }
+        if (mediaUrl.startsWith("/")) {
+          return `${baseUrl}${mediaUrl}`;
+        }
+        return `${baseUrl}/${mediaUrl}`;
+      }
+      return null;
+    }
+  };
+
+  // Validate URL for security
+  const validateUrl = (url) => {
+    if (!url || typeof url !== "string") return false;
+    try {
+      const parsed = new URL(url);
+      // Only allow http/https protocols
+      return ["http:", "https:"].includes(parsed.protocol);
+    } catch {
+      return false;
+    }
+  };
+
+  // Check if media is a video - Same logic as OrderImages component
+  const isVideo = (mediaUrl) => {
+    if (!mediaUrl || typeof mediaUrl !== "string") return false;
+    try {
+      // Try to parse as JSON first
+      const parsed = JSON.parse(mediaUrl);
+      const path = parsed.path || "";
+      return path.toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|webm|mkv)$/);
+    } catch {
+      // If not JSON, check the direct path
+      return mediaUrl.toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|webm|mkv)$/);
+    }
+  };
+
+  // Handle document click to open in new tab
+  const handleDocumentClick = (doc) => {
+    if (!doc?.media_url) {
+      toast.error("Document URL not available");
+      return;
+    }
+
+    const fileUrl = parseMediaUrl(doc.media_url);
+    if (!fileUrl || !validateUrl(fileUrl)) {
+      toast.error("Invalid document URL");
+      return;
+    }
+
+    // Open in new tab with security measures
+    const newWindow = window.open(fileUrl, "_blank", "noopener,noreferrer");
+    if (!newWindow) {
+      toast.error("Popup blocked. Please allow popups for this site.");
+    }
+  };
+
+  // Handle document removal from mail attachments
+  const handleRemoveDocument = (docId) => {
+    if (!docId || isNaN(Number(docId))) {
+      toast.error("Invalid document ID");
+      return;
+    }
+
+    setRemovedDocumentIds((prev) => {
+      if (prev.includes(Number(docId))) {
+        return prev; // Already removed
+      }
+      return [...prev, Number(docId)];
+    });
+  };
+
+  // Memoize approved videos extraction to avoid recalculating on every render
+  const approvedVideos = useMemo(() => {
+    const allMedia = media?.media || [];
+    const allVideos = allMedia.filter((item) => item?.media_url && isVideo(item.media_url));
+    return allVideos.filter((video) => video?.status === 1);
+  }, [media?.media]);
+
   // Render approved documents as tag-style attachments (like in the image)
   const renderApprovedDocuments = () => {
     if (approvedLoading) {
@@ -562,7 +674,13 @@ function OrderDetails() {
       );
     }
 
-    if (!approvedDocuments || approvedDocuments.length === 0) {
+    // Get all approved documents from approvedDocuments
+    const approvedDocsArray = approvedDocuments || [];
+
+    // Combine approved documents and approved videos
+    const allApprovedDocuments = [...approvedDocsArray, ...approvedVideos];
+
+    if (allApprovedDocuments.length === 0) {
       return (
         <div style={{ padding: "10px", color: "#888", fontStyle: "italic" }}>
           No approved documents to attach
@@ -570,55 +688,175 @@ function OrderDetails() {
       );
     }
 
-    // Combine all approved documents (collages first, then reports)
-    const approvedCollages = approvedDocuments.filter(
-      (doc) => doc.document_type === "collage"
+    // Filter out removed documents
+    const availableDocuments = allApprovedDocuments.filter(
+      (doc) => !removedDocumentIds.includes(Number(doc.id))
     );
-    const approvedReports = approvedDocuments.filter(
-      (doc) => doc.document_type === "report"
+
+    if (availableDocuments.length === 0) {
+      return (
+        <div style={{ padding: "10px", color: "#888", fontStyle: "italic" }}>
+          No approved documents to attach (all removed)
+        </div>
+      );
+    }
+
+    // Separate documents (collage/report) and videos
+    // Videos might not have document_type, so check by media_url extension first
+    const approvedVideosList = availableDocuments.filter(
+      (doc) => doc?.media_url && isVideo(doc.media_url)
     );
-    const allApproved = [...approvedCollages, ...approvedReports];
+    
+    // Documents are collages and reports (excluding videos)
+    const approvedCollages = availableDocuments.filter(
+      (doc) => doc.document_type === "collage" && !isVideo(doc?.media_url)
+    );
+    const approvedReports = availableDocuments.filter(
+      (doc) => doc.document_type === "report" && !isVideo(doc?.media_url)
+    );
+    const allDocuments = [...approvedCollages, ...approvedReports];
 
     return (
       <div className="selected-documents-container">
-        {allApproved.map((doc) => (
-          <div key={doc.id} className="approved-document-tag">
-            <span style={{ marginRight: "6px" }}>
-              {getFilenameFromMediaUrl(doc.media_url)}
-            </span>
-            <button
-              type="button"
-              className="remove-document-tag"
-              style={{
-                background: "none",
-                border: "none",
-                color: "#6b7280",
-                fontSize: "14px",
-                cursor: "pointer",
-                padding: "0",
-                marginLeft: "4px",
-                lineHeight: "1",
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
+        {/* Documents (Collages & Reports) */}
+        {allDocuments.length > 0 && (
+          <>
+            <div style={{ marginBottom: "8px", fontWeight: "500", color: "#374151" }}>
+              Documents:
+            </div>
+            {allDocuments.map((doc) => (
+              <div key={`doc-${doc.id}`} className="approved-document-tag">
+                <span
+                  style={{
+                    marginRight: "6px",
+                    cursor: "pointer",
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleDocumentClick(doc);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleDocumentClick(doc);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open ${getFilenameFromMediaUrl(
+                    doc.media_url
+                  )} in new tab`}
+                  title="Click to open in new tab"
+                >
+                  {getFilenameFromMediaUrl(doc.media_url)}
+                </span>
+                <button
+                  type="button"
+                  className="remove-document-tag"
+                  disabled={isSendingMail}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: isSendingMail ? "#d1d5db" : "#6b7280",
+                    fontSize: "14px",
+                    cursor: isSendingMail ? "not-allowed" : "pointer",
+                    padding: "0",
+                    marginLeft: "4px",
+                    lineHeight: "1",
+                    opacity: isSendingMail ? 0.5 : 1,
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!isSendingMail) {
+                      handleRemoveDocument(doc.id);
+                    }
+                  }}
+                  aria-label={`Remove ${getFilenameFromMediaUrl(doc.media_url)}`}
+                  title={
+                    isSendingMail
+                      ? "Cannot remove while sending"
+                      : "Remove document"
+                  }
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </>
+        )}
 
-                // Validate document ID
-                if (!doc.id || isNaN(Number(doc.id))) {
-                  console.error("Invalid document ID");
-                  return;
-                }
-
-                // In a real implementation, you might want to remove this document
-                // For now, just show it's clickable with validation
-                /* console.log("Remove attachment:", Number(doc.id)); */
-              }}
-              aria-label={`Remove ${getFilenameFromMediaUrl(doc.media_url)}`}
-            >
-              ×
-            </button>
-          </div>
-        ))}
+        {/* Videos */}
+        {approvedVideos.length > 0 && (
+          <>
+            <div style={{ marginTop: allDocuments.length > 0 ? "16px" : "0", marginBottom: "8px", fontWeight: "500", color: "#374151" }}>
+              Videos:
+            </div>
+            {approvedVideos.map((doc) => (
+              <div key={`video-${doc.id}`} className="approved-document-tag">
+                <span
+                  style={{
+                    marginRight: "6px",
+                    cursor: "pointer",
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleDocumentClick(doc);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleDocumentClick(doc);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open ${getFilenameFromMediaUrl(
+                    doc.media_url
+                  )} in new tab`}
+                  title="Click to open in new tab"
+                >
+                  {getFilenameFromMediaUrl(doc.media_url)}
+                </span>
+                <button
+                  type="button"
+                  className="remove-document-tag"
+                  disabled={isSendingMail}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: isSendingMail ? "#d1d5db" : "#6b7280",
+                    fontSize: "14px",
+                    cursor: isSendingMail ? "not-allowed" : "pointer",
+                    padding: "0",
+                    marginLeft: "4px",
+                    lineHeight: "1",
+                    opacity: isSendingMail ? 0.5 : 1,
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!isSendingMail) {
+                      handleRemoveDocument(doc.id);
+                    }
+                  }}
+                  aria-label={`Remove ${getFilenameFromMediaUrl(doc.media_url)}`}
+                  title={
+                    isSendingMail
+                      ? "Cannot remove while sending"
+                      : "Remove video"
+                  }
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </>
+        )}
       </div>
     );
   };
@@ -701,6 +939,8 @@ function OrderDetails() {
   };
 
   const OpenMailModal = () => {
+    setIsSendingMail(false); // Reset sending state when opening modal
+    setRemovedDocumentIds([]); // Reset removed documents when opening modal
     setShowMailModal(true);
   };
 
@@ -879,9 +1119,33 @@ function OrderDetails() {
     }));
   };
 
+  // Prevent browser window/tab closing when sending mail
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isSendingMail) {
+        e.preventDefault();
+        e.returnValue = "Mail is being sent. Are you sure you want to leave?";
+        return e.returnValue;
+      }
+    };
+
+    if (isSendingMail) {
+      window.addEventListener("beforeunload", handleBeforeUnload);
+    }
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [isSendingMail]);
+
   // Handle mail form submission with enhanced validation
-  const handleMailFormSubmit = (e) => {
+  const handleMailFormSubmit = async (e) => {
     e.preventDefault();
+
+    // Prevent submission if already sending
+    if (isSendingMail) {
+      return;
+    }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -962,51 +1226,126 @@ function OrderDetails() {
       return;
     }
 
-    // Validate approved documents
+    // Get all approved documents from approvedDocuments
+    const approvedDocsArray = approvedDocuments || [];
+
+    // Combine approved documents and approved videos (approvedVideos is memoized)
+    const allApprovedDocuments = [...approvedDocsArray, ...approvedVideos];
+
+    // Filter out removed documents
+    const availableDocuments = allApprovedDocuments.filter(
+      (doc) =>
+        doc &&
+        typeof doc === "object" &&
+        doc.id &&
+        doc.media_url &&
+        !removedDocumentIds.includes(Number(doc.id))
+    );
+
+    // Separate documents (collage/report) and videos
+    // Videos are identified by file extension, not document_type
+    const availableVideosList = availableDocuments.filter(
+      (doc) => doc?.media_url && isVideo(doc.media_url)
+    );
+    const availableDocs = availableDocuments.filter(
+      (doc) => doc?.media_url && !isVideo(doc.media_url)
+    );
+
+    // Validate - at least one document or video should be available
     if (
-      !approvedDocuments ||
-      !Array.isArray(approvedDocuments) ||
-      approvedDocuments.length === 0
+      (!availableDocs || availableDocs.length === 0) &&
+      (!availableVideosList || availableVideosList.length === 0)
     ) {
-      toast.error("No approved documents available to send");
+      toast.error(
+        "No approved documents or videos available to send. Please select at least one."
+      );
       return;
     }
 
-    const sanitizedMailData = {
+    // Prepare document IDs (collages and reports only, excluding videos)
+    const documentIds = availableDocs
+      .filter(
+        (doc) => doc && typeof doc === "object" && doc.id && doc.media_url
+      )
+      .map((doc) => ({
+        id: Number(doc.id),
+        media_url: String(doc.media_url).trim(),
+        document_type: doc.document_type || "unknown",
+      }));
+
+    // Prepare video IDs separately
+    const videoIds = availableVideosList
+      .filter(
+        (doc) => doc && typeof doc === "object" && doc.id && doc.media_url
+      )
+      .map((doc) => Number(doc.id));
+
+    // Prepare payload for API
+    // Note: SingleSearchSelect with isMulti returns arrays of values (email strings)
+    const mailPayload = {
       to: Array.isArray(mailFormData.to)
-        ? mailFormData.to.map((email) => email.trim().toLowerCase())
+        ? mailFormData.to
+            .map((email) => String(email).trim().toLowerCase())
+            .filter((email) => email && emailRegex.test(email))
         : [],
       cc: Array.isArray(mailFormData.cc)
-        ? mailFormData.cc.map((email) => email.trim().toLowerCase())
+        ? mailFormData.cc
+            .map((email) => String(email).trim().toLowerCase())
+            .filter((email) => email && emailRegex.test(email))
         : [],
       bcc: Array.isArray(mailFormData.bcc)
-        ? mailFormData.bcc.map((email) => email.trim().toLowerCase())
+        ? mailFormData.bcc
+            .map((email) => String(email).trim().toLowerCase())
+            .filter((email) => email && emailRegex.test(email))
         : [],
       subject: mailFormData.subject?.trim() || "",
       comments: comments,
-      orderId: Number(id),
-      approvedDocuments: approvedDocuments.filter(
-        (doc) => doc && typeof doc === "object" && doc.id && doc.media_url
-      ),
+      document_ids: documentIds.map((doc) => doc.id), // Array of document IDs (collages and reports)
+      // Add videos separately if there are any
+      ...(videoIds.length > 0 && { video_ids: videoIds }), // Array of video IDs (only if videos exist)
+      // Alternative: if backend needs full document objects with media_url
+      // documents: documentIds,
     };
 
-    /*  console.log("Sanitized Mail Data:", sanitizedMailData); */
+    // Set sending state to true
+    setIsSendingMail(true);
 
-    // Here you can add API call to send mail
-    // dispatch(sendMail(sanitizedMailData));
-    toast.success(
-      "Mail prepared successfully! (Ready for sending implementation)"
+    // Show processing message
+    toast.info(
+      "Mail sending process has started. Please be patient, it might take some time due to heavy files you are attaching.",
+      {
+        autoClose: 5000,
+        hideProgressBar: false,
+      }
     );
-    setShowMailModal(false);
 
-    // Reset form data
-    setMailFormData({
-      to: [],
-      cc: [],
-      bcc: [],
-      subject: "",
-      comments: "",
-    });
+    // Make API call to send mail
+    try {
+      const response = await sendOrderMail(Number(id), mailPayload);
+
+      if (response.data) {
+        toast.success("Mail sent successfully!");
+        setIsSendingMail(false);
+        setShowMailModal(false);
+
+        // Reset form data
+        setMailFormData({
+          to: [],
+          cc: [],
+          bcc: [],
+          subject: "",
+          comments: "",
+        });
+      }
+    } catch (error) {
+      console.error("Failed to send mail:", error);
+      setIsSendingMail(false);
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to send mail. Please try again.";
+      toast.error(errorMessage);
+    }
   };
 
   return (
@@ -2127,6 +2466,7 @@ function OrderDetails() {
                       onChange={handleToFieldChange}
                       placeholder="Select recipients..."
                       isMulti={true}
+                      disabled={isSendingMail}
                     />
                   </div>
 
@@ -2138,6 +2478,7 @@ function OrderDetails() {
                       onChange={handleCcFieldChange}
                       placeholder="Select CC recipients..."
                       isMulti={true}
+                      disabled={isSendingMail}
                     />
                   </div>
 
@@ -2149,6 +2490,7 @@ function OrderDetails() {
                       onChange={handleBccFieldChange}
                       placeholder="Select BCC recipients..."
                       isMulti={true}
+                      disabled={isSendingMail}
                     />
                   </div>
 
@@ -2164,6 +2506,7 @@ function OrderDetails() {
                       placeholder="Enter email subject"
                       maxLength="200"
                       aria-label="Subject"
+                      disabled={isSendingMail}
                     />
                   </div>
 
@@ -2180,11 +2523,12 @@ function OrderDetails() {
                       style={{ resize: "vertical" }}
                       maxLength="2000"
                       aria-label="Comments"
+                      disabled={isSendingMail}
                     />
                   </div>
 
                   <div className="form-group">
-                    <label>Selected Collage & Reports</label>
+                    <label>Selected Collage, Reports & Videos</label>
                     {renderApprovedDocuments()}
                   </div>
 
@@ -2192,24 +2536,69 @@ function OrderDetails() {
                     <button
                       className="submit-button"
                       type="submit"
+                      disabled={isSendingMail}
                       style={{
-                        backgroundColor: "#4ade80",
-                        borderColor: "#4ade80",
+                        backgroundColor: isSendingMail ? "#9ca3af" : "#4ade80",
+                        borderColor: isSendingMail ? "#9ca3af" : "#4ade80",
                         color: "white",
                         fontWeight: "500",
                         padding: "12px 24px",
                         borderRadius: "6px",
                         width: "100%",
                         fontSize: "14px",
+                        cursor: isSendingMail ? "not-allowed" : "pointer",
+                        opacity: isSendingMail ? 0.7 : 1,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "8px",
                       }}
                     >
-                      Send Mail
+                      {isSendingMail && (
+                        <span
+                          style={{
+                            display: "inline-block",
+                            width: "16px",
+                            height: "16px",
+                            border: "2px solid rgba(255,255,255,0.3)",
+                            borderTop: "2px solid white",
+                            borderRadius: "50%",
+                            animation: "spin 0.8s linear infinite",
+                          }}
+                        />
+                      )}
+                      {isSendingMail ? "Sending Mail..." : "Send Mail"}
                     </button>
                   </div>
+                  {isSendingMail && (
+                    <div
+                      style={{
+                        marginTop: "12px",
+                        padding: "12px",
+                        backgroundColor: "#fef3c7",
+                        border: "1px solid #fbbf24",
+                        borderRadius: "6px",
+                        color: "#92400e",
+                        fontSize: "14px",
+                        textAlign: "center",
+                      }}
+                    >
+                      <strong>Processing...</strong><br/> Mail sending process has
+                      started. Please be patient, it might take some time due to
+                      heavy files you are attaching.
+                    </div>
+                  )}
                 </div>
               </form>
             ),
             onClose: () => {
+              // Prevent closing modal while sending mail
+              if (isSendingMail) {
+                toast.warning(
+                  "Please wait while mail is being sent. Do not close the window."
+                );
+                return;
+              }
               setShowMailModal(false);
             },
           }}

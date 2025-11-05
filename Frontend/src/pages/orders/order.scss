@@ -1354,3 +1354,12 @@
     color: hsl(0, 0%, 60%) !important;
   }
 }
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

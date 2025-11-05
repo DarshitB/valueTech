@@ -59,6 +59,13 @@ router.delete(
   orderController.softDelete
 );
 
+// Send email with order documents
+router.post(
+  "/:orderId/send-mail",
+  activityLogger("orders", (req) => req.params.orderId, "send_mail"), // Log send mail activity
+  orderController.sendMail
+);
+
 // Nested routes for order comments (chat/comments)
 router.use("/:orderId/comments", orderCommentRoutes);
 

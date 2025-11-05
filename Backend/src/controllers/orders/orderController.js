@@ -1210,3 +1210,196 @@ exports.updateOrderStatusAfterUnderReview = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * Send email with order documents and videos
+ * POST /api/orders/:orderId/send-mail
+ * Body: { to: [], cc: [], bcc: [], subject: string, comments: string, document_ids: [], video_ids: [] }
+ */
+exports.sendMail = async (req, res, next) => {
+  try {
+    const { orderId } = req.params;
+    const { to, cc, bcc, subject, comments, document_ids, video_ids } = req.body;
+
+    // Validate order exists
+    const order = await Order.findById(orderId, req.user);
+    if (!order) {
+      throw new NotFoundError("Order not found");
+    }
+
+    // Validate required fields
+    if (!to || !Array.isArray(to) || to.length === 0) {
+      throw new BadRequestError("'to' field is required and must be a non-empty array");
+    }
+
+    if (!subject || typeof subject !== "string" || subject.trim() === "") {
+      throw new BadRequestError("'subject' field is required and must be a non-empty string");
+    }
+
+    // Validate arrays if provided
+    if (cc !== undefined && (!Array.isArray(cc))) {
+      throw new BadRequestError("'cc' must be an array");
+    }
+
+    if (bcc !== undefined && (!Array.isArray(bcc))) {
+      throw new BadRequestError("'bcc' must be an array");
+    }
+
+    if (document_ids !== undefined && (!Array.isArray(document_ids))) {
+      throw new BadRequestError("'document_ids' must be an array");
+    }
+
+    if (video_ids !== undefined && (!Array.isArray(video_ids))) {
+      throw new BadRequestError("'video_ids' must be an array");
+    }
+
+    // Import email service and models
+    const { sendEmail } = require("../../utils/emailService");
+    const orderMediaDocument = require("../../models/orders/orderMediaDocument");
+    const orderMediaPortal = require("../../models/orders/orderMediaPortal");
+    const path = require("path");
+
+    // Fetch videos if video_ids are provided (in parallel for better performance)
+    const videoAttachments = [];
+    if (video_ids && video_ids.length > 0) {
+      // Fetch all videos in parallel instead of sequentially
+      const videoPromises = video_ids.map((videoId) =>
+        orderMediaPortal.findById(parseInt(videoId))
+      );
+      const videos = await Promise.all(videoPromises);
+      
+      // Validate and prepare video attachments
+      for (let i = 0; i < videos.length; i++) {
+        const video = videos[i];
+        const videoId = video_ids[i];
+        
+        if (!video) {
+          throw new BadRequestError(`Video with ID ${videoId} not found`);
+        }
+
+        // Verify video belongs to this order
+        if (video.order_id !== parseInt(orderId)) {
+          throw new BadRequestError(`Video with ID ${videoId} does not belong to order ${orderId}`);
+        }
+
+        // Verify it's actually a video
+        if (video.media_type !== "video") {
+          throw new BadRequestError(`Media with ID ${videoId} is not a video`);
+        }
+
+        // Convert media_url (e.g., /uploads/2024/Jan/ORD123/videos/file.mp4) to relative path
+        // Remove leading slash if present (emailService will prepend process.cwd())
+        const mediaPath = video.media_url.startsWith("/")
+          ? video.media_url.substring(1)
+          : video.media_url;
+
+        // Extract filename from path for attachment
+        const filename = path.basename(video.media_url);
+
+        videoAttachments.push({
+          path: mediaPath, // Use relative path (emailService will prepend process.cwd())
+          filename: filename,
+        });
+      }
+    }
+
+    // Fetch documents if document_ids are provided (in parallel for better performance)
+    const documentAttachments = [];
+    if (document_ids && document_ids.length > 0) {
+      // Fetch all documents in parallel instead of sequentially
+      const documentPromises = document_ids.map((docId) =>
+        orderMediaDocument.findById(parseInt(docId))
+      );
+      const documents = await Promise.all(documentPromises);
+      
+      // Validate and prepare document attachments
+      for (let i = 0; i < documents.length; i++) {
+        const document = documents[i];
+        const docId = document_ids[i];
+        
+        if (!document) {
+          throw new BadRequestError(`Document with ID ${docId} not found`);
+        }
+
+        // Verify document belongs to this order
+        if (document.order_id !== parseInt(orderId)) {
+          throw new BadRequestError(`Document with ID ${docId} does not belong to order ${orderId}`);
+        }
+
+        // Convert media_url (e.g., /uploads/2024/Jan/ORD123/documents/file.pdf) to relative path
+        // Remove leading slash if present (emailService will prepend process.cwd())
+        const mediaPath = document.media_url.startsWith("/")
+          ? document.media_url.substring(1)
+          : document.media_url;
+
+        // Extract filename from path for attachment
+        const filename = path.basename(document.media_url);
+
+        documentAttachments.push({
+          path: mediaPath, // Use relative path (emailService will prepend process.cwd())
+          filename: filename,
+        });
+      }
+    }
+
+    // Combine attachments: videos first, then documents
+    const attachments = [...videoAttachments, ...documentAttachments];
+
+    // Prepare email body (only use comments if provided, no attachment lists)
+    const emailBody = comments || `Please find attached files for order ${order.order_number || orderId}.`;
+    
+    // Prepare HTML email body (convert newlines to HTML breaks)
+    const htmlEmailBody = emailBody.replace(/\n/g, "<br>");
+
+    // Send email
+    const emailResult = await sendEmail({
+      to: to,
+      cc: cc || [],
+      bcc: bcc || [],
+      subject: subject,
+      text: emailBody,
+      html: htmlEmailBody,
+      attachments: attachments.length > 0 ? attachments : undefined,
+    });
+
+    // Update order status to 13 (Mail sent)
+    await Order.updateOrder(
+      parseInt(orderId),
+      {
+        current_status_id: 13,
+        updated_at: new Date(),
+        updated_by: req.user?.id,
+      },
+      req.user?.id
+    );
+
+    // Create status history entry for mail sent activity
+    const statusHistoryData = {
+      order_id: parseInt(orderId),
+      status_id: 13, // Mail sent status
+      activity_extra: "Mail sent",
+      changed_by: req.user?.id,
+      changed_at: new Date(),
+    };
+
+    await OrderStatusHistory.createStatusHistory(statusHistoryData);
+
+    res.status(200).json({
+      success: true,
+      message: "Email sent successfully",
+      data: {
+        orderId: parseInt(orderId),
+        messageId: emailResult.messageId,
+        to: to,
+        cc: cc || [],
+        bcc: bcc || [],
+        subject: subject,
+        videosCount: videoAttachments.length,
+        documentsCount: documentAttachments.length,
+        totalAttachmentsCount: attachments.length,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
