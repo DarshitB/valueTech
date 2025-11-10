@@ -1236,7 +1236,6 @@ exports.sendMail = async (req, res, next) => {
       throw new BadRequestError("'subject' field is required and must be a non-empty string");
     }
 
-    // Validate arrays if provided
     if (cc !== undefined && (!Array.isArray(cc))) {
       throw new BadRequestError("'cc' must be an array");
     }
@@ -1259,99 +1258,115 @@ exports.sendMail = async (req, res, next) => {
     const orderMediaPortal = require("../../models/orders/orderMediaPortal");
     const path = require("path");
 
+    const baseUrl =
+      process.env.APP_BASE_URL ||
+      process.env.FRONTEND_URL ||
+      `${req.protocol}://${req.get("host")}`;
+
     // Fetch videos if video_ids are provided (in parallel for better performance)
-    const videoAttachments = [];
+    const videoLinks = [];
     if (video_ids && video_ids.length > 0) {
-      // Fetch all videos in parallel instead of sequentially
       const videoPromises = video_ids.map((videoId) =>
         orderMediaPortal.findById(parseInt(videoId))
       );
       const videos = await Promise.all(videoPromises);
-      
-      // Validate and prepare video attachments
+
       for (let i = 0; i < videos.length; i++) {
         const video = videos[i];
         const videoId = video_ids[i];
-        
+
         if (!video) {
           throw new BadRequestError(`Video with ID ${videoId} not found`);
         }
 
-        // Verify video belongs to this order
         if (video.order_id !== parseInt(orderId)) {
           throw new BadRequestError(`Video with ID ${videoId} does not belong to order ${orderId}`);
         }
 
-        // Verify it's actually a video
         if (video.media_type !== "video") {
           throw new BadRequestError(`Media with ID ${videoId} is not a video`);
         }
 
-        // Convert media_url (e.g., /uploads/2024/Jan/ORD123/videos/file.mp4) to relative path
-        // Remove leading slash if present (emailService will prepend process.cwd())
-        const mediaPath = video.media_url.startsWith("/")
-          ? video.media_url.substring(1)
-          : video.media_url;
-
-        // Extract filename from path for attachment
+        const relativeUrl = video.media_url.startsWith("/")
+          ? video.media_url
+          : `/${video.media_url}`;
         const filename = path.basename(video.media_url);
+        const fullUrl = `${baseUrl}${relativeUrl}`;
 
-        videoAttachments.push({
-          path: mediaPath, // Use relative path (emailService will prepend process.cwd())
-          filename: filename,
-        });
+        videoLinks.push({ filename, url: fullUrl });
       }
     }
 
     // Fetch documents if document_ids are provided (in parallel for better performance)
     const documentAttachments = [];
     if (document_ids && document_ids.length > 0) {
-      // Fetch all documents in parallel instead of sequentially
       const documentPromises = document_ids.map((docId) =>
         orderMediaDocument.findById(parseInt(docId))
       );
       const documents = await Promise.all(documentPromises);
-      
-      // Validate and prepare document attachments
+
       for (let i = 0; i < documents.length; i++) {
         const document = documents[i];
         const docId = document_ids[i];
-        
+
         if (!document) {
           throw new BadRequestError(`Document with ID ${docId} not found`);
         }
 
-        // Verify document belongs to this order
         if (document.order_id !== parseInt(orderId)) {
           throw new BadRequestError(`Document with ID ${docId} does not belong to order ${orderId}`);
         }
 
-        // Convert media_url (e.g., /uploads/2024/Jan/ORD123/documents/file.pdf) to relative path
-        // Remove leading slash if present (emailService will prepend process.cwd())
         const mediaPath = document.media_url.startsWith("/")
           ? document.media_url.substring(1)
           : document.media_url;
-
-        // Extract filename from path for attachment
         const filename = path.basename(document.media_url);
 
         documentAttachments.push({
-          path: mediaPath, // Use relative path (emailService will prepend process.cwd())
-          filename: filename,
+          path: mediaPath,
+          filename,
         });
       }
     }
 
-    // Combine attachments: videos first, then documents
-    const attachments = [...videoAttachments, ...documentAttachments];
+    const attachments = [...documentAttachments];
 
-    // Prepare email body (only use comments if provided, no attachment lists)
-    const emailBody = comments || `Please find attached files for order ${order.order_number || orderId}.`;
-    
-    // Prepare HTML email body (convert newlines to HTML breaks)
-    const htmlEmailBody = emailBody.replace(/\n/g, "<br>");
+    let emailBody = comments ? `${comments.trim()}` : "";
 
-    // Send email
+    if (videoLinks.length > 0) {
+      const videoListText = videoLinks
+        .map((video) => `- ${video.filename}: ${video.url}`)
+        .join("\n");
+      emailBody += `${emailBody ? "\n\n" : ""}Video links:\n${videoListText}`;
+    }
+
+    if (documentAttachments.length > 0) {
+      emailBody += `${emailBody ? "\n\n" : ""}Documents attached: ${documentAttachments.length}`;
+    }
+
+    if (!emailBody) {
+      emailBody = `Please find attached files for order ${order.order_number || orderId}.`;
+    }
+
+    let htmlEmailBody = comments
+      ? comments.replace(/\n/g, "<br>")
+      : "";
+
+    if (videoLinks.length > 0) {
+      const videoListHtml = videoLinks
+        .map((video) => `<li><a href="${video.url}" target="_blank" rel="noopener noreferrer">${video.filename}</a></li>`)
+        .join("");
+      htmlEmailBody += `${htmlEmailBody ? "<br><br>" : ""}<strong>Video links:</strong><ul>${videoListHtml}</ul>`;
+    }
+
+    if (documentAttachments.length > 0) {
+      htmlEmailBody += `${htmlEmailBody ? "<br><br>" : ""}<strong>Documents attached:</strong> ${documentAttachments.length}`;
+    }
+
+    if (!htmlEmailBody) {
+      htmlEmailBody = `Please find attached files for order ${order.order_number || orderId}.`;
+    }
+
     const emailResult = await sendEmail({
       to: to,
       cc: cc || [],
@@ -1362,7 +1377,6 @@ exports.sendMail = async (req, res, next) => {
       attachments: attachments.length > 0 ? attachments : undefined,
     });
 
-    // Update order status to 13 (Mail sent)
     await Order.updateOrder(
       parseInt(orderId),
       {
@@ -1373,7 +1387,6 @@ exports.sendMail = async (req, res, next) => {
       req.user?.id
     );
 
-    // Create status history entry for mail sent activity
     const statusHistoryData = {
       order_id: parseInt(orderId),
       status_id: 13, // Mail sent status
@@ -1394,7 +1407,7 @@ exports.sendMail = async (req, res, next) => {
         cc: cc || [],
         bcc: bcc || [],
         subject: subject,
-        videosCount: videoAttachments.length,
+        videosCount: videoLinks.length,
         documentsCount: documentAttachments.length,
         totalAttachmentsCount: attachments.length,
       },
