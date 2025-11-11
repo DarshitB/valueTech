@@ -1342,11 +1342,21 @@ function CEReport() {
       reportFormData.fair_market_value
     );
 
-    // Dispatch save action with JSON data
+    // Convert reportData object to FormData for multipart submission
+    const formData = new FormData();
+    Object.entries(reportData).forEach(([key, value]) => {
+      if (value instanceof File || value instanceof Blob) {
+        formData.append(key, value);
+      } else if (value !== null && value !== undefined) {
+        formData.append(key, value);
+      }
+    });
+
+    // Dispatch save action with FormData payload
     dispatch(
       saveOrderReport({
         orderId: id,
-        reportData: reportData,
+        reportData: formData,
       })
     );
   }, [

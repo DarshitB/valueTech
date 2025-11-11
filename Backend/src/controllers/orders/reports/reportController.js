@@ -427,16 +427,7 @@ exports.generateReport = async (req, res, next) => {
     const orderNumber = order.order_number;
 
     // Handle flexible_fields - convert object with numeric keys to array
-    let flexibleFields = [];
-    if (
-      formData.flexible_fields &&
-      typeof formData.flexible_fields === "object"
-    ) {
-      // Convert object with numeric keys to array
-      flexibleFields = Object.keys(formData.flexible_fields)
-        .map((key) => formData.flexible_fields[key])
-        .filter((field) => field && typeof field === "object");
-    }
+    const flexibleFields = extractFlexibleFieldsFromFormData(formData);
 
     // Handle chassis impression image
     let chassisImageRelativePath = resolveChassisRelativePath(
@@ -1029,6 +1020,8 @@ exports.saveReportData = async (req, res, next) => {
     const { order_id } = req.params;
     const { report_type: requestedReportType } = req.body;
     const { id: userId } = req.user;
+    console.log("req.body", req.body);
+    
     // Get order details with relationships
     const order = await Order.findById(order_id, req.user);
     if (!order) {
@@ -1048,6 +1041,8 @@ exports.saveReportData = async (req, res, next) => {
     const year = now.getFullYear().toString();
     const month = now.toLocaleString("en-US", { month: "short" });
     const orderNumber = order.order_number;
+
+    const flexibleFields = extractFlexibleFieldsFromFormData(formData);
 
     let chassisImageRelativePath = resolveChassisRelativePath(
       formData.chassis_no_pencil_impression,
@@ -1082,9 +1077,6 @@ exports.saveReportData = async (req, res, next) => {
     } else {
       delete formData.chassis_no_pencil_impression;
     }
-
-    // Handle flexible_fields - parse from request body format for save API
-    let flexibleFields = parseFlexibleFieldsFromRequest(formData);
 
     // Handle asset_make: Only for report types that have this field (CV, Machinery, CE)
     // AVR report does NOT have asset_make field
@@ -1206,7 +1198,7 @@ exports.saveReportData = async (req, res, next) => {
  * @param {Object} formData - Form data from request
  * @returns {Array} Array of flexible field objects
  */
-function parseFlexibleFieldsFromRequest(formData) {
+function parseFlexibleFieldsFromBracketSyntax(formData) {
   const flexibleFields = [];
   const fieldIndices = new Set();
 
@@ -1227,18 +1219,91 @@ function parseFlexibleFieldsFromRequest(formData) {
     const fieldValue = formData[`flexible_fields[${index}][field_value]`];
     const fieldOrder = formData[`flexible_fields[${index}][field_order]`];
 
-    // Only add field if it has at least section_name and field_label
-    if (sectionName && fieldLabel) {
-      field.section_name = sectionName;
-      field.col_span = colSpan ? parseInt(colSpan) : null;
-      field.field_label = fieldLabel;
-      field.field_value = fieldValue || null;
-      field.field_order = fieldOrder ? parseInt(fieldOrder) : null;
-      flexibleFields.push(field);
+    if (sectionName !== undefined) {
+      delete formData[`flexible_fields[${index}][section_name]`];
     }
+    if (colSpan !== undefined) {
+      delete formData[`flexible_fields[${index}][col_span]`];
+    }
+    if (fieldLabel !== undefined) {
+      delete formData[`flexible_fields[${index}][field_label]`];
+    }
+    if (fieldValue !== undefined) {
+      delete formData[`flexible_fields[${index}][field_value]`];
+    }
+    if (fieldOrder !== undefined) {
+      delete formData[`flexible_fields[${index}][field_order]`];
+    }
+
+    field.section_name = sectionName;
+    field.col_span = colSpan;
+    field.field_label = fieldLabel;
+    field.field_value = fieldValue;
+    field.field_order = fieldOrder;
+
+    flexibleFields.push(field);
   });
 
   return flexibleFields;
+}
+
+function normalizeFlexibleField(field) {
+  if (!field || typeof field !== "object") return null;
+
+  const sectionName = field.section_name || field.sectionName || null;
+  const fieldLabel = field.field_label || field.fieldLabel || null;
+
+  if (!sectionName || !fieldLabel) {
+    return null;
+  }
+
+  const parseNumeric = (value) => {
+    if (value === undefined || value === null || value === "") {
+      return null;
+    }
+    const parsed = parseInt(value, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  };
+
+  return {
+    section_name: sectionName,
+    col_span: parseNumeric(field.col_span || field.colSpan),
+    field_label: fieldLabel,
+    field_value:
+      field.field_value !== undefined
+        ? field.field_value
+        : field.fieldValue !== undefined
+        ? field.fieldValue
+        : null,
+    field_order: parseNumeric(field.field_order || field.fieldOrder),
+  };
+}
+
+function extractFlexibleFieldsFromFormData(formData = {}) {
+  if (!formData || typeof formData !== "object") {
+    return [];
+  }
+
+  let rawFields = [];
+  const rawFlexible = formData.flexible_fields;
+
+  if (Array.isArray(rawFlexible)) {
+    rawFields = rawFlexible.filter(
+      (field) => field && typeof field === "object"
+    );
+  } else if (rawFlexible && typeof rawFlexible === "object") {
+    rawFields = Object.keys(rawFlexible)
+      .map((key) => rawFlexible[key])
+      .filter((field) => field && typeof field === "object");
+  } else {
+    rawFields = parseFlexibleFieldsFromBracketSyntax(formData);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(formData, "flexible_fields")) {
+    delete formData.flexible_fields;
+  }
+
+  return rawFields.map(normalizeFlexibleField).filter(Boolean);
 }
 
 /**

@@ -27,9 +27,11 @@ export const generateCustomReport = (orderId, content) =>
   }); // Generate custom report with JSON payload
 
 // Save order report data
-export const saveOrderReport = (orderId, reportData) => 
-  axios.post(`${ENDPOINT}/${orderId}/save`, reportData, {
+export const saveOrderReport = (orderId, reportData) => {
+  const isFormData = reportData instanceof FormData;
+  return axios.post(`${ENDPOINT}/${orderId}/save`, reportData, {
     headers: {
-      'Content-Type': 'application/json',
+      'Content-Type': isFormData ? 'multipart/form-data' : 'application/json',
     },
-  }); // Save order report data with JSON payload
+  });
+}; // Save order report data; supports JSON or multipart payloads
