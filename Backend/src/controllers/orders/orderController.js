@@ -129,7 +129,7 @@ exports.getForMobile = async (req, res, next) => {
 
           return {
             ...order,
-            mobile_job_status
+            mobile_job_status,
           };
         })
       );
@@ -212,7 +212,7 @@ exports.mobileOrderAction = async (req, res, next) => {
       const statusHistoryData = {
         order_id: order_id,
         status_id: 5,
-        user_type: 'field_verifier',
+        user_type: "field_verifier",
         changed_by: fieldVerifierId,
         changed_at: new Date(),
       };
@@ -226,18 +226,22 @@ exports.mobileOrderAction = async (req, res, next) => {
     } else if (action === "Job started") {
       // Update orders table with job started timestamp and field verifier
       const currentTime = new Date();
-      await Order.updateOrder(order_id, {
-        job_started_at: currentTime,
-        job_started_by: fieldVerifierId,
-      }, fieldVerifierId);
+      await Order.updateOrder(
+        order_id,
+        {
+          job_started_at: currentTime,
+          job_started_by: fieldVerifierId,
+        },
+        fieldVerifierId
+      );
 
       // Add status history entry
       const statusHistoryData = {
         order_id: order_id,
-        user_type: 'field_verifier',
+        user_type: "field_verifier",
         changed_by: fieldVerifierId,
         changed_at: currentTime,
-        activity_extra: "Order approved (Job started)"
+        activity_extra: "Order approved (Job started)",
       };
 
       await OrderStatusHistory.createStatusHistory(statusHistoryData);
@@ -316,7 +320,7 @@ exports.create = async (req, res, next) => {
     } else if (hasSupervisorAndDriver) {
       // If both supervisor and driver numbers are set but no manager, status should be 3 (Telecaller Completed)
       orderStatusId = 3;
-      
+
       // Auto-assign "Pan India" manager if no manager is provided
       if (!manager_id) {
         const panIndiaManagerId = await getPanIndiaManagerId();
@@ -488,11 +492,13 @@ exports.update = async (req, res, next) => {
     }
 
     // Check if Telecaller changed place_of_inspection - if yes, reset manager and field verifier
-    const isTelecaller = (req.user?.role_name || "").toUpperCase().includes("TELECALLER");
-    const placeOfInspectionChanged = 
-      place_of_inspection !== undefined && 
+    const isTelecaller = (req.user?.role_name || "")
+      .toUpperCase()
+      .includes("TELECALLER");
+    const placeOfInspectionChanged =
+      place_of_inspection !== undefined &&
       place_of_inspection !== existingOrder.place_of_inspection;
-    
+
     let resetManagerAndFieldVerifier = false;
     if (isTelecaller && placeOfInspectionChanged) {
       resetManagerAndFieldVerifier = true;
@@ -501,13 +507,14 @@ exports.update = async (req, res, next) => {
     // Determine new order status based on field_verifier_id, manager_id, supervisor_number, and driver_number
     // IMPORTANT: Only update status if current status is lower than the new status
     let newStatusId;
-    let finalManagerId = manager_id !== undefined ? manager_id : existingOrder.manager_id;
-    
+    let finalManagerId =
+      manager_id !== undefined ? manager_id : existingOrder.manager_id;
+
     // Reset manager if Telecaller changed place of inspection
     if (resetManagerAndFieldVerifier) {
       finalManagerId = null;
     }
-    
+
     const currentSupervisorNumber =
       supervisor_number !== undefined
         ? supervisor_number
@@ -519,7 +526,7 @@ exports.update = async (req, res, next) => {
       field_verifier_id !== undefined
         ? field_verifier_id
         : existingOrder.field_verifier_id;
-    
+
     // Reset field verifier if Telecaller changed place of inspection
     if (resetManagerAndFieldVerifier) {
       currentFieldVerifierId = null;
@@ -540,7 +547,7 @@ exports.update = async (req, res, next) => {
     } else if (hasSupervisorAndDriver) {
       // If both supervisor and driver numbers are set but no manager, status should be 3 (Telecaller Completed)
       newStatusId = 3;
-      
+
       // Auto-assign "Pan India" manager if no manager is currently set
       if (!currentManagerId && existingOrder.current_status_id < 3) {
         const panIndiaManagerId = await getPanIndiaManagerId();
@@ -557,7 +564,10 @@ exports.update = async (req, res, next) => {
     // Only update status if current status is lower than the new calculated status
     // This prevents downgrading from higher statuses (e.g., 6 -> 4)
     // EXCEPTION: If Telecaller changed place_of_inspection, allow status to be reset to 3
-    if (!resetManagerAndFieldVerifier && existingOrder.current_status_id >= newStatusId) {
+    if (
+      !resetManagerAndFieldVerifier &&
+      existingOrder.current_status_id >= newStatusId
+    ) {
       newStatusId = existingOrder.current_status_id;
     }
 
@@ -591,10 +601,9 @@ exports.update = async (req, res, next) => {
       ),
       officer_id: getIntegerValue(officer_id, existingOrder.officer_id),
       manager_id: finalManagerId,
-      field_verifier_id: resetManagerAndFieldVerifier ? null : getIntegerValue(
-        field_verifier_id,
-        existingOrder.field_verifier_id
-      ),
+      field_verifier_id: resetManagerAndFieldVerifier
+        ? null
+        : getIntegerValue(field_verifier_id, existingOrder.field_verifier_id),
       registration_number:
         registration_number !== undefined
           ? registration_number
@@ -622,14 +631,16 @@ exports.update = async (req, res, next) => {
     const changes = [];
     let hasStatusChange = false;
     let hasFieldVerifierChange = false;
-    
+
     // Track if manager and field verifier were reset due to place of inspection change
     if (resetManagerAndFieldVerifier) {
       // First, log the place of inspection change itself
       const oldPlace = existingOrder.place_of_inspection || "empty";
       const newPlace = place_of_inspection || "empty";
-      changes.push(`PLACE OF INSPECTION changed from "${oldPlace}" to "${newPlace}"`);
-      
+      changes.push(
+        `PLACE OF INSPECTION changed from "${oldPlace}" to "${newPlace}"`
+      );
+
       // Then log the consequences of this change
       if (existingOrder.manager_id) {
         changes.push(`MANAGER reset (place changed)`);
@@ -662,10 +673,13 @@ exports.update = async (req, res, next) => {
 
     for (const field of fieldsToCheck) {
       // Skip place_of_inspection and manager_id if already logged due to Telecaller reset
-      if ((field === "place_of_inspection" || field === "manager_id") && resetManagerAndFieldVerifier) {
+      if (
+        (field === "place_of_inspection" || field === "manager_id") &&
+        resetManagerAndFieldVerifier
+      ) {
         continue;
       }
-      
+
       const newValue = req.body[field];
       if (newValue !== undefined) {
         const oldValue = existingOrder[field];
@@ -785,7 +799,7 @@ exports.update = async (req, res, next) => {
       if (activityExtra.length > 255) {
         activityExtra = activityExtra.substring(0, 252) + "...";
       }
-      
+
       const statusHistoryData = {
         order_id: orderId,
         activity_extra: activityExtra,
@@ -1203,8 +1217,8 @@ exports.updateOrderStatusAfterUnderReview = async (req, res, next) => {
       data: {
         order_id: orderId,
         new_status_id: statusIdNum,
-        status_name: statusExists.name
-      }
+        status_name: statusExists.name,
+      },
     });
   } catch (err) {
     next(err);
@@ -1219,7 +1233,8 @@ exports.updateOrderStatusAfterUnderReview = async (req, res, next) => {
 exports.sendMail = async (req, res, next) => {
   try {
     const { orderId } = req.params;
-    const { to, cc, bcc, subject, comments, document_ids, video_ids } = req.body;
+    const { to, cc, bcc, subject, comments, document_ids, video_ids } =
+      req.body;
 
     // Validate order exists
     const order = await Order.findById(orderId, req.user);
@@ -1229,26 +1244,30 @@ exports.sendMail = async (req, res, next) => {
 
     // Validate required fields
     if (!to || !Array.isArray(to) || to.length === 0) {
-      throw new BadRequestError("'to' field is required and must be a non-empty array");
+      throw new BadRequestError(
+        "'to' field is required and must be a non-empty array"
+      );
     }
 
     if (!subject || typeof subject !== "string" || subject.trim() === "") {
-      throw new BadRequestError("'subject' field is required and must be a non-empty string");
+      throw new BadRequestError(
+        "'subject' field is required and must be a non-empty string"
+      );
     }
 
-    if (cc !== undefined && (!Array.isArray(cc))) {
+    if (cc !== undefined && !Array.isArray(cc)) {
       throw new BadRequestError("'cc' must be an array");
     }
 
-    if (bcc !== undefined && (!Array.isArray(bcc))) {
+    if (bcc !== undefined && !Array.isArray(bcc)) {
       throw new BadRequestError("'bcc' must be an array");
     }
 
-    if (document_ids !== undefined && (!Array.isArray(document_ids))) {
+    if (document_ids !== undefined && !Array.isArray(document_ids)) {
       throw new BadRequestError("'document_ids' must be an array");
     }
 
-    if (video_ids !== undefined && (!Array.isArray(video_ids))) {
+    if (video_ids !== undefined && !Array.isArray(video_ids)) {
       throw new BadRequestError("'video_ids' must be an array");
     }
 
@@ -1263,7 +1282,25 @@ exports.sendMail = async (req, res, next) => {
       process.env.FRONTEND_URL ||
       `${req.protocol}://${req.get("host")}`;
 
-    // Fetch videos if video_ids are provided (in parallel for better performance)
+    const video_as_attachment =
+      (process.env.EMAIL_VIDEO_AS_ATTACHMENT || "false").toLowerCase() ===
+      "true";
+    const document_as_attachment =
+      (process.env.EMAIL_DOCUMENT_AS_ATTACHMENT || "true").toLowerCase() ===
+      "true";
+
+    const titleCase = (value) =>
+      (value || "")
+        .split(/\s|_/)
+        .filter(Boolean)
+        .map(
+          (part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+        )
+        .join(" ");
+
+    const attachments = [];
+    let documentAttachmentCount = 0;
+
     const videoLinks = [];
     if (video_ids && video_ids.length > 0) {
       const videoPromises = video_ids.map((videoId) =>
@@ -1280,25 +1317,40 @@ exports.sendMail = async (req, res, next) => {
         }
 
         if (video.order_id !== parseInt(orderId)) {
-          throw new BadRequestError(`Video with ID ${videoId} does not belong to order ${orderId}`);
+          throw new BadRequestError(
+            `Video with ID ${videoId} does not belong to order ${orderId}`
+          );
         }
 
         if (video.media_type !== "video") {
           throw new BadRequestError(`Media with ID ${videoId} is not a video`);
         }
 
+        const mediaPath = video.media_url.startsWith("/")
+          ? video.media_url.substring(1)
+          : video.media_url;
+        const filename = path.basename(video.media_url);
+
         const relativeUrl = video.media_url.startsWith("/")
           ? video.media_url
           : `/${video.media_url}`;
-        const filename = path.basename(video.media_url);
         const fullUrl = `${baseUrl}${relativeUrl}`;
 
         videoLinks.push({ filename, url: fullUrl });
+
+        if (video_as_attachment) {
+          attachments.push({
+            path: mediaPath,
+            filename,
+          });
+        }
       }
     }
 
-    // Fetch documents if document_ids are provided (in parallel for better performance)
     const documentAttachments = [];
+    const documentLinkGroups = new Map();
+    let documentLinkCount = 0;
+
     if (document_ids && document_ids.length > 0) {
       const documentPromises = document_ids.map((docId) =>
         orderMediaDocument.findById(parseInt(docId))
@@ -1314,7 +1366,9 @@ exports.sendMail = async (req, res, next) => {
         }
 
         if (document.order_id !== parseInt(orderId)) {
-          throw new BadRequestError(`Document with ID ${docId} does not belong to order ${orderId}`);
+          throw new BadRequestError(
+            `Document with ID ${docId} does not belong to order ${orderId}`
+          );
         }
 
         const mediaPath = document.media_url.startsWith("/")
@@ -1322,16 +1376,41 @@ exports.sendMail = async (req, res, next) => {
           : document.media_url;
         const filename = path.basename(document.media_url);
 
-        documentAttachments.push({
-          path: mediaPath,
-          filename,
-        });
+        if (document_as_attachment) {
+          documentAttachments.push({
+            path: mediaPath,
+            filename,
+          });
+          documentAttachmentCount++;
+        } else {
+          const relativeUrl = document.media_url.startsWith("/")
+            ? document.media_url
+            : `/${document.media_url}`;
+          const fullUrl = `${baseUrl}${relativeUrl}`;
+          const category = titleCase(document.document_type || "Documents");
+
+          if (!documentLinkGroups.has(category)) {
+            documentLinkGroups.set(category, []);
+          }
+
+          documentLinkGroups.get(category).push({ filename, url: fullUrl });
+          documentLinkCount++;
+        }
       }
     }
 
-    const attachments = [...documentAttachments];
+    attachments.push(...documentAttachments);
 
     let emailBody = comments ? `${comments.trim()}` : "";
+
+    if (!document_as_attachment && documentLinkGroups.size > 0) {
+      for (const [category, links] of documentLinkGroups.entries()) {
+        const list = links
+          .map((item) => `- ${item.filename}: ${item.url}`)
+          .join("\n");
+        emailBody += `${emailBody ? "\n\n" : ""}${category}:\n${list}`;
+      }
+    }
 
     if (videoLinks.length > 0) {
       const videoListText = videoLinks
@@ -1340,31 +1419,44 @@ exports.sendMail = async (req, res, next) => {
       emailBody += `${emailBody ? "\n\n" : ""}Video links:\n${videoListText}`;
     }
 
-    if (documentAttachments.length > 0) {
-      emailBody += `${emailBody ? "\n\n" : ""}Documents attached: ${documentAttachments.length}`;
-    }
-
     if (!emailBody) {
-      emailBody = `Please find attached files for order ${order.order_number || orderId}.`;
+      emailBody = `Please find attached files for order ${
+        order.order_number || orderId
+      }.`;
     }
 
-    let htmlEmailBody = comments
-      ? comments.replace(/\n/g, "<br>")
-      : "";
+    let htmlEmailBody = comments ? comments.replace(/\n/g, "<br>") : "";
+
+    if (!document_as_attachment && documentLinkGroups.size > 0) {
+      for (const [category, links] of documentLinkGroups.entries()) {
+        const linkHtml = links
+          .map(
+            (item) =>
+              `<li><a href="${item.url}" target="_blank" rel="noopener noreferrer">${item.filename}</a></li>`
+          )
+          .join("");
+        htmlEmailBody += `${
+          htmlEmailBody ? "<br><br>" : ""
+        }<strong>${category}:</strong><ul>${linkHtml}</ul>`;
+      }
+    }
 
     if (videoLinks.length > 0) {
       const videoListHtml = videoLinks
-        .map((video) => `<li><a href="${video.url}" target="_blank" rel="noopener noreferrer">${video.filename}</a></li>`)
+        .map(
+          (video) =>
+            `<li><a href="${video.url}" target="_blank" rel="noopener noreferrer">${video.filename}</a></li>`
+        )
         .join("");
-      htmlEmailBody += `${htmlEmailBody ? "<br><br>" : ""}<strong>Video links:</strong><ul>${videoListHtml}</ul>`;
-    }
-
-    if (documentAttachments.length > 0) {
-      htmlEmailBody += `${htmlEmailBody ? "<br><br>" : ""}<strong>Documents attached:</strong> ${documentAttachments.length}`;
+      htmlEmailBody += `${
+        htmlEmailBody ? "<br><br>" : ""
+      }<strong>Video links:</strong><ul>${videoListHtml}</ul>`;
     }
 
     if (!htmlEmailBody) {
-      htmlEmailBody = `Please find attached files for order ${order.order_number || orderId}.`;
+      htmlEmailBody = `Please find attached files for order ${
+        order.order_number || orderId
+      }.`;
     }
 
     const emailResult = await sendEmail({
@@ -1408,7 +1500,9 @@ exports.sendMail = async (req, res, next) => {
         bcc: bcc || [],
         subject: subject,
         videosCount: videoLinks.length,
-        documentsCount: documentAttachments.length,
+        documentsCount: document_as_attachment
+          ? documentAttachmentCount
+          : documentLinkCount,
         totalAttachmentsCount: attachments.length,
       },
     });

@@ -191,6 +191,207 @@ function convertNumericExpression(fieldValue, fieldName = 'field') {
   return trimmedValue;
 }
 
+const IMAGE_MIME_EXTENSION_MAP = {
+  "image/jpeg": ".jpg",
+  "image/jpg": ".jpg",
+  "image/png": ".png",
+  "image/webp": ".webp",
+  "image/gif": ".gif",
+  "image/bmp": ".bmp"
+};
+
+const EXTENSION_MIME_MAP = {
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".bmp": "image/bmp"
+};
+
+function getExtensionFromMime(mimeType = "") {
+  if (!mimeType) return "";
+  const lower = mimeType.toLowerCase();
+  return IMAGE_MIME_EXTENSION_MAP[lower] || "";
+}
+
+function getMimeFromExtension(extension = "") {
+  if (!extension) return "image/jpeg";
+  const lower = extension.toLowerCase();
+  return EXTENSION_MIME_MAP[lower] || "image/jpeg";
+}
+
+function sanitizeStoredUploadPath(value) {
+  if (!value || typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.startsWith("data:")) return null;
+
+  let normalized = trimmed.replace(/\\/g, "/");
+
+  if (!normalized.startsWith("/")) {
+    normalized = `/${normalized}`;
+  }
+
+  if (!normalized.startsWith("/uploads/")) {
+    if (normalized.startsWith("/public/uploads/")) {
+      normalized = normalized.replace("/public", "");
+    } else {
+      return null;
+    }
+  }
+
+  const withoutPrefix = normalized.replace(/^\/uploads\//, "");
+  const safeSegments = withoutPrefix
+    .split("/")
+    .filter((segment) => segment && segment !== "." && segment !== "..");
+
+  if (safeSegments.length === 0) {
+    return null;
+  }
+
+  return `/uploads/${safeSegments.join("/")}`;
+}
+
+function resolveAbsoluteUploadPath(storedPath) {
+  const sanitized = sanitizeStoredUploadPath(storedPath);
+  if (!sanitized) return null;
+
+  const relative = sanitized.replace(/^\/uploads\//, "");
+  return path.join(process.cwd(), "uploads", relative);
+}
+
+function saveChassisImage(buffer, mimeType, originalName, year, month, orderNumber) {
+  if (!buffer || !buffer.length || !orderNumber) return null;
+
+  const extensionFromOriginal = originalName ? path.extname(originalName) : "";
+  const extensionFromMime = getExtensionFromMime(mimeType);
+  const extension = (extensionFromOriginal || extensionFromMime || ".jpg").toLowerCase();
+
+  const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+  const fileName = `chassis_${uniqueSuffix}${extension.startsWith(".") ? extension : `.${extension}`}`;
+
+  const chassisDir = path.join(
+    process.cwd(),
+    "uploads",
+    year,
+    month,
+    orderNumber,
+    "chassis_no"
+  );
+  ensureDirectoryExists(chassisDir);
+
+  const absolutePath = path.join(chassisDir, fileName);
+  fs.writeFileSync(absolutePath, buffer);
+
+  const relativePath = `/uploads/${year}/${month}/${orderNumber}/chassis_no/${fileName}`;
+  return { relativePath, absolutePath };
+}
+
+async function saveChassisImageFromDiskFile(file, year, month, orderNumber) {
+  if (!file) {
+    return { relativePath: null, base64: null };
+  }
+
+  const tempBuffer = fs.readFileSync(file.path);
+  const storedImage = saveChassisImage(
+    tempBuffer,
+    file.mimetype,
+    file.originalname,
+    year,
+    month,
+    orderNumber
+  );
+
+  try {
+    fs.unlinkSync(file.path);
+  } catch (unlinkErr) {
+    console.warn("Failed to remove temporary chassis image:", unlinkErr);
+  }
+
+  if (!storedImage) {
+    return { relativePath: null, base64: null };
+  }
+
+  return {
+    relativePath: storedImage.relativePath,
+    base64: `data:${file.mimetype};base64,${tempBuffer.toString("base64")}`,
+  };
+}
+
+function saveChassisImageFromMemoryFile(file, year, month, orderNumber) {
+  if (!file || !file.buffer || !file.buffer.length) {
+    return null;
+  }
+
+  const storedImage = saveChassisImage(
+    file.buffer,
+    file.mimetype,
+    file.originalname,
+    year,
+    month,
+    orderNumber
+  );
+
+  return storedImage ? storedImage.relativePath : null;
+}
+
+function resolveChassisRelativePath(formValue, existingReport) {
+  const sanitizedInput = sanitizeStoredUploadPath(formValue);
+  if (sanitizedInput) {
+    return sanitizedInput;
+  }
+
+  if (existingReport && existingReport.chassis_no_pencil_impression) {
+    const sanitizedExisting = sanitizeStoredUploadPath(
+      existingReport.chassis_no_pencil_impression
+    );
+    if (sanitizedExisting) {
+      return sanitizedExisting;
+    }
+  }
+
+  return null;
+}
+
+async function loadChassisImageBase64(relativePath) {
+  const absolutePath = resolveAbsoluteUploadPath(relativePath);
+  if (!absolutePath || !fs.existsSync(absolutePath)) {
+    return null;
+  }
+
+  const buffer = fs.readFileSync(absolutePath);
+  const mimeType = getMimeFromExtension(path.extname(absolutePath));
+  return `data:${mimeType};base64,${buffer.toString("base64")}`;
+}
+
+function deleteChassisImage(relativePath) {
+  const absolutePath = resolveAbsoluteUploadPath(relativePath);
+  if (absolutePath && fs.existsSync(absolutePath)) {
+    try {
+      fs.unlinkSync(absolutePath);
+    } catch (err) {
+      console.warn("Failed to delete chassis image:", err);
+    }
+  }
+}
+
+function getReportModelByType(reportType) {
+  const normalized = (reportType || "").toLowerCase();
+
+  switch (normalized) {
+    case "report_cv":
+      return CvReport;
+    case "report_avr":
+      return AvrReport;
+    case "report_machinery":
+      return MachineryReport;
+    case "report_ce":
+      return CeReport;
+    default:
+      throw new BadRequestError(`Report type '${reportType}' is not supported`);
+  }
+}
+
 /**
  * Generate Report PDF
  * POST /orders-reports/:order_id/generate
@@ -211,8 +412,19 @@ exports.generateReport = async (req, res, next) => {
       throw new NotFoundError("Order not found");
     }
 
+    const ReportModel = getReportModelByType(requestedReportType);
+    let existingReport = await ReportModel.findByOrderId(order_id);
+    let existingChassisPath = existingReport
+      ? sanitizeStoredUploadPath(existingReport.chassis_no_pencil_impression)
+      : null;
+
     // Get form data from request body
     const formData = req.body;
+
+    const now = new Date();
+    const year = now.getFullYear().toString();
+    const month = now.toLocaleString("en-US", { month: "short" });
+    const orderNumber = order.order_number;
 
     // Handle flexible_fields - convert object with numeric keys to array
     let flexibleFields = [];
@@ -226,18 +438,47 @@ exports.generateReport = async (req, res, next) => {
         .filter((field) => field && typeof field === "object");
     }
 
-    // Handle chassis impression image if uploaded
+    // Handle chassis impression image
+    let chassisImageRelativePath = resolveChassisRelativePath(
+      formData.chassis_no_pencil_impression,
+      existingReport
+    );
     let chassisImageBase64 = null;
-    if (req.file) {
-      const imagePath = req.file.path;
-      const imageBuffer = fs.readFileSync(imagePath);
-      const mimeType = req.file.mimetype;
-      chassisImageBase64 = `data:${mimeType};base64,${imageBuffer.toString(
-        "base64"
-      )}`;
 
-      // Clean up temporary file
-      fs.unlinkSync(imagePath);
+    if (chassisImageRelativePath) {
+      existingChassisPath = chassisImageRelativePath;
+    }
+
+    if (req.file) {
+      const saved = await saveChassisImageFromDiskFile(
+        req.file,
+        year,
+        month,
+        orderNumber
+      );
+      if (saved.relativePath) {
+        if (
+          existingChassisPath &&
+          existingChassisPath !== saved.relativePath
+        ) {
+          deleteChassisImage(existingChassisPath);
+        }
+        chassisImageRelativePath = saved.relativePath;
+        existingChassisPath = saved.relativePath;
+      }
+      if (saved.base64) {
+        chassisImageBase64 = saved.base64;
+      }
+    }
+
+    if (chassisImageRelativePath && !chassisImageBase64) {
+      chassisImageBase64 = await loadChassisImageBase64(chassisImageRelativePath);
+    }
+
+    if (chassisImageRelativePath) {
+      formData.chassis_no_pencil_impression = chassisImageRelativePath;
+    } else {
+      delete formData.chassis_no_pencil_impression;
     }
 
     // Handle asset_make: Only for report types that have this field (CV, Machinery, CE)
@@ -315,12 +556,6 @@ exports.generateReport = async (req, res, next) => {
     }
 
     // Create upload directory structure: uploads/YYYY/MMM/orderNumber/reports/
-    const now = new Date();
-    const year = now.getFullYear().toString();
-    const month = now.toLocaleString("en-US", { month: "short" });
-    const orderNumber = order.order_number;
-
-    // Generate report name with counter
     const reportName = await generateReportFileName(order_id, orderNumber);
 
     const uploadDir = path.join(
@@ -375,38 +610,16 @@ exports.generateReport = async (req, res, next) => {
       created_at: new Date(),
     };
 
-    // Add chassis_no_pencil_impression for CV and CE reports
     if (["report_cv", "report_ce"].includes(requestedReportType.toLowerCase())) {
-      reportData.chassis_no_pencil_impression = chassisImageBase64
-        ? reportName
-        : null;
+      if (chassisImageRelativePath) {
+        reportData.chassis_no_pencil_impression = chassisImageRelativePath;
+      } else {
+        delete reportData.chassis_no_pencil_impression;
+      }
     }
 
-    // Determine which report model to use based on report_type
-    let ReportModel;
-    switch (requestedReportType.toLowerCase()) {
-      case "report_cv":
-        ReportModel = CvReport;
-        break;
-      case "report_avr":
-        ReportModel = AvrReport;
-        break;
-      case "report_machinery":
-        ReportModel = MachineryReport;
-        break;
-      case "report_ce":
-        ReportModel = CeReport;
-        break;
-      default:
-        throw new BadRequestError(
-          `Report type '${requestedReportType}' is not supported`
-        );
-    }
-
-    // Check if report already exists for this order
-    const existingReport = await ReportModel.findByOrderId(order_id);
     let report;
-    
+
     if (existingReport) {
       // Update existing report (whether saved or generated) - NO DUPLICATES
       report = await ReportModel.updateReport(
@@ -822,8 +1035,53 @@ exports.saveReportData = async (req, res, next) => {
       throw new NotFoundError("Order not found");
     }
 
+    const ReportModel = getReportModelByType(requestedReportType);
+    let existingReport = await ReportModel.findByOrderId(order_id);
+    let existingChassisPath = existingReport
+      ? sanitizeStoredUploadPath(existingReport.chassis_no_pencil_impression)
+      : null;
+
     // Get form data from request body
     const formData = req.body;
+
+    const now = new Date();
+    const year = now.getFullYear().toString();
+    const month = now.toLocaleString("en-US", { month: "short" });
+    const orderNumber = order.order_number;
+
+    let chassisImageRelativePath = resolveChassisRelativePath(
+      formData.chassis_no_pencil_impression,
+      existingReport
+    );
+
+    if (chassisImageRelativePath) {
+      existingChassisPath = chassisImageRelativePath;
+    }
+
+    if (Array.isArray(req.files) && req.files.length > 0) {
+      const chassisFile = req.files.find(
+        (file) => file.fieldname === "chassis_no_pencil_impression"
+      );
+      const storedPath = saveChassisImageFromMemoryFile(
+        chassisFile,
+        year,
+        month,
+        orderNumber
+      );
+      if (storedPath) {
+        if (existingChassisPath && existingChassisPath !== storedPath) {
+          deleteChassisImage(existingChassisPath);
+        }
+        chassisImageRelativePath = storedPath;
+        existingChassisPath = storedPath;
+      }
+    }
+
+    if (chassisImageRelativePath) {
+      formData.chassis_no_pencil_impression = chassisImageRelativePath;
+    } else {
+      delete formData.chassis_no_pencil_impression;
+    }
 
     // Handle flexible_fields - parse from request body format for save API
     let flexibleFields = parseFlexibleFieldsFromRequest(formData);
@@ -881,31 +1139,16 @@ exports.saveReportData = async (req, res, next) => {
     const validFields = filterValidReportFields(formData, requestedReportType);
     Object.assign(reportData, validFields);
 
-    // Determine which report model to use based on report_type
-    let ReportModel;
-    switch (requestedReportType.toLowerCase()) {
-      case "report_cv":
-        ReportModel = CvReport;
-        break;
-      case "report_avr":
-        ReportModel = AvrReport;
-        break;
-      case "report_machinery":
-        ReportModel = MachineryReport;
-        break;
-      case "report_ce":
-        ReportModel = CeReport;
-        break;
-      default:
-        throw new BadRequestError(
-          `Report type '${requestedReportType}' is not supported`
-        );
+    if (["report_cv", "report_ce"].includes(requestedReportType.toLowerCase())) {
+      if (chassisImageRelativePath) {
+        reportData.chassis_no_pencil_impression = chassisImageRelativePath;
+      } else {
+        delete reportData.chassis_no_pencil_impression;
+      }
     }
 
-    // Check if report already exists for this order
-    const existingReport = await ReportModel.findByOrderId(order_id);
     let report;
-    
+
     if (existingReport) {
       // Update existing report with new/partial data
       report = await ReportModel.updateReport(

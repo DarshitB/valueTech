@@ -789,12 +789,12 @@ function OrderDetails() {
         )}
 
         {/* Videos */}
-        {approvedVideos.length > 0 && (
+        {approvedVideosList.length > 0 && (
           <>
             <div style={{ marginTop: allDocuments.length > 0 ? "16px" : "0", marginBottom: "8px", fontWeight: "500", color: "#374151" }}>
               Videos:
             </div>
-            {approvedVideos.map((doc) => (
+            {approvedVideosList.map((doc) => (
               <div key={`video-${doc.id}`} className="approved-document-tag">
                 <span
                   style={{

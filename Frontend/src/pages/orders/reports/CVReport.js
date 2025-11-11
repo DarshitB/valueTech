@@ -471,6 +471,7 @@ function CVReport() {
 
   // File state for chassis impression
   const [chassisImpressionFile, setChassisImpressionFile] = useState(null);
+  const [chassisPreviewUrl, setChassisPreviewUrl] = useState("");
 
   // State for flexible fields
   const [flexibleFields, setFlexibleFields] = useState([]);
@@ -715,11 +716,69 @@ function CVReport() {
     [getLicenseNumber]
   );
 
-  // Handle file input changes
   const handleFileChange = useCallback((e) => {
-    const file = e.target.files[0];
+    const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
     setChassisImpressionFile(file);
   }, []);
+
+  const resolveChassisImageUrl = useCallback((value) => {
+    if (!value || typeof value !== "string") return "";
+
+    const baseUrl =
+      process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
+
+    // Attempt to parse JSON structure first
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === "object" && parsed.path) {
+        const cleanPath = parsed.path.startsWith("/")
+          ? parsed.path
+          : `/${parsed.path}`;
+        return `${baseUrl}${cleanPath}`;
+      }
+    } catch (err) {
+      // Ignore JSON parse errors, fall back to raw string
+    }
+
+    // Allow absolute URLs or data URIs as is
+    if (
+      value.startsWith("http://") ||
+      value.startsWith("https://") ||
+      value.startsWith("data:")
+    ) {
+      return value;
+    }
+
+    const cleanPath = value.startsWith("/") ? value : `/${value}`;
+    return `${baseUrl}${cleanPath}`;
+  }, []);
+
+  useEffect(() => {
+    let objectUrl = "";
+
+    if (chassisImpressionFile instanceof File) {
+      objectUrl = URL.createObjectURL(chassisImpressionFile);
+      setChassisPreviewUrl(objectUrl);
+    } else {
+      const existingValue = reportFormData?.chassis_no_pencil_impression;
+      if (existingValue && existingValue !== null && existingValue !== undefined) {
+        const resolved = resolveChassisImageUrl(existingValue);
+        setChassisPreviewUrl(resolved);
+      } else {
+        setChassisPreviewUrl("");
+      }
+    }
+
+    return () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [
+    chassisImpressionFile,
+    reportFormData?.chassis_no_pencil_impression,
+    resolveChassisImageUrl,
+  ]);
 
   // Handle date input formatting (DD-MM-YYYY)
   const handleDateChange = useCallback((e) => {
@@ -3242,10 +3301,27 @@ function CVReport() {
                       onChange={handleFileChange}
                       accept="image/*"
                     />
-                    {chassisImpressionFile && (
-                      <small className="text-muted">
-                        Selected: {chassisImpressionFile.name}
-                      </small>
+                    {chassisPreviewUrl && (
+                      <div
+                        style={{
+                          marginTop: "12px",
+                          maxWidth: "320px",
+                          border: "1px solid #e5e7eb",
+                          borderRadius: "6px",
+                          padding: "8px",
+                          backgroundColor: "#f9fafb",
+                        }}
+                      >
+                        <img
+                          src={chassisPreviewUrl}
+                          alt="Chassis impression preview"
+                          style={{
+                            width: "100%",
+                            height: "auto",
+                            display: "block",
+                          }}
+                        />
+                      </div>
                     )}
                   </div>
                 </div>
