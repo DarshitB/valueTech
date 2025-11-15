@@ -356,6 +356,7 @@ function MachineryReport() {
     machine_type: "",
 
     // COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION
+    asset_classification: "",
     machine_technology: "",
     machine_condition: "",
     electrical_condition: "",
@@ -446,6 +447,7 @@ function MachineryReport() {
           order?.sub_category_name && order?.child_category_name
             ? `${order.sub_category_name}, ${order.child_category_name}`
             : "",
+        asset_classification: order?.child_category_name || "",
         hyp_with: order?.bank_name || "",
         // ALWAYS use valuer_name from order (never from report or previous state)
         valuer_name: order?.valuer_name || "",
@@ -877,11 +879,6 @@ function MachineryReport() {
           key === "invoice_no_date"
         ) {
           return;
-        }
-
-        // Special handling for asset_classification - use order data
-        if (key === "asset_classification") {
-          value = order?.child_category_name || "";
         }
 
         // Clear asset_make if new_asset_make has value
@@ -1946,13 +1943,9 @@ function MachineryReport() {
                       className="form-field"
                       id="model"
                       name="model"
-                      value={
-                        order?.sub_category_name && order?.child_category_name
-                          ? `${order.sub_category_name} - ${order.child_category_name}`
-                          : ""
-                      }
-                      readOnly
-                      placeholder="Auto-populated from order data"
+                      value={reportFormData.model || ""}
+                      onChange={handleFormChange}
+                      placeholder="Enter Model"
                       required
                     />
                   </div>
@@ -2124,9 +2117,9 @@ function MachineryReport() {
                       className="form-field"
                       id="asset_classification"
                       name="asset_classification"
-                      value={order?.child_category_name || ""}
-                      readOnly
-                      placeholder="Auto-populated from order data"
+                      value={reportFormData.asset_classification || ""}
+                      onChange={handleFormChange}
+                      placeholder="Enter Asset Classification"
                       required
                     />
                   </div>

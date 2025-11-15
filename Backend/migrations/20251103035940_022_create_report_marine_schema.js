@@ -39,7 +39,6 @@ exports.up = async function (knex) {
     table.string("ref_no_code", 255).nullable();
     table.string("ref_no_id", 255).nullable();
     table.string("report_date", 255).nullable();
-    table.string("report_date", 255).nullable();
     table.text("client_name_with_full_address").nullable();
     table.string("imo_official_regd_no", 255).nullable();
     
@@ -59,6 +58,7 @@ exports.up = async function (knex) {
     table.string("present_flag", 255).nullable();
     table.string("port_of_registry", 255).nullable();
     table.string("no_of_registry_registration_no", 255).nullable();
+    table.string("date_of_registry", 255).nullable();
     table.string("registered_under", 255).nullable();
     table.string("year_of_built", 255).nullable();
     table.string("year_of_built_inwords", 255).nullable();
@@ -67,6 +67,7 @@ exports.up = async function (knex) {
     table.string("type_of_propelled", 255).nullable();
     table.string("length_of_vessel", 255).nullable();
     table.string("loa_length_overall", 255).nullable();
+    table.string("lbp_length_by_perpendicular", 255).nullable();
     table.string("breadth_of_vessel", 255).nullable();
     table.string("depth_of_vessel", 255).nullable();
     table.string("draught_of_vessel", 255).nullable();
@@ -249,7 +250,7 @@ exports.up = async function (knex) {
     table.string("anode_cargo_tanks", 255).nullable();
     table.string("coated_ballast_tanks", 255).nullable();
     table.string("type_of_ballast_tanks", 255).nullable();
-    table.string("to_what_extent_cargo_tanks", 255).nullable();
+    table.string("to_what_extent_ballast_tanks", 255).nullable();
     table.string("anode_ballast_tanks", 255).nullable();
     table.string("coated_slop_tanks", 255).nullable();
     table.string("type_of_slop_tanks", 255).nullable();
@@ -280,12 +281,12 @@ exports.up = async function (knex) {
     table.string("percentage_of_sdwt_vessel_can_maintain", 255).nullable();
     table.string("does_vessel_meet_the_requirements_of_marpol_annex_i_reg_18_2", 255).nullable();
     //// Cargo Handling and Pumping Systems
-    table.string("how_many_grades_products_can_vessel_load_discharge_with_double_valve_segregation", 255).nullable();
+    table.string("how_many_grades_products_can_vessel_load_discharge_with_double", 255).nullable();
     table.string("type_of_cargo_containment", 255).nullable();
     table.string("with_vecs_capacity", 255).nullable();
     table.string("without_vecs_capacity", 255).nullable();
     table.string("loaded_simultaneously_through_all_manifolds_with_vecs_capacity", 255).nullable();
-    table.string("loaded_simultaneously_through_all_manifolds_without_vecs_capacity", 255).nullable();
+    table.string("loaded_simultaneously_through_all_manifolds_without_vecs", 255).nullable();
     //// CARGO CONTROL ROOM
     table.string("is_ship_fitted_with_a_cargo_control_room_ccr", 255).nullable();
     table.string("can_tank_innage_ullage_be_read_from_the_ccr", 255).nullable();
@@ -312,7 +313,7 @@ exports.up = async function (knex) {
     table.string("distance_top_of_rail_to_center_of_manifold", 255).nullable();
     table.string("distance_main_deck_to_center_of_manifold", 255).nullable();
     table.string("distance_spill_tank_grating_to_center_of_manifold", 255).nullable();
-    table.string("manifold_height_above_the_waterline_in_normal_ballast_at_sdwt_condition", 255).nullable();
+    table.string("manifold_height_above_the_waterline_in_normal_ballast_at_sdwt", 255).nullable();
     table.string("manifold_height_above_the_waterline_in_lightship_condition", 255).nullable();
     table.string("number_of_reducers_per_side", 255).nullable();
     table.string("is_vessel_fitted_with_a_stern_manifold_if_yes_state_size", 255).nullable();
@@ -329,7 +330,7 @@ exports.up = async function (knex) {
     
     // INERT GAS & CRUDE OIL WASHING
     table.string("is_an_inert_gas_system_igs_fitted_operational", 255).nullable();
-    table.string("is_igs_supplied_by_flue_gas_inert_gas_ig_generator_and_or_nitrogen", 255).nullable();
+    table.string("is_igs_supplied_by_flue_gas_inert_gas_ig_generator", 255).nullable();
     table.string("if_nitrogen_generator_specify", 255).nullable();
     
     // CARGO PUMPS
@@ -439,7 +440,7 @@ exports.up = async function (knex) {
     table.string("motive_power_of_forecastle_winches", 255).nullable();
     table.string("brake_capacity_of_forecastle_winches", 255).nullable();
     table.string("type_of_brake_of_forecastle_winches", 255).nullable();
-    table.string("no_of_drums_of_main_deck_fwd_winches", 255).nullable();
+    table.string("no_of_main_deck_fwd_winches", 255).nullable();
     table.string("no_of_drums_of_main_deck_fwd_winches", 255).nullable();
     table.string("motive_power_of_main_deck_fwd_winches", 255).nullable();
     table.string("brake_capacity_of_main_deck_fwd_winches", 255).nullable();
@@ -529,15 +530,15 @@ exports.up = async function (knex) {
     table.string("energy_efficiency_design_index_eedi_rating_number", 255).nullable();
 
     // SHIP TO SHIP TRANSFER
-    table.string("does_vessel_comply_with_recommendations_contained_in_ocimf_ics_ship_to_ship", 255).nullable();
-    table.string("what_is_maximum_outreach_of_cranes_derricks_outboard_of_the_ship_s_side", 255).nullable();
+    table.string("does_vessel_comply_with_recommendations_contained_in_ocimf", 255).nullable();
+    table.string("what_is_maximum_outreach_of_cranes_derricks_outboard", 255).nullable();
     table.string("date_place_of_last_sts_operation", 255).nullable();
     
     // RECENT OPERATIONAL HISTORY
     table.string("last_three_cargoes_charterers_voyages", 255).nullable();
     table.string("has_vessel_been_involved_in_a_pollution", 255).nullable();
     table.string("date_and_place_of_last_port_state_control_inspection", 255).nullable();
-    table.string("any_outstanding_deficiencies_as_reported_by_any_port_state_control", 255).nullable();
+    table.string("any_outstanding_deficiencies_as_reported_by_any_port_state", 255).nullable();
     table.string("recent_oil_company_inspections_screenings", 255).nullable();
     table.string("date_place_of_last_sire_inspection", 255).nullable();
 
@@ -600,3 +601,4 @@ exports.down = async function (knex) {
   await knex.schema.dropTableIfExists("report_marine_flexible_fields");
   await knex.schema.dropTableIfExists("report_marine");
 };
+

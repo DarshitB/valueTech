@@ -86,6 +86,9 @@ function generateMachineryReportHTML(
     <div class="content-wrapper">
         <table style="min-height: calc(100% - 225px);">
         <tr>
+            <th colspan="6">${extraData.bank_name}</th>
+        </tr>
+        <tr>
             <th colspan="6">VALUATION REPORT FOR ${extraData.cat} / ${
     extraData.subCat
   }</th>
@@ -222,7 +225,7 @@ function generateMachineryReportHTML(
         </tr>
         <tr>
             <td>ASSET CLASSIFICATION:</td>
-            <td colspan="5">${extraData.subCat}</td>
+            <td colspan="5">${formData.asset_classification}</td>
         </tr>
         <tr>
             <td>MACHINE TECHNOLOGY:</td>

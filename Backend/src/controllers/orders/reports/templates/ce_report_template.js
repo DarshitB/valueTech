@@ -214,7 +214,7 @@ function generateCEReportHTML(formData, extraData, bgImageBase64, stampImageBase
         </tr>
         <tr>
             <td>ASSET CLASSIFICATION:</td>
-            <td colspan="2">${extraData.subCat}</td>
+            <td colspan="2">${formData.asset_classification}</td>
             <td>NO OF CYLINDER:</td>
             <td colspan="2">${formData.no_of_cylinder} CYLINDER</td>
         </tr>

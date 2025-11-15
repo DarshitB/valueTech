@@ -9,6 +9,7 @@ const CvReport = require("../../../models/orders/reports/cvReport");
 const AvrReport = require("../../../models/orders/reports/avrReport");
 const MachineryReport = require("../../../models/orders/reports/machineryReport");
 const CeReport = require("../../../models/orders/reports/ceReport");
+const MarineReport = require("../../../models/orders/reports/marineReport");
 const orderMediaDocument = require("../../../models/orders/orderMediaDocument");
 const OrderStatusHistory = require("../../../models/orders/orderStatusHistory");
 const AssetMakesForReports = require("../../../models/orders/assetMakesOfReports");
@@ -19,6 +20,7 @@ const cvReportTemplate = require("./templates/cv_report_template");
 const avrReportTemplate = require("./templates/avr_report_template");
 const machineryReportTemplate = require("./templates/machinery_report_template");
 const ceReportTemplate = require("./templates/ce_report_template");
+const marineReportTemplate = require("./templates/marine_report_template");
 
 // Import custom error classes
 const {
@@ -387,6 +389,8 @@ function getReportModelByType(reportType) {
       return MachineryReport;
     case "report_ce":
       return CeReport;
+    case "report_marine":
+      return MarineReport;
     default:
       throw new BadRequestError(`Report type '${reportType}' is not supported`);
   }
@@ -427,49 +431,87 @@ exports.generateReport = async (req, res, next) => {
     const orderNumber = order.order_number;
 
     // Handle flexible_fields - convert object with numeric keys to array
-    const flexibleFields = extractFlexibleFieldsFromFormData(formData);
+    let flexibleFields = extractFlexibleFieldsFromFormData(formData);
+    
+    // If no flexible fields in request body but report exists, load from database
+    if (flexibleFields.length === 0 && existingReport) {
+      const reportWithFlexibleFields = await ReportModel.findByOrderIdWithFlexibleFields(order_id);
+      if (reportWithFlexibleFields && reportWithFlexibleFields.flexible_fields) {
+        flexibleFields = reportWithFlexibleFields.flexible_fields;
+        /* console.log(`[Marine Report] Loaded ${flexibleFields.length} flexible fields from database`); */
+      }
+    } else if (flexibleFields.length > 0) {
+      /* console.log(`[Marine Report] Using ${flexibleFields.length} flexible fields from request body`); */
+    }
+    
+    // Debug: Log flexible fields for marine reports
+    if (requestedReportType.toLowerCase() === 'report_marine' && flexibleFields.length > 0) {
+      /* console.log(`[Marine Report] Flexible fields sections:`, flexibleFields.map(f => f.section_name).filter(Boolean)); */
+    }
+    
+    // Add flexible fields back to formData for template rendering
+    formData.flexible_fields = flexibleFields;
 
-    // Handle chassis impression image
-    let chassisImageRelativePath = resolveChassisRelativePath(
-      formData.chassis_no_pencil_impression,
-      existingReport
-    );
+    // Handle chassis impression image (for CV and CE reports)
+    let chassisImageRelativePath = null;
     let chassisImageBase64 = null;
-
-    if (chassisImageRelativePath) {
-      existingChassisPath = chassisImageRelativePath;
-    }
-
-    if (req.file) {
-      const saved = await saveChassisImageFromDiskFile(
-        req.file,
-        year,
-        month,
-        orderNumber
+    
+    if (["report_cv", "report_ce"].includes(requestedReportType.toLowerCase())) {
+      chassisImageRelativePath = resolveChassisRelativePath(
+        formData.chassis_no_pencil_impression,
+        existingReport
       );
-      if (saved.relativePath) {
-        if (
-          existingChassisPath &&
-          existingChassisPath !== saved.relativePath
-        ) {
-          deleteChassisImage(existingChassisPath);
+
+      if (chassisImageRelativePath) {
+        existingChassisPath = chassisImageRelativePath;
+      }
+
+      if (req.file) {
+        const saved = await saveChassisImageFromDiskFile(
+          req.file,
+          year,
+          month,
+          orderNumber
+        );
+        if (saved.relativePath) {
+          if (
+            existingChassisPath &&
+            existingChassisPath !== saved.relativePath
+          ) {
+            deleteChassisImage(existingChassisPath);
+          }
+          chassisImageRelativePath = saved.relativePath;
+          existingChassisPath = saved.relativePath;
         }
-        chassisImageRelativePath = saved.relativePath;
-        existingChassisPath = saved.relativePath;
+        if (saved.base64) {
+          chassisImageBase64 = saved.base64;
+        }
       }
-      if (saved.base64) {
-        chassisImageBase64 = saved.base64;
+
+      if (chassisImageRelativePath && !chassisImageBase64) {
+        chassisImageBase64 = await loadChassisImageBase64(chassisImageRelativePath);
+      }
+
+      if (chassisImageRelativePath) {
+        formData.chassis_no_pencil_impression = chassisImageRelativePath;
+      } else {
+        delete formData.chassis_no_pencil_impression;
       }
     }
 
-    if (chassisImageRelativePath && !chassisImageBase64) {
-      chassisImageBase64 = await loadChassisImageBase64(chassisImageRelativePath);
-    }
-
-    if (chassisImageRelativePath) {
-      formData.chassis_no_pencil_impression = chassisImageRelativePath;
-    } else {
-      delete formData.chassis_no_pencil_impression;
+    // Handle vessel_photo for marine reports
+    if (requestedReportType.toLowerCase() === 'report_marine') {
+      // Store the relative path, use preview URL for template if available
+      if (formData.vessel_photo_preview) {
+        // Keep preview URL for template, but store relative path in DB
+        formData.vessel_photo_for_template = formData.vessel_photo_preview;
+      } else if (formData.vessel_photo) {
+        // Convert relative path to full URL for template
+        const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+        formData.vessel_photo_for_template = formData.vessel_photo.startsWith('/')
+          ? `${baseUrl}${formData.vessel_photo}`
+          : `${baseUrl}/${formData.vessel_photo}`;
+      }
     }
 
     // Handle asset_make: Only for report types that have this field (CV, Machinery, CE)
@@ -569,12 +611,14 @@ exports.generateReport = async (req, res, next) => {
       throw new Error("Failed to generate report PDF");
     }
 
-    // Prepare report data (exclude flexible_fields, report_type, tyre_image_base64, and new_asset_make from main report data)
+    // Prepare report data (exclude flexible_fields, report_type, tyre_image_base64, new_asset_make, and template-only fields from main report data)
     const {
       flexible_fields,
       report_type,
       tyre_image_base64,
       new_asset_make,
+      vessel_photo_preview,
+      vessel_photo_for_template,
       ...mainReportData
     } = formData;
     
@@ -632,16 +676,39 @@ exports.generateReport = async (req, res, next) => {
     // Save flexible fields if any
     if (flexibleFields.length > 0) {
       for (const field of flexibleFields) {
-        await ReportModel.createFlexibleField({
-          report_id: report.id,
-          section_name: field.section_name || null,
-          col_span: field.col_span ? parseInt(field.col_span) : null,
-          field_label: field.field_label || null,
-          field_value: field.field_value || null,
-          field_order: field.field_order ? parseInt(field.field_order) : null,
-          created_by: userId,
-          created_at: new Date(),
-        });
+        // Marine reports use field_1, field_2, etc. instead of field_label/field_value
+        if (requestedReportType.toLowerCase() === 'report_marine') {
+          await ReportModel.createFlexibleField({
+            report_id: report.id,
+            section_name: field.section_name || null,
+            col_span: field.col_span ? parseInt(field.col_span) : null,
+            field_1: field.field_1 || null,
+            field_2: field.field_2 || null,
+            field_3: field.field_3 || null,
+            field_4: field.field_4 || null,
+            field_5: field.field_5 || null,
+            field_6: field.field_6 || null,
+            field_7: field.field_7 || null,
+            field_8: field.field_8 || null,
+            field_9: field.field_9 || null,
+            field_10: field.field_10 || null,
+            field_order: field.field_order ? parseInt(field.field_order) : null,
+            created_by: userId,
+            created_at: new Date(),
+          });
+        } else {
+          // Other reports use field_label/field_value
+          await ReportModel.createFlexibleField({
+            report_id: report.id,
+            section_name: field.section_name || null,
+            col_span: field.col_span ? parseInt(field.col_span) : null,
+            field_label: field.field_label || null,
+            field_value: field.field_value || null,
+            field_order: field.field_order ? parseInt(field.field_order) : null,
+            created_by: userId,
+            created_at: new Date(),
+          });
+        }
       }
     }
 
@@ -743,28 +810,55 @@ async function generateReportFileName(orderId, orderNumber) {
  * @param {string} outputPath - Output path for PDF
  */
 async function generateReportPDF(reportType, formData, extraData, outputPath) {
-  // Determine background image based on valuer_name (CV) or surveyor (AVR)
+  // Determine background image based on report type
   let bgImageFileName = "vkassociate_letter_head.jpg"; // Default image
   let stampPngFile = null; // Optional stamp overlay
 
-  // Check for valuer_name (CV reports) or surveyor (AVR reports)
-  const nameField = formData.valuer_name || formData.surveyor;
-  
-  if (nameField) {
-    const name = nameField.toUpperCase().trim();
+  // Marine reports use separate letterhead images
+  if (reportType.toLowerCase() === "report_marine") {
+    // For marine reports, use marine-specific letterhead
+    // Check valuer_name to determine which marine letterhead to use
+    const nameField = formData.valuer_name;
     
-    if (name === "V.K. ASSOCIATES") {
-      bgImageFileName = "vkassociate_letter_head.jpg";
-      stampPngFile = "vka.png";
-    } else if (name === "VALUETECH SOLUTIONS") {
-      bgImageFileName = "valuetech-solutions.png";
-      stampPngFile = "vts.png";
-    } else if (name === "VISHAL D. KOTHARI") {
-      bgImageFileName = "vishal-d-kothri.png";
-      stampPngFile = "vdk.png";
+    if (nameField) {
+      const name = nameField.toUpperCase().trim();
+      
+      if (name === "V.K. ASSOCIATES") {
+        bgImageFileName = "marine-vs.webp"; // Marine letterhead for VKA
+        stampPngFile = "vka.png";
+      } else if (name === "VALUETECH SOLUTIONS") {
+        bgImageFileName = "marine-vs.webp"; // Marine letterhead for VTS
+        stampPngFile = "vts.png";
+      } else if (name === "VISHAL D. KOTHARI") {
+        bgImageFileName = "marine-vs.webp"; // Marine letterhead for VDK
+        stampPngFile = "vdk.png";
+      } else {
+        // Default marine letterhead
+        bgImageFileName = "marine-vs.webp";
+      }
+    } else {
+      // Default marine letterhead
+      bgImageFileName = "marine-vs.webp";
+    }
+  } else {
+    // For other report types (CV, AVR, Machinery, CE), use regular letterheads
+    const nameField = formData.valuer_name || formData.surveyor;
+    
+    if (nameField) {
+      const name = nameField.toUpperCase().trim();
+      
+      if (name === "V.K. ASSOCIATES") {
+        bgImageFileName = "vkassociate_letter_head.jpg";
+        stampPngFile = "vka.png";
+      } else if (name === "VALUETECH SOLUTIONS") {
+        bgImageFileName = "valuetech-solutions.png";
+        stampPngFile = "vts.png";
+      } else if (name === "VISHAL D. KOTHARI") {
+        bgImageFileName = "vishal-d-kothri.png";
+        stampPngFile = "vdk.png";
+      }
     }
   }
-  
   
   // Background image path
   const bgPath = path.join(process.cwd(), "public", "img", bgImageFileName);
@@ -775,7 +869,15 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
   try {
     if (fs.existsSync(bgPath)) {
       const imageBuffer = fs.readFileSync(bgPath);
-      const mimeType = "image/png"; // Assuming PNG format
+      // Determine MIME type based on file extension
+      let mimeType = "image/png"; // Default
+      if (bgImageFileName.endsWith(".webp")) {
+        mimeType = "image/webp";
+      } else if (bgImageFileName.endsWith(".jpg") || bgImageFileName.endsWith(".jpeg")) {
+        mimeType = "image/jpeg";
+      } else if (bgImageFileName.endsWith(".png")) {
+        mimeType = "image/png";
+      }
       bgImageBase64 = `data:${mimeType};base64,${imageBuffer.toString(
         "base64"
       )}`;
@@ -841,11 +943,39 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
 
     const startTime = Date.now();
 
-    // Set content with faster loading strategy
+    // Set content with appropriate loading strategy
+    // For marine reports, wait for networkidle to ensure JavaScript executes
+    const waitStrategy = reportType.toLowerCase() === "report_marine" 
+      ? "networkidle0" 
+      : "domcontentloaded";
+    
     await page.setContent(htmlContent, {
-      waitUntil: "domcontentloaded",
-      timeout: 10000, // 10 second timeout instead of 30
+      waitUntil: waitStrategy,
+      timeout: reportType.toLowerCase() === "report_marine" ? 30000 : 10000, // More time for marine reports
     });
+    
+    // For marine reports, add additional wait to ensure JavaScript pagination completes
+    if (reportType.toLowerCase() === "report_marine") {
+      // Wait for JavaScript to execute using waitForFunction
+      try {
+        await page.waitForFunction(
+          () => {
+            // Check if autoPaginate has run by looking for multiple pages or updated content
+            const pages = document.querySelectorAll('.page');
+            return pages.length > 0;
+          },
+          { timeout: 5000 }
+        ).catch(() => {
+          // If it times out, just continue - the content is already loaded
+        });
+        
+        // Additional delay using Promise
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (error) {
+        // Continue even if wait fails
+        console.warn("Wait for pagination completed with warning:", error.message);
+      }
+    }
 
     // Generate PDF with legal size dimensions (8.5" x 14")
     const pdfStartTime = Date.now();
@@ -916,6 +1046,14 @@ function generateReportHTML(reportType, formData, extraData, bgImageBase64, stam
           stampImageBase64
         );
 
+      case "report_marine":
+        return marineReportTemplate.generateMarineReportHTML(
+          formData,
+          extraData,
+          bgImageBase64,
+          stampImageBase64
+        );
+
     // Future report types can be added here
     // case 'property_report':
     //   return propertyReportTemplate.generatePropertyReportHTML(formData, extraData, bgImageBase64);
@@ -972,6 +1110,11 @@ exports.getReportByOrderAndType = async (req, res, next) => {
         report = await CeReport.findByOrderIdWithFlexibleFields(order_id);
         break;
 
+      case "report_marine":
+        // Get Marine report with flexible fields
+        report = await MarineReport.findByOrderIdWithFlexibleFields(order_id);
+        break;
+
       default:
         throw new BadRequestError(
           `Report type '${report_type}' does not exist`
@@ -1020,7 +1163,7 @@ exports.saveReportData = async (req, res, next) => {
     const { order_id } = req.params;
     const { report_type: requestedReportType } = req.body;
     const { id: userId } = req.user;
-    console.log("req.body", req.body);
+    /* console.log("saveReportData", req.body); */
     
     // Get order details with relationships
     const order = await Order.findById(order_id, req.user);
@@ -1158,16 +1301,39 @@ exports.saveReportData = async (req, res, next) => {
     // Save flexible fields if any
     if (flexibleFields.length > 0) {
       for (const field of flexibleFields) {
-        await ReportModel.createFlexibleField({
-          report_id: report.id,
-          section_name: field.section_name || null,
-          col_span: field.col_span ? parseInt(field.col_span) : null,
-          field_label: field.field_label || null,
-          field_value: field.field_value || null,
-          field_order: field.field_order ? parseInt(field.field_order) : null,
-          created_by: userId,
-          created_at: new Date(),
-        });
+        // Marine reports use field_1, field_2, etc. instead of field_label/field_value
+        if (requestedReportType.toLowerCase() === 'report_marine') {
+          await ReportModel.createFlexibleField({
+            report_id: report.id,
+            section_name: field.section_name || null,
+            col_span: field.col_span ? parseInt(field.col_span) : null,
+            field_1: field.field_1 || null,
+            field_2: field.field_2 || null,
+            field_3: field.field_3 || null,
+            field_4: field.field_4 || null,
+            field_5: field.field_5 || null,
+            field_6: field.field_6 || null,
+            field_7: field.field_7 || null,
+            field_8: field.field_8 || null,
+            field_9: field.field_9 || null,
+            field_10: field.field_10 || null,
+            field_order: field.field_order ? parseInt(field.field_order) : null,
+            created_by: userId,
+            created_at: new Date(),
+          });
+        } else {
+          // Other reports use field_label/field_value
+          await ReportModel.createFlexibleField({
+            report_id: report.id,
+            section_name: field.section_name || null,
+            col_span: field.col_span ? parseInt(field.col_span) : null,
+            field_label: field.field_label || null,
+            field_value: field.field_value || null,
+            field_order: field.field_order ? parseInt(field.field_order) : null,
+            created_by: userId,
+            created_at: new Date(),
+          });
+        }
       }
     }
 
@@ -1251,9 +1417,8 @@ function normalizeFlexibleField(field) {
   if (!field || typeof field !== "object") return null;
 
   const sectionName = field.section_name || field.sectionName || null;
-  const fieldLabel = field.field_label || field.fieldLabel || null;
-
-  if (!sectionName || !fieldLabel) {
+  
+  if (!sectionName) {
     return null;
   }
 
@@ -1265,18 +1430,51 @@ function normalizeFlexibleField(field) {
     return Number.isNaN(parsed) ? null : parsed;
   };
 
-  return {
-    section_name: sectionName,
-    col_span: parseNumeric(field.col_span || field.colSpan),
-    field_label: fieldLabel,
-    field_value:
-      field.field_value !== undefined
-        ? field.field_value
-        : field.fieldValue !== undefined
-        ? field.fieldValue
-        : null,
-    field_order: parseNumeric(field.field_order || field.fieldOrder),
-  };
+  // Check if this is a marine report field (has field_1, field_2, etc.)
+  const hasMarineFields = field.field_1 !== undefined || 
+                          field.field_2 !== undefined || 
+                          field.field_3 !== undefined ||
+                          field.field_4 !== undefined ||
+                          field.field_5 !== undefined;
+
+  if (hasMarineFields) {
+    // Marine report format: field_1 through field_10
+    return {
+      section_name: sectionName,
+      col_span: parseNumeric(field.col_span || field.colSpan),
+      field_1: field.field_1 !== undefined ? field.field_1 : null,
+      field_2: field.field_2 !== undefined ? field.field_2 : null,
+      field_3: field.field_3 !== undefined ? field.field_3 : null,
+      field_4: field.field_4 !== undefined ? field.field_4 : null,
+      field_5: field.field_5 !== undefined ? field.field_5 : null,
+      field_6: field.field_6 !== undefined ? field.field_6 : null,
+      field_7: field.field_7 !== undefined ? field.field_7 : null,
+      field_8: field.field_8 !== undefined ? field.field_8 : null,
+      field_9: field.field_9 !== undefined ? field.field_9 : null,
+      field_10: field.field_10 !== undefined ? field.field_10 : null,
+      field_order: parseNumeric(field.field_order || field.fieldOrder),
+    };
+  } else {
+    // Other report formats: field_label/field_value
+    const fieldLabel = field.field_label || field.fieldLabel || null;
+    
+    if (!fieldLabel) {
+      return null;
+    }
+
+    return {
+      section_name: sectionName,
+      col_span: parseNumeric(field.col_span || field.colSpan),
+      field_label: fieldLabel,
+      field_value:
+        field.field_value !== undefined
+          ? field.field_value
+          : field.fieldValue !== undefined
+          ? field.fieldValue
+          : null,
+      field_order: parseNumeric(field.field_order || field.fieldOrder),
+    };
+  }
 }
 
 function extractFlexibleFieldsFromFormData(formData = {}) {
@@ -1410,6 +1608,235 @@ function filterValidReportFields(formData, reportType) {
       'fair_market_value', 'amount_in_words',
       'no_of_photograph', 'no_of_collage', 'valuer_comments_remarks',
       'declaration', 'disclaimer', 'chassis_no_pencil_impression'
+    ],
+    report_marine: [
+      // Vessel Details Section
+      'report_title_type', 'report_title', 'name_of_the_vessel', 'official_no',
+      'imo_or_regd_type', 'imo_or_regd_no', 'vessel_photo', 'vessel_photo_id',
+      'client_city_state_name', 'execute_above', 'valuer_name', 'license_no',
+      'inspection_location_front_page', 'inspection_date_front_page',
+      'ref_no_year', 'ref_no_bank', 'state_initial', 'ref_no_code', 'ref_no_id',
+      'report_date', 'client_name_with_full_address', 'imo_official_regd_no',
+      // PARTICULARS OF THE VESSEL
+      'registry_vessel_date', 'registry_vessel_location', 'registered_or_proposed_owner',
+      'registered_or_proposed_owner_address', 'purpose_of_valuation', 'marine_vessel_name',
+      'type_or_description_of_vessel', 'mmsi_no', 'class_notation', 'call_sign_class_notation_machinery',
+      'current_registry_port', 'classification_of_registry', 'present_flag', 'port_of_registry',
+      'no_of_registry_registration_no', 'date_of_registry', 'registered_under', 'year_of_built', 'year_of_built_inwords',
+      'place_of_built', 'vessel_built_by', 'type_of_propelled', 'length_of_vessel',
+      'loa_length_overall','lbp_length_by_perpendicular', 'breadth_of_vessel', 'depth_of_vessel', 'draught_of_vessel',
+      'summer_draft_of_vessel', 'length_of_stroke', 'ballast_water_capacity', 'light_ship',
+      'propeller', 'gross_registered_tonnage_grt', 'net_registered_tonnage_nrt',
+      'deadweight_tonnage_dwt', 'free_board', 'operating_speed_max_speed', 'regd_accommodation',
+      'bollard_pull_sustained', 'type_of_propulsion', 'no_of_decks', 'no_of_masts',
+      'no_of_bulkheads', 'rigged_not_rigged', 'stem_type', 'stern_type', 'built_type',
+      'material_of_construction',
+      // OWNERSHIP AND OPERATION
+      'registered_owner', 'technical_operator', 'commercial_operator', 'disponent_owner',
+      // PROTECTION & INDEMNITY POLICY
+      'institution_name_insurance_policy', 'certificate_no_insurance_policy',
+      'date_of_issue_insurance_policy', 'p_i_clause_insurance_policy', 'co_assured_insurance_policy',
+      'start_period_of_p_i_policy_insurance_policy', 'end_period_of_p_i_policy_insurance_policy',
+      'insured_value_insurance_policy', 'insured_value_in_words_insurance_policy',
+      // INSURANCE FOR BUNKER OIL POLLUTION DAMAGE POLICY
+      'institution_name_damage_policy', 'certificate_type_damage_policy', 'type_of_security_damage_policy',
+      'insurer_guarantor_name_address_damage_policy', 'policy_ref_no_damage_policy',
+      'date_of_issue_damage_policy', 'start_period_of_damage_policy', 'end_period_of_damage_policy',
+      // WAR RISK INSURANCE POLICY
+      'insurance_company_name_war_risk_policy', 'policy_no_war_risk_policy',
+      'start_period_of_war_risk_policy', 'end_period_of_war_risk_policy',
+      'insured_value_war_risk_policy', 'insured_value_in_words_war_risk_policy',
+      // HULL & MACHINERY INSURANCE POLICY
+      'insurance_company_name_hull_machinery_policy', 'policy_no_hull_machinery_policy',
+      'start_period_of_hull_machinery_policy', 'end_period_of_hull_machinery_policy',
+      'insured_value_hull_machinery_policy', 'insured_value_in_words_hull_machinery_policy',
+      // OTHER DETAILS
+      'trading_limit', 'collision_bulkhead', 'vessel_bottom_type', 'ex_name_flag',
+      'previous_registry', 'keel_to_masthead_ktm', 'manifold_bcm_scm',
+      // CLASSIFICATION
+      'classification_society', 'is_vessel_subject_to_any_conditions',
+      'if_classification_society_changed_name', 'does_the_vessel_have_ice_class',
+      'date_place_of_last_dry_dock', 'start_date_next_dry_dock_due_next_annual_survey_due',
+      'end_date_next_dry_dock_due_next_annual_survey_due',
+      'start_date_of_last_special_survey_next_special_survey_due',
+      'end_date_of_last_special_survey_next_special_survey_due', 'if_ship_has_condition_assessment',
+      // HULL DESIGN
+      'hull_design', 'present_condition_1', 'present_condition_2', 'present_condition_3',
+      'auxiliary_machinerie_other_auxiliary_machinerie_condition', 'steering_details',
+      'propeller_asd_vessel_condition',
+      // DIMENSIONS
+      'keel_to_masthead_ktm_dimensions', 'distance_bridge_front_to_center_of_manifold_dimensions',
+      'bow_to_center_manifold_bcm_dimensions', 'stern_to_center_manifold_scm_dimensions',
+      'forward_to_mid_point_manifold_lightship_dimensions',
+      'forward_to_mid_point_manifold_normal_ballast_dimensions',
+      'forward_to_mid_point_manifold_summer_dwt_dimensions',
+      'aft_to_mid_point_manifold_lightship_dimensions',
+      'aft_to_mid_point_manifold_normal_ballast_dimensions',
+      'aft_to_mid_point_manifold_summer_dwt_dimensions',
+      'parallel_body_length_lightship_dimensions', 'parallel_body_length_normal_ballast_dimensions',
+      'parallel_body_length_summer_dwt_dimensions',
+      // LOADLINE INFORMATION (all summer, winter, tropical, lightship, normal_ballast, segregated_ballast variations)
+      'summer_Freeboard_dimensions', 'summer_Draft_dimensions', 'summer_Deadweight_dimensions',
+      'summer_Displacement_dimensions', 'winter_Freeboard_dimensions', 'winter_Draft_dimensions',
+      'winter_Deadweight_dimensions', 'winter_Displacement_dimensions',
+      'tropical_Freeboard_dimensions', 'tropical_Draft_dimensions', 'tropical_Deadweight_dimensions',
+      'tropical_Displacement_dimensions', 'lightship_Freeboard_dimensions', 'lightship_Draft_dimensions',
+      'lightship_Deadweight_dimensions', 'lightship_Displacement_dimensions',
+      'normal_ballast_condition_Freeboard_dimensions', 'normal_ballast_condition_Draft_dimensions',
+      'normal_ballast_condition_Deadweight_dimensions', 'normal_ballast_condition_Displacement_dimensions',
+      'segregated_ballast_condition_Freeboard_dimensions', 'segregated_ballast_condition_Draft_dimensions',
+      'segregated_ballast_condition_Deadweight_dimensions', 'segregated_ballast_condition_Displacement_dimensions',
+      'fwa_tpc_at_summer_draft_Freeboard_dimensions', 'fwa_tpc_at_summer_draft_Draft_dimensions',
+      'does_vessel_have_multiple_sdwt', 'constant_excluding_fresh_water',
+      'company_guidelines_for_under_keel_clearance_ukc',
+      'full_mast_summer_deadweight_dimensions', 'collapsed_mast_summer_deadweight_dimensions',
+      'full_mast_normal_ballast_dimensions', 'collapsed_mast_normal_ballast_dimensions',
+      'full_mast_lightship_dimensions', 'collapsed_mast_lightship_dimensions',
+      // CREW AND OPERATIONS
+      'itopf_member', 'ocimf_member', 'nationality_of_master_name',
+      'number_and_nationality_of_officers', 'number_and_nationality_of_crew',
+      'common_working_language_onboard', 'do_officers_speak_and_understand_english',
+      'if_officers_ratings_employed_by_a_manning_agency_full_style',
+      'is_the_vessel_operated_under_a_quality_management_system',
+      'can_the_ship_comply_with_the_ics_helicopter_guidelines',
+      // VESSEL ACCESSORIES & CAPACITIES - COATING/ANODES
+      'coated_cargo_tanks', 'type_of_cargo_tanks', 'to_what_extent_cargo_tanks', 'anode_cargo_tanks',
+      'coated_ballast_tanks', 'type_of_ballast_tanks', 'to_what_extent_ballast_tanks', 'anode_ballast_tanks',
+      'coated_slop_tanks', 'type_of_slop_tanks', 'to_what_extent_slop_tanks', 'anode_slop_tanks',
+      // BALLAST, CARGO, SLOP TANKS (all related fields from migration)
+      'number_of_ballast_pumps', 'type_of_ballast_pumps', 'capacity_of_ballast_pumps',
+      'at_what_head_ballast_pumps', 'number_of_ballast_eductors', 'type_of_ballast_eductors',
+      'capacity_of_ballast_eductors', 'at_what_head_ballast_eductors',
+      'is_vessel_fitted_with_centerline_bulkhead_in_all_cargo_tanks',
+      'number_of_cargo_tanks_and_total_cubic_capacity_98', 'total_cubic_capacity_98',
+      'capacity_of_each_natural_segregation_with_double_valve', 'imo_class',
+      'number_of_slop_tanks_and_total_cubic_capacity_98', 'total_cubic_capacity_98_slop_tanks',
+      'specify_segregations_double_valve', 'residual_retention_oil_tank_capacity_98',
+      'total_sbt_capacity_and_percentage_of_sdwt_vessel_can_maintain',
+      'percentage_of_sdwt_vessel_can_maintain',
+      'does_vessel_meet_the_requirements_of_marpol_annex_i_reg_18_2',
+      'how_many_grades_products_can_vessel_load_discharge_with_double','type_of_cargo_containment', 'with_vecs_capacity', 'without_vecs_capacity',
+      'loaded_simultaneously_through_all_manifolds_with_vecs_capacity',
+      'loaded_simultaneously_through_all_manifolds_without_vecs',
+      'is_ship_fitted_with_a_cargo_control_room_ccr',
+      'can_tank_innage_ullage_be_read_from_the_ccr', 'is_gauging_system_certified_and_calibrated',
+      'type_of_fixed_closed_tank_gauging_system_fitted',
+      'are_high_level_alarms_fitted_to_the_cargo_tanks',
+      'number_of_portable_gauging_units_on_board', 'is_a_vapour_emission_control_system_vecs_fitted',
+      'number_of_vecs_manifolds_per_side', 'size_of_vecs_manifolds_per_side',
+      'number_of_vecs_reducers_per_side', 'state_what_type_of_venting_system_is_fitted',
+      'total_number_of_cargo_manifold_connections_on_each_side',
+      'what_type_of_valves_are_fitted_at_manifold', 'what_is_the_material_rating_of_the_manifold',
+      'does_vessel_comply', 'distance_between_cargo_manifold_centers',
+      'distance_ships_rail_to_manifold', 'distance_manifold_to_ships_side',
+      'distance_top_of_rail_to_center_of_manifold', 'distance_main_deck_to_center_of_manifold',
+      'distance_spill_tank_grating_to_center_of_manifold',
+      'manifold_height_above_the_waterline_in_normal_ballast_at_sdwt',
+      'manifold_height_above_the_waterline_in_lightship_condition', 'number_of_reducers_per_side',
+      'is_vessel_fitted_with_a_stern_manifold_if_yes_state_size',
+      // CARGO TANKS HEATING
+      'type_of_cargo_tanks_heating', 'coiled_cargo_tanks_heating', 'material_of_cargo_tanks_heating',
+      'type_of_slop_tanks_heating', 'coiled_slop_tanks_heating', 'material_of_slop_tanks_heating',
+      'maximum_temperature_cargo_can_be_loaded_maintained_1',
+      'maximum_temperature_cargo_can_be_loaded_maintained_2',
+      // INERT GAS SYSTEM
+      'is_an_inert_gas_system_igs_fitted_operational',
+      'is_igs_supplied_by_flue_gas_inert_gas_ig_generator',
+      'if_nitrogen_generator_specify',
+      // CARGO PUMPS
+      'how_many_cargo_pumps_can_be_run_simultaneously_at_full_capacity',
+      'sr_no_of_cargo_pumps', 'type_of_cargo_pumps', 'capacity_of_cargo_pumps', 'at_what_head_cargo_pumps',
+      'sr_no_of_cargo_eductors', 'type_of_cargo_eductors', 'capacity_of_cargo_eductors',
+      'at_what_head_cargo_eductors', 'sr_no_of_stripping', 'type_of_stripping', 'capacity_of_stripping',
+      'at_what_head_stripping', 'is_at_least_one_emergency_portable_cargo_pump_provided',
+      // MOORING EQUIPMENT (all forecastle, main_deck_fwd, main_deck_aft, poop_deck variations)
+      'no_of_forecastle', 'diameter_of_forecastle', 'material_of_forecastle', 'length_of_forecastle',
+      'breaking_of_forecastle', 'no_of_main_deck_fwd', 'diameter_of_main_deck_fwd',
+      'material_of_main_deck_fwd', 'length_of_main_deck_fwd', 'breaking_of_main_deck_fwd',
+      'no_of_main_deck_aft', 'diameter_of_main_deck_aft', 'material_of_main_deck_aft',
+      'length_of_main_deck_aft', 'breaking_of_main_deck_aft', 'no_of_poop_deck',
+      'diameter_of_poop_deck', 'material_of_poop_deck', 'length_of_poop_deck', 'breaking_of_poop_deck',
+      // TAILS (all variations)
+      'no_of_forecastle_tails', 'diameter_of_forecastle_tails', 'material_of_forecastle_tails',
+      'length_of_forecastle_tails', 'breaking_of_forecastle_tails', 'no_of_main_deck_fwd_tails',
+      'diameter_of_main_deck_fwd_tails', 'material_of_main_deck_fwd_tails',
+      'length_of_main_deck_fwd_tails', 'breaking_of_main_deck_fwd_tails', 'no_of_main_deck_aft_tails',
+      'diameter_of_main_deck_aft_tails', 'material_of_main_deck_aft_tails',
+      'length_of_main_deck_aft_tails', 'breaking_of_main_deck_aft_tails', 'no_of_poop_deck_tails',
+      'diameter_of_poop_deck_tails', 'material_of_poop_deck_tails', 'length_of_poop_deck_tails',
+      'breaking_of_poop_deck_tails',
+      // ROPES (all variations)
+      'no_of_forecastle_ropes', 'diameter_of_forecastle_ropes', 'material_of_forecastle_ropes',
+      'length_of_forecastle_ropes', 'breaking_of_forecastle_ropes', 'no_of_main_deck_fwd_ropes',
+      'diameter_of_main_deck_fwd_ropes', 'material_of_main_deck_fwd_ropes',
+      'length_of_main_deck_fwd_ropes', 'breaking_of_main_deck_fwd_ropes', 'no_of_main_deck_aft_ropes',
+      'diameter_of_main_deck_aft_ropes', 'material_of_main_deck_aft_ropes',
+      'length_of_main_deck_aft_ropes', 'breaking_of_main_deck_aft_ropes', 'no_of_poop_deck_ropes',
+      'diameter_of_poop_deck_ropes', 'material_of_poop_deck_ropes', 'length_of_poop_deck_ropes',
+      'breaking_of_poop_deck_ropes',
+      // OTHER LINES (all variations)
+      'no_of_forecastle_other_lines', 'diameter_of_forecastle_other_lines',
+      'material_of_forecastle_other_lines', 'length_of_forecastle_other_lines',
+      'breaking_of_forecastle_other_lines', 'no_of_main_deck_fwd_other_lines',
+      'diameter_of_main_deck_fwd_other_lines', 'material_of_main_deck_fwd_other_lines',
+      'length_of_main_deck_fwd_other_lines', 'breaking_of_main_deck_fwd_other_lines',
+      'no_of_main_deck_aft_other_lines', 'diameter_of_main_deck_aft_other_lines',
+      'material_of_main_deck_aft_other_lines', 'length_of_main_deck_aft_other_lines',
+      'breaking_of_main_deck_aft_other_lines', 'no_of_poop_deck_other_lines',
+      'diameter_of_poop_deck_other_lines', 'material_of_poop_deck_other_lines',
+      'length_of_poop_deck_other_lines', 'breaking_of_poop_deck_other_lines',
+      // WINCHES (all variations)
+      'no_of_forecastle_winches', 'no_of_drums_of_forecastle_winches',
+      'motive_power_of_forecastle_winches', 'brake_capacity_of_forecastle_winches',
+      'type_of_brake_of_forecastle_winches', 'no_of_main_deck_fwd_winches',
+      'no_of_drums_of_main_deck_fwd_winches', 'motive_power_of_main_deck_fwd_winches',
+      'brake_capacity_of_main_deck_fwd_winches', 'type_of_brake_of_main_deck_fwd_winches',
+      'no_of_main_deck_aft_winches', 'no_of_drums_of_main_deck_aft_winches',
+      'motive_power_of_main_deck_aft_winches', 'brake_capacity_of_main_deck_aft_winches',
+      'type_of_brake_of_main_deck_aft_winches', 'no_of_poop_deck_winches',
+      'no_of_drums_of_poop_deck_winches', 'motive_power_of_poop_deck_winches',
+      'brake_capacity_of_poop_deck_winches', 'type_of_brake_of_poop_deck_winches',
+      // BITTS (all variations)
+      'no_of_forecastle_bitts', 'swl_bitts_of_forecastle_bitts',
+      'no_of_closed_chocks_of_forecastle_bitts', 'swl_closed_chocks_of_forecastle_bitts',
+      'no_of_main_deck_fwd_bitts', 'swl_bitts_of_main_deck_fwd_bitts',
+      'no_of_closed_chocks_of_main_deck_fwd_bitts', 'swl_closed_chocks_of_main_deck_fwd_bitts',
+      'no_of_main_deck_aft_bitts', 'swl_bitts_of_main_deck_aft_bitts',
+      'no_of_closed_chocks_of_main_deck_aft_bitts', 'swl_closed_chocks_of_main_deck_aft_bitts',
+      'no_of_poop_deck_bitts', 'swl_bitts_of_poop_deck_bitts',
+      'no_of_closed_chocks_of_poop_deck_bitts', 'swl_closed_chocks_of_poop_deck_bitts',
+      // ANCHORING AND TOWING
+      'number_of_shackles_on_port_starboard_cable',
+      'type_of_emergency_towing_system_forward_type', 'type_of_emergency_towing_system_forward_swl',
+      'type_of_emergency_towing_system_aft_type', 'type_of_emergency_towing_system_aft_swl',
+      'type_of_escort_tug_type', 'type_of_escort_tug_swl',
+      'swl_of_bollard_on_poop_deck_suitable_for_escort_tug',
+      // DECK EQUIPMENT
+      'derrick_crane_description', 'accommodation_ladder_direction',
+      'does_vessel_have_a_portable_gangway', 'does_vessel_meet_the_recommendations',
+      'how_many_chain_stoppers', 'state_type_swl_of_chain_stopper_s',
+      'maximum_size_chain_diameter_the_bow_stopper_s_can_handle',
+      'distance_between_the_bow_fairlead_and_chain_stopper_bracket',
+      'is_bow_chock_and_or_fairlead',
+      // SPEED AND FUEL
+      'ballast_speed_maximum', 'ballast_speed_minimum', 'laden_speed_maximum', 'laden_speed_minimum',
+      'what_type_of_fuel_is_used_maximum', 'what_type_of_fuel_is_used_economic', 'type_of_bunker_tanks',
+      'is_vessel_fitted_with_fixed',
+      // ENGINES
+      'no_of_main_engine', 'capacity_of_main_engine', 'make_type_of_main_engine',
+      'no_of_aux_engine', 'capacity_of_aux_engine', 'make_type_of_aux_engine',
+      'no_of_power_packs', 'capacity_of_power_packs', 'make_type_of_power_packs',
+      'no_of_boilers', 'capacity_of_boilers', 'make_type_of_boilers',
+      'what_is_brake_horse_power_of_bow_thruster', 'what_is_brake_horse_power_of_stern_thruster',
+      'main_engine_imo_nox_emission_standard', 'energy_efficiency_design_index_eedi_rating_number',
+      // COMPLIANCE AND INSPECTIONS
+      'does_vessel_comply_with_recommendations_contained_in_ocimf',
+      'what_is_maximum_outreach_of_cranes_derricks_outboard',
+      'date_place_of_last_sts_operation', 'last_three_cargoes_charterers_voyages',
+      'has_vessel_been_involved_in_a_pollution',
+      'date_and_place_of_last_port_state_control_inspection',
+      'any_outstanding_deficiencies_as_reported_by_any_port_state',
+      'recent_oil_company_inspections_screenings', 'date_place_of_last_sire_inspection'
     ]
   };
 

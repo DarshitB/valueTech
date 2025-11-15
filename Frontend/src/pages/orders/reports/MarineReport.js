@@ -31,6 +31,7 @@ function MarineReport() {
   const order = useSelector((state) => state.orders.selected);
   const media = useSelector((state) => state.orders.media);
   const mediaLoading = useSelector((state) => state.orders.mediaLoading);
+  const orderLoading = useSelector((state) => state.orders.loading);
 
   // Select order report data from Redux store
   const {
@@ -39,6 +40,9 @@ function MarineReport() {
     generating,
     saving,
   } = useSelector((state) => state.orderReports);
+
+  // Combined loading state - show loading when fetching order or report data
+  const isLoadingData = orderLoading || reportLoading;
 
   // Get current date in DD-MM-YYYY format
   const getCurrentDate = useCallback(() => {
@@ -172,6 +176,7 @@ function MarineReport() {
   // Form state
   const [reportFormData, setReportFormData] = useState({
     report_type: "report_marine",
+    report_title_type: "VALUATION REPORT",
     ref_no_year: new Date().getFullYear().toString(),
     ref_no_bank: "",
     ref_no_code: "VKM",
@@ -235,6 +240,7 @@ function MarineReport() {
     // Reset form data to initial state when order changes
     setReportFormData({
       report_type: "report_marine",
+      report_title_type: "VALUATION REPORT",
       ref_no_year: new Date().getFullYear().toString(),
       ref_no_bank: "",
       ref_no_code: "VKM",
@@ -364,6 +370,18 @@ function MarineReport() {
         updated[key] = fieldValue;
       });
 
+      // Ensure report_title_type has a default value if missing
+      if (!updated.report_title_type) {
+        updated.report_title_type = "VALUATION REPORT";
+      }
+
+      // Ensure how_many_grades_products_can_vessel_load_discharge_with_double is initialized
+      // This field might not be in the API response or might be null, so ensure it's always initialized
+      if (updated.how_many_grades_products_can_vessel_load_discharge_with_double === undefined || 
+          updated.how_many_grades_products_can_vessel_load_discharge_with_double === null) {
+        updated.how_many_grades_products_can_vessel_load_discharge_with_double = "";
+      }
+
       // Regenerate vessel photo preview if vessel_photo exists
       if (report.vessel_photo && !updated.vessel_photo_preview) {
         const baseUrl =
@@ -476,7 +494,19 @@ function MarineReport() {
         };
 
         // Auto-update corresponding "in words" field
-        const wordsFieldName = `${name}_in_words`;
+        // Handle special field name mappings for insurance policy fields
+        let wordsFieldName;
+        if (name === "insured_value_insurance_policy") {
+          wordsFieldName = "insured_value_in_words_insurance_policy";
+        } else if (name === "insured_value_war_risk_policy") {
+          wordsFieldName = "insured_value_in_words_war_risk_policy";
+        } else if (name === "insured_value_hull_machinery_policy") {
+          wordsFieldName = "insured_value_in_words_hull_machinery_policy";
+        } else {
+          // Default: append _in_words for other fields
+          wordsFieldName = `${name}_in_words`;
+        }
+        
         const amountInWords = getAmountInWords(formattedValue);
         updated[wordsFieldName] = amountInWords;
 
@@ -489,7 +519,7 @@ function MarineReport() {
   // Handle form input changes with optional uppercase conversion for specific fields
   const handleFormChange = useCallback((e) => {
     const { name, value } = e.target;
-    
+
     // Fields that should be converted to uppercase
     const uppercaseFields = [
       "name_of_the_vessel",
@@ -535,6 +565,39 @@ function MarineReport() {
     () => getAmountInWords(reportFormData.insured_value_hull_machinery_policy),
     [getAmountInWords, reportFormData.insured_value_hull_machinery_policy]
   );
+
+  // Sync memoized "in words" values to reportFormData to ensure they're saved
+  // This ensures the values are always in sync, especially when loading from API or when currency values change programmatically
+  useEffect(() => {
+    setReportFormData((prev) => {
+      const updated = { ...prev };
+      let hasChanges = false;
+
+      // Update insured_value_in_words_insurance_policy if it's different
+      const currentInsuranceWords = updated.insured_value_in_words_insurance_policy || "";
+      if (currentInsuranceWords !== insurancePolicyAmountInWords) {
+        updated.insured_value_in_words_insurance_policy = insurancePolicyAmountInWords;
+        hasChanges = true;
+      }
+
+      // Update insured_value_in_words_war_risk_policy if it's different
+      const currentWarRiskWords = updated.insured_value_in_words_war_risk_policy || "";
+      if (currentWarRiskWords !== warRiskPolicyAmountInWords) {
+        updated.insured_value_in_words_war_risk_policy = warRiskPolicyAmountInWords;
+        hasChanges = true;
+      }
+
+      // Update insured_value_in_words_hull_machinery_policy if it's different
+      const currentHullMachineryWords = updated.insured_value_in_words_hull_machinery_policy || "";
+      if (currentHullMachineryWords !== hullMachineryPolicyAmountInWords) {
+        updated.insured_value_in_words_hull_machinery_policy = hullMachineryPolicyAmountInWords;
+        hasChanges = true;
+      }
+
+      // Only update if there are actual changes to avoid unnecessary re-renders
+      return hasChanges ? updated : prev;
+    });
+  }, [insurancePolicyAmountInWords, warRiskPolicyAmountInWords, hullMachineryPolicyAmountInWords]);
 
   // Handle SingleSearchSelect changes
   const handleSelectChange = (name, value) => {
@@ -615,10 +678,11 @@ function MarineReport() {
       const { name, value } = e.target;
       const formattedValue = formatDimension(value);
 
-      // Update form data with formatted value
+      // Update form data with formatted value (always set, even if empty string)
+      // This ensures the field exists in reportFormData and will be included in the payload
       setReportFormData((prev) => ({
         ...prev,
-        [name]: formattedValue,
+        [name]: formattedValue !== undefined && formattedValue !== null ? formattedValue : "",
       }));
     },
     [formatDimension]
@@ -812,7 +876,11 @@ function MarineReport() {
 
     flexibleFields.forEach((field, index) => {
       // Validation: for all sections, check field_1 exists; for two-column generic sections, also field_2
-      if (!field.field_1 || (field.section_name === "DECK_EQUIPMENT_SPECIAL_FEATURES" && !field.field_2)) {
+      if (
+        !field.field_1 ||
+        (field.section_name === "DECK_EQUIPMENT_SPECIAL_FEATURES" &&
+          !field.field_2)
+      ) {
         errors.push(`Flexible field ${index + 1}: Required fields are missing`);
       }
     });
@@ -859,11 +927,7 @@ function MarineReport() {
                 className="form-field"
                 value={field.field_1 || ""}
                 onChange={(e) =>
-                  handleFlexibleFieldChange(
-                    field.id,
-                    "field_1",
-                    e.target.value
-                  )
+                  handleFlexibleFieldChange(field.id, "field_1", e.target.value)
                 }
                 placeholder="Enter Name of Equipment"
                 required
@@ -1081,11 +1145,7 @@ function MarineReport() {
                 className="form-field"
                 value={field.field_1 || ""}
                 onChange={(e) =>
-                  handleFlexibleFieldChange(
-                    field.id,
-                    "field_1",
-                    e.target.value
-                  )
+                  handleFlexibleFieldChange(field.id, "field_1", e.target.value)
                 }
                 placeholder="Enter certificate name"
                 required
@@ -1124,7 +1184,11 @@ function MarineReport() {
                     formattedValue = numericValue;
                   }
 
-                  handleFlexibleFieldChange(field.id, "field_2", formattedValue);
+                  handleFlexibleFieldChange(
+                    field.id,
+                    "field_2",
+                    formattedValue
+                  );
                 }}
                 placeholder="DD-MM-YYYY"
                 required
@@ -1163,7 +1227,11 @@ function MarineReport() {
                     formattedValue = numericValue;
                   }
 
-                  handleFlexibleFieldChange(field.id, "field_3", formattedValue);
+                  handleFlexibleFieldChange(
+                    field.id,
+                    "field_3",
+                    formattedValue
+                  );
                 }}
                 placeholder="DD-MM-YYYY"
                 required
@@ -1202,7 +1270,11 @@ function MarineReport() {
                     formattedValue = numericValue;
                   }
 
-                  handleFlexibleFieldChange(field.id, "field_4", formattedValue);
+                  handleFlexibleFieldChange(
+                    field.id,
+                    "field_4",
+                    formattedValue
+                  );
                 }}
                 placeholder="DD-MM-YYYY"
                 required
@@ -1241,7 +1313,11 @@ function MarineReport() {
                     formattedValue = numericValue;
                   }
 
-                  handleFlexibleFieldChange(field.id, "field_5", formattedValue);
+                  handleFlexibleFieldChange(
+                    field.id,
+                    "field_5",
+                    formattedValue
+                  );
                 }}
                 placeholder="DD-MM-YYYY"
                 required
@@ -1282,11 +1358,7 @@ function MarineReport() {
               className="form-field"
               value={field.field_1}
               onChange={(e) =>
-                handleFlexibleFieldChange(
-                  field.id,
-                  "field_1",
-                  e.target.value
-                )
+                handleFlexibleFieldChange(field.id, "field_1", e.target.value)
               }
               placeholder="Enter Particulars"
               required
@@ -1303,11 +1375,7 @@ function MarineReport() {
               className="form-field"
               value={field.field_2}
               onChange={(e) =>
-                handleFlexibleFieldChange(
-                  field.id,
-                  "field_2",
-                  e.target.value
-                )
+                handleFlexibleFieldChange(field.id, "field_2", e.target.value)
               }
               placeholder="Enter Specifications"
               required
@@ -1393,13 +1461,35 @@ function MarineReport() {
     // Create FormData for multipart/form-data submission
     const formData = new FormData();
 
-    // Add all form fields to FormData
+    // Add ALL form fields to FormData - ensure every field is included to prevent data loss
     Object.keys(reportFormData).forEach((key) => {
       let value = reportFormData[key];
 
-      // Always append the value, even if empty, to ensure all fields are in payload
-      formData.append(key, value || "");
+      // Handle different value types properly:
+      // - null/undefined -> empty string
+      // - numbers (including 0) -> keep as is
+      // - booleans (including false) -> keep as is
+      // - strings -> keep as is (empty string is fine)
+      if (value === null || value === undefined) {
+        formData.append(key, "");
+      } else if (typeof value === "number" || typeof value === "boolean") {
+        formData.append(key, value.toString());
+      } else {
+        formData.append(key, value);
+      }
     });
+
+    // Ensure report_title_type is always included (mandatory field)
+    if (!reportFormData.report_title_type) {
+      formData.set("report_title_type", "VALUATION REPORT");
+    }
+
+    // Ensure how_many_grades_products_can_vessel_load_discharge_with_double is always included
+    // This field might not exist in reportFormData if it was never interacted with
+    // Check if the field exists in reportFormData, and if not, add it to FormData
+    if (!reportFormData.hasOwnProperty("how_many_grades_products_can_vessel_load_discharge_with_double")) {
+      formData.append("how_many_grades_products_can_vessel_load_discharge_with_double", "");
+    }
 
     // Add flexible fields to FormData with proper sequential ordering
     let formDataIndex = 0;
@@ -1500,7 +1590,28 @@ function MarineReport() {
         );
       }
 
-      // (deprecated keys removed) particulars/specifications are standardized to field_1/field_2
+      // Add generic flexible fields (default sections: TANK_STORAGE_CAPACITIES, ADDITIONAL_SAFETY_FIRE_FIGHTING_EQUIPMENT,
+      // COMMUNICATION_NAVIGATIONAL_EQUIPMENT, MAIN_ENGINES, AUXILIARY_MACHINERIES_GENERATORS,
+      // AUXILIARY_MACHINERIES_HARBOUR_GENERATORS, PROPELLER_ASD_VESSEL, MASTER_OR_CAPTAIN_OF_THE_VESSEL, ACCESSORIES, etc.)
+      // These use field_1 and field_2 structure
+      if (
+        field.section_name !== "HEADING_DESCRIPTION_IMAGE" &&
+        field.section_name !== "HEADING_DESCRIPTION_IMAGE_2" &&
+        field.section_name !== "HEADING_DESCRIPTION_IMAGE_3" &&
+        field.section_name !== "EQUIPMENT_MAKE_MODEL" &&
+        field.section_name !== "EQUIPMENT_MAKE_MODEL_2" &&
+        field.section_name !== "CERTIFICATIONS_OF_THE_VESSEL" &&
+        field.section_name !== "DECK_EQUIPMENT_SPECIAL_FEATURES"
+      ) {
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_1]`,
+          field.field_1 || ""
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_2]`,
+          field.field_2 || ""
+        );
+      }
 
       formDataIndex++;
     });
@@ -1534,27 +1645,56 @@ function MarineReport() {
 
   // Handle save report data
   const handleSaveReport = () => {
-    // Create report data object with ALL fields (including empty ones)
-    const reportData = {};
+    // Create FormData for multipart/form-data submission (same as generate API)
+    const formData = new FormData();
 
-    // Add ALL report form data fields to payload (even if empty)
+    // Add ALL form fields to FormData - ensure every field is included to prevent data loss
     Object.keys(reportFormData).forEach((key) => {
       let value = reportFormData[key];
-      // Always include the field, convert null/undefined to empty string
-      reportData[key] = value !== null && value !== undefined ? value : "";
+
+      // Handle different value types properly:
+      // - null/undefined -> empty string
+      // - numbers (including 0) -> keep as is
+      // - booleans (including false) -> keep as is
+      // - strings -> keep as is (empty string is fine)
+      if (value === null || value === undefined) {
+        formData.append(key, "");
+      } else if (typeof value === "number" || typeof value === "boolean") {
+        formData.append(key, value.toString());
+      } else {
+        formData.append(key, value);
+      }
     });
 
-    // Add ALL flexible fields to payload (same format as report generation)
+    // Ensure report_title_type is always included (mandatory field)
+    if (!reportFormData.report_title_type) {
+      formData.set("report_title_type", "VALUATION REPORT");
+    }
+
+    // Ensure how_many_grades_products_can_vessel_load_discharge_with_double is always included
+    // This field might not exist in reportFormData if it was never interacted with
+    // Check if the field exists in reportFormData, and if not, add it to FormData
+    if (!reportFormData.hasOwnProperty("how_many_grades_products_can_vessel_load_discharge_with_double")) {
+      formData.append("how_many_grades_products_can_vessel_load_discharge_with_double", "");
+    }
+
+    // Add flexible fields to FormData with proper sequential ordering (same format as generate API)
     let formDataIndex = 0;
     flexibleFields.forEach((field) => {
-      // Add ALL flexible fields, even if empty
-      reportData[`flexible_fields[${formDataIndex}][section_name]`] =
-        field.section_name;
-      reportData[`flexible_fields[${formDataIndex}][col_span]`] =
-        field.col_span;
+      // Add field (only Add One functionality)
+      formData.append(
+        `flexible_fields[${formDataIndex}][section_name]`,
+        field.section_name
+      );
+      formData.append(
+        `flexible_fields[${formDataIndex}][col_span]`,
+        field.col_span
+      );
       // Do not send field_label/field_value; generic inputs are standardized as field_1..N
-      reportData[`flexible_fields[${formDataIndex}][field_order]`] =
-        field.field_order;
+      formData.append(
+        `flexible_fields[${formDataIndex}][field_order]`,
+        field.field_order
+      );
 
       // Add custom media block fields using generic field_ keys
       if (
@@ -1562,15 +1702,23 @@ function MarineReport() {
         field.section_name === "HEADING_DESCRIPTION_IMAGE_2" ||
         field.section_name === "HEADING_DESCRIPTION_IMAGE_3"
       ) {
-        reportData[`flexible_fields[${formDataIndex}][field_1]`] =
-          field.field_1 || "";
-        reportData[`flexible_fields[${formDataIndex}][field_2]`] =
-          field.field_2 || "";
-        reportData[`flexible_fields[${formDataIndex}][field_3]`] =
-          field.field_3 || "";
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_1]`,
+          field.field_1 || ""
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_2]`,
+          field.field_2 || ""
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_3]`,
+          field.field_3 || ""
+        );
         if (field.field_4) {
-          reportData[`flexible_fields[${formDataIndex}][field_4]`] =
-            field.field_4;
+          formData.append(
+            `flexible_fields[${formDataIndex}][field_4]`,
+            field.field_4
+          );
         }
       }
 
@@ -1579,52 +1727,87 @@ function MarineReport() {
         field.section_name === "EQUIPMENT_MAKE_MODEL" ||
         field.section_name === "EQUIPMENT_MAKE_MODEL_2"
       ) {
-        reportData[`flexible_fields[${formDataIndex}][field_1]`] =
-          field.field_1 || "";
-        reportData[`flexible_fields[${formDataIndex}][field_2]`] =
-          field.field_2 || "";
-        reportData[`flexible_fields[${formDataIndex}][field_3]`] =
-          field.field_3 || "";
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_1]`,
+          field.field_1 || ""
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_2]`,
+          field.field_2 || ""
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_3]`,
+          field.field_3 || ""
+        );
       }
 
-      // Add certifications fields using generic field_ keys
+      // Add certifications fields using generic field_ keys (1..5)
       if (field.section_name === "CERTIFICATIONS_OF_THE_VESSEL") {
-        reportData[`flexible_fields[${formDataIndex}][field_1]`] =
-          field.field_1 || "";
-        reportData[`flexible_fields[${formDataIndex}][field_2]`] =
-          field.field_2 || "";
-        reportData[`flexible_fields[${formDataIndex}][field_3]`] =
-          field.field_3 || "";
-        reportData[`flexible_fields[${formDataIndex}][field_4]`] =
-          field.field_4 || "";
-        reportData[`flexible_fields[${formDataIndex}][field_5]`] =
-          field.field_5 || "";
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_1]`,
+          field.field_1 || ""
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_2]`,
+          field.field_2 || ""
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_3]`,
+          field.field_3 || ""
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_4]`,
+          field.field_4 || ""
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_5]`,
+          field.field_5 || ""
+        );
       }
 
       // Add deck equipment fields using generic field_ keys
       if (field.section_name === "DECK_EQUIPMENT_SPECIAL_FEATURES") {
-        reportData[`flexible_fields[${formDataIndex}][field_1]`] =
-          field.field_1 || "";
-        reportData[`flexible_fields[${formDataIndex}][field_2]`] =
-          field.field_2 || "";
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_1]`,
+          field.field_1 || ""
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_2]`,
+          field.field_2 || ""
+        );
       }
 
-      // Add deck equipment fields (particulars, specifications)
-      if (field.section_name === "DECK_EQUIPMENT_SPECIAL_FEATURES") {
-        reportData[`flexible_fields[${formDataIndex}][particulars]`] =
-          field.particulars || "";
-        reportData[`flexible_fields[${formDataIndex}][specifications]`] =
-          field.specifications || "";
+      // Add generic flexible fields (default sections: TANK_STORAGE_CAPACITIES, ADDITIONAL_SAFETY_FIRE_FIGHTING_EQUIPMENT,
+      // COMMUNICATION_NAVIGATIONAL_EQUIPMENT, MAIN_ENGINES, AUXILIARY_MACHINERIES_GENERATORS,
+      // AUXILIARY_MACHINERIES_HARBOUR_GENERATORS, PROPELLER_ASD_VESSEL, MASTER_OR_CAPTAIN_OF_THE_VESSEL, ACCESSORIES, etc.)
+      // These use field_1 and field_2 structure
+      if (
+        field.section_name !== "HEADING_DESCRIPTION_IMAGE" &&
+        field.section_name !== "HEADING_DESCRIPTION_IMAGE_2" &&
+        field.section_name !== "HEADING_DESCRIPTION_IMAGE_3" &&
+        field.section_name !== "EQUIPMENT_MAKE_MODEL" &&
+        field.section_name !== "EQUIPMENT_MAKE_MODEL_2" &&
+        field.section_name !== "CERTIFICATIONS_OF_THE_VESSEL" &&
+        field.section_name !== "DECK_EQUIPMENT_SPECIAL_FEATURES"
+      ) {
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_1]`,
+          field.field_1 || ""
+        );
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_2]`,
+          field.field_2 || ""
+        );
       }
 
       formDataIndex++;
     });
 
-    // Dispatch save action with JSON data
+    // Dispatch save action with FormData payload (same as generate API)
     dispatch(
       saveOrderReport({
         orderId: id,
-        reportData: reportData,
+        reportData: formData,
       })
     );
   };
@@ -1635,7 +1818,52 @@ function MarineReport() {
         <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12 mb-5">
           <div className="order-report-container">
             <h2>Marine Report</h2>
-            <form className="body-form-box" onSubmit={handleReportSubmit}>
+            <form
+              className="body-form-box"
+              onSubmit={handleReportSubmit}
+              style={{ position: "relative" }}
+            >
+              {/* Loading Overlay - Shows when fetching order or report data */}
+              {isLoadingData && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: "rgba(255, 255, 255, 0.9)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    zIndex: 1000,
+                    borderRadius: "4px",
+                  }}
+                >
+                  <div style={{ textAlign: "center" }}>
+                    <div
+                      className="spinner-border text-primary"
+                      role="status"
+                      style={{ width: "3rem", height: "3rem" }}
+                    >
+                      <span className="visually-hidden">Loading...</span>
+                    </div>
+                    <div
+                      style={{
+                        marginTop: "1rem",
+                        fontSize: "16px",
+                        color: "#333",
+                      }}
+                    >
+                      {orderLoading && reportLoading
+                        ? "Loading Order and Report Data..."
+                        : orderLoading
+                        ? "Loading Order Data..."
+                        : "Loading Marine Report Data..."}
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="row">
                 <div className="col-md-6">
                   <div className="form-group">
@@ -1657,7 +1885,9 @@ function MarineReport() {
                           label: "DESKTOP VALUATION REPORT",
                         },
                       ]}
-                      value={reportFormData.report_title_type || "VALUATION REPORT"}
+                      value={
+                        reportFormData.report_title_type || "VALUATION REPORT"
+                      }
                       onChange={(value) =>
                         handleSelectChange("report_title_type", value)
                       }
@@ -2060,13 +2290,25 @@ function MarineReport() {
                 <div className="col-md-6">
                   <div className="form-group">
                     <label>IMO/Official/Regd. No. </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      name="imo_official_regd_no"
-                      value={reportFormData.imo_official_regd_no}
-                      onChange={handleFormChange}
-                      placeholder="Enter IMO/Official/Regd. No."
+                    <SingleSearchSelect
+                      options={[
+                        {
+                          value: "IMO No",
+                          label: "IMO No",
+                        },
+                        {
+                          value: "Regd. No",
+                          label: "Regd. No",
+                        },
+                        {
+                          value: "Official No",
+                          label: "Official No",
+                        },
+                      ]}
+                      value={reportFormData.imo_official_regd_no || "IMO No"}
+                      onChange={(value) =>
+                        handleSelectChange("imo_official_regd_no", value)
+                      }
                     />
                   </div>
                 </div>
@@ -2202,14 +2444,14 @@ function MarineReport() {
                       value={reportFormData.type_or_description_of_vessel}
                       onChange={handleFormChange}
                       placeholder="Enter Type or Description of Vessel"
-                      required
                     />
                   </div>
                 </div>
                 <div className="col-md-6">
                   <div className="form-group">
                     <label>
-                      MMSI No. <span className="text-danger">*</span>
+                      Official Number / MMSI No.
+                      <span className="text-danger">*</span>
                     </label>
                   </div>
                 </div>
@@ -2221,7 +2463,7 @@ function MarineReport() {
                       name="mmsi_no"
                       value={reportFormData.mmsi_no}
                       onChange={handleFormChange}
-                      placeholder="Enter MMSI No."
+                      placeholder="0000/000000000"
                       required
                     />
                   </div>
@@ -2368,6 +2610,27 @@ function MarineReport() {
                       value={reportFormData.no_of_registry_registration_no}
                       onChange={handleFormChange}
                       placeholder="Enter No Of Registry / Registration No."
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Date Of Registry
+                      <span className="text-danger">*</span>
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="date_of_registry"
+                      value={reportFormData.date_of_registry}
+                      onChange={handleFormChange}
+                      placeholder="Enter Date Of Registry"
                       required
                     />
                   </div>
@@ -2549,6 +2812,31 @@ function MarineReport() {
                       }}
                       placeholder="Enter LOA - Length Overall"
                       required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                    LBP - Length By Perpendicular <small>(in meters)</small>
+                    </label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="lbp_length_by_perpendicular"
+                      value={reportFormData.lbp_length_by_perpendicular}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Only allow numbers
+                        const sanitized = value.replace(/[^0-9]/g, "");
+                        e.target.value = sanitized;
+                        handleFormChange(e);
+                      }}
+                      placeholder="Enter LBP - Length By Perpendicular"
                     />
                   </div>
                 </div>
@@ -4577,7 +4865,7 @@ function MarineReport() {
                             reportFormData.forward_to_mid_point_manifold_lightship_dimensions
                           }
                           onChange={handleDimensionChange}
-                          placeholder="Lightship" 
+                          placeholder="Lightship"
                         />
                       </div>
                     </div>
@@ -5159,9 +5447,7 @@ function MarineReport() {
                           label: "No",
                         },
                       ]}
-                      value={
-                        reportFormData.does_vessel_have_multiple_sdwt || "Yes"
-                      }
+                      value={reportFormData.does_vessel_have_multiple_sdwt || ""}
                       onChange={(value) =>
                         handleSelectChange(
                           "does_vessel_have_multiple_sdwt",
@@ -5370,9 +5656,7 @@ function MarineReport() {
                           label: "No",
                         },
                       ]}
-                      value={
-                        reportFormData.itopf_member || "Yes / ITOPF Member"
-                      }
+                      value={reportFormData.itopf_member || ""}
                       onChange={(value) =>
                         handleSelectChange("itopf_member", value)
                       }
@@ -5400,9 +5684,7 @@ function MarineReport() {
                           label: "No",
                         },
                       ]}
-                      value={
-                        reportFormData.ocimf_member || "Yes / OCIMF Member"
-                      }
+                      value={reportFormData.ocimf_member || ""}
                       onChange={(value) =>
                         handleSelectChange("ocimf_member", value)
                       }
@@ -5504,8 +5786,7 @@ function MarineReport() {
                         },
                       ]}
                       value={
-                        reportFormData.do_officers_speak_and_understand_english ||
-                        "Yes"
+                        reportFormData.do_officers_speak_and_understand_english || ""
                       }
                       onChange={(value) =>
                         handleSelectChange(
@@ -5569,8 +5850,7 @@ function MarineReport() {
                         },
                       ]}
                       value={
-                        reportFormData.is_the_vessel_operated_under_a_quality_management_system ||
-                        "Yes"
+                        reportFormData.is_the_vessel_operated_under_a_quality_management_system || ""
                       }
                       onChange={(value) =>
                         handleSelectChange(
@@ -5602,8 +5882,7 @@ function MarineReport() {
                         },
                       ]}
                       value={
-                        reportFormData.can_the_ship_comply_with_the_ics_helicopter_guidelines ||
-                        "Yes"
+                        reportFormData.can_the_ship_comply_with_the_ics_helicopter_guidelines || ""
                       }
                       onChange={(value) =>
                         handleSelectChange(
@@ -5648,7 +5927,7 @@ function MarineReport() {
                             label: "No",
                           },
                         ]}
-                        value={reportFormData.coated_cargo_tanks || "Yes"}
+                        value={reportFormData.coated_cargo_tanks || ""}
                         onChange={(value) =>
                           handleSelectChange("coated_cargo_tanks", value)
                         }
@@ -5701,7 +5980,7 @@ function MarineReport() {
                             label: "No",
                           },
                         ]}
-                        value={reportFormData.anode_cargo_tanks || "Yes"}
+                        value={reportFormData.anode_cargo_tanks || ""}
                         onChange={(value) =>
                           handleSelectChange("anode_cargo_tanks", value)
                         }
@@ -5727,7 +6006,7 @@ function MarineReport() {
                             label: "No",
                           },
                         ]}
-                        value={reportFormData.coated_ballast_tanks || "Yes"}
+                        value={reportFormData.coated_ballast_tanks || ""}
                         onChange={(value) =>
                           handleSelectChange("coated_ballast_tanks", value)
                         }
@@ -5752,7 +6031,7 @@ function MarineReport() {
                         type="text"
                         className="form-field"
                         name="to_what_extent_ballast_tanks"
-                        value={reportFormData.to_what_extent_cargo_tanks}
+                        value={reportFormData.to_what_extent_ballast_tanks}
                         onChange={handleFormChange}
                         placeholder="Enter To What Extent Ballast Tanks"
                       />
@@ -5771,7 +6050,7 @@ function MarineReport() {
                             label: "No",
                           },
                         ]}
-                        value={reportFormData.anode_ballast_tanks || "Yes"}
+                        value={reportFormData.anode_ballast_tanks || ""}
                         onChange={(value) =>
                           handleSelectChange("anode_ballast_tanks", value)
                         }
@@ -5797,7 +6076,7 @@ function MarineReport() {
                             label: "No",
                           },
                         ]}
-                        value={reportFormData.coated_slop_tanks || "Yes"}
+                        value={reportFormData.coated_slop_tanks || ""}
                         onChange={(value) =>
                           handleSelectChange("coated_slop_tanks", value)
                         }
@@ -5841,7 +6120,7 @@ function MarineReport() {
                             label: "No",
                           },
                         ]}
-                        value={reportFormData.anode_slop_tanks || "Yes"}
+                        value={reportFormData.anode_slop_tanks || ""}
                         onChange={(value) =>
                           handleSelectChange("anode_slop_tanks", value)
                         }
@@ -6237,8 +6516,7 @@ function MarineReport() {
                           },
                         ]}
                         value={
-                          reportFormData.does_vessel_meet_the_requirements_of_marpol_annex_i_reg_18_2 ||
-                          "Yes"
+                          reportFormData.does_vessel_meet_the_requirements_of_marpol_annex_i_reg_18_2 || ""
                         }
                         onChange={(value) =>
                           handleSelectChange(
@@ -6267,9 +6545,9 @@ function MarineReport() {
                       <input
                         type="text"
                         className="form-field"
-                        name="how_many_grades_products_can_vessel_load_discharge_with_double_valve_segregation"
+                        name="how_many_grades_products_can_vessel_load_discharge_with_double"
                         value={
-                          reportFormData.how_many_grades_products_can_vessel_load_discharge_with_double_valve_segregation
+                          reportFormData.how_many_grades_products_can_vessel_load_discharge_with_double || ""
                         }
                         onChange={handleDimensionChange}
                         placeholder="Enter How Many Grades/Products Can Vessel Load/Discharge With Double Valve Segregation"
@@ -6361,9 +6639,9 @@ function MarineReport() {
                           <input
                             type="text"
                             className="form-field"
-                            name="loaded_simultaneously_through_all_manifolds_without_vecs_capacity"
+                            name="loaded_simultaneously_through_all_manifolds_without_vecs"
                             value={
-                              reportFormData.loaded_simultaneously_through_all_manifolds_without_vecs_capacity
+                              reportFormData.loaded_simultaneously_through_all_manifolds_without_vecs
                             }
                             onChange={handleDimensionChange}
                             placeholder="Enter Loaded Simultaneously Through All Manifolds Without VECS Capacity (in Cu. Metres/Hour)"
@@ -6398,8 +6676,7 @@ function MarineReport() {
                           },
                         ]}
                         value={
-                          reportFormData.is_ship_fitted_with_a_cargo_control_room_ccr ||
-                          "Yes"
+                          reportFormData.is_ship_fitted_with_a_cargo_control_room_ccr || ""
                         }
                         onChange={(value) =>
                           handleSelectChange(
@@ -6431,8 +6708,7 @@ function MarineReport() {
                           },
                         ]}
                         value={
-                          reportFormData.can_tank_innage_ullage_be_read_from_the_ccr ||
-                          "Yes"
+                          reportFormData.can_tank_innage_ullage_be_read_from_the_ccr || ""
                         }
                         onChange={(value) =>
                           handleSelectChange(
@@ -6470,8 +6746,7 @@ function MarineReport() {
                           },
                         ]}
                         value={
-                          reportFormData.is_gauging_system_certified_and_calibrated ||
-                          "Yes"
+                          reportFormData.is_gauging_system_certified_and_calibrated || ""
                         }
                         onChange={(value) =>
                           handleSelectChange(
@@ -6572,8 +6847,7 @@ function MarineReport() {
                           },
                         ]}
                         value={
-                          reportFormData.is_a_vapour_emission_control_system_vecs_fitted ||
-                          "Yes"
+                          reportFormData.is_a_vapour_emission_control_system_vecs_fitted || ""
                         }
                         onChange={(value) =>
                           handleSelectChange(
@@ -6761,7 +7035,7 @@ function MarineReport() {
                             label: "No",
                           },
                         ]}
-                        value={reportFormData.does_vessel_comply || "Yes"}
+                        value={reportFormData.does_vessel_comply || ""}
                         onChange={(value) =>
                           handleSelectChange("does_vessel_comply", value)
                         }
@@ -6917,9 +7191,9 @@ function MarineReport() {
                           <input
                             type="text"
                             className="form-field"
-                            name="manifold_height_above_the_waterline_in_normal_ballast_at_sdwt_condition"
+                            name="manifold_height_above_the_waterline_in_normal_ballast_at_sdwt"
                             value={
-                              reportFormData.manifold_height_above_the_waterline_in_normal_ballast_at_sdwt_condition
+                              reportFormData.manifold_height_above_the_waterline_in_normal_ballast_at_sdwt
                             }
                             onChange={handleDimensionChange}
                             placeholder="Enter Manifold Height Above The Waterline In Normal Ballast At SDWT Condition (in Metres)"
@@ -7028,7 +7302,7 @@ function MarineReport() {
                           label: "No",
                         },
                       ]}
-                      value={reportFormData.coiled_cargo_tanks_heating || "Yes"}
+                      value={reportFormData.coiled_cargo_tanks_heating || ""}
                       onChange={(value) =>
                         handleSelectChange("coiled_cargo_tanks_heating", value)
                       }
@@ -7087,7 +7361,7 @@ function MarineReport() {
                           label: "No",
                         },
                       ]}
-                      value={reportFormData.coiled_slop_tanks_heating || "Yes"}
+                      value={reportFormData.coiled_slop_tanks_heating || ""}
                       onChange={(value) =>
                         handleSelectChange("coiled_slop_tanks_heating", value)
                       }
@@ -7192,9 +7466,9 @@ function MarineReport() {
                     <input
                       type="text"
                       className="form-field"
-                      name="is_igs_supplied_by_flue_gas_inert_gas_ig_generator_and_or_nitrogen"
+                      name="is_igs_supplied_by_flue_gas_inert_gas_ig_generator"
                       value={
-                        reportFormData.is_igs_supplied_by_flue_gas_inert_gas_ig_generator_and_or_nitrogen
+                        reportFormData.is_igs_supplied_by_flue_gas_inert_gas_ig_generator
                       }
                       onChange={handleFormChange}
                       placeholder="Enter Is IGS Supplied By Flue Gas, Inert Gas (IG) Generator And/Or Nitrogen"
@@ -8714,10 +8988,8 @@ function MarineReport() {
                     <input
                       type="text"
                       className="form-field"
-                      name="no_of_drums_of_main_deck_fwd_winches"
-                      value={
-                        reportFormData.no_of_drums_of_main_deck_fwd_winches
-                      }
+                      name="no_of_main_deck_fwd_winches"
+                      value={reportFormData.no_of_main_deck_fwd_winches}
                       onChange={handleDimensionChange}
                       placeholder="Enter No of Drums"
                     />
@@ -8729,7 +9001,9 @@ function MarineReport() {
                       type="text"
                       className="form-field"
                       name="no_of_drums_of_main_deck_fwd_winches"
-                      value={reportFormData.no_of_drums_of_main_deck_fwd_winches}
+                      value={
+                        reportFormData.no_of_drums_of_main_deck_fwd_winches
+                      }
                       onChange={handleFormChange}
                       placeholder="Enter No of Drums"
                     />
@@ -9423,8 +9697,7 @@ function MarineReport() {
                         },
                       ]}
                       value={
-                        reportFormData.does_vessel_meet_the_recommendations ||
-                        "Yes"
+                        reportFormData.does_vessel_meet_the_recommendations || ""
                       }
                       onChange={(value) =>
                         handleSelectChange(
@@ -9543,8 +9816,7 @@ function MarineReport() {
                         },
                       ]}
                       value={
-                        reportFormData.is_bow_chock_and_or_fairlead ||
-                        "Yes"
+                        reportFormData.is_bow_chock_and_or_fairlead || ""
                       }
                       onChange={(value) =>
                         handleSelectChange(
@@ -9943,8 +10215,7 @@ function MarineReport() {
                         },
                       ]}
                       value={
-                        reportFormData.what_is_brake_horse_power_of_bow_thruster ||
-                        "Yes"
+                        reportFormData.what_is_brake_horse_power_of_bow_thruster || ""
                       }
                       onChange={(value) =>
                         handleSelectChange(
@@ -9977,8 +10248,7 @@ function MarineReport() {
                         },
                       ]}
                       value={
-                        reportFormData.what_is_brake_horse_power_of_stern_thruster ||
-                        "Yes"
+                        reportFormData.what_is_brake_horse_power_of_stern_thruster || ""
                       }
                       onChange={(value) =>
                         handleSelectChange(
@@ -10064,16 +10334,14 @@ function MarineReport() {
                         },
                       ]}
                       value={
-                        reportFormData.does_vessel_comply_with_recommendations_contained_in_ocimf_ics_ship_to_ship ||
-                        "Yes"
+                        reportFormData.does_vessel_comply_with_recommendations_contained_in_ocimf || ""
                       }
                       onChange={(value) =>
                         handleSelectChange(
-                          "does_vessel_comply_with_recommendations_contained_in_ocimf_ics_ship_to_ship",
+                          "does_vessel_comply_with_recommendations_contained_in_ocimf",
                           value
                         )
                       }
-                      placeholder="Enter Does Vessel Comply with Recommendations Contained in OCIMF/ICS Ship To Ship"
                     />
                   </div>
                 </div>
@@ -10094,9 +10362,9 @@ function MarineReport() {
                     <input
                       type="text"
                       className="form-field"
-                      name="what_is_maximum_outreach_of_cranes_derricks_outboard_of_the_ship_s_side"
+                      name="what_is_maximum_outreach_of_cranes_derricks_outboard"
                       value={
-                        reportFormData.what_is_maximum_outreach_of_cranes_derricks_outboard_of_the_ship_s_side
+                        reportFormData.what_is_maximum_outreach_of_cranes_derricks_outboard
                       }
                       onChange={handleDimensionChange}
                     />
@@ -10202,9 +10470,9 @@ function MarineReport() {
                     <input
                       type="text"
                       className="form-field"
-                      name="any_outstanding_deficiencies_as_reported_by_any_port_state_control"
+                      name="any_outstanding_deficiencies_as_reported_by_any_port_state"
                       value={
-                        reportFormData.any_outstanding_deficiencies_as_reported_by_any_port_state_control
+                        reportFormData.any_outstanding_deficiencies_as_reported_by_any_port_state
                       }
                       onChange={handleFormChange}
                     />
@@ -10373,7 +10641,7 @@ function MarineReport() {
                 <div className="col-md-12">
                   <div className="form-buttons">
                     <button
-                      type="button"
+                      type="submit"
                       className="submit-button"
                       disabled={generating}
                     >
@@ -10536,4 +10804,3 @@ function MarineReport() {
 }
 
 export default MarineReport;
-
