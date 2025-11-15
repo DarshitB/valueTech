@@ -14,6 +14,7 @@ step_to_depoye_to_vps.md
 step_to_depoye_to_vps_production.md
 LOCAL_UPLOAD_SETUP.md
 PUPPETEER_SETUP.md
+marine_report_template.html
 
 # Optional: ignore coverage reports
 coverage/
