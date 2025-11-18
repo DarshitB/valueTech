@@ -1372,13 +1372,22 @@ function CVReport() {
       return;
     }
 
-    /* console.log("🚀 CVReport External API - Calling API with registration:", registrationNumber); */
+    // Clean and format registration number: remove spaces, dashes, and convert to uppercase
+    // Example: "GJ-03-BZ-0618" or "gj 03 bz 0618" → "GJ03BZ0618"
+    const cleanedRegistrationNumber = registrationNumber
+      .replace(/[\s\-]/g, '') // Remove spaces and dashes
+      .toUpperCase(); // Convert to uppercase
+
+    console.log("🚀 CVReport External API - Calling API with registration:", {
+      original: registrationNumber,
+      cleaned: cleanedRegistrationNumber,
+    });
     
     try {
       const response = await axios.post(
         "https://api.attestr.com/api/v2/public/checkx/rc",
         {
-          reg: registrationNumber.trim(),
+          reg: cleanedRegistrationNumber,
         },
         {
           headers: {
@@ -1517,7 +1526,7 @@ function CVReport() {
 
   // Call external RC API only when report is blank (no existing report data)
   useEffect(() => {
-   /*  console.log("🔍 CVReport External API - Checking conditions...", {
+    console.log("🔍 CVReport External API - Checking conditions...", {
       reportLoading,
       reportLoadingStarted: reportLoadingStartedRef.current,
       reportFetchCompleted: reportFetchCompleted,
@@ -1525,7 +1534,7 @@ function CVReport() {
       hasReportData: !!currentReport?.report,
       apiAlreadyCalled: externalApiCalledRef.current,
       hasRegistrationNumber: !!order?.registration_number,
-    }); */
+    });
 
     // Check if report loading is complete, report is blank, and we haven't called the API yet
     // IMPORTANT: Wait for initial report fetch to complete before calling external API
