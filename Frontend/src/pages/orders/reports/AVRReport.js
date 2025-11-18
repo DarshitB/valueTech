@@ -1634,7 +1634,7 @@ function AVRReport() {
                 </div>
               </div>
 
-              {/* Generate and Save Report Buttons */}
+              {/* Generate Report Button */}
               <div className="row">
                 <div className="col-md-12">
                   <div className="form-buttons">
@@ -1647,15 +1647,6 @@ function AVRReport() {
                         ? "Generating AVR Report..."
                         : "Generate AVR Report"}
                     </button>
-                    <button
-                      type="button"
-                      className="btn save-report"
-                      onClick={handleSaveReport}
-                      disabled={saving}
-                      style={{ marginRight: "10px" }}
-                    >
-                      {saving ? "Saving..." : "Save"}
-                    </button>
                   </div>
                 </div>
               </div>
@@ -1663,6 +1654,25 @@ function AVRReport() {
           </div>
         </div>
       </div>
+
+      {/* Fixed Save Button - Bottom Right Corner */}
+      <button
+        type="button"
+        className="btn save-report"
+        onClick={handleSaveReport}
+        disabled={saving}
+        style={{
+          position: "fixed",
+          bottom: "20px",
+          right: "20px",
+          zIndex: 1000,
+          padding: "12px 24px",
+          borderRadius: "4px",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+        }}
+      >
+        {saving ? "Saving..." : "Save"}
+      </button>
     </section>
   );
 }

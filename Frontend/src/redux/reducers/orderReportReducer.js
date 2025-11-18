@@ -158,6 +158,8 @@ const orderReportSlice = createSlice({
       .addCase(saveOrderReport.fulfilled, (state, action) => {
         state.saving = false;
         state.savedReport = action.payload.data;
+        // Also update currentReport so the component knows data exists
+        state.currentReport = action.payload.data;
         toast.success(action.payload.message || "Report saved successfully");
       })
       .addCase(saveOrderReport.rejected, (state, action) => {

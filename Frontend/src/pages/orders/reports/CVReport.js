@@ -4,6 +4,7 @@ import React, {
   useState,
   useCallback,
   useMemo,
+  useRef,
 } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -20,6 +21,7 @@ import SingleSearchSelect from "../../../components/SingleSearchSelect";
 import { toast } from "react-toastify";
 import "../order.scss";
 import { DeleteIcon } from "../../../components/icons";
+import axios from "axios";
 
 function CVReport() {
   // Extract order ID from route parameters
@@ -37,22 +39,43 @@ function CVReport() {
     saving,
   } = useSelector((state) => state.orderReports);
 
+  /* console.log("currentReport", currentReport); */
   // Get asset makes data from Redux store
   const { list: assetMakes, loading: assetMakesLoading } = useSelector((state) => state.assetMakes);
   const [showOtherAssetMake, setShowOtherAssetMake] = useState(false);
   const [otherAssetMake, setOtherAssetMake] = useState("");
   // Set page title using custom hook
   const { setTitle } = usePageTitle();
+  
+  // State to track if initial report fetch has completed (using state instead of ref to trigger re-renders)
+  const [reportFetchCompleted, setReportFetchCompleted] = useState(false);
+  
+  // Ref to track if external RC API has been called (to ensure it's only called once)
+  const externalApiCalledRef = useRef(false);
+  // Ref to track if we should auto-save after external API prefills data
+  const shouldAutoSaveAfterApiRef = useRef(false);
+  // Ref to track if we've seen the report loading state (to ensure we wait for the fetch to actually happen)
+  const reportLoadingStartedRef = useRef(false);
+  
   // Clear report data when component mounts or order changes
   useEffect(() => {
     // Clear any existing report data first
     dispatch(clearCurrentReport());
+    // Reset external API call ref when order changes
+    externalApiCalledRef.current = false;
+    // Reset auto-save flag when order changes
+    shouldAutoSaveAfterApiRef.current = false;
+    // Reset report fetch tracking flags when order changes
+    reportLoadingStartedRef.current = false;
+    setReportFetchCompleted(false); // Reset state
   }, [dispatch, id]);
 
   // Fetch order details when component mounts or ID changes
   useEffect(() => {
     if (id) {
       dispatch(fetchOrderById(id));
+      // Mark that we're starting to fetch the report
+      /* console.log("📋 CVReport - Dispatching fetchOrderReport"); */
       dispatch(
         fetchOrderReport({ orderId: id, reportType: "report_cv", silent: true })
       );
@@ -497,9 +520,51 @@ function CVReport() {
         // ALWAYS use valuer_name from order (never from report or previous state)
         valuer_name: order?.valuer_name || "",
         license_no: order?.valuer_name ? getLicenseNumber(order.valuer_name) : "",
+        // Prefill registration number from order if available
+        registration_no: order?.registration_number || "",
       }));
     }
   }, [order, getLicenseNumber, getRefNoCode]);
+
+  // Track when the initial report fetch completes
+  // We need to ensure: (1) fetch has started (reportLoading = true), (2) fetch has completed (reportLoading = false)
+  useEffect(() => {
+    // Step 1: Mark that loading has started when reportLoading becomes true
+    if (reportLoading && !reportLoadingStartedRef.current) {
+      reportLoadingStartedRef.current = true;
+      /* console.log("📋 CVReport - Report fetch started (loading = true)"); */
+    }
+    
+    // Step 2: Mark as completed only after loading has started AND then becomes false
+    // This prevents treating the initial false state as "fetch completed"
+    if (!reportLoading && reportLoadingStartedRef.current && !reportFetchCompleted) {
+      // Add a small delay to ensure Redux state has fully updated
+      const timer = setTimeout(() => {
+        setReportFetchCompleted(true); // Use setState to trigger re-renders
+        /* console.log("📋 CVReport - Initial report fetch completed (normal flow)", {
+          hasReport: !!currentReport,
+          hasReportData: !!currentReport?.report,
+          timestamp: new Date().toISOString(),
+        }); */
+      }, 300); // Small delay to ensure state propagation
+      
+      return () => clearTimeout(timer);
+    }
+    
+    // Fallback: If loading state hasn't been detected after 1.5 seconds, assume fetch completed
+    // This handles cases where Redux state changes too quickly to detect
+    if (!reportLoadingStartedRef.current && !reportFetchCompleted) {
+      const fallbackTimer = setTimeout(() => {
+        if (!reportFetchCompleted) {
+          /* console.log("📋 CVReport - Report fetch completed (fallback - loading state not detected)"); */
+          reportLoadingStartedRef.current = true; // Mark as started
+          setReportFetchCompleted(true); // Use setState to trigger re-renders
+        }
+      }, 1500); // Wait 1.5 seconds before using fallback
+      
+      return () => clearTimeout(fallbackTimer);
+    }
+  }, [reportLoading, currentReport, reportFetchCompleted]);
 
   // Populate form data from fetched report (if available)
   useEffect(() => {
@@ -927,7 +992,7 @@ function CVReport() {
           const doc = preOpenedTab.document;
           doc.open();
           doc.write(
-            `<!doctype html><html><head><meta charset="utf-8"><title>Preparing report…</title><style>html,body{height:100%;margin:0}body{display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}.box{text-align:center}.spinner{width:44px;height:44px;border: 4px solid rgba(88, 100, 189, 0.2);border-top-color: #5864bd;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px}@keyframes spin{to{transform:rotate(360deg)}}small{opacity:.75}</style></head><body><div class="box"><div class="spinner"></div><div>Preparing your Report...</div><small>This tab will update automatically. So don't close the tab.</small></div></body></html>`
+            `<!doctype html><html><head><meta charset="utf-8"><title>Preparing report…</title><style>html,body{height:100%;margin:0}body{display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}.box{text-align:center}.spinner{width:44px;height:44px;border: 4px solid rgba(88, 100, 189, 0.2);border-top-color: #5864bd;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px}@keyframes spin{to{transform:rotate(360deg)}}small{opacity:.75}</style></head><body><div className="box"><div className="spinner"></div><div>Preparing your Report...</div><small>This tab will update automatically. So don't close the tab.</small></div></body></html>`
           );
           doc.close();
         } catch (err) {
@@ -1012,7 +1077,7 @@ function CVReport() {
           const total = front + middle + rear;
           const word = numberToWords(total);
           value = `${total} (${word})`;
-          console.log('🔍 CVReport Generate - no_of_tyres computed:', value);
+          /* console.log('🔍 CVReport Generate - no_of_tyres computed:', value); */
         }
 
         if (value !== null && value !== "") {
@@ -1204,7 +1269,7 @@ function CVReport() {
           const total = front + middle + rear;
           const word = numberToWords(total);
           defaultValue = `${total} (${word})`;
-          console.log('🔍 CVReport Save - no_of_tyres - Computed value:', defaultValue);
+          /* console.log('🔍 CVReport Save - no_of_tyres - Computed value:', defaultValue); */
         }
         reportData[key] = defaultValue;
       } else {
@@ -1257,13 +1322,13 @@ function CVReport() {
       return;
     }
 
-    console.log('📤 CVReport - Sending to backend - reportData:', reportData);
+ /*    console.log('📤 CVReport - Sending to backend - reportData:', reportData);
     console.log('📤 CVReport - amount_in_words in payload:', reportData.amount_in_words);
 
     // Debug log for payload
     console.log('🔍 CVReport Save - Final reportData:', reportData);
     console.log('🔍 CVReport Save - amount_in_words in payload:', reportData.amount_in_words);
-    console.log('🔍 CVReport Save - fair_market_value:', reportFormData.fair_market_value);
+    console.log('🔍 CVReport Save - fair_market_value:', reportFormData.fair_market_value); */
 
     // Convert reportData object to FormData for multipart submission
     const formData = new FormData();
@@ -1293,6 +1358,222 @@ function CVReport() {
     convertNumberToWordsIndian,
     numberToWords,
   ]);
+
+  // Function to call external RC API and prefill form data
+  const fetchRCDetailsFromExternalAPI = useCallback(async (registrationNumber) => {
+    if (!registrationNumber || registrationNumber.trim() === "") {
+      /* console.log("🚫 CVReport External API - Skipping: Registration number is empty"); */
+      return;
+    }
+
+    const apiToken = process.env.REACT_APP_ATTESTR_API_TOKEN;
+    if (!apiToken) {
+      console.warn("⚠️ CVReport External API - REACT_APP_ATTESTR_API_TOKEN not found in environment variables");
+      return;
+    }
+
+    /* console.log("🚀 CVReport External API - Calling API with registration:", registrationNumber); */
+    
+    try {
+      const response = await axios.post(
+        "https://api.attestr.com/api/v2/public/checkx/rc",
+        {
+          reg: registrationNumber.trim(),
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Basic ${apiToken}`,
+          },
+        }
+      );
+
+      /* console.log("✅ CVReport External API - Response received:", response.data); */
+
+      if (response.data && response.data.valid) {
+        const rcData = response.data;
+
+        // Helper function to convert owner number to format (e.g., "1" -> "1ST OWNER")
+        const formatOwnerNumber = (ownerNum) => {
+          const num = parseInt(ownerNum);
+          if (isNaN(num) || num < 1) return "";
+          
+          // Handle special cases: 11th, 12th, 13th use "TH"
+          const lastDigit = num % 10;
+          const lastTwoDigits = num % 100;
+          
+          let suffix = "TH";
+          if (lastTwoDigits >= 11 && lastTwoDigits <= 13) {
+            suffix = "TH";
+          } else if (lastDigit === 1) {
+            suffix = "ST";
+          } else if (lastDigit === 2) {
+            suffix = "ND";
+          } else if (lastDigit === 3) {
+            suffix = "RD";
+          }
+          
+          return `${num}${suffix} OWNER`;
+        };
+
+        // Helper function to convert cylinders to format (e.g., "6" -> "6 (SIX)")
+        const formatCylinders = (cylinders) => {
+          const num = parseInt(cylinders);
+          if (isNaN(num) || num < 1) return "";
+          const words = ["", "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN"];
+          const word = num <= 10 ? words[num] : "";
+          return word ? `${num} (${word})` : cylinders;
+        };
+
+        // Map API response to form fields
+        setReportFormData((prev) => {
+          const updated = { ...prev };
+
+          // Basic vehicle information
+          // Note: registration_no is from user input (not in API response), so we keep the existing value
+          if (rcData.registered) updated.registration_date = rcData.registered;
+          if (rcData.rto) updated.registered_location = rcData.rto;
+
+          // Owner information
+          if (rcData.owner) updated.registered_owner_name = rcData.owner;
+          if (rcData.currentAddress) updated.registered_owner_address = rcData.currentAddress;
+          if (rcData.permanentAddress) updated.proposed_owner_address = rcData.permanentAddress;
+
+          // Vehicle details
+          if (rcData.chassisNumber) updated.chassis_no = rcData.chassisNumber;
+          if (rcData.engineNumber) updated.engine_no_detail = rcData.engineNumber;
+          // if (rcData.makerDescription) updated.asset_make = rcData.makerDescription;
+          if (rcData.makerModel) updated.model = rcData.makerModel;
+          if (rcData.bodyType) updated.body_type = rcData.bodyType;
+          if (rcData.fuelType) updated.fuel_type = rcData.fuelType;
+
+          // Manufacturing details
+          if (rcData.manufactured) {
+            // Convert "11/2024" to "2024" or keep as is
+            const manufacturedDate = rcData.manufactured.split("/");
+            if (manufacturedDate.length > 1) {
+              updated.manufacture_year = manufacturedDate[1];
+            } else {
+              updated.manufacture_year = rcData.manufactured;
+            }
+          }
+
+          // Technical specifications
+          if (rcData.cylinders) {
+            updated.no_of_cylinder = formatCylinders(rcData.cylinders);
+          }
+          if (rcData.cubicCapacity) updated.cubic_capacity = rcData.cubicCapacity;
+          if (rcData.seatingCapacity) updated.seating_capacity = rcData.seatingCapacity;
+          if (rcData.colorType) updated.vehicle_colour = rcData.colorType;
+
+          // Owner serial number mapping (ownerNumber -> owner_serial_no)
+          if (rcData.ownerNumber) {
+            updated.owner_serial_no = formatOwnerNumber(rcData.ownerNumber);
+          }
+
+          // Gross vehicle weight mapping (grossWeight -> gross_vehicle_weight)
+          if (rcData.grossWeight) {
+            updated.gross_vehicle_weight = rcData.grossWeight.toString();
+          }
+
+          // RC, Permit, Tax, Fitness & Insurance details
+          if (rcData.fitnessUpto) updated.fitness_upto = rcData.fitnessUpto;
+          if (rcData.taxUpto) updated.tax_upto = rcData.taxUpto;
+          if (rcData.permitUpto) updated.permit_upto = rcData.permitUpto;
+          if (rcData.permitType) updated.permit_type = rcData.permitType;
+          if (rcData.insuranceUpto) {
+            // You may want to map this to an insurance field if available
+            // updated.insurance_upto = rcData.insuranceUpto;
+          }
+          if (rcData.insuranceProvider) {
+            // You may want to map this to an insurance provider field if available
+            // updated.insurance_provider = rcData.insuranceProvider;
+          }
+
+          /* console.log("📝 CVReport External API - Updated form data:", updated); */
+          return updated;
+        });
+
+       /*  console.log("📝 CVReport External API - Form data prefilled successfully"); */
+        
+        // Set flag to trigger auto-save after state is updated
+        // We'll use a useEffect to watch for the state change and trigger save
+        shouldAutoSaveAfterApiRef.current = true;
+        /* console.log("💾 CVReport External API - Auto-save flag set, will trigger save after state update"); */
+      } else {
+        console.warn("⚠️ CVReport External API - Response indicates invalid RC:", response.data);
+        toast.warning("RC details could not be fetched or RC is invalid");
+      }
+    } catch (error) {
+      console.error("❌ CVReport External API - Error calling API:", error);
+      if (error.response) {
+        console.error("❌ CVReport External API - Error response:", error.response.data);
+        toast.error("Failed to fetch RC details. Please check the registration number.");
+      } else {
+        toast.error("Failed to fetch RC details. Please try again later.");
+      }
+    }
+  }, []);
+
+  // Call external RC API only when report is blank (no existing report data)
+  useEffect(() => {
+   /*  console.log("🔍 CVReport External API - Checking conditions...", {
+      reportLoading,
+      reportLoadingStarted: reportLoadingStartedRef.current,
+      reportFetchCompleted: reportFetchCompleted,
+      hasCurrentReport: !!currentReport,
+      hasReportData: !!currentReport?.report,
+      apiAlreadyCalled: externalApiCalledRef.current,
+      hasRegistrationNumber: !!order?.registration_number,
+    }); */
+
+    // Check if report loading is complete, report is blank, and we haven't called the API yet
+    // IMPORTANT: Wait for initial report fetch to complete before calling external API
+    if (
+      reportFetchCompleted && // Initial report fetch has completed (critical to prevent calling API before checking for existing data)
+      !currentReport?.report && // No existing report (blank report)
+      !externalApiCalledRef.current && // API hasn't been called yet
+      order?.registration_number && // Registration number exists
+      order.registration_number.trim() !== "" // Registration number is not empty
+    ) {
+      /* console.log("🔍 CVReport External API - Conditions met. Report is blank, calling external API..."); */
+      externalApiCalledRef.current = true; // Mark as called to prevent multiple calls
+      fetchRCDetailsFromExternalAPI(order.registration_number);
+    } else {
+      if (!reportFetchCompleted) {
+        console.log("🚫 CVReport External API - Skipping: Waiting for initial report fetch to complete");
+      } else if (currentReport?.report) {
+        console.log("🚫 CVReport External API - Skipping: Report already exists", currentReport);
+      } else if (externalApiCalledRef.current) {
+        console.log("🚫 CVReport External API - Skipping: API already called");
+      } else if (!order?.registration_number || order.registration_number.trim() === "") {
+        console.log("🚫 CVReport External API - Skipping: Registration number not available yet");
+      }
+    }
+  }, [reportLoading, currentReport, order?.registration_number, fetchRCDetailsFromExternalAPI, reportFetchCompleted]);
+
+  // Auto-save after external API prefills data
+  useEffect(() => {
+    // Only trigger if flag is set and we have some form data (indicating state was updated)
+    if (shouldAutoSaveAfterApiRef.current && reportFormData && Object.keys(reportFormData).length > 0) {
+      // Check if we have some of the key fields that would be set by the API
+      const hasApiData = reportFormData.chassis_no || 
+                        reportFormData.engine_no_detail || 
+                        reportFormData.registered_owner_name ||
+                        reportFormData.no_of_cylinder ||
+                        reportFormData.owner_serial_no ||
+                        reportFormData.gross_vehicle_weight;
+      
+      if (hasApiData) {
+        /* console.log("💾 CVReport External API - State updated, triggering auto-save now"); */
+        shouldAutoSaveAfterApiRef.current = false; // Reset flag to prevent multiple saves
+        // Use a small timeout to ensure all state updates are batched
+        setTimeout(() => {
+          handleSaveReport();
+        }, 100);
+      }
+    }
+  }, [reportFormData, handleSaveReport]);
 
   // Render flexible fields for a section
   const renderFlexibleFields = useCallback(
@@ -1671,7 +1952,7 @@ function CVReport() {
                 <div className="col-md-6">
                   <div className="form-group ">
                     <label>
-                      Ref NO. <span class="text-danger">*</span>
+                      Ref NO. <span className="text-danger">*</span>
                     </label>
                     <div className="ref-no-input">
                       <input
@@ -1726,7 +2007,7 @@ function CVReport() {
                 <div className="col-md-6">
                   <div className="form-group">
                     <label htmlFor="report_date">
-                      Report Date <span class="text-danger">*</span>
+                      Report Date <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -1746,7 +2027,7 @@ function CVReport() {
                 <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="valuer_name">
-                      Valuer Name <span class="text-danger">*</span>
+                      Valuer Name <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -1763,7 +2044,7 @@ function CVReport() {
                 <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="license_no">
-                      License No <span class="text-danger">*</span>
+                      License No <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -1796,7 +2077,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="valuation_purpose">
-                      Valuation Purpose <span class="text-danger">*</span>
+                      Valuation Purpose <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -1839,7 +2120,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="date_of_inspection">
-                      Date of Inspection <span class="text-danger">*</span>
+                      Date of Inspection <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -1857,7 +2138,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="place_of_inspection">
-                      Place of Inspection <span class="text-danger">*</span>
+                      Place of Inspection <span className="text-danger">*</span>
                     </label>
                     <textarea
                       className="form-field"
@@ -1876,7 +2157,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="registered_owner_name">
-                      Registered Owner Name <span class="text-danger">*</span>
+                      Registered Owner Name <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -1894,7 +2175,7 @@ function CVReport() {
                   <div className="form-group">
                     <label htmlFor="registered_owner_address">
                       Registered Owner Address{" "}
-                      <span class="text-danger">*</span>
+                      <span className="text-danger">*</span>
                     </label>
                     <textarea
                       className="form-field"
@@ -1910,7 +2191,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="proposed_owner_name">
-                      Proposed Owner Name <span class="text-danger">*</span>
+                      Proposed Owner Name <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -1927,7 +2208,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="proposed_owner_address">
-                      Proposed Owner Address <span class="text-danger">*</span>
+                      Proposed Owner Address <span className="text-danger">*</span>
                     </label>
                     <textarea
                       className="form-field"
@@ -1952,7 +2233,7 @@ function CVReport() {
                 <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="registration_no">
-                      Registration No <span class="text-danger">*</span>
+                      Registration No <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -1969,7 +2250,7 @@ function CVReport() {
                 <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="registration_date">
-                      Registration Date <span class="text-danger">*</span>
+                      Registration Date <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -1987,7 +2268,7 @@ function CVReport() {
                 <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="registered_location">
-                      Registered Location <span class="text-danger">*</span>
+                      Registered Location <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -2005,7 +2286,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="owner_serial_no">
-                      Owner Serial No <span class="text-danger">*</span>
+                      Owner Serial No <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -2031,7 +2312,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="manufacture_year">
-                      Manufacture Year <span class="text-danger">*</span>
+                      Manufacture Year <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -2047,7 +2328,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="asset_make">
-                      Asset Make <span class="text-danger">*</span>
+                      Asset Make <span className="text-danger">*</span>
                     </label>
                     <div>
                       <SingleSearchSelect
@@ -2092,7 +2373,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="model">
-                      Model <span class="text-danger">*</span>
+                      Model <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -2111,7 +2392,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="engine_no_detail">
-                      Engine No./ Detail <span class="text-danger">*</span>
+                      Engine No./ Detail <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -2127,7 +2408,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="chassis_no">
-                      Chassis No <span class="text-danger">*</span>
+                      Chassis No <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -2143,7 +2424,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="body_type">
-                      Body Type <span class="text-danger">*</span>
+                      Body Type <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -2159,7 +2440,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="fuel_type">
-                      Fuel Type <span class="text-danger">*</span>
+                      Fuel Type <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -2179,7 +2460,7 @@ function CVReport() {
                   <div className="form-group">
                     <label htmlFor="kilometer_reading">
                       Hours / Kilometer Reading{" "}
-                      <span class="text-danger">*</span>
+                      <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -2219,7 +2500,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="hyp_with">
-                      Hyp With <span class="text-danger">*</span>
+                      Hyp With <span className="text-danger">*</span>
                     </label>
                     <textarea
                       className="form-field"
@@ -2285,7 +2566,7 @@ function CVReport() {
                 <div className="col-md-6">
                   <div className="form-group">
                     <label htmlFor="asset_classification">
-                      Asset Classification <span class="text-danger">*</span>
+                      Asset Classification <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -2302,7 +2583,7 @@ function CVReport() {
                 <div className="col-md-6">
                   <div className="form-group">
                     <label htmlFor="no_of_cylinder">
-                      No of Cylinders <span class="text-danger">*</span>
+                      No of Cylinders <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -2331,7 +2612,7 @@ function CVReport() {
                 <div className="col-md-2">
                   <div className="form-group">
                     <label htmlFor="engine_condition">
-                      Engine Condition <span class="text-danger">*</span>
+                      Engine Condition <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -2353,7 +2634,7 @@ function CVReport() {
                 <div className="col-md-2">
                   <div className="form-group">
                     <label htmlFor="chassis_condition">
-                      Chassis Condition <span class="text-danger">*</span>
+                      Chassis Condition <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -2375,7 +2656,7 @@ function CVReport() {
                 <div className="col-md-2">
                   <div className="form-group">
                     <label htmlFor="body_condition">
-                      Body Condition <span class="text-danger">*</span>
+                      Body Condition <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -2397,7 +2678,7 @@ function CVReport() {
                 <div className="col-md-2">
                   <div className="form-group">
                     <label htmlFor="cabin_condition">
-                      Cabin Condition <span class="text-danger">*</span>
+                      Cabin Condition <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -2419,7 +2700,7 @@ function CVReport() {
                 <div className="col-md-2">
                   <div className="form-group">
                     <label htmlFor="electrical_condition">
-                      Electrical Condition <span class="text-danger">*</span>
+                      Electrical Condition <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -2441,7 +2722,7 @@ function CVReport() {
                 <div className="col-md-2">
                   <div className="form-group">
                     <label htmlFor="gear_transmission">
-                      Gear Transmission <span class="text-danger">*</span>
+                      Gear Transmission <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -2467,7 +2748,7 @@ function CVReport() {
                   <div className="form-group">
                     <label htmlFor="battery_available">
                       Battery Available-yes/no{" "}
-                      <span class="text-danger">*</span>
+                      <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -2483,7 +2764,7 @@ function CVReport() {
                 <div className="col-md-6">
                   <div className="form-group">
                     <label htmlFor="gross_vehicle_weight">
-                      Gross Vehicle Weight <span class="text-danger">*</span>
+                      Gross Vehicle Weight <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -2506,7 +2787,7 @@ function CVReport() {
                       <div className="col-md-6">
                         <label htmlFor="front_tyre_no">
                           Number Of Front Tires{" "}
-                          <span class="text-danger">*</span>
+                          <span className="text-danger">*</span>
                         </label>
                         <input
                           type="text"
@@ -2521,7 +2802,7 @@ function CVReport() {
                       <div className="col-md-6">
                         <label htmlFor="front_tyre_condition">
                           Front Tyre Condition{" "}
-                          <span class="text-danger">*</span>
+                          <span className="text-danger">*</span>
                         </label>
                         <input
                           type="text"
@@ -2576,7 +2857,7 @@ function CVReport() {
                       <div className="col-md-6">
                         <label htmlFor="rear_tyre_no">
                           Number Of Rear Tires{" "}
-                          <span class="text-danger">*</span>
+                          <span className="text-danger">*</span>
                         </label>
                         <input
                           type="text"
@@ -2590,7 +2871,7 @@ function CVReport() {
                       </div>
                       <div className="col-md-6">
                         <label htmlFor="rear_tyre_condition">
-                          Rear Tyre Condition <span class="text-danger">*</span>
+                          Rear Tyre Condition <span className="text-danger">*</span>
                         </label>
                         <input
                           type="text"
@@ -2611,7 +2892,7 @@ function CVReport() {
                     <div className="row">
                       <div className="col-md-6">
                         <label htmlFor="no_of_tyres">
-                          Total Tyres <span class="text-danger">*</span>
+                          Total Tyres <span className="text-danger">*</span>
                         </label>
                         <input
                           type="text"
@@ -2630,7 +2911,7 @@ function CVReport() {
                       </div>
                       <div className="col-md-6">
                         <label htmlFor="stepney">
-                          Stepney- Yes/no <span class="text-danger">*</span>
+                          Stepney- Yes/no <span className="text-danger">*</span>
                         </label>
                         <SingleSearchSelect
                           options={[
@@ -2653,7 +2934,7 @@ function CVReport() {
                 <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="horse_power">
-                      Horse Power <span class="text-danger">*</span>
+                      Horse Power <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -2670,7 +2951,7 @@ function CVReport() {
                   <div className="form-group">
                     <label htmlFor="mechanical_unit_condition">
                       Mechanical Unit Condition{" "}
-                      <span class="text-danger">*</span>
+                      <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -2692,7 +2973,7 @@ function CVReport() {
                 <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="cubic_capacity">
-                      Cubic Capacity <span class="text-danger">*</span>
+                      Cubic Capacity <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -2711,7 +2992,7 @@ function CVReport() {
                 <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="suspension">
-                      Suspension <span class="text-danger">*</span>
+                      Suspension <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -2733,7 +3014,7 @@ function CVReport() {
                 <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="seating_capacity">
-                      Seating Capacity <span class="text-danger">*</span>
+                      Seating Capacity <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -2749,7 +3030,7 @@ function CVReport() {
                 <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="tool_kit_available">
-                      Tool Kit Available <span class="text-danger">*</span>
+                      Tool Kit Available <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -2770,7 +3051,7 @@ function CVReport() {
                 <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="vehicle_colour">
-                      Vehicle Colour <span class="text-danger">*</span>
+                      Vehicle Colour <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -2786,7 +3067,7 @@ function CVReport() {
                 <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="color_condition">
-                      Color Condition <span class="text-danger">*</span>
+                      Color Condition <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -2861,7 +3142,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="rc_book_verified">
-                      RC Book Verified <span class="text-danger">*</span>
+                      RC Book Verified <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -2882,7 +3163,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="invoice_verified">
-                      Invoice Verified <span class="text-danger">*</span>
+                      Invoice Verified <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -3025,7 +3306,7 @@ function CVReport() {
                 <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="insurance_verified">
-                      Insurance Verified <span class="text-danger">*</span>
+                      Insurance Verified <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -3054,7 +3335,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="current_invoice_cost">
-                      Current Invoice Cost <span class="text-danger">*</span>
+                      Current Invoice Cost <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -3071,7 +3352,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="depreciation">
-                      Depreciation <span class="text-danger">*</span>
+                      Depreciation <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -3087,7 +3368,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="depreciation_value">
-                      Depreciation Value <span class="text-danger">*</span>
+                      Depreciation Value <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -3104,7 +3385,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="appraiser_value">
-                      Appraiser Value <span class="text-danger">*</span>
+                      Appraiser Value <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -3123,7 +3404,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="fair_market_value">
-                      Fair Market Value <span class="text-danger">*</span>
+                      Fair Market Value <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -3141,7 +3422,7 @@ function CVReport() {
                   <div className="form-group">
                     <label htmlFor="amount_in_words">
                       Fair Market Value Amount In Words{" "}
-                      <span class="text-danger">*</span>
+                      <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -3158,7 +3439,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="no_of_photograph">
-                      No of Photographs <span class="text-danger">*</span>
+                      No of Photographs <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -3181,7 +3462,7 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="no_of_collage">
-                      No of Collages <span class="text-danger">*</span>
+                      No of Collages <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -3207,7 +3488,7 @@ function CVReport() {
                 <div className="col-md-12">
                   <div className="form-group">
                     <label htmlFor="valuer_comments_remarks">
-                      Valuer Comments/remarks <span class="text-danger">*</span>
+                      Valuer Comments/remarks <span className="text-danger">*</span>
                     </label>
                     <textarea
                       className="form-field"
@@ -3249,7 +3530,7 @@ function CVReport() {
                 <div className="col-md-12">
                   <div className="form-group">
                     <label htmlFor="declaration">
-                      Declaration <span class="text-danger">*</span>
+                      Declaration <span className="text-danger">*</span>
                     </label>
                     <p className="mb-0">
                       The aforesaid COMMERCIAL VEHICLE / TATA LPT 3518 inspected
@@ -3329,7 +3610,7 @@ function CVReport() {
                 </div>
               </div>
 
-              {/* Generate and Save Report Buttons */}
+              {/* Generate Report Button */}
               <div className="row">
                 <div className="col-12 text-center">
                   <div className="form-buttons">
@@ -3342,15 +3623,6 @@ function CVReport() {
                         ? "Generating Report..."
                         : "Generate CV Report"}
                     </button>
-                    <button
-                      type="button"
-                      className="btn save-report"
-                      onClick={handleSaveReport}
-                      disabled={saving}
-                      style={{ marginRight: "10px" }}
-                    >
-                      {saving ? "Saving..." : "Save"}
-                    </button>
                   </div>
                 </div>
               </div>
@@ -3358,6 +3630,25 @@ function CVReport() {
           </div>
         </div>
       </div>
+
+      {/* Fixed Save Button - Bottom Right Corner */}
+      <button
+        type="button"
+        className="btn save-report"
+        onClick={handleSaveReport}
+        disabled={saving}
+        style={{
+          position: "fixed",
+          bottom: "20px",
+          right: "20px",
+          zIndex: 1000,
+          padding: "12px 24px",
+          borderRadius: "4px",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+        }}
+      >
+        {saving ? "Saving..." : "Save"}
+      </button>
     </section>
   );
 }
