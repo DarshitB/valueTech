@@ -386,8 +386,8 @@ function generateCVReportHTML(
             <td rowspan="2">PERIOD OF INSURANCE:</td>
             <td rowspan="2" colspan="2">
                 ${
-                  extraData.formattedPeriod
-                    ? extraData.formattedPeriod
+                  formData.period_of_insurance
+                    ? formData.period_of_insurance
                     : "NOT AVAILABLE"
                 }
             </td>

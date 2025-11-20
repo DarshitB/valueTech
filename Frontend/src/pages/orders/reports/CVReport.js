@@ -49,6 +49,8 @@ function CVReport() {
   
   // State to track if initial report fetch has completed (using state instead of ref to trigger re-renders)
   const [reportFetchCompleted, setReportFetchCompleted] = useState(false);
+  // State to track if external API is currently loading
+  const [externalApiLoading, setExternalApiLoading] = useState(false);
   
   // Ref to track if external RC API has been called (to ensure it's only called once)
   const externalApiCalledRef = useRef(false);
@@ -68,6 +70,7 @@ function CVReport() {
     // Reset report fetch tracking flags when order changes
     reportLoadingStartedRef.current = false;
     setReportFetchCompleted(false); // Reset state
+    setExternalApiLoading(false); // Reset external API loading state
   }, [dispatch, id]);
 
   // Fetch order details when component mounts or ID changes
@@ -569,13 +572,20 @@ function CVReport() {
   // Populate form data from fetched report (if available)
   useEffect(() => {
     const report = currentReport?.report;
-    if (!report) return; // Gracefully do nothing when data is null
+    if (!report) {
+      // If no report and fetch is completed, ensure loading is false
+      if (reportFetchCompleted && !reportLoading) {
+        setExternalApiLoading(false);
+      }
+      return; // Gracefully do nothing when data is null
+    }
 
     // Validate that the report belongs to the current order
     if (currentReport?.order_id && currentReport.order_id !== parseInt(id)) {
       console.warn(
         `Report data for order ${currentReport.order_id} does not match current order ${id}. Ignoring report data.`
       );
+      setExternalApiLoading(false);
       return;
     }
 
@@ -670,7 +680,13 @@ function CVReport() {
 
       setFlexibleFields(combined);
     }
-  }, [currentReport, id]);
+    
+    // After form data is populated from report, set loading to false
+    // Small delay to ensure all state updates are complete
+    setTimeout(() => {
+      setExternalApiLoading(false);
+    }, 300);
+  }, [currentReport, id, reportFetchCompleted, reportLoading]);
 
   // Set page title with breadcrumb navigation
   useLayoutEffect(() => {
@@ -1372,6 +1388,9 @@ function CVReport() {
       return;
     }
 
+    // Set loading state to true when external API starts
+    setExternalApiLoading(true);
+
     // Clean and format registration number: remove spaces, dashes, and convert to uppercase
     // Example: "GJ-03-BZ-0618" or "gj 03 bz 0618" → "GJ03BZ0618"
     const cleanedRegistrationNumber = registrationNumber
@@ -1490,13 +1509,16 @@ function CVReport() {
           if (rcData.taxUpto) updated.tax_upto = rcData.taxUpto;
           if (rcData.permitUpto) updated.permit_upto = rcData.permitUpto;
           if (rcData.permitType) updated.permit_type = rcData.permitType;
-          if (rcData.insuranceUpto) {
-            // You may want to map this to an insurance field if available
-            // updated.insurance_upto = rcData.insuranceUpto;
-          }
+          
+          // Insurance details mapping
           if (rcData.insuranceProvider) {
-            // You may want to map this to an insurance provider field if available
-            // updated.insurance_provider = rcData.insuranceProvider;
+            updated.insurance_co_name = rcData.insuranceProvider;
+          }
+          if (rcData.insurancePolicyNumber) {
+            updated.policy_no = rcData.insurancePolicyNumber;
+          }
+          if (rcData.insuranceUpto) {
+            updated.period_of_insurance = rcData.insuranceUpto;
           }
 
           /* console.log("📝 CVReport External API - Updated form data:", updated); */
@@ -1509,9 +1531,15 @@ function CVReport() {
         // We'll use a useEffect to watch for the state change and trigger save
         shouldAutoSaveAfterApiRef.current = true;
         /* console.log("💾 CVReport External API - Auto-save flag set, will trigger save after state update"); */
+        
+        // Set loading to false after data is prefilled (with small delay to ensure state update)
+        setTimeout(() => {
+          setExternalApiLoading(false);
+        }, 500);
       } else {
         console.warn("⚠️ CVReport External API - Response indicates invalid RC:", response.data);
         toast.warning("RC details could not be fetched or RC is invalid");
+        setExternalApiLoading(false);
       }
     } catch (error) {
       console.error("❌ CVReport External API - Error calling API:", error);
@@ -1521,6 +1549,7 @@ function CVReport() {
       } else {
         toast.error("Failed to fetch RC details. Please try again later.");
       }
+      setExternalApiLoading(false);
     }
   }, []);
 
@@ -1583,6 +1612,23 @@ function CVReport() {
       }
     }
   }, [reportFormData, handleSaveReport]);
+
+  // Handle loading completion when no external API is needed
+  useEffect(() => {
+    // If report fetch is complete, no external API is needed, and we're not loading external API
+    if (
+      reportFetchCompleted &&
+      !reportLoading &&
+      !externalApiLoading &&
+      (currentReport?.report || !externalApiCalledRef.current)
+    ) {
+      // Small delay to ensure all state updates are complete
+      const timer = setTimeout(() => {
+        setExternalApiLoading(false);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [reportFetchCompleted, reportLoading, externalApiLoading, currentReport]);
 
   // Render flexible fields for a section
   const renderFlexibleFields = useCallback(
@@ -1949,8 +1995,51 @@ function CVReport() {
     numberToWords,
   ]);
 
+  // Calculate overall loading state
+  const isLoading = reportLoading || externalApiLoading;
+
   return (
     <section className="order-details-wrapper">
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(255, 255, 255, 0.9)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+          }}
+        >
+          <div
+            className="spinner-border text-primary"
+            role="status"
+            style={{ width: "3rem", height: "3rem" }}
+          >
+           {/* <span className="visually-hidden">Loading...</span> */}
+          </div>
+          <div
+            style={{
+              marginTop: "1rem",
+              fontSize: "16px",
+              color: "#333",
+              textAlign: "center",
+            }}
+          >
+            {reportLoading && externalApiLoading
+              ? "Loading Report Data and Fetching RC Details..."
+              : reportLoading
+              ? "Loading Report Data..."
+              : "Fetching RC Details from External API..."}
+          </div>
+        </div>
+      )}
       <div className="row">
         {/* Reference Number Form Section */}
         <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12 mb-5">
