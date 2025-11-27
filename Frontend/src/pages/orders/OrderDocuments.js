@@ -197,7 +197,7 @@ function OrderDocuments() {
         day: "2-digit",
         hour: "2-digit",
         minute: "2-digit",
-        hour12: false,
+        hour12: true, // <--- 12-hour format
       }).format(date);
     } catch (error) {
       console.warn("Date formatting error:", error);
