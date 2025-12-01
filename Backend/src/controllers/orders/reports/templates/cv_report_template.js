@@ -89,14 +89,15 @@ function generateCVReportHTML(
             <th colspan="6">${extraData.bank_name}</th>
         </tr>
         <tr>
-            <th colspan="6">VALUATION REPORT FOR ${extraData.subCat} / ${
-    extraData.childCat
-  }</th>
+            <th colspan="6">VALUATION REPORT FOR ${extraData.cat} / ${
+    extraData.subCat
+  } ${extraData.childCat}</th>
         </tr>
         <tr>
             <th colspan="6">GENERAL DETAILS OF THE INSPECTED ${
-              extraData.subCat
-            } / ${extraData.childCat}</th>
+              extraData.cat
+            } / ${extraData.subCat}
+            ${extraData.childCat}</th>
         </tr>
         <tr>
             <td style="width: 20%;">REF NO.</td>
@@ -145,9 +146,9 @@ function generateCVReportHTML(
             <td colspan="5">${formData.proposed_owner_address}</td>
         </tr>
         <tr>
-            <th colspan="6">INSPECTED EQUIPMENT DETAILS OF ${extraData.subCat} / ${
-    extraData.childCat
-  }</th>
+            <th colspan="6">INSPECTED EQUIPMENT DETAILS OF ${extraData.cat} / ${
+    extraData.subCat
+  } ${extraData.childCat}</th>
         </tr>
         <tr>
             <td>REGISTRATION NO:</td>
@@ -218,8 +219,8 @@ function generateCVReportHTML(
         )}
         <tr>
             <th colspan="6">COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION ${
-              extraData.subCat
-            } / ${extraData.childCat}</th>
+              extraData.cat
+            } / ${extraData.subCat} ${extraData.childCat}</th>
         </tr>
         <tr>
             <td>ASSET CLASSIFICATION:</td>
@@ -325,8 +326,9 @@ function generateCVReportHTML(
         </tr>
         <tr>
             <th colspan="6">RC, PERMIT, TAX, FITNESS & INSURANCE DETAILS OF ${
-              extraData.subCat
-            } / ${extraData.childCat}</th>
+              extraData.cat
+            } / ${extraData.subCat} ${extraData.childCat}
+            </th>
         </tr>
         <tr>
             <td>RC BOOK VERIFIED:</td>
@@ -406,8 +408,9 @@ function generateCVReportHTML(
         </tr>
         <tr>
             <th colspan="6">OVER ALL FEED BACK OF THE INSPECTED ${
-              extraData.subCat
-            } / ${extraData.childCat}</th>
+              extraData.cat
+            } / ${extraData.subCat} ${extraData.childCat}
+            </th>
         </tr>
         <tr>
             <td>CURRENT INVOICE COST:</td>
@@ -444,7 +447,7 @@ function generateCVReportHTML(
         <tr>
             <td>DECLARATION:</td>
             <td colspan="5" style="text-transform: none;">
-                The aforesaid ${extraData.subCat} / ${
+                The aforesaid ${extraData.cat} / ${extraData.subCat} ${
     extraData.childCat
   } inspected by us & found in ${
     formData.declaration_condition
