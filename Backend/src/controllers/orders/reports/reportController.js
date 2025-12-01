@@ -563,6 +563,7 @@ exports.generateReport = async (req, res, next) => {
       state_name: order.state_name || "State Name",
       cat: order.category_name || "Category",
       subCat: order.sub_category_name || "Sub Category",
+      childCat: order.child_category_name || "Child Category",
       formattedPeriod: formattedPeriod,
     };
 
