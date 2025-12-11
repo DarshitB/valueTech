@@ -15,6 +15,8 @@ import {
   uploadOrderMediaDocuments,
   deleteOrderMediaDocuments,
   approveOrderMediaDocuments,
+  uploadOrderReportCollage,
+  uploadMultipleOrderReportsCollages,
 } from "../../redux/reducers/orderMediaDocumentsReducer";
 import CustomDataTable from "../../components/CustomDataTable";
 import {
@@ -130,8 +132,15 @@ function OrderDocuments() {
   }, [id]);
 
   const order = useSelector((state) => state.orders.selected);
-  const { documents, loading, uploadLoading, approveLoading, error } =
+  const { documents, loading, uploadLoading, approveLoading, error, reportCollageUploadLoading } =
     useSelector((state) => state.orderMediaDocuments);
+
+  // Refs for file inputs
+  const reportFileInputRef = useRef(null);
+  const collageFileInputRef = useRef(null);
+  
+  // State to track which type is being uploaded
+  const [uploadingType, setUploadingType] = useState(null);
 
   const documentState = useDocumentState();
 
@@ -573,6 +582,84 @@ function OrderDocuments() {
     [handleFileUpload]
   );
 
+  // Handle upload report/collage button click
+  const handleUploadReportCollageClick = useCallback(
+    (type) => {
+      if (type === "report") {
+        reportFileInputRef.current?.click();
+      } else if (type === "collage") {
+        collageFileInputRef.current?.click();
+      }
+    },
+    []
+  );
+
+  // Handle file selection for report/collage upload
+  const handleReportCollageFileChange = useCallback(
+    async (e, type) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) {
+        e.target.value = ""; // Reset input
+        return;
+      }
+
+      // Validate files are PDF
+      const pdfFiles = Array.from(files).filter((file) => {
+        if (file.type !== "application/pdf") {
+          toast.error(`${file.name} is not a PDF file. Only PDF files are allowed.`);
+          return false;
+        }
+        if (file.size > MAX_FILE_SIZE) {
+          toast.error(`${file.name} exceeds maximum file size of ${MAX_FILE_SIZE / (1024 * 1024)}MB`);
+          return false;
+        }
+        return true;
+      });
+
+      if (pdfFiles.length === 0) {
+        e.target.value = ""; // Reset input
+        return;
+      }
+
+      // Limit to 10 files for multiple upload
+      if (pdfFiles.length > 10) {
+        toast.error("Maximum 10 files allowed for upload");
+        e.target.value = ""; // Reset input
+        return;
+      }
+
+      setUploadingType(type);
+      try {
+        const formData = new FormData();
+        formData.append("order_id", orderId.toString());
+        formData.append("type", type);
+
+        if (pdfFiles.length === 1) {
+          // Single file upload
+          formData.append("file", pdfFiles[0]);
+          await dispatch(uploadOrderReportCollage(formData)).unwrap();
+        } else {
+          // Multiple files upload
+          pdfFiles.forEach((file) => {
+            formData.append("files", file);
+          });
+          await dispatch(uploadMultipleOrderReportsCollages(formData)).unwrap();
+        }
+
+        // Refresh documents list
+        await dispatch(fetchOrderMediaDocuments(orderId));
+        toast.success(`${pdfFiles.length} ${type}(s) uploaded successfully`);
+      } catch (error) {
+        console.error("Upload failed:", error);
+        toast.error(error || `Failed to upload ${type}`);
+      } finally {
+        setUploadingType(null);
+        e.target.value = ""; // Reset input
+      }
+    },
+    [dispatch, orderId]
+  );
+
   // Drag and drop handlers
   const handleDragOver = useCallback((e) => {
     e.preventDefault();
@@ -951,6 +1038,36 @@ function OrderDocuments() {
 
   return (
     <section className="order-documents-wrapper">
+      {/* Full-screen loading overlay for report/collage upload */}
+      {reportCollageUploadLoading && uploadingType && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.7)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            color: "white",
+          }}
+        >
+          <div
+            className="spinner-border text-light"
+            role="status"
+            style={{ width: "3rem", height: "3rem", marginBottom: "1rem" }}
+          >
+            {/* <span className="visually-hidden">Loading...</span> */}
+          </div>
+          <div style={{ fontSize: "18px", fontWeight: "500" }}>
+            Uploading {uploadingType}...
+          </div>
+        </div>
+      )}
       <div className="row">
         <div className="col-xl-6 col-lg-6 col-md-12 col-sm-12 col-xs-12">
           <div className="order-collage-report-container">
@@ -959,22 +1076,45 @@ function OrderDocuments() {
                 <div className="order-collage-container">
                   <div className="order-collage-header">
                     <h3>Collage</h3>
-                    {hasPermission(
-                      allowedPermissions,
-                      "view_order_media_files"
-                    ) &&
-                      hasPermission(
+                    <div style={{ display: "flex", gap: "10px" }}>
+                      {hasPermission(
                         allowedPermissions,
-                        "generate_order_collage"
+                        "view_order_media_files"
+                      ) &&
+                        hasPermission(
+                          allowedPermissions,
+                          "generate_order_collage"
+                        ) && (
+                          <Link
+                            to={`/orders/${id}/details/images`}
+                            className="btn primary"
+                          >
+                            Generate Collage
+                          </Link>
+                        )}
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_order_media_files"
                       ) && (
-                        <Link
-                          to={`/orders/${id}/details/images`}
+                        <button
                           className="btn primary"
+                          onClick={() => handleUploadReportCollageClick("collage")}
+                          disabled={reportCollageUploadLoading || loading}
                         >
-                          Generate Collage
-                        </Link>
+                          {reportCollageUploadLoading && uploadingType === "collage" ? "Uploading..." : "Upload Collage"}
+                        </button>
                       )}
+                    </div>
                   </div>
+                  {/* Hidden file input for collage upload */}
+                  <input
+                    type="file"
+                    ref={collageFileInputRef}
+                    style={{ display: "none" }}
+                    accept="application/pdf"
+                    multiple
+                    onChange={(e) => handleReportCollageFileChange(e, "collage")}
+                  />
                   <div className="order-document-table">
                     {renderDocumentTable(
                       segregatedDocuments.collage,
@@ -1019,8 +1159,31 @@ function OrderDocuments() {
                 <div className="order-report-container">
                   <div className="order-report-header">
                     <h3>Reports</h3>
-                    <Link className="btn primary">Generate Report</Link>
+                    <div style={{ display: "flex", gap: "10px" }}>
+                      <Link className="btn primary">Generate Report</Link>
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_order_media_files"
+                      ) && (
+                        <button
+                          className="btn primary"
+                          onClick={() => handleUploadReportCollageClick("report")}
+                          disabled={reportCollageUploadLoading || loading}
+                        >
+                          {reportCollageUploadLoading && uploadingType === "report" ? "Uploading..." : "Upload Report"}
+                        </button>
+                      )}
+                    </div>
                   </div>
+                  {/* Hidden file input for report upload */}
+                  <input
+                    type="file"
+                    ref={reportFileInputRef}
+                    style={{ display: "none" }}
+                    accept="application/pdf"
+                    multiple
+                    onChange={(e) => handleReportCollageFileChange(e, "report")}
+                  />
                   <div className="order-document-table">
                     {renderDocumentTable(
                       segregatedDocuments.report,

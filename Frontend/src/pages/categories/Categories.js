@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchCategories,
@@ -6,6 +6,9 @@ import {
   editCategory,
   removeCategory,
 } from "../../redux/reducers/categoryReducer";
+import { fetchOrders } from "../../redux/reducers/orderReducer";
+import { fetchChildCategories } from "../../redux/reducers/childCategoryReducer";
+import { fetchSubCategories } from "../../redux/reducers/subcategoryReducer";
 import CustomDataTable from "../../components/CustomDataTable";
 import { DeleteIcon, EditIcon } from "../../components/icons";
 import ConfirmationModal from "../../components/ConfirmationModal";
@@ -32,6 +35,15 @@ function Categories() {
     (state) => state.categories
   );
 
+  // Get orders, child categories, and sub-categories from Redux store
+  const { list: orders } = useSelector((state) => state.orders);
+  const { list: childCategories } = useSelector(
+    (state) => state.childCategories
+  );
+  const { list: subCategories } = useSelector(
+    (state) => state.subcategories
+  );
+
   // Get logged-in user's permissions
   const allowedPermissions = useSelector(selectPermissions);
 
@@ -47,10 +59,45 @@ function Categories() {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [confirmDeleteName, setConfirmDeleteName] = useState(null);
 
-  // Fetch all categories on component mount
+  // Fetch all required data on component mount
   useEffect(() => {
     dispatch(fetchCategories());
+    dispatch(fetchOrders());
+    dispatch(fetchChildCategories());
+    dispatch(fetchSubCategories());
   }, [dispatch]);
+
+  // Calculate order count per category
+  const categoryOrderCounts = useMemo(() => {
+    const counts = {};
+
+    // Create mapping: child_category_id -> sub_category_id
+    const childToSubMap = {};
+    childCategories.forEach((child) => {
+      childToSubMap[child.id] = child.sub_category_id;
+    });
+
+    // Create mapping: sub_category_id -> category_id
+    const subToCategoryMap = {};
+    subCategories.forEach((sub) => {
+      subToCategoryMap[sub.id] = sub.category_id;
+    });
+
+    // Count orders per category
+    orders.forEach((order) => {
+      if (order.child_category_id) {
+        const subCategoryId = childToSubMap[order.child_category_id];
+        if (subCategoryId) {
+          const categoryId = subToCategoryMap[subCategoryId];
+          if (categoryId) {
+            counts[categoryId] = (counts[categoryId] || 0) + 1;
+          }
+        }
+      }
+    });
+
+    return counts;
+  }, [orders, childCategories, subCategories]);
 
   // ➕ Handle Add
   const handleAdd = () => {
@@ -145,6 +192,7 @@ function Categories() {
               <tr>
                 <th style={{ width: "55px" }}>ID</th>
                 <th style={{ width: "225px" }}>Name</th>
+                <th style={{ width: "150px" }}>No. of Orders</th>
                 <th style={{ width: "150px" }}>Created By</th>
                 <th>Updated By</th>
                 <th style={{ width: "200px", textAlign: "center" }}>Action</th>
@@ -179,6 +227,7 @@ function Categories() {
                 >
                   {item.name}
                 </td>
+                <td>{categoryOrderCounts[item.id] || 0}</td>
                 <td>{item.created_by}</td>
                 <td>{item.updated_by || "-"}</td>
                 <td style={{ textAlign: "center" }}>

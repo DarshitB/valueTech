@@ -41,6 +41,7 @@ const assetMakesOfReportsRoutes = require("./routes/orders/assetMakesOfReportsRo
 // Orders-Reports routes
 const ordersReportsRoutes = require("./routes/orders/ordersReportsRoutes");
 const customReportRoutes = require("./routes/orders/customReportRoutes");
+const reportCollageUploadRoutes = require("./routes/orders/reportCollageUploadRoutes");
 
 // Field Verifier routes
 const fieldVerifierPortalOperationsRoutes = require("./routes/fieldVerifier/portalOperationsRoutes");
@@ -161,6 +162,7 @@ app.use("/api/attendance", attendanceRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/orders-reports/custom-report", customReportRoutes);
 app.use("/api/orders-reports", ordersReportsRoutes);
+app.use("/api/orders-reports-collages", reportCollageUploadRoutes);
 app.use("/api/field-verifiers", fieldVerifierPortalOperationsRoutes);
 app.use("/api/order-media", orderMediaPortalRoutes);
 app.use("/api/collage-generator", collageGeneratorRoutes);

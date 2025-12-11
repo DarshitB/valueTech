@@ -89,27 +89,23 @@ function generateMachineryReportHTML(
             <th colspan="6">${extraData.bank_name}</th>
         </tr>
         <tr>
-            <th colspan="6">VALUATION REPORT FOR ${extraData.cat} / ${
-    extraData.subCat
-  }</th>
+            <th colspan="6">${formData.valueation_report_for_heading}</th>
         </tr>
         <tr>
-            <th colspan="6">GENERAL DETAILS OF THE ${extraData.cat} / ${
-    extraData.subCat
-  }</th>
+            <th colspan="6">${formData.general_details_heading}</th>
         </tr>
         <tr>
             <td style="width: 20%;">REF NO.</td>
             <td colspan="2">${formData.ref_no_year}/${formData.ref_no_bank}/${
     formData.state_name
-  }/${formData.ref_no_code}/${formData.ref_no_id}</td>
+  }/${formData.ref_no_code}/${formData.ref_no_month}${formData.ref_no_id}</td>
             <td>REPORT DATE:</td>
             <td colspan="2">${formData.report_date}</td>
         </tr>
         <tr>
             <td>VALUER NAME:</td>
             <td colspan="2">${formData.valuer_name}</td>
-            <td>LICENCE NO:</td>
+            <td>${formData.valuer_name === "VALUETECH SOLUTIONS" ? "Licence No." : "LICENCE NO:"}</td>
             <td colspan="2">${formData.license_no}</td>
         </tr>
         <tr>
@@ -145,9 +141,7 @@ function generateMachineryReportHTML(
             <td colspan="5">${formData.proposed_owner_address}</td>
         </tr>
         <tr>
-            <th colspan="6">INSPECTED EQUIPMENT DETAILS OF ${extraData.cat} / ${
-    extraData.subCat
-  }</th>
+            <th colspan="6">${formData.inspected_equipment_heading}</th>
         </tr>
         <tr>
             <td>REGISTRATION NO:</td>
@@ -219,9 +213,7 @@ function generateMachineryReportHTML(
           "INSPECTED_EQUIPMENT_DETAILS"
         )}
         <tr>
-            <th colspan="6">COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION ${
-              extraData.cat
-            } / ${extraData.subCat}</th>
+            <th colspan="6">${formData.comments_on_equipment_heading}</th>
         </tr>
         <tr>
             <td>ASSET CLASSIFICATION:</td>
@@ -353,9 +345,7 @@ function generateMachineryReportHTML(
             </td>
         </tr>
         <tr>
-            <th colspan="6">INSURANCE DETAILS OF THE ${extraData.cat} / ${
-    extraData.subCat
-  }</th>
+            <th colspan="6">${formData.insurance_details_heading}</th>
         </tr>
         <tr>
             <td>RC BOOK VERIFIED:</td>
@@ -442,9 +432,7 @@ function generateMachineryReportHTML(
             <td colspan="2">${formData.insurance_verified}</td>
         </tr>
         <tr>
-            <th colspan="6">OVER ALL FEED BACK OF THE ${extraData.cat} / ${
-    extraData.subCat
-  }</th>
+            <th colspan="6">${formData.overall_feedback_heading}</th>
         </tr>
         <tr>
             <td>TAX INVOICE COST:</td>
@@ -492,10 +480,10 @@ function generateMachineryReportHTML(
             <td colspan="6" style="height: 48px;">SIGNATURE WITH SEAL & STAMP</td>
         </tr>
     </table>
-        <div style="position: absolute; left:50%; bottom: 50px; transform:translateX(calc(-50% - 225px));  width: fit-content; height: fit-content;z-index:2;">
+        <div style="position: absolute; left:50%; bottom: 50px; transform:translateX(calc(-50% - 250px));  width: fit-content; height: fit-content;z-index:2;">
           ${
             stampImageBase64
-              ? `<img src="${stampImageBase64}" alt="stamp" style=" height: 150px;  pointer-events:none;" />`
+              ? `<img src="${stampImageBase64}" alt="stamp" style=" height: 125px;  pointer-events:none;" />`
               : ""
           }
         </div>

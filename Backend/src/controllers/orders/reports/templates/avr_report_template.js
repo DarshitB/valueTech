@@ -89,7 +89,7 @@ function generateAVRReportHTML(
             <tr>
                 <td colspan="3">Ref. No. ${formData.ref_no_year}/${
     formData.ref_no_bank
-  }/${formData.ref_no_code}/${formData.ref_no_id}</td>
+  }/${formData.ref_no_code}/${formData.ref_no_month}${formData.ref_no_id}</td>
             </tr>
             <tr>
                 <th style="width: 10%;">LAN No.:-</th>
@@ -321,7 +321,7 @@ function generateAVRReportHTML(
             </tr>
             <tr>
                 <td colspan="2" style="border:none;">&nbsp;</td>
-                <th style="width: 10%;border:none;">License No.:- ${
+                <th style="width: 10%;border:none;">${formData.valuer_name === "VALUETECH SOLUTIONS" ? "Licence No." : "License No."}:- ${
                   formData.license_no || ""
                 }</th>
             </tr>
@@ -332,10 +332,10 @@ function generateAVRReportHTML(
                 }</th>
             </tr>
         </table>
-        <div style="position: absolute; left:50%; bottom: 50px; transform:translateX(calc(-50% - 225px));  width: fit-content; height: fit-content;z-index:2;">
+        <div style="position: absolute; left:50%; bottom: 50px; transform:translateX(calc(-50% - 275px));  width: fit-content; height: fit-content;z-index:2;">
           ${
             stampImageBase64
-              ? `<img src="${stampImageBase64}" alt="stamp" style=" height: 150px;  pointer-events:none;" />`
+              ? `<img src="${stampImageBase64}" alt="stamp" style=" height: 125px;  pointer-events:none;" />`
               : ""
           }
         </div>

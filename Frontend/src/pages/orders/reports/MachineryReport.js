@@ -4,6 +4,7 @@ import React, {
   useState,
   useCallback,
   useMemo,
+  useRef,
 } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -43,6 +44,10 @@ function MachineryReport() {
   );
   const [showOtherAssetMake, setShowOtherAssetMake] = useState(false);
   const [otherAssetMake, setOtherAssetMake] = useState("");
+  // State to track if initial report fetch has completed (using state instead of ref to trigger re-renders)
+  const [reportFetchCompleted, setReportFetchCompleted] = useState(false);
+  // Ref to track if we've seen the report loading state (to ensure we wait for the fetch to actually happen)
+  const reportLoadingStartedRef = useRef(false);
   // Set page title using custom hook
   const { setTitle } = usePageTitle();
 
@@ -50,6 +55,9 @@ function MachineryReport() {
   useEffect(() => {
     // Clear any existing report data first
     dispatch(clearCurrentReport());
+    // Reset report fetch tracking flags when order changes
+    reportLoadingStartedRef.current = false;
+    setReportFetchCompleted(false); // Reset state
   }, [dispatch, id]);
 
   // Fetch order details when component mounts or ID changes
@@ -71,12 +79,22 @@ function MachineryReport() {
   // Reset form data when component mounts or order ID changes
   useEffect(() => {
     // Get current date in DD-MM-YYYY format
-    const getCurrentDate = () => {
+    const getCurrentDateLocal = () => {
       const today = new Date();
       const day = String(today.getDate()).padStart(2, "0");
       const month = String(today.getMonth() + 1).padStart(2, "0");
       const year = today.getFullYear();
       return `${day}-${month}-${year}`;
+    };
+
+    // Get current month in 3-letter uppercase format
+    const getCurrentMonthAbbreviationLocal = () => {
+      const months = [
+        "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+        "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+      ];
+      const currentMonth = new Date().getMonth();
+      return months[currentMonth];
     };
 
     // Reset form data to initial state when order changes
@@ -87,12 +105,23 @@ function MachineryReport() {
       ref_no_bank: "",
       state_name: "", // Default to first option
       ref_no_code: "", // Default to first option
+      ref_no_month: `SFW-${getCurrentMonthAbbreviationLocal()}-`, // Default: SFW-(CURRENT_MONTH)
       ref_no_id: "",
-      report_date: getCurrentDate(), // Default to today's date
+      report_date: getCurrentDateLocal(), // Default to today's date
 
       valuer_name: "VALUETECH SOLUTIONS", // Default to first option
       license_no: "CAT-VII-A-6019",
       valuer_contact: "99209-88549", // Fixed read-only value
+
+      // Category suffix - controls all heading fields
+      category_suffix: "",
+      // Heading fields (read-only, auto-generated from category_suffix)
+      valueation_report_for_heading: "",
+      general_details_heading: "",
+      inspected_equipment_heading: "",
+      comments_on_equipment_heading: "",
+      insurance_details_heading: "",
+      overall_feedback_heading: "",
 
       valuation_purpose: "FINANCIAL USAGE",
       initiated_by: "",
@@ -182,6 +211,24 @@ function MachineryReport() {
     return "";
   }, []);
 
+  // Function to build category suffix from category data
+  const buildCategorySuffix = useCallback(
+    (categoryName, subCategoryName, childCategoryName) => {
+      const parts = [];
+      if (categoryName) parts.push(categoryName);
+      if (subCategoryName) parts.push(subCategoryName);
+      if (childCategoryName) parts.push(childCategoryName);
+
+      if (parts.length === 0) return "";
+
+      // Format: (category_name) / (sub_category_name) (child_category_name)
+      if (parts.length === 1) return parts[0];
+      if (parts.length === 2) return `${parts[0]} / ${parts[1]}`;
+      return `${parts[0]} / ${parts[1]} ${parts[2]}`;
+    },
+    []
+  );
+
   // Function to get current date in DD-MM-YYYY format
   const getCurrentDate = useCallback(() => {
     const today = new Date();
@@ -189,6 +236,16 @@ function MachineryReport() {
     const month = String(today.getMonth() + 1).padStart(2, "0");
     const year = today.getFullYear();
     return `${day}-${month}-${year}`;
+  }, []);
+
+  // Function to get current month in 3-letter uppercase format (JAN, FEB, MAR, etc.)
+  const getCurrentMonthAbbreviation = useCallback(() => {
+    const months = [
+      "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+      "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+    ];
+    const currentMonth = new Date().getMonth();
+    return months[currentMonth];
   }, []);
 
   // Function to parse currency value (remove commas and convert to number)
@@ -316,12 +373,23 @@ function MachineryReport() {
     ref_no_bank: "",
     state_name: "", // Default to first option
     ref_no_code: "", // Default to first option
+    ref_no_month: `SFW-${getCurrentMonthAbbreviation()}-`, // Default: SFW-(CURRENT_MONTH)
     ref_no_id: "",
     report_date: getCurrentDate(), // Default to today's date
 
     valuer_name: "VALUETECH SOLUTIONS", // Default to first option
     license_no: "CAT-VII-A-6019",
     valuer_contact: "99209-88549", // Fixed read-only value
+
+    // Category suffix - controls all heading fields
+    category_suffix: "",
+    // Heading fields (read-only, auto-generated from category_suffix)
+    valueation_report_for_heading: "",
+    general_details_heading: "",
+    inspected_equipment_heading: "",
+    comments_on_equipment_heading: "",
+    insurance_details_heading: "",
+    overall_feedback_heading: "",
 
     valuation_purpose: "FINANCIAL USAGE",
     initiated_by: "",
@@ -434,49 +502,211 @@ function MachineryReport() {
   // Auto-populate form data when order data is available
   useEffect(() => {
     if (order) {
-      setReportFormData((prev) => ({
-        ...prev,
-        ref_no_bank: order?.bank_initial || "",
-        state_name: prev.state_name || "MUM",
-        ref_no_code: order?.valuer_name ? getRefNoCode(order.valuer_name) : "",
-        initiated_by:
-          order?.officer_name && order?.bank_name
-            ? `${order.officer_name}, ${order.bank_name}`
+      // Build category suffix once
+      const categorySuffix = buildCategorySuffix(
+        order?.category_name,
+        order?.sub_category_name,
+        order?.child_category_name
+      );
+
+      setReportFormData((prev) => {
+        // Check if there's already a saved report - if so, don't override heading fields
+        // The report loading effect will handle setting saved values
+        // Also check if report fetch is complete - only prefill if fetch completed and no report exists
+        const hasSavedReport =
+          reportFetchCompleted &&
+          currentReport?.report &&
+          currentReport.order_id === parseInt(id);
+
+        // Also check if heading fields already have values (from saved report)
+        const hasSavedHeadingValues =
+          prev.valueation_report_for_heading ||
+          prev.general_details_heading ||
+          prev.inspected_equipment_heading ||
+          prev.comments_on_equipment_heading ||
+          prev.insurance_details_heading ||
+          prev.overall_feedback_heading;
+
+        // Prefill headings if:
+        // 1. No saved report exists, OR
+        // 2. Headings are empty/null (need defaults)
+        // This ensures headings always have values when category data is available
+        const shouldPrefillHeadings =
+          (!hasSavedReport || !hasSavedHeadingValues) && categorySuffix;
+
+        return {
+          ...prev,
+          ref_no_bank: order?.bank_initial || "",
+          state_name: prev.state_name || "MUM",
+          ref_no_code: order?.valuer_name
+            ? getRefNoCode(order.valuer_name)
             : "",
-        model:
-          order?.sub_category_name && order?.child_category_name
-            ? `${order.sub_category_name}, ${order.child_category_name}`
+          initiated_by:
+            order?.officer_name && order?.bank_name
+              ? `${order.officer_name}, ${order.bank_name}`
+              : "",
+          model:
+            order?.sub_category_name && order?.child_category_name
+              ? `${order.sub_category_name}, ${order.child_category_name}`
+              : "",
+          asset_classification: order?.child_category_name || "",
+          hyp_with: order?.bank_name || "",
+          // ALWAYS use valuer_name from order (never from report or previous state)
+          valuer_name: order?.valuer_name || "",
+          license_no: order?.valuer_name
+            ? getLicenseNumber(order.valuer_name)
             : "",
-        asset_classification: order?.child_category_name || "",
-        hyp_with: order?.bank_name || "",
-        // ALWAYS use valuer_name from order (never from report or previous state)
-        valuer_name: order?.valuer_name || "",
-        license_no: order?.valuer_name
-          ? getLicenseNumber(order.valuer_name)
-          : "",
-      }));
+          // Prefill category_suffix with category information
+          // Only prefill if there's no saved report and no existing category_suffix value
+          category_suffix: shouldPrefillHeadings && categorySuffix
+            ? categorySuffix
+            : prev.category_suffix || "",
+        };
+      });
     }
-  }, [order, getLicenseNumber, getRefNoCode]);
+  }, [
+    order,
+    getLicenseNumber,
+    getRefNoCode,
+    buildCategorySuffix,
+    currentReport,
+    id,
+    reportFetchCompleted,
+  ]);
+
+  // Track when the initial report fetch completes
+  // We need to ensure: (1) fetch has started (reportLoading = true), (2) fetch has completed (reportLoading = false)
+  useEffect(() => {
+    // Step 1: Mark that loading has started when reportLoading becomes true
+    if (reportLoading && !reportLoadingStartedRef.current) {
+      reportLoadingStartedRef.current = true;
+    }
+
+    // Step 2: Mark as completed only after loading has started AND then becomes false
+    // This prevents treating the initial false state as "fetch completed"
+    if (
+      !reportLoading &&
+      reportLoadingStartedRef.current &&
+      !reportFetchCompleted
+    ) {
+      // Add a small delay to ensure Redux state has fully updated
+      const timer = setTimeout(() => {
+        setReportFetchCompleted(true); // Use setState to trigger re-renders
+      }, 300); // Small delay to ensure state propagation
+
+      return () => clearTimeout(timer);
+    }
+
+    // Fallback: If loading state hasn't been detected after 1.5 seconds, assume fetch completed
+    // This handles cases where Redux state changes too quickly to detect
+    if (!reportLoadingStartedRef.current && !reportFetchCompleted) {
+      const fallbackTimer = setTimeout(() => {
+        if (!reportFetchCompleted) {
+          reportLoadingStartedRef.current = true; // Mark as started
+          setReportFetchCompleted(true); // Use setState to trigger re-renders
+        }
+      }, 1500); // Wait 1.5 seconds before using fallback
+
+      return () => clearTimeout(fallbackTimer);
+    }
+  }, [reportLoading, currentReport, reportFetchCompleted]);
 
   // Populate form data from fetched Machinery report (if available)
   useEffect(() => {
     const report = currentReport?.report;
-    if (!report) return; // Gracefully do nothing when data is null
+    if (!report) {
+      // If no report and fetch is completed, ensure default values are set
+      if (reportFetchCompleted && !reportLoading) {
+        // Ensure ref_no_month has a default value if it's empty or null
+        setReportFormData((prev) => {
+          if (!prev.ref_no_month || prev.ref_no_month.trim() === "") {
+            const months = [
+              "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+              "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+            ];
+            const currentMonth = new Date().getMonth();
+            return {
+              ...prev,
+              ref_no_month: `SFW-${months[currentMonth]}-`,
+            };
+          }
+          return prev;
+        });
+      }
+      return; // Gracefully do nothing when data is null
+    }
 
     // Validate that the report belongs to the current order
     if (currentReport?.order_id && currentReport.order_id !== parseInt(id)) {
-      console.warn(
-        `Report data for order ${currentReport.order_id} does not match current order ${id}. Ignoring report data.`
-      );
+      // Report belongs to different order, ignore it
       return;
     }
 
     setReportFormData((prev) => {
       const updated = { ...prev };
 
+      // Define all heading fields to ensure they're all handled
+      const headingFields = [
+        "valueation_report_for_heading",
+        "general_details_heading",
+        "inspected_equipment_heading",
+        "comments_on_equipment_heading",
+        "insurance_details_heading",
+        "overall_feedback_heading",
+      ];
+
+      // Extract category_suffix from saved headings or use default from order
+      let extractedCategorySuffix = "";
+      
+      // Try to extract category_suffix from any existing heading
+      if (report.valueation_report_for_heading && String(report.valueation_report_for_heading).trim() !== "") {
+        const match = String(report.valueation_report_for_heading).match(/VALUATION REPORT FOR (.+)/i);
+        if (match && match[1]) {
+          extractedCategorySuffix = match[1].trim();
+        }
+      } else if (report.general_details_heading && String(report.general_details_heading).trim() !== "") {
+        const match = String(report.general_details_heading).match(/GENERAL DETAILS OF THE INSPECTED (.+)/i);
+        if (match && match[1]) {
+          extractedCategorySuffix = match[1].trim();
+        }
+      }
+      
+      // If no category_suffix found in headings, use default from order
+      if (!extractedCategorySuffix && order) {
+        extractedCategorySuffix = buildCategorySuffix(
+          order?.category_name,
+          order?.sub_category_name,
+          order?.child_category_name
+        );
+      }
+      
+      // Set category_suffix (this will trigger heading regeneration via handleFormChange)
+      updated.category_suffix = extractedCategorySuffix;
+      
+      // Generate headings from category_suffix
+      const categorySuffixUpper = extractedCategorySuffix ? extractedCategorySuffix.toUpperCase().trim() : "";
+      updated.valueation_report_for_heading = categorySuffixUpper
+        ? `VALUATION REPORT FOR ${categorySuffixUpper}`
+        : "";
+      updated.general_details_heading = categorySuffixUpper
+        ? `GENERAL DETAILS OF THE INSPECTED ${categorySuffixUpper}`
+        : "";
+      updated.inspected_equipment_heading = categorySuffixUpper
+        ? `INSPECTED EQUIPMENT DETAILS OF ${categorySuffixUpper}`
+        : "";
+      updated.comments_on_equipment_heading = categorySuffixUpper
+        ? `COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION ${categorySuffixUpper}`
+        : "";
+      updated.insurance_details_heading = categorySuffixUpper
+        ? `INSURANCE DETAILS OF ${categorySuffixUpper}`
+        : "";
+      updated.overall_feedback_heading = categorySuffixUpper
+        ? `OVER ALL FEED BACK OF THE INSPECTED ${categorySuffixUpper}`
+        : "";
+
       // More robust field population - try to set all relevant fields
       Object.entries(report).forEach(([key, value]) => {
-        // Skip system fields and valuer-related fields (those come from order only)
+        // Skip system fields, valuer-related fields, and heading fields (already handled above)
         if (
           key.startsWith("created_") ||
           key.startsWith("updated_") ||
@@ -485,7 +715,8 @@ function MachineryReport() {
           key === "flexible_fields" ||
           key === "valuer_name" ||
           key === "license_no" ||
-          key === "ref_no_code"
+          key === "ref_no_code" ||
+          headingFields.includes(key)
         ) {
           return;
         }
@@ -511,6 +742,16 @@ function MachineryReport() {
         // Try to set the field (both existing and dynamic fields)
         updated[key] = fieldValue;
       });
+
+      // Ensure ref_no_month has a default value if it's empty or null
+      if (!updated.ref_no_month || updated.ref_no_month.trim() === "") {
+        const months = [
+          "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+          "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+        ];
+        const currentMonth = new Date().getMonth();
+        updated.ref_no_month = `SFW-${months[currentMonth]}-`;
+      }
 
       return updated;
     });
@@ -561,7 +802,14 @@ function MachineryReport() {
 
       setFlexibleFields(combined);
     }
-  }, [currentReport, id]);
+  }, [
+    currentReport,
+    id,
+    reportFetchCompleted,
+    reportLoading,
+    order,
+    buildCategorySuffix,
+  ]);
 
   // Set page title with breadcrumb navigation
   useLayoutEffect(() => {
@@ -582,6 +830,42 @@ function MachineryReport() {
     );
   }, [id, order, setTitle]);
 
+  // Auto-update all heading fields when category_suffix changes (for programmatic updates)
+  useEffect(() => {
+    const categorySuffix = reportFormData.category_suffix || "";
+    const categorySuffixUpper = categorySuffix ? categorySuffix.toUpperCase().trim() : "";
+    
+    setReportFormData((prev) => {
+      // Only update if category_suffix has changed to avoid infinite loops
+      if (prev.category_suffix === categorySuffix && 
+          prev.valueation_report_for_heading === (categorySuffixUpper ? `VALUATION REPORT FOR ${categorySuffixUpper}` : "")) {
+        return prev;
+      }
+      
+      return {
+        ...prev,
+        valueation_report_for_heading: categorySuffixUpper
+          ? `VALUATION REPORT FOR ${categorySuffixUpper}`
+          : "",
+        general_details_heading: categorySuffixUpper
+          ? `GENERAL DETAILS OF THE INSPECTED ${categorySuffixUpper}`
+          : "",
+        inspected_equipment_heading: categorySuffixUpper
+          ? `INSPECTED EQUIPMENT DETAILS OF ${categorySuffixUpper}`
+          : "",
+        comments_on_equipment_heading: categorySuffixUpper
+          ? `COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION ${categorySuffixUpper}`
+          : "",
+        insurance_details_heading: categorySuffixUpper
+          ? `INSURANCE DETAILS OF ${categorySuffixUpper}`
+          : "",
+        overall_feedback_heading: categorySuffixUpper
+          ? `OVER ALL FEED BACK OF THE INSPECTED ${categorySuffixUpper}`
+          : "",
+      };
+    });
+  }, [reportFormData.category_suffix]);
+
   // Handle form input changes
   const handleFormChange = useCallback(
     (e) => {
@@ -591,6 +875,29 @@ function MachineryReport() {
           ...prev,
           [name]: value,
         };
+
+        // If category_suffix changes, update all heading fields automatically
+        if (name === "category_suffix") {
+          const categorySuffixUpper = value ? value.toUpperCase().trim() : "";
+          updated.valueation_report_for_heading = categorySuffixUpper
+            ? `VALUATION REPORT FOR ${categorySuffixUpper}`
+            : "";
+          updated.general_details_heading = categorySuffixUpper
+            ? `GENERAL DETAILS OF THE INSPECTED ${categorySuffixUpper}`
+            : "";
+          updated.inspected_equipment_heading = categorySuffixUpper
+            ? `INSPECTED EQUIPMENT DETAILS OF ${categorySuffixUpper}`
+            : "";
+          updated.comments_on_equipment_heading = categorySuffixUpper
+            ? `COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION ${categorySuffixUpper}`
+            : "";
+          updated.insurance_details_heading = categorySuffixUpper
+            ? `INSURANCE DETAILS OF ${categorySuffixUpper}`
+            : "";
+          updated.overall_feedback_heading = categorySuffixUpper
+            ? `OVER ALL FEED BACK OF THE INSPECTED ${categorySuffixUpper}`
+            : "";
+        }
 
         // Handle currency formatting for currency fields
         if (
@@ -836,11 +1143,15 @@ function MachineryReport() {
       // Compute and validate amount_in_words centrally based on fair_market_value
       const fmvRaw = reportFormData.fair_market_value;
       const fmvAmount = parseCurrency(fmvRaw);
-      const computedAmountInWords = fmvRaw ? convertNumberToWordsIndian(fmvAmount) : "";
+      const computedAmountInWords = fmvRaw
+        ? convertNumberToWordsIndian(fmvAmount)
+        : "";
 
       // If FMV is present but amount_in_words couldn't be computed, block submit
       if (fmvRaw && !computedAmountInWords) {
-        toast.error("Amount in words missing. Please enter a valid Fair Market Value.");
+        toast.error(
+          "Amount in words missing. Please enter a valid Fair Market Value."
+        );
         if (preOpenedTab && !preOpenedTab.closed) {
           preOpenedTab.close();
         }
@@ -907,8 +1218,12 @@ function MachineryReport() {
       }
 
       // ALWAYS include disclaimer in payload
-      const defaultDisclaimer = "THIS REPORT IS GENERATED BY THE VALUETECH SOLUTIONS AT THE SOLE REQUEST OF UGRO CAPITAL LIMITED, KAROL BAGH BRANCH, NEW DELHI WHOM, THIS VALUATION REPORT IS ADDRESSED AND IS TO BE USED SOLELY BY THE SAID PARTY FOR THE STATED PURPOSE ONLY. VALUETECH SOLUTIONS WILL NOT BE HELD LIABLE FOR ANY LOSS OR LIABLITY SUSTAINED BY ANY PARTY RELYING ON THIS VALUATION REPORT. VALUETECH SOLUTIONS HAS RELIED ON THE DATA PROVIDED BY THE CLIENT & HAS NOT VERIFIED GENUIUNENESS THEREOFF. AS THERE IS NO STANDARD PRICE LIST FOR PRE-OWNED/USED MACHINERY / CRANE, THIS VALUATION INDICATED IN THE REPORT IS OUR PROFESSIONAL OPINION ONLY ON THE MARKET VALUE OF THE PRODUCT SHOWN IN COLLAGE OR IN DETAILS BASED ON STANDARD VALUATION METHODOLOGY & PROCEDURES CALCULATING FLUCTUATIONS & LIMITATIONS OF VALUATED PRODUCTS. ACUAL REALISATION MAY DIFFER FROM THE VALUATION INDICATED IN THE REPORT. VALUETECH SOLUTIONS (SIGNATORY & EMPLOYEES WILL NOT BE HELD LIABLE FOR ANY DIRECT, INDIRECT CONSEQUENTIAL OR EXEMPLARY DAMAGES FOR ANY LOSS RESULTING FROM THE USE OF THIS REPORT. VALUETECH SOLUTIONS IS NOT RESPONSIBLE FOR VERIFYING THE GENUINENESS OF THE PROVIDED DOCUMENTS. THE VALUATION OF ASSET IS PRIMARILY BASED ON THE CONDITION OF THE MACHINERY AT THE TIME OF INSPECTION & SURVEY. TO GIVE LOAN TO THE APPLICANT IS THE RESPONSIIBLITY OF THE FINANCE COMPANY/BANK. WE ARE NOT RESPONSIBLE OR CONCERNED FOR THE SAME.";
-      formData.append("disclaimer", reportFormData.disclaimer || defaultDisclaimer);
+      const defaultDisclaimer =
+        "THIS REPORT IS GENERATED BY THE VALUETECH SOLUTIONS AT THE SOLE REQUEST OF UGRO CAPITAL LIMITED, KAROL BAGH BRANCH, NEW DELHI WHOM, THIS VALUATION REPORT IS ADDRESSED AND IS TO BE USED SOLELY BY THE SAID PARTY FOR THE STATED PURPOSE ONLY. VALUETECH SOLUTIONS WILL NOT BE HELD LIABLE FOR ANY LOSS OR LIABLITY SUSTAINED BY ANY PARTY RELYING ON THIS VALUATION REPORT. VALUETECH SOLUTIONS HAS RELIED ON THE DATA PROVIDED BY THE CLIENT & HAS NOT VERIFIED GENUIUNENESS THEREOFF. AS THERE IS NO STANDARD PRICE LIST FOR PRE-OWNED/USED MACHINERY / CRANE, THIS VALUATION INDICATED IN THE REPORT IS OUR PROFESSIONAL OPINION ONLY ON THE MARKET VALUE OF THE PRODUCT SHOWN IN COLLAGE OR IN DETAILS BASED ON STANDARD VALUATION METHODOLOGY & PROCEDURES CALCULATING FLUCTUATIONS & LIMITATIONS OF VALUATED PRODUCTS. ACUAL REALISATION MAY DIFFER FROM THE VALUATION INDICATED IN THE REPORT. VALUETECH SOLUTIONS (SIGNATORY & EMPLOYEES WILL NOT BE HELD LIABLE FOR ANY DIRECT, INDIRECT CONSEQUENTIAL OR EXEMPLARY DAMAGES FOR ANY LOSS RESULTING FROM THE USE OF THIS REPORT. VALUETECH SOLUTIONS IS NOT RESPONSIBLE FOR VERIFYING THE GENUINENESS OF THE PROVIDED DOCUMENTS. THE VALUATION OF ASSET IS PRIMARILY BASED ON THE CONDITION OF THE MACHINERY AT THE TIME OF INSPECTION & SURVEY. TO GIVE LOAN TO THE APPLICANT IS THE RESPONSIIBLITY OF THE FINANCE COMPANY/BANK. WE ARE NOT RESPONSIBLE OR CONCERNED FOR THE SAME.";
+      formData.append(
+        "disclaimer",
+        reportFormData.disclaimer || defaultDisclaimer
+      );
 
       // Add flexible fields to FormData with proper sequential ordering
       let formDataIndex = 0;
@@ -1047,11 +1362,15 @@ function MachineryReport() {
     // Compute and validate amount_in_words centrally based on fair_market_value
     const fmvRaw = reportFormData.fair_market_value;
     const fmvAmount = parseCurrency(fmvRaw);
-    const computedAmountInWords = fmvRaw ? convertNumberToWordsIndian(fmvAmount) : "";
+    const computedAmountInWords = fmvRaw
+      ? convertNumberToWordsIndian(fmvAmount)
+      : "";
 
     // If FMV is present but amount_in_words couldn't be computed, block save
     if (fmvRaw && !computedAmountInWords) {
-      toast.error("Amount in words missing. Please enter a valid Fair Market Value.");
+      toast.error(
+        "Amount in words missing. Please enter a valid Fair Market Value."
+      );
       return;
     }
 
@@ -1059,7 +1378,8 @@ function MachineryReport() {
     const reportData = {};
 
     // Default disclaimer text - ALWAYS included in payload
-    const defaultDisclaimer = "THIS REPORT IS GENERATED BY THE VALUETECH SOLUTIONS AT THE SOLE REQUEST OF UGRO CAPITAL LIMITED, KAROL BAGH BRANCH, NEW DELHI WHOM, THIS VALUATION REPORT IS ADDRESSED AND IS TO BE USED SOLELY BY THE SAID PARTY FOR THE STATED PURPOSE ONLY. VALUETECH SOLUTIONS WILL NOT BE HELD LIABLE FOR ANY LOSS OR LIABLITY SUSTAINED BY ANY PARTY RELYING ON THIS VALUATION REPORT. VALUETECH SOLUTIONS HAS RELIED ON THE DATA PROVIDED BY THE CLIENT & HAS NOT VERIFIED GENUIUNENESS THEREOFF. AS THERE IS NO STANDARD PRICE LIST FOR PRE-OWNED/USED MACHINERY / CRANE, THIS VALUATION INDICATED IN THE REPORT IS OUR PROFESSIONAL OPINION ONLY ON THE MARKET VALUE OF THE PRODUCT SHOWN IN COLLAGE OR IN DETAILS BASED ON STANDARD VALUATION METHODOLOGY & PROCEDURES CALCULATING FLUCTUATIONS & LIMITATIONS OF VALUATED PRODUCTS. ACUAL REALISATION MAY DIFFER FROM THE VALUATION INDICATED IN THE REPORT. VALUETECH SOLUTIONS (SIGNATORY & EMPLOYEES WILL NOT BE HELD LIABLE FOR ANY DIRECT, INDIRECT CONSEQUENTIAL OR EXEMPLARY DAMAGES FOR ANY LOSS RESULTING FROM THE USE OF THIS REPORT. VALUETECH SOLUTIONS IS NOT RESPONSIBLE FOR VERIFYING THE GENUINENESS OF THE PROVIDED DOCUMENTS. THE VALUATION OF ASSET IS PRIMARILY BASED ON THE CONDITION OF THE MACHINERY AT THE TIME OF INSPECTION & SURVEY. TO GIVE LOAN TO THE APPLICANT IS THE RESPONSIIBLITY OF THE FINANCE COMPANY/BANK. WE ARE NOT RESPONSIBLE OR CONCERNED FOR THE SAME.";
+    const defaultDisclaimer =
+      "THIS REPORT IS GENERATED BY THE VALUETECH SOLUTIONS AT THE SOLE REQUEST OF UGRO CAPITAL LIMITED, KAROL BAGH BRANCH, NEW DELHI WHOM, THIS VALUATION REPORT IS ADDRESSED AND IS TO BE USED SOLELY BY THE SAID PARTY FOR THE STATED PURPOSE ONLY. VALUETECH SOLUTIONS WILL NOT BE HELD LIABLE FOR ANY LOSS OR LIABLITY SUSTAINED BY ANY PARTY RELYING ON THIS VALUATION REPORT. VALUETECH SOLUTIONS HAS RELIED ON THE DATA PROVIDED BY THE CLIENT & HAS NOT VERIFIED GENUIUNENESS THEREOFF. AS THERE IS NO STANDARD PRICE LIST FOR PRE-OWNED/USED MACHINERY / CRANE, THIS VALUATION INDICATED IN THE REPORT IS OUR PROFESSIONAL OPINION ONLY ON THE MARKET VALUE OF THE PRODUCT SHOWN IN COLLAGE OR IN DETAILS BASED ON STANDARD VALUATION METHODOLOGY & PROCEDURES CALCULATING FLUCTUATIONS & LIMITATIONS OF VALUATED PRODUCTS. ACUAL REALISATION MAY DIFFER FROM THE VALUATION INDICATED IN THE REPORT. VALUETECH SOLUTIONS (SIGNATORY & EMPLOYEES WILL NOT BE HELD LIABLE FOR ANY DIRECT, INDIRECT CONSEQUENTIAL OR EXEMPLARY DAMAGES FOR ANY LOSS RESULTING FROM THE USE OF THIS REPORT. VALUETECH SOLUTIONS IS NOT RESPONSIBLE FOR VERIFYING THE GENUINENESS OF THE PROVIDED DOCUMENTS. THE VALUATION OF ASSET IS PRIMARILY BASED ON THE CONDITION OF THE MACHINERY AT THE TIME OF INSPECTION & SURVEY. TO GIVE LOAN TO THE APPLICANT IS THE RESPONSIIBLITY OF THE FINANCE COMPANY/BANK. WE ARE NOT RESPONSIBLE OR CONCERNED FOR THE SAME.";
 
     // ALWAYS include disclaimer in payload - no conditions
     reportData.disclaimer = reportFormData.disclaimer || defaultDisclaimer;
@@ -1527,6 +1847,57 @@ function MachineryReport() {
             <h2>Machinery Report</h2>
             <form onSubmit={handleReportSubmit} className="body-form-box">
               <div className="row">
+                <div className="col-12">
+                  <div className="form-group">
+                    <label htmlFor="category_suffix">
+                      Category Suffix <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="category_suffix"
+                      name="category_suffix"
+                      value={reportFormData.category_suffix || ""}
+                      onChange={handleFormChange}
+                      placeholder="Enter category/subcategory/child-category (e.g., COMMERCIAL VEHICLE / CV CV-IN 11)"
+                    />
+                    <small className="form-text text-muted">
+                      This field controls all heading fields below. Enter the category information in the format: (category_name) / (sub_category_name) (child_category_name)
+                    </small>
+                  </div>
+                </div>
+                <div className="col-12">
+                  <div className="form-group">
+                    <label htmlFor="valueation_report_for_heading">
+                      Valuation Report For Heading
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="valueation_report_for_heading"
+                      name="valueation_report_for_heading"
+                      value={reportFormData.valueation_report_for_heading || ""}
+                      readOnly
+                      placeholder="Auto-generated from Category Suffix"
+                    />
+                  </div>
+                </div>
+                <div className="col-12">
+                  <div className="form-group">
+                    <label htmlFor="general_details_heading">
+                      General Details Heading
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="general_details_heading"
+                      name="general_details_heading"
+                      value={reportFormData.general_details_heading || ""}
+                      readOnly
+                      placeholder="Auto-generated from Category Suffix"
+                    />
+                  </div>
+                </div>
                 <div className="col-md-6">
                   <div className="form-group ">
                     <label>
@@ -1570,6 +1941,15 @@ function MachineryReport() {
                         required
                       />
                       <span className="ref-no-slash">/</span>
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="ref_no_month"
+                        value={reportFormData.ref_no_month || ""}
+                        onChange={handleFormChange}
+                        placeholder="Enter Month"
+                        required
+                      />
                       <input
                         type="text"
                         className="form-field"
@@ -1798,6 +2178,22 @@ function MachineryReport() {
                 <div className="col-12">
                   <h4>INSPECTED EQUIPMENT DETAILS</h4>
                   <hr />
+                </div>
+                <div className="col-12">
+                  <div className="form-group">
+                    <label htmlFor="inspected_equipment_heading">
+                      Inspected Equipment Heading
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="inspected_equipment_heading"
+                      name="inspected_equipment_heading"
+                      value={reportFormData.inspected_equipment_heading || ""}
+                      readOnly
+                      placeholder="Auto-generated from Category Suffix"
+                    />
+                  </div>
                 </div>
                 <div className="col-md-4">
                   <div className="form-group">
@@ -2106,6 +2502,22 @@ function MachineryReport() {
                 <div className="col-12">
                   <h4>COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION</h4>
                   <hr />
+                </div>
+                <div className="col-12">
+                  <div className="form-group">
+                    <label htmlFor="comments_on_equipment_heading">
+                      Comments on Equipment Heading
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="comments_on_equipment_heading"
+                      name="comments_on_equipment_heading"
+                      value={reportFormData.comments_on_equipment_heading || ""}
+                      readOnly
+                      placeholder="Auto-generated from Category Suffix"
+                    />
+                  </div>
                 </div>
                 <div className="col-md-6">
                   <div className="form-group">
@@ -2639,6 +3051,22 @@ function MachineryReport() {
                   <h4>INSURANCE DETAILS OF THE</h4>
                   <hr />
                 </div>
+                <div className="col-12">
+                  <div className="form-group">
+                    <label htmlFor="insurance_details_heading">
+                      Insurance Details Heading
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="insurance_details_heading"
+                      name="insurance_details_heading"
+                      value={reportFormData.insurance_details_heading || ""}
+                      readOnly
+                      placeholder="Auto-generated from Category Suffix"
+                    />
+                  </div>
+                </div>
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="rc_book_verified">
@@ -2850,6 +3278,22 @@ function MachineryReport() {
                 <div className="col-12">
                   <h4>OVER ALL FEED BACK OF THE INSPECTED</h4>
                   <hr />
+                </div>
+                <div className="col-12">
+                  <div className="form-group">
+                    <label htmlFor="overall_feedback_heading">
+                      Overall Feedback Heading
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="overall_feedback_heading"
+                      name="overall_feedback_heading"
+                      value={reportFormData.overall_feedback_heading || ""}
+                      readOnly
+                      placeholder="Auto-generated from Category Suffix"
+                    />
+                  </div>
                 </div>
                 <div className="col-md-3">
                   <div className="form-group">

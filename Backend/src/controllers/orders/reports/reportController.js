@@ -636,6 +636,14 @@ exports.generateReport = async (req, res, next) => {
       mainReportData.asset_make = assetMakeIdForDB;
     }
     
+    // Map frontend field name to database column name for CV, CE, and Machinery report headings
+    if (['report_cv', 'report_ce', 'report_machinery'].includes(requestedReportType.toLowerCase())) {
+      if (mainReportData.valuation_report_for_heading !== undefined) {
+        mainReportData.valueation_report_for_heading = mainReportData.valuation_report_for_heading;
+        delete mainReportData.valuation_report_for_heading;
+      }
+    }
+    
     // Filter form data to only include valid database columns
     const validFields = filterValidReportFields(mainReportData, requestedReportType);
     
@@ -1271,6 +1279,14 @@ exports.saveReportData = async (req, res, next) => {
       formData.asset_make = assetMakeIdForDB;
     }
     
+    // Map frontend field name to database column name for CV, CE, and Machinery report headings
+    if (['report_cv', 'report_ce', 'report_machinery'].includes(requestedReportType.toLowerCase())) {
+      if (formData.valuation_report_for_heading !== undefined) {
+        formData.valueation_report_for_heading = formData.valuation_report_for_heading;
+        delete formData.valuation_report_for_heading;
+      }
+    }
+    
     // Filter form data to only include valid database columns
     const validFields = filterValidReportFields(formData, requestedReportType);
     Object.assign(reportData, validFields);
@@ -1515,7 +1531,9 @@ function filterValidReportFields(formData, reportType) {
   // Define valid columns for each report type based on actual database schema
   const validColumns = {
     report_cv: [
-      'ref_no_year', 'ref_no_bank', 'state_name', 'ref_no_code', 'ref_no_id',
+      'valueation_report_for_heading', 'general_details_heading', 'inspected_equipment_heading',
+      'comments_on_equipment_heading', 'rc_permit_tax_fitness_insurance_heading', 'overall_feedback_heading',
+      'ref_no_year', 'ref_no_month', 'ref_no_bank', 'state_name', 'ref_no_code', 'ref_no_id',
       'report_date', 'valuer_name', 'license_no', 'valuer_contact', 'valuation_purpose',
       'initiated_by', 'date_of_inspection', 'place_of_inspection',
       'registered_owner_name', 'registered_owner_address', 'proposed_owner_name', 'proposed_owner_address',
@@ -1538,7 +1556,7 @@ function filterValidReportFields(formData, reportType) {
       'declaration', 'disclaimer', 'chassis_no_pencil_impression'
     ],
     report_avr: [
-      'ref_no_year', 'ref_no_bank', 'ref_no_code', 'ref_no_id', 'lan_no',
+      'ref_no_year', 'ref_no_month', 'ref_no_bank', 'ref_no_code', 'ref_no_id', 'lan_no',
       'report_date', 'bank_name', 'branch_name', 'state_name',
       'model_number', 'officer_name', 'officer_designation', 'inspected_item', 'inspected_date',
       'inspection_address', 'customer_name', 'address_as_per_kyc', 'machinery_locations', 'lan_city_no',
@@ -1553,7 +1571,9 @@ function filterValidReportFields(formData, reportType) {
       'declaration', 'disclaimer'
     ],
     report_machinery: [
-      'ref_no_year', 'ref_no_bank', 'state_name', 'ref_no_code', 'ref_no_id',
+      'valueation_report_for_heading', 'general_details_heading', 'inspected_equipment_heading',
+      'comments_on_equipment_heading', 'insurance_details_heading', 'overall_feedback_heading',
+      'ref_no_year', 'ref_no_month', 'ref_no_bank', 'state_name', 'ref_no_code', 'ref_no_id',
       'report_date', 'valuer_name', 'license_no', 'valuer_contact', 'valuation_purpose',
       'initiated_by', 'date_of_inspection', 'place_of_inspection',
       'registered_owner_name', 'registered_owner_address', 'proposed_owner_name', 'proposed_owner_address',
@@ -1578,7 +1598,9 @@ function filterValidReportFields(formData, reportType) {
       'declaration', 'disclaimer'
     ],
     report_ce: [
-      'ref_no_year', 'ref_no_bank', 'state_name', 'ref_no_code', 'ref_no_id', 'rev_report_date',
+      'valueation_report_for_heading', 'general_details_heading', 'inspected_equipment_heading',
+      'comments_on_equipment_heading', 'rc_permit_tax_fitness_insurance_heading', 'overall_feedback_heading',
+      'ref_no_year', 'ref_no_month', 'ref_no_bank', 'state_name', 'ref_no_code', 'ref_no_id', 'rev_report_date',
       'valuer_name', 'license_no', 'valuer_contact', 'valuation_purpose', 'initiated_by',
       'date_of_inspection', 'place_of_inspection',
       'registered_owner_name', 'registered_owner_address', 'proposed_owner_name', 'proposed_owner_address',
@@ -1616,7 +1638,7 @@ function filterValidReportFields(formData, reportType) {
       'imo_or_regd_type', 'imo_or_regd_no', 'vessel_photo', 'vessel_photo_id',
       'client_city_state_name', 'execute_above', 'valuer_name', 'license_no',
       'inspection_location_front_page', 'inspection_date_front_page',
-      'ref_no_year', 'ref_no_bank', 'state_initial', 'ref_no_code', 'ref_no_id',
+      'ref_no_year', 'ref_no_month', 'ref_no_bank', 'state_initial', 'ref_no_code', 'ref_no_id',
       'report_date', 'client_name_with_full_address', 'imo_official_regd_no',
       // PARTICULARS OF THE VESSEL
       'registry_vessel_date', 'registry_vessel_location', 'registered_or_proposed_owner',

@@ -39,26 +39,27 @@ function CVReport() {
     saving,
   } = useSelector((state) => state.orderReports);
 
-  /* console.log("currentReport", currentReport); */
   // Get asset makes data from Redux store
-  const { list: assetMakes, loading: assetMakesLoading } = useSelector((state) => state.assetMakes);
+  const { list: assetMakes, loading: assetMakesLoading } = useSelector(
+    (state) => state.assetMakes
+  );
   const [showOtherAssetMake, setShowOtherAssetMake] = useState(false);
   const [otherAssetMake, setOtherAssetMake] = useState("");
   // Set page title using custom hook
   const { setTitle } = usePageTitle();
-  
+
   // State to track if initial report fetch has completed (using state instead of ref to trigger re-renders)
   const [reportFetchCompleted, setReportFetchCompleted] = useState(false);
   // State to track if external API is currently loading
   const [externalApiLoading, setExternalApiLoading] = useState(false);
-  
+
   // Ref to track if external RC API has been called (to ensure it's only called once)
   const externalApiCalledRef = useRef(false);
   // Ref to track if we should auto-save after external API prefills data
   const shouldAutoSaveAfterApiRef = useRef(false);
   // Ref to track if we've seen the report loading state (to ensure we wait for the fetch to actually happen)
   const reportLoadingStartedRef = useRef(false);
-  
+
   // Clear report data when component mounts or order changes
   useEffect(() => {
     // Clear any existing report data first
@@ -87,16 +88,25 @@ function CVReport() {
     }
   }, [dispatch, id]);
 
-
   // Reset form data when component mounts or order ID changes
   useEffect(() => {
     // Get current date in DD-MM-YYYY format
-    const getCurrentDate = () => {
+    const getCurrentDateLocal = () => {
       const today = new Date();
       const day = String(today.getDate()).padStart(2, "0");
       const month = String(today.getMonth() + 1).padStart(2, "0");
       const year = today.getFullYear();
       return `${day}-${month}-${year}`;
+    };
+
+    // Get current month in 3-letter uppercase format
+    const getCurrentMonthAbbreviationLocal = () => {
+      const months = [
+        "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+        "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+      ];
+      const currentMonth = new Date().getMonth();
+      return months[currentMonth];
     };
 
     // Reset form data to initial state when order changes
@@ -107,12 +117,23 @@ function CVReport() {
       ref_no_bank: "",
       state_name: "", // Default to first option
       ref_no_code: "", // Default to first option
+      ref_no_month: `SFW-${getCurrentMonthAbbreviationLocal()}-`, // Default: SFW-(CURRENT_MONTH)
       ref_no_id: "",
-      report_date: getCurrentDate(), // Default to today's date
+      report_date: getCurrentDateLocal(), // Default to today's date
 
       valuer_name: "V.K. ASSOCIATES", // Default to first option
       license_no: "SLA-60827",
       valuer_contact: "99209-88549", // Fixed read-only value
+
+      // Category suffix - controls all heading fields
+      category_suffix: "",
+      // Heading fields (read-only, auto-generated from category_suffix)
+      valueation_report_for_heading: "",
+      general_details_heading: "",
+      inspected_equipment_heading: "",
+      comments_on_equipment_heading: "",
+      rc_permit_tax_fitness_insurance_heading: "",
+      overall_feedback_heading: "",
 
       valuation_purpose: "",
       initiated_by: "",
@@ -195,9 +216,12 @@ function CVReport() {
   // Function to get reference number code based on valuer name
   const getRefNoCode = useCallback((valuerName) => {
     if (!valuerName) return "";
-    
+
     const name = valuerName.toUpperCase();
-    if (name.includes("V.K. ASSOCIATES") || name.includes("VISHAL D. KOTHARI")) {
+    if (
+      name.includes("V.K. ASSOCIATES") ||
+      name.includes("VISHAL D. KOTHARI")
+    ) {
       return "VKM";
     } else if (name.includes("VALUETECH SOLUTIONS")) {
       return "VTS";
@@ -212,6 +236,16 @@ function CVReport() {
     const month = String(today.getMonth() + 1).padStart(2, "0");
     const year = today.getFullYear();
     return `${day}-${month}-${year}`;
+  }, []);
+
+  // Function to get current month in 3-letter uppercase format (JAN, FEB, MAR, etc.)
+  const getCurrentMonthAbbreviation = useCallback(() => {
+    const months = [
+      "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+      "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+    ];
+    const currentMonth = new Date().getMonth();
+    return months[currentMonth];
   }, []);
 
   // Function to parse currency value (remove commas and convert to number)
@@ -390,12 +424,23 @@ function CVReport() {
     ref_no_bank: "",
     state_name: "", // Default to first option
     ref_no_code: "", // Default to first option
+    ref_no_month: `SFW-${getCurrentMonthAbbreviation()}-`, // Default: SFW-(CURRENT_MONTH)
     ref_no_id: "",
     report_date: getCurrentDate(), // Default to today's date
 
     valuer_name: "V.K. ASSOCIATES", // Default to first option
     license_no: "SLA-60827",
     valuer_contact: "99209-88549", // Fixed read-only value
+
+    // Category suffix - controls all heading fields
+    category_suffix: "",
+    // Heading fields (read-only, auto-generated from category_suffix)
+    valueation_report_for_heading: "",
+    general_details_heading: "",
+    inspected_equipment_heading: "",
+    comments_on_equipment_heading: "",
+    rc_permit_tax_fitness_insurance_heading: "",
+    overall_feedback_heading: "",
 
     valuation_purpose: "",
     initiated_by: "",
@@ -502,32 +547,86 @@ function CVReport() {
   // State for flexible fields
   const [flexibleFields, setFlexibleFields] = useState([]);
 
+  // Helper function to build category suffix for headings
+  const buildCategorySuffix = useCallback((categoryName, subCategoryName, childCategoryName) => {
+    const parts = [];
+    if (categoryName) parts.push(categoryName);
+    if (subCategoryName) parts.push(subCategoryName);
+    if (childCategoryName) parts.push(childCategoryName);
+    
+    if (parts.length === 0) return "";
+    
+    // Format: (category_name) / (sub_category_name) (child_category_name)
+    if (parts.length === 1) return parts[0];
+    if (parts.length === 2) return `${parts[0]} / ${parts[1]}`;
+    return `${parts[0]} / ${parts[1]} ${parts[2]}`;
+  }, []);
+
   // Auto-populate form data when order data is available
   useEffect(() => {
     if (order) {
-      setReportFormData((prev) => ({
-        ...prev,
-        ref_no_bank: order?.bank_initial || "",
-        state_name: prev.state_name || "MUM",
-        ref_no_code: order?.valuer_name ? getRefNoCode(order.valuer_name) : "",
-        initiated_by:
-          order?.officer_name && order?.bank_name
-            ? `${order.officer_name}, ${order.bank_name}`
+      // Build category suffix once
+      const categorySuffix = buildCategorySuffix(
+        order?.category_name,
+        order?.sub_category_name,
+        order?.child_category_name
+      );
+
+      setReportFormData((prev) => {
+        // Check if there's already a saved report - if so, don't override heading fields
+        // The report loading effect will handle setting saved values
+        // Also check if report fetch is complete - only prefill if fetch completed and no report exists
+        const hasSavedReport = reportFetchCompleted && 
+                               currentReport?.report && 
+                               currentReport.order_id === parseInt(id);
+        
+        // Also check if heading fields already have values (from saved report)
+        const hasSavedHeadingValues = 
+          prev.valueation_report_for_heading ||
+          prev.general_details_heading ||
+          prev.inspected_equipment_heading ||
+          prev.comments_on_equipment_heading ||
+          prev.rc_permit_tax_fitness_insurance_heading ||
+          prev.overall_feedback_heading;
+
+        // Prefill headings if:
+        // 1. No saved report exists, OR
+        // 2. Headings are empty/null (need defaults)
+        // This ensures headings always have values when category data is available
+        const shouldPrefillHeadings = (!hasSavedReport || !hasSavedHeadingValues) && categorySuffix;
+        
+
+        return {
+          ...prev,
+          ref_no_bank: order?.bank_initial || "",
+          state_name: prev.state_name || "MUM",
+          ref_no_code: order?.valuer_name ? getRefNoCode(order.valuer_name) : "",
+          initiated_by:
+            order?.officer_name && order?.bank_name
+              ? `${order.officer_name}, ${order.bank_name}`
+              : "",
+          model:
+            order?.sub_category_name && order?.child_category_name
+              ? `${order.sub_category_name}, ${order.child_category_name}`
+              : "",
+          asset_classification: order?.child_category_name || "",
+          hyp_with: order?.bank_name || "",
+          // ALWAYS use valuer_name from order (never from report or previous state)
+          valuer_name: order?.valuer_name || "",
+          license_no: order?.valuer_name
+            ? getLicenseNumber(order.valuer_name)
             : "",
-        model:
-          order?.sub_category_name && order?.child_category_name
-            ? `${order.sub_category_name}, ${order.child_category_name}`
-            : "",
-        asset_classification: order?.child_category_name || "",
-        hyp_with: order?.bank_name || "",
-        // ALWAYS use valuer_name from order (never from report or previous state)
-        valuer_name: order?.valuer_name || "",
-        license_no: order?.valuer_name ? getLicenseNumber(order.valuer_name) : "",
-        // Prefill registration number from order if available
-        registration_no: order?.registration_number || "",
-      }));
+          // Prefill registration number from order if available
+          registration_no: order?.registration_number || "",
+          // Prefill category_suffix with category information
+          // Only prefill if there's no saved report and no existing category_suffix value
+          category_suffix: shouldPrefillHeadings && categorySuffix
+            ? categorySuffix
+            : prev.category_suffix || "",
+        };
+      });
     }
-  }, [order, getLicenseNumber, getRefNoCode]);
+  }, [order, getLicenseNumber, getRefNoCode, buildCategorySuffix, currentReport, id, reportFetchCompleted]);
 
   // Track when the initial report fetch completes
   // We need to ensure: (1) fetch has started (reportLoading = true), (2) fetch has completed (reportLoading = false)
@@ -537,10 +636,14 @@ function CVReport() {
       reportLoadingStartedRef.current = true;
       /* console.log("📋 CVReport - Report fetch started (loading = true)"); */
     }
-    
+
     // Step 2: Mark as completed only after loading has started AND then becomes false
     // This prevents treating the initial false state as "fetch completed"
-    if (!reportLoading && reportLoadingStartedRef.current && !reportFetchCompleted) {
+    if (
+      !reportLoading &&
+      reportLoadingStartedRef.current &&
+      !reportFetchCompleted
+    ) {
       // Add a small delay to ensure Redux state has fully updated
       const timer = setTimeout(() => {
         setReportFetchCompleted(true); // Use setState to trigger re-renders
@@ -550,10 +653,10 @@ function CVReport() {
           timestamp: new Date().toISOString(),
         }); */
       }, 300); // Small delay to ensure state propagation
-      
+
       return () => clearTimeout(timer);
     }
-    
+
     // Fallback: If loading state hasn't been detected after 1.5 seconds, assume fetch completed
     // This handles cases where Redux state changes too quickly to detect
     if (!reportLoadingStartedRef.current && !reportFetchCompleted) {
@@ -564,7 +667,7 @@ function CVReport() {
           setReportFetchCompleted(true); // Use setState to trigger re-renders
         }
       }, 1500); // Wait 1.5 seconds before using fallback
-      
+
       return () => clearTimeout(fallbackTimer);
     }
   }, [reportLoading, currentReport, reportFetchCompleted]);
@@ -582,30 +685,102 @@ function CVReport() {
 
     // Validate that the report belongs to the current order
     if (currentReport?.order_id && currentReport.order_id !== parseInt(id)) {
-      console.warn(
-        `Report data for order ${currentReport.order_id} does not match current order ${id}. Ignoring report data.`
-      );
+      // Report belongs to different order, ignore it
       setExternalApiLoading(false);
       return;
     }
 
     setReportFormData((prev) => {
       const updated = { ...prev };
+
+      // Define all heading fields to ensure they're all handled
+      const headingFields = [
+        "valueation_report_for_heading",
+        "general_details_heading",
+        "inspected_equipment_heading",
+        "comments_on_equipment_heading",
+        "rc_permit_tax_fitness_insurance_heading",
+        "overall_feedback_heading",
+      ];
+
+      // Extract category_suffix from saved headings or use default from order
+      let extractedCategorySuffix = "";
       
+      // Try to extract category_suffix from any existing heading
+      if (report.valueation_report_for_heading && String(report.valueation_report_for_heading).trim() !== "") {
+        const match = String(report.valueation_report_for_heading).match(/VALUATION REPORT FOR (.+)/i);
+        if (match && match[1]) {
+          extractedCategorySuffix = match[1].trim();
+        }
+      } else if (report.general_details_heading && String(report.general_details_heading).trim() !== "") {
+        const match = String(report.general_details_heading).match(/GENERAL DETAILS OF THE INSPECTED (.+)/i);
+        if (match && match[1]) {
+          extractedCategorySuffix = match[1].trim();
+        }
+      }
+      
+      // If no category_suffix found in headings, use default from order
+      if (!extractedCategorySuffix && order) {
+        extractedCategorySuffix = buildCategorySuffix(
+          order?.category_name,
+          order?.sub_category_name,
+          order?.child_category_name
+        );
+      }
+      
+      // Set category_suffix (this will trigger heading regeneration via handleFormChange)
+      updated.category_suffix = extractedCategorySuffix;
+      
+      // Generate headings from category_suffix
+      const categorySuffixUpper = extractedCategorySuffix ? extractedCategorySuffix.toUpperCase().trim() : "";
+      updated.valueation_report_for_heading = categorySuffixUpper
+        ? `VALUATION REPORT FOR ${categorySuffixUpper}`
+        : "";
+      updated.general_details_heading = categorySuffixUpper
+        ? `GENERAL DETAILS OF THE INSPECTED ${categorySuffixUpper}`
+        : "";
+      updated.inspected_equipment_heading = categorySuffixUpper
+        ? `INSPECTED EQUIPMENT DETAILS OF ${categorySuffixUpper}`
+        : "";
+      updated.comments_on_equipment_heading = categorySuffixUpper
+        ? `COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION ${categorySuffixUpper}`
+        : "";
+      updated.rc_permit_tax_fitness_insurance_heading = categorySuffixUpper
+        ? `RC, PERMIT, TAX, FITNESS & INSURANCE DETAILS OF ${categorySuffixUpper}`
+        : "";
+      updated.overall_feedback_heading = categorySuffixUpper
+        ? `OVER ALL FEED BACK OF THE INSPECTED ${categorySuffixUpper}`
+        : "";
+
       // Only populate fields that exist in the form structure (editable fields)
       Object.entries(report).forEach(([key, value]) => {
         // Skip system fields and valuer-related fields (those come from order only)
-        if (key.startsWith('created_') || key.startsWith('updated_') || key === 'id' || key === 'order_id' || key === 'flexible_fields' || key === 'valuer_name' || key === 'license_no' || key === 'ref_no_code') {
+        if (
+          key.startsWith("created_") ||
+          key.startsWith("updated_") ||
+          key === "id" ||
+          key === "order_id" ||
+          key === "flexible_fields" ||
+          key === "valuer_name" ||
+          key === "license_no" ||
+          key === "ref_no_code"
+        ) {
           return;
         }
-        
+
         // Convert null to empty string
         const fieldValue = value !== null ? value : "";
-        
+
+        // Skip heading fields as they're already handled above
+        if (headingFields.includes(key)) {
+          // Already handled above, skip to avoid overwriting
+          return;
+        }
+
         // Special handling for invoice_no_date - split into separate fields
-        if (key === 'invoice_no_date' && fieldValue) {
+        if (key === "invoice_no_date" && fieldValue) {
           // Parse "12 Dated 12" format
-          const parts = fieldValue.split(' Dated ');
+          const parts = fieldValue.split(" Dated ");
           if (parts.length === 2) {
             updated.invoice_no = parts[0].trim();
             updated.invoice_date = parts[1].trim();
@@ -616,7 +791,7 @@ function CVReport() {
           }
           return;
         }
-        
+
         // Try to set the field directly first
         if (Object.prototype.hasOwnProperty.call(prev, key)) {
           updated[key] = fieldValue;
@@ -625,7 +800,17 @@ function CVReport() {
           updated[key] = fieldValue;
         }
       });
-      
+
+      // Ensure ref_no_month has a default value if it's empty or null
+      if (!updated.ref_no_month || updated.ref_no_month.trim() === "") {
+        const months = [
+          "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+          "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+        ];
+        const currentMonth = new Date().getMonth();
+        updated.ref_no_month = `SFW-${months[currentMonth]}-`;
+      }
+
       return updated;
     });
 
@@ -680,7 +865,7 @@ function CVReport() {
 
       setFlexibleFields(combined);
     }
-    
+
     // After form data is populated from report, set loading to false
     // Small delay to ensure all state updates are complete
     setTimeout(() => {
@@ -707,6 +892,42 @@ function CVReport() {
     );
   }, [id, order, setTitle]);
 
+  // Auto-update all heading fields when category_suffix changes
+  useEffect(() => {
+    const categorySuffix = reportFormData.category_suffix || "";
+    const categorySuffixUpper = categorySuffix ? categorySuffix.toUpperCase().trim() : "";
+    
+    setReportFormData((prev) => {
+      // Only update if category_suffix has changed to avoid infinite loops
+      if (prev.category_suffix === categorySuffix && 
+          prev.valueation_report_for_heading === (categorySuffixUpper ? `VALUATION REPORT FOR ${categorySuffixUpper}` : "")) {
+        return prev;
+      }
+      
+      return {
+        ...prev,
+        valueation_report_for_heading: categorySuffixUpper
+          ? `VALUATION REPORT FOR ${categorySuffixUpper}`
+          : "",
+        general_details_heading: categorySuffixUpper
+          ? `GENERAL DETAILS OF THE INSPECTED ${categorySuffixUpper}`
+          : "",
+        inspected_equipment_heading: categorySuffixUpper
+          ? `INSPECTED EQUIPMENT DETAILS OF ${categorySuffixUpper}`
+          : "",
+        comments_on_equipment_heading: categorySuffixUpper
+          ? `COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION ${categorySuffixUpper}`
+          : "",
+        rc_permit_tax_fitness_insurance_heading: categorySuffixUpper
+          ? `RC, PERMIT, TAX, FITNESS & INSURANCE DETAILS OF ${categorySuffixUpper}`
+          : "",
+        overall_feedback_heading: categorySuffixUpper
+          ? `OVER ALL FEED BACK OF THE INSPECTED ${categorySuffixUpper}`
+          : "",
+      };
+    });
+  }, [reportFormData.category_suffix]);
+
   // Handle form input changes
   const handleFormChange = useCallback(
     (e) => {
@@ -716,6 +937,29 @@ function CVReport() {
           ...prev,
           [name]: value,
         };
+
+        // If category_suffix changes, update all heading fields automatically
+        if (name === "category_suffix") {
+          const categorySuffixUpper = value ? value.toUpperCase().trim() : "";
+          updated.valueation_report_for_heading = categorySuffixUpper
+            ? `VALUATION REPORT FOR ${categorySuffixUpper}`
+            : "";
+          updated.general_details_heading = categorySuffixUpper
+            ? `GENERAL DETAILS OF THE INSPECTED ${categorySuffixUpper}`
+            : "";
+          updated.inspected_equipment_heading = categorySuffixUpper
+            ? `INSPECTED EQUIPMENT DETAILS OF ${categorySuffixUpper}`
+            : "";
+          updated.comments_on_equipment_heading = categorySuffixUpper
+            ? `COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION ${categorySuffixUpper}`
+            : "";
+          updated.rc_permit_tax_fitness_insurance_heading = categorySuffixUpper
+            ? `RC, PERMIT, TAX, FITNESS & INSURANCE DETAILS OF ${categorySuffixUpper}`
+            : "";
+          updated.overall_feedback_heading = categorySuffixUpper
+            ? `OVER ALL FEED BACK OF THE INSPECTED ${categorySuffixUpper}`
+            : "";
+        }
 
         // Handle currency formatting for currency fields
         if (
@@ -843,7 +1087,11 @@ function CVReport() {
       setChassisPreviewUrl(objectUrl);
     } else {
       const existingValue = reportFormData?.chassis_no_pencil_impression;
-      if (existingValue && existingValue !== null && existingValue !== undefined) {
+      if (
+        existingValue &&
+        existingValue !== null &&
+        existingValue !== undefined
+      ) {
         const resolved = resolveChassisImageUrl(existingValue);
         setChassisPreviewUrl(resolved);
       } else {
@@ -1030,11 +1278,15 @@ function CVReport() {
       // Compute and validate amount_in_words centrally based on fair_market_value
       const fmvRaw = reportFormData.fair_market_value;
       const fmvAmount = parseCurrency(fmvRaw);
-      const computedAmountInWords = fmvRaw ? convertNumberToWordsIndian(fmvAmount) : "";
+      const computedAmountInWords = fmvRaw
+        ? convertNumberToWordsIndian(fmvAmount)
+        : "";
 
       // If FMV is present but amount_in_words couldn't be computed, block submit
       if (fmvRaw && !computedAmountInWords) {
-        toast.error("Amount in words missing. Please enter a valid Fair Market Value.");
+        toast.error(
+          "Amount in words missing. Please enter a valid Fair Market Value."
+        );
         if (preOpenedTab && !preOpenedTab.closed) {
           preOpenedTab.close();
         }
@@ -1251,11 +1503,15 @@ function CVReport() {
     // Compute and validate amount_in_words centrally based on fair_market_value
     const fmvRaw = reportFormData.fair_market_value;
     const fmvAmount = parseCurrency(fmvRaw);
-    const computedAmountInWords = fmvRaw ? convertNumberToWordsIndian(fmvAmount) : "";
+    const computedAmountInWords = fmvRaw
+      ? convertNumberToWordsIndian(fmvAmount)
+      : "";
 
     // If FMV is present but amount_in_words couldn't be computed, block save
     if (fmvRaw && !computedAmountInWords) {
-      toast.error("Amount in words missing. Please enter a valid Fair Market Value.");
+      toast.error(
+        "Amount in words missing. Please enter a valid Fair Market Value."
+      );
       return;
     }
 
@@ -1265,10 +1521,16 @@ function CVReport() {
     // Add report form data - only include fields with actual values
     Object.keys(reportFormData).forEach((key) => {
       const value = reportFormData[key];
-      
+
       // Always include important read-only fields even if empty
-      const alwaysIncludeFields = ['license_no', 'valuer_contact', 'amount_in_words', 'no_of_tyres', 'depreciation_value'];
-      
+      const alwaysIncludeFields = [
+        "license_no",
+        "valuer_contact",
+        "amount_in_words",
+        "no_of_tyres",
+        "depreciation_value",
+      ];
+
       if (alwaysIncludeFields.includes(key)) {
         // Always include these fields, even if empty
         let defaultValue = value || "";
@@ -1278,7 +1540,7 @@ function CVReport() {
           return; // Skip the normal flow for this field
         }
         // Use computed no_of_tyres value if this is no_of_tyres field
-        if (key === 'no_of_tyres') {
+        if (key === "no_of_tyres") {
           const front = parseInt(reportFormData.front_tyre_no) || 0;
           const middle = parseInt(reportFormData.middle_tyre_no) || 0;
           const rear = parseInt(reportFormData.rear_tyre_no) || 0;
@@ -1301,11 +1563,16 @@ function CVReport() {
     flexibleFields.forEach((field) => {
       // Only include fields with actual values
       if (field.field_value && field.field_value.trim() !== "") {
-        reportData[`flexible_fields[${formDataIndex}][section_name]`] = field.section_name;
-        reportData[`flexible_fields[${formDataIndex}][col_span]`] = field.col_span;
-        reportData[`flexible_fields[${formDataIndex}][field_label]`] = field.field_label;
-        reportData[`flexible_fields[${formDataIndex}][field_value]`] = field.field_value;
-        reportData[`flexible_fields[${formDataIndex}][field_order]`] = field.field_order;
+        reportData[`flexible_fields[${formDataIndex}][section_name]`] =
+          field.section_name;
+        reportData[`flexible_fields[${formDataIndex}][col_span]`] =
+          field.col_span;
+        reportData[`flexible_fields[${formDataIndex}][field_label]`] =
+          field.field_label;
+        reportData[`flexible_fields[${formDataIndex}][field_value]`] =
+          field.field_value;
+        reportData[`flexible_fields[${formDataIndex}][field_order]`] =
+          field.field_order;
         formDataIndex++;
 
         // Add second field for "Add Two" functionality
@@ -1315,11 +1582,16 @@ function CVReport() {
           field.field_value_2 &&
           field.field_value_2.trim() !== ""
         ) {
-          reportData[`flexible_fields[${formDataIndex}][section_name]`] = field.section_name;
-          reportData[`flexible_fields[${formDataIndex}][col_span]`] = field.col_span;
-          reportData[`flexible_fields[${formDataIndex}][field_label]`] = field.field_label_2;
-          reportData[`flexible_fields[${formDataIndex}][field_value]`] = field.field_value_2;
-          reportData[`flexible_fields[${formDataIndex}][field_order]`] = field.field_order + 1;
+          reportData[`flexible_fields[${formDataIndex}][section_name]`] =
+            field.section_name;
+          reportData[`flexible_fields[${formDataIndex}][col_span]`] =
+            field.col_span;
+          reportData[`flexible_fields[${formDataIndex}][field_label]`] =
+            field.field_label_2;
+          reportData[`flexible_fields[${formDataIndex}][field_value]`] =
+            field.field_value_2;
+          reportData[`flexible_fields[${formDataIndex}][field_order]`] =
+            field.field_order + 1;
           formDataIndex++;
         }
       }
@@ -1338,7 +1610,7 @@ function CVReport() {
       return;
     }
 
- /*    console.log('📤 CVReport - Sending to backend - reportData:', reportData);
+    /*    console.log('📤 CVReport - Sending to backend - reportData:', reportData);
     console.log('📤 CVReport - amount_in_words in payload:', reportData.amount_in_words);
 
     // Debug log for payload
@@ -1376,186 +1648,208 @@ function CVReport() {
   ]);
 
   // Function to call external RC API and prefill form data
-  const fetchRCDetailsFromExternalAPI = useCallback(async (registrationNumber) => {
-    if (!registrationNumber || registrationNumber.trim() === "") {
-      /* console.log("🚫 CVReport External API - Skipping: Registration number is empty"); */
-      return;
-    }
+  const fetchRCDetailsFromExternalAPI = useCallback(
+    async (registrationNumber) => {
+      if (!registrationNumber || registrationNumber.trim() === "") {
+        /* console.log("🚫 CVReport External API - Skipping: Registration number is empty"); */
+        return;
+      }
 
-    const apiToken = process.env.REACT_APP_ATTESTR_API_TOKEN;
-    if (!apiToken) {
-      console.warn("⚠️ CVReport External API - REACT_APP_ATTESTR_API_TOKEN not found in environment variables");
-      return;
-    }
+      const apiToken = process.env.REACT_APP_ATTESTR_API_TOKEN;
+      if (!apiToken) {
+        // API token not found
+        return;
+      }
 
-    // Set loading state to true when external API starts
-    setExternalApiLoading(true);
+      // Set loading state to true when external API starts
+      setExternalApiLoading(true);
 
-    // Clean and format registration number: remove spaces, dashes, and convert to uppercase
-    // Example: "GJ-03-BZ-0618" or "gj 03 bz 0618" → "GJ03BZ0618"
-    const cleanedRegistrationNumber = registrationNumber
-      .replace(/[\s\-]/g, '') // Remove spaces and dashes
-      .toUpperCase(); // Convert to uppercase
+      // Clean and format registration number: remove spaces, dashes, and convert to uppercase
+      // Example: "GJ-03-BZ-0618" or "gj 03 bz 0618" → "GJ03BZ0618"
+      const cleanedRegistrationNumber = registrationNumber
+        .replace(/[\s\-]/g, "") // Remove spaces and dashes
+        .toUpperCase(); // Convert to uppercase
 
-    console.log("🚀 CVReport External API - Calling API with registration:", {
-      original: registrationNumber,
-      cleaned: cleanedRegistrationNumber,
-    });
-    
-    try {
-      const response = await axios.post(
-        "https://api.attestr.com/api/v2/public/checkx/rc",
-        {
-          reg: cleanedRegistrationNumber,
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Basic ${apiToken}`,
+      // Calling external RC API
+
+      try {
+        const response = await axios.post(
+          "https://api.attestr.com/api/v2/public/checkx/rc",
+          {
+            reg: cleanedRegistrationNumber,
           },
-        }
-      );
-
-      /* console.log("✅ CVReport External API - Response received:", response.data); */
-
-      if (response.data && response.data.valid) {
-        const rcData = response.data;
-
-        // Helper function to convert owner number to format (e.g., "1" -> "1ST OWNER")
-        const formatOwnerNumber = (ownerNum) => {
-          const num = parseInt(ownerNum);
-          if (isNaN(num) || num < 1) return "";
-          
-          // Handle special cases: 11th, 12th, 13th use "TH"
-          const lastDigit = num % 10;
-          const lastTwoDigits = num % 100;
-          
-          let suffix = "TH";
-          if (lastTwoDigits >= 11 && lastTwoDigits <= 13) {
-            suffix = "TH";
-          } else if (lastDigit === 1) {
-            suffix = "ST";
-          } else if (lastDigit === 2) {
-            suffix = "ND";
-          } else if (lastDigit === 3) {
-            suffix = "RD";
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Basic ${apiToken}`,
+            },
           }
-          
-          return `${num}${suffix} OWNER`;
-        };
+        );
 
-        // Helper function to convert cylinders to format (e.g., "6" -> "6 (SIX)")
-        const formatCylinders = (cylinders) => {
-          const num = parseInt(cylinders);
-          if (isNaN(num) || num < 1) return "";
-          const words = ["", "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN"];
-          const word = num <= 10 ? words[num] : "";
-          return word ? `${num} (${word})` : cylinders;
-        };
+        /* console.log("✅ CVReport External API - Response received:", response.data); */
 
-        // Map API response to form fields
-        setReportFormData((prev) => {
-          const updated = { ...prev };
+        if (response.data && response.data.valid) {
+          const rcData = response.data;
 
-          // Basic vehicle information
-          // Note: registration_no is from user input (not in API response), so we keep the existing value
-          if (rcData.registered) updated.registration_date = rcData.registered;
-          if (rcData.rto) updated.registered_location = rcData.rto;
+          // Helper function to convert owner number to format (e.g., "1" -> "1ST OWNER")
+          const formatOwnerNumber = (ownerNum) => {
+            const num = parseInt(ownerNum);
+            if (isNaN(num) || num < 1) return "";
 
-          // Owner information
-          if (rcData.owner) updated.registered_owner_name = rcData.owner;
-          if (rcData.currentAddress) updated.registered_owner_address = rcData.currentAddress;
-          if (rcData.permanentAddress) updated.proposed_owner_address = rcData.permanentAddress;
+            // Handle special cases: 11th, 12th, 13th use "TH"
+            const lastDigit = num % 10;
+            const lastTwoDigits = num % 100;
 
-          // Vehicle details
-          if (rcData.chassisNumber) updated.chassis_no = rcData.chassisNumber;
-          if (rcData.engineNumber) updated.engine_no_detail = rcData.engineNumber;
-          // if (rcData.makerDescription) updated.asset_make = rcData.makerDescription;
-          if (rcData.makerModel) updated.model = rcData.makerModel;
-          if (rcData.bodyType) updated.body_type = rcData.bodyType;
-          if (rcData.fuelType) updated.fuel_type = rcData.fuelType;
-
-          // Manufacturing details
-          if (rcData.manufactured) {
-            // Convert "11/2024" to "2024" or keep as is
-            const manufacturedDate = rcData.manufactured.split("/");
-            if (manufacturedDate.length > 1) {
-              updated.manufacture_year = manufacturedDate[1];
-            } else {
-              updated.manufacture_year = rcData.manufactured;
+            let suffix = "TH";
+            if (lastTwoDigits >= 11 && lastTwoDigits <= 13) {
+              suffix = "TH";
+            } else if (lastDigit === 1) {
+              suffix = "ST";
+            } else if (lastDigit === 2) {
+              suffix = "ND";
+            } else if (lastDigit === 3) {
+              suffix = "RD";
             }
-          }
 
-          // Technical specifications
-          if (rcData.cylinders) {
-            updated.no_of_cylinder = formatCylinders(rcData.cylinders);
-          }
-          if (rcData.cubicCapacity) updated.cubic_capacity = rcData.cubicCapacity;
-          if (rcData.seatingCapacity) updated.seating_capacity = rcData.seatingCapacity;
-          if (rcData.colorType) updated.vehicle_colour = rcData.colorType;
+            return `${num}${suffix} OWNER`;
+          };
 
-          // Owner serial number mapping (ownerNumber -> owner_serial_no)
-          if (rcData.ownerNumber) {
-            updated.owner_serial_no = formatOwnerNumber(rcData.ownerNumber);
-          }
+          // Helper function to convert cylinders to format (e.g., "6" -> "6 (SIX)")
+          const formatCylinders = (cylinders) => {
+            const num = parseInt(cylinders);
+            if (isNaN(num) || num < 1) return "";
+            const words = [
+              "",
+              "ONE",
+              "TWO",
+              "THREE",
+              "FOUR",
+              "FIVE",
+              "SIX",
+              "SEVEN",
+              "EIGHT",
+              "NINE",
+              "TEN",
+            ];
+            const word = num <= 10 ? words[num] : "";
+            return word ? `${num} (${word})` : cylinders;
+          };
 
-          // Gross vehicle weight mapping (grossWeight -> gross_vehicle_weight)
-          if (rcData.grossWeight) {
-            updated.gross_vehicle_weight = rcData.grossWeight.toString();
-          }
+          // Map API response to form fields
+          setReportFormData((prev) => {
+            const updated = { ...prev };
 
-          // RC, Permit, Tax, Fitness & Insurance details
-          if (rcData.fitnessUpto) updated.fitness_upto = rcData.fitnessUpto;
-          if (rcData.taxUpto) updated.tax_upto = rcData.taxUpto;
-          if (rcData.permitUpto) updated.permit_upto = rcData.permitUpto;
-          if (rcData.permitType) updated.permit_type = rcData.permitType;
-          
-          // Insurance details mapping
-          if (rcData.insuranceProvider) {
-            updated.insurance_co_name = rcData.insuranceProvider;
-          }
-          if (rcData.insurancePolicyNumber) {
-            updated.policy_no = rcData.insurancePolicyNumber;
-          }
-          if (rcData.insuranceUpto) {
-            updated.period_of_insurance = rcData.insuranceUpto;
-          }
+            // Basic vehicle information
+            // Note: registration_no is from user input (not in API response), so we keep the existing value
+            if (rcData.registered)
+              updated.registration_date = rcData.registered;
+            if (rcData.rto) updated.registered_location = rcData.rto;
 
-          /* console.log("📝 CVReport External API - Updated form data:", updated); */
-          return updated;
-        });
+            // Owner information
+            if (rcData.owner) updated.registered_owner_name = rcData.owner;
+            if (rcData.currentAddress)
+              updated.registered_owner_address = rcData.currentAddress;
+            if (rcData.permanentAddress)
+              updated.proposed_owner_address = rcData.permanentAddress;
 
-       /*  console.log("📝 CVReport External API - Form data prefilled successfully"); */
-        
-        // Set flag to trigger auto-save after state is updated
-        // We'll use a useEffect to watch for the state change and trigger save
-        shouldAutoSaveAfterApiRef.current = true;
-        /* console.log("💾 CVReport External API - Auto-save flag set, will trigger save after state update"); */
-        
-        // Set loading to false after data is prefilled (with small delay to ensure state update)
-        setTimeout(() => {
+            // Vehicle details
+            if (rcData.chassisNumber) updated.chassis_no = rcData.chassisNumber;
+            if (rcData.engineNumber)
+              updated.engine_no_detail = rcData.engineNumber;
+            // if (rcData.makerDescription) updated.asset_make = rcData.makerDescription;
+            if (rcData.makerModel) {
+              updated.model = rcData.makerModel;
+              updated.asset_classification = rcData.makerModel;
+            }
+            if (rcData.bodyType) updated.body_type = rcData.bodyType;
+            if (rcData.fuelType) updated.fuel_type = rcData.fuelType;
+
+            // Manufacturing details
+            if (rcData.manufactured) {
+              // Convert "11/2024" to "2024" or keep as is
+              const manufacturedDate = rcData.manufactured.split("/");
+              if (manufacturedDate.length > 1) {
+                updated.manufacture_year = manufacturedDate[1];
+              } else {
+                updated.manufacture_year = rcData.manufactured;
+              }
+            }
+
+            // Technical specifications
+            if (rcData.cylinders) {
+              updated.no_of_cylinder = formatCylinders(rcData.cylinders);
+            }
+            if (rcData.cubicCapacity)
+              updated.cubic_capacity = rcData.cubicCapacity;
+            if (rcData.seatingCapacity)
+              updated.seating_capacity = rcData.seatingCapacity;
+            if (rcData.colorType) updated.vehicle_colour = rcData.colorType;
+
+            // Owner serial number mapping (ownerNumber -> owner_serial_no)
+            if (rcData.ownerNumber) {
+              updated.owner_serial_no = formatOwnerNumber(rcData.ownerNumber);
+            }
+
+            // Gross vehicle weight mapping (grossWeight -> gross_vehicle_weight)
+            if (rcData.grossWeight) {
+              updated.gross_vehicle_weight = rcData.grossWeight.toString();
+            }
+
+            // RC, Permit, Tax, Fitness & Insurance details
+            if (rcData.fitnessUpto) updated.fitness_upto = rcData.fitnessUpto;
+            if (rcData.taxUpto) updated.tax_upto = rcData.taxUpto;
+            if (rcData.permitUpto) updated.permit_upto = rcData.permitUpto;
+            if (rcData.permitType) updated.permit_type = rcData.permitType;
+
+            // Insurance details mapping
+            if (rcData.insuranceProvider) {
+              updated.insurance_co_name = rcData.insuranceProvider;
+            }
+            if (rcData.insurancePolicyNumber) {
+              updated.policy_no = rcData.insurancePolicyNumber;
+            }
+            if (rcData.insuranceUpto) {
+              updated.period_of_insurance = rcData.insuranceUpto;
+            }
+
+            /* console.log("📝 CVReport External API - Updated form data:", updated); */
+            return updated;
+          });
+
+          /*  console.log("📝 CVReport External API - Form data prefilled successfully"); */
+
+          // Set flag to trigger auto-save after state is updated
+          // We'll use a useEffect to watch for the state change and trigger save
+          shouldAutoSaveAfterApiRef.current = true;
+          /* console.log("💾 CVReport External API - Auto-save flag set, will trigger save after state update"); */
+
+          // Set loading to false after data is prefilled (with small delay to ensure state update)
+          setTimeout(() => {
+            setExternalApiLoading(false);
+          }, 500);
+        } else {
+          // Invalid RC response
+          toast.warning("RC details could not be fetched or RC is invalid");
           setExternalApiLoading(false);
-        }, 500);
-      } else {
-        console.warn("⚠️ CVReport External API - Response indicates invalid RC:", response.data);
-        toast.warning("RC details could not be fetched or RC is invalid");
+        }
+      } catch (error) {
+        // Error calling external API
+        if (error.response) {
+          toast.error(
+            "Failed to fetch RC details. Please check the registration number."
+          );
+        } else {
+          toast.error("Failed to fetch RC details. Please try again later.");
+        }
         setExternalApiLoading(false);
       }
-    } catch (error) {
-      console.error("❌ CVReport External API - Error calling API:", error);
-      if (error.response) {
-        console.error("❌ CVReport External API - Error response:", error.response.data);
-        toast.error("Failed to fetch RC details. Please check the registration number.");
-      } else {
-        toast.error("Failed to fetch RC details. Please try again later.");
-      }
-      setExternalApiLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   // Call external RC API only when report is blank (no existing report data)
   useEffect(() => {
-    console.log("🔍 CVReport External API - Checking conditions...", {
+    /* console.log("🔍 CVReport External API - Checking conditions...", {
       reportLoading,
       reportLoadingStarted: reportLoadingStartedRef.current,
       reportFetchCompleted: reportFetchCompleted,
@@ -1563,7 +1857,7 @@ function CVReport() {
       hasReportData: !!currentReport?.report,
       apiAlreadyCalled: externalApiCalledRef.current,
       hasRegistrationNumber: !!order?.registration_number,
-    });
+    }); */
 
     // Check if report loading is complete, report is blank, and we haven't called the API yet
     // IMPORTANT: Wait for initial report fetch to complete before calling external API
@@ -1579,29 +1873,43 @@ function CVReport() {
       fetchRCDetailsFromExternalAPI(order.registration_number);
     } else {
       if (!reportFetchCompleted) {
-        console.log("🚫 CVReport External API - Skipping: Waiting for initial report fetch to complete");
+        // Waiting for report fetch
       } else if (currentReport?.report) {
-        console.log("🚫 CVReport External API - Skipping: Report already exists", currentReport);
+        // Report already exists
       } else if (externalApiCalledRef.current) {
-        console.log("🚫 CVReport External API - Skipping: API already called");
-      } else if (!order?.registration_number || order.registration_number.trim() === "") {
-        console.log("🚫 CVReport External API - Skipping: Registration number not available yet");
+        // API already called
+      } else if (
+        !order?.registration_number ||
+        order.registration_number.trim() === ""
+      ) {
+        // Registration number not available
       }
     }
-  }, [reportLoading, currentReport, order?.registration_number, fetchRCDetailsFromExternalAPI, reportFetchCompleted]);
+  }, [
+    reportLoading,
+    currentReport,
+    order?.registration_number,
+    fetchRCDetailsFromExternalAPI,
+    reportFetchCompleted,
+  ]);
 
   // Auto-save after external API prefills data
   useEffect(() => {
     // Only trigger if flag is set and we have some form data (indicating state was updated)
-    if (shouldAutoSaveAfterApiRef.current && reportFormData && Object.keys(reportFormData).length > 0) {
+    if (
+      shouldAutoSaveAfterApiRef.current &&
+      reportFormData &&
+      Object.keys(reportFormData).length > 0
+    ) {
       // Check if we have some of the key fields that would be set by the API
-      const hasApiData = reportFormData.chassis_no || 
-                        reportFormData.engine_no_detail || 
-                        reportFormData.registered_owner_name ||
-                        reportFormData.no_of_cylinder ||
-                        reportFormData.owner_serial_no ||
-                        reportFormData.gross_vehicle_weight;
-      
+      const hasApiData =
+        reportFormData.chassis_no ||
+        reportFormData.engine_no_detail ||
+        reportFormData.registered_owner_name ||
+        reportFormData.no_of_cylinder ||
+        reportFormData.owner_serial_no ||
+        reportFormData.gross_vehicle_weight;
+
       if (hasApiData) {
         /* console.log("💾 CVReport External API - State updated, triggering auto-save now"); */
         shouldAutoSaveAfterApiRef.current = false; // Reset flag to prevent multiple saves
@@ -2022,7 +2330,7 @@ function CVReport() {
             role="status"
             style={{ width: "3rem", height: "3rem" }}
           >
-           {/* <span className="visually-hidden">Loading...</span> */}
+            {/* <span className="visually-hidden">Loading...</span> */}
           </div>
           <div
             style={{
@@ -2047,6 +2355,57 @@ function CVReport() {
             <h2>CV Report</h2>
             <form onSubmit={handleReportSubmit} className="body-form-box">
               <div className="row">
+                <div className="col-12">
+                  <div className="form-group">
+                    <label htmlFor="category_suffix">
+                      Category Suffix <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="category_suffix"
+                      name="category_suffix"
+                      value={reportFormData.category_suffix || ""}
+                      onChange={handleFormChange}
+                      placeholder="Enter category/subcategory/child-category (e.g., COMMERCIAL VEHICLE / CV CV-IN 11)"
+                    />
+                    <small className="form-text text-muted">
+                      This field controls all heading fields below. Enter the category information in the format: (category_name) / (sub_category_name) (child_category_name)
+                    </small>
+                  </div>
+                </div>
+                <div className="col-12">
+                  <div className="form-group">
+                    <label htmlFor="valueation_report_for_heading">
+                      Valuation Report For Heading
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="valueation_report_for_heading"
+                      name="valueation_report_for_heading"
+                      value={reportFormData.valueation_report_for_heading || ""}
+                      readOnly
+                      placeholder="Auto-generated from Category Suffix"
+                    />
+                  </div>
+                </div>
+                <div className="col-12">
+                  <div className="form-group">
+                    <label htmlFor="general_details_heading">
+                      General Details Heading
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="general_details_heading"
+                      name="general_details_heading"
+                      value={reportFormData.general_details_heading || ""}
+                      readOnly
+                      placeholder="Auto-generated from Category Suffix"
+                    />
+                  </div>
+                </div>
                 <div className="col-md-6">
                   <div className="form-group ">
                     <label>
@@ -2090,6 +2449,15 @@ function CVReport() {
                         required
                       />
                       <span className="ref-no-slash">/</span>
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="ref_no_month"
+                        value={reportFormData.ref_no_month || ""}
+                        onChange={handleFormChange}
+                        placeholder="Enter Month"
+                        required
+                      />
                       <input
                         type="text"
                         className="form-field"
@@ -2255,7 +2623,8 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="registered_owner_name">
-                      Registered Owner Name <span className="text-danger">*</span>
+                      Registered Owner Name{" "}
+                      <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -2306,7 +2675,8 @@ function CVReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="proposed_owner_address">
-                      Proposed Owner Address <span className="text-danger">*</span>
+                      Proposed Owner Address{" "}
+                      <span className="text-danger">*</span>
                     </label>
                     <textarea
                       className="form-field"
@@ -2327,6 +2697,22 @@ function CVReport() {
                 <div className="col-12">
                   <h4>INSPECTED EQUIPMENT DETAILS</h4>
                   <hr />
+                </div>
+                <div className="col-12">
+                  <div className="form-group">
+                    <label htmlFor="inspected_equipment_heading">
+                      Inspected Equipment Heading
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="inspected_equipment_heading"
+                      name="inspected_equipment_heading"
+                      value={reportFormData.inspected_equipment_heading || ""}
+                      readOnly
+                      placeholder="Auto-generated from Category Suffix"
+                    />
+                  </div>
                 </div>
                 <div className="col-md-4">
                   <div className="form-group">
@@ -2661,10 +3047,27 @@ function CVReport() {
                   <h4>COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION</h4>
                   <hr />
                 </div>
+                <div className="col-12">
+                  <div className="form-group">
+                    <label htmlFor="comments_on_equipment_heading">
+                      Comments on Equipment Heading
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="comments_on_equipment_heading"
+                      name="comments_on_equipment_heading"
+                      value={reportFormData.comments_on_equipment_heading || ""}
+                      readOnly
+                      placeholder="Auto-generated from Category Suffix"
+                    />
+                  </div>
+                </div>
                 <div className="col-md-6">
                   <div className="form-group">
                     <label htmlFor="asset_classification">
-                      Asset Classification <span className="text-danger">*</span>
+                      Asset Classification{" "}
+                      <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -2798,7 +3201,8 @@ function CVReport() {
                 <div className="col-md-2">
                   <div className="form-group">
                     <label htmlFor="electrical_condition">
-                      Electrical Condition <span className="text-danger">*</span>
+                      Electrical Condition{" "}
+                      <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -2862,7 +3266,8 @@ function CVReport() {
                 <div className="col-md-6">
                   <div className="form-group">
                     <label htmlFor="gross_vehicle_weight">
-                      Gross Vehicle Weight <span className="text-danger">*</span>
+                      Gross Vehicle Weight{" "}
+                      <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -2969,7 +3374,8 @@ function CVReport() {
                       </div>
                       <div className="col-md-6">
                         <label htmlFor="rear_tyre_condition">
-                          Rear Tyre Condition <span className="text-danger">*</span>
+                          Rear Tyre Condition{" "}
+                          <span className="text-danger">*</span>
                         </label>
                         <input
                           type="text"
@@ -3237,6 +3643,25 @@ function CVReport() {
                   <h4>RC, PERMIT, TAX, FITNESS & INSURANCE DETAILS</h4>
                   <hr />
                 </div>
+                <div className="col-12">
+                  <div className="form-group">
+                    <label htmlFor="rc_permit_tax_fitness_insurance_heading">
+                      RC Permit Tax Fitness Insurance Heading
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="rc_permit_tax_fitness_insurance_heading"
+                      name="rc_permit_tax_fitness_insurance_heading"
+                      value={
+                        reportFormData.rc_permit_tax_fitness_insurance_heading ||
+                        ""
+                      }
+                      readOnly
+                      placeholder="Auto-generated from Category Suffix"
+                    />
+                  </div>
+                </div>
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="rc_book_verified">
@@ -3430,10 +3855,27 @@ function CVReport() {
                   <h4>OVER ALL FEED BACK OF THE INSPECTED</h4>
                   <hr />
                 </div>
+                <div className="col-12">
+                  <div className="form-group">
+                    <label htmlFor="overall_feedback_heading">
+                      Overall Feedback Heading
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="overall_feedback_heading"
+                      name="overall_feedback_heading"
+                      value={reportFormData.overall_feedback_heading || ""}
+                      readOnly
+                      placeholder="Auto-generated from Category Suffix"
+                    />
+                  </div>
+                </div>
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="current_invoice_cost">
-                      Current Invoice Cost <span className="text-danger">*</span>
+                      Current Invoice Cost{" "}
+                      <span className="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -3586,7 +4028,8 @@ function CVReport() {
                 <div className="col-md-12">
                   <div className="form-group">
                     <label htmlFor="valuer_comments_remarks">
-                      Valuer Comments/remarks <span className="text-danger">*</span>
+                      Valuer Comments/remarks{" "}
+                      <span className="text-danger">*</span>
                     </label>
                     <textarea
                       className="form-field"

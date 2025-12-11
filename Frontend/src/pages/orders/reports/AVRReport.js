@@ -63,15 +63,35 @@ function AVRReport() {
 
   // Reset form data when component mounts or order ID changes
   useEffect(() => {
+    // Get current date in DD-MM-YYYY format
+    const getCurrentDateLocal = () => {
+      const today = new Date();
+      const day = String(today.getDate()).padStart(2, "0");
+      const month = String(today.getMonth() + 1).padStart(2, "0");
+      const year = today.getFullYear();
+      return `${day}-${month}-${year}`;
+    };
+
+    // Get current month in 3-letter uppercase format
+    const getCurrentMonthAbbreviationLocal = () => {
+      const months = [
+        "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+        "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+      ];
+      const currentMonth = new Date().getMonth();
+      return months[currentMonth];
+    };
+
     // Reset form data to initial state when order changes
     setReportFormData({
       report_type: "report_avr",
       ref_no_year: new Date().getFullYear().toString(),
       ref_no_bank: "",
       ref_no_code: "VKM",
+      ref_no_month: `SFW-${getCurrentMonthAbbreviationLocal()}-`, // Default: SFW-(CURRENT_MONTH)
       ref_no_id: "",
       lan_no: "",
-      report_date: getCurrentDate(),
+      report_date: getCurrentDateLocal(),
       bank_name: "",
       branch_name: "",
       state_name: "",
@@ -126,6 +146,16 @@ function AVRReport() {
     const month = String(today.getMonth() + 1).padStart(2, "0");
     const year = today.getFullYear();
     return `${day}-${month}-${year}`;
+  }, []);
+
+  // Function to get current month in 3-letter uppercase format (JAN, FEB, MAR, etc.)
+  const getCurrentMonthAbbreviation = useCallback(() => {
+    const months = [
+      "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+      "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+    ];
+    const currentMonth = new Date().getMonth();
+    return months[currentMonth];
   }, []);
 
   // Function to get license number based on surveyor name
@@ -298,6 +328,7 @@ function AVRReport() {
     ref_no_year: new Date().getFullYear().toString(),
     ref_no_bank: "",
     ref_no_code: "VKM",
+    ref_no_month: `SFW-${getCurrentMonthAbbreviation()}-`, // Default: SFW-(CURRENT_MONTH)
     ref_no_id: "",
     lan_no: "",
     report_date: getCurrentDate(),
@@ -369,7 +400,24 @@ function AVRReport() {
   // Populate form data from fetched AVR report (if available)
   useEffect(() => {
     const report = currentReport?.report;
-    if (!report) return; // Gracefully do nothing when data is null
+    if (!report) {
+      // Ensure ref_no_month has a default value if it's empty or null
+      setReportFormData((prev) => {
+        if (!prev.ref_no_month || prev.ref_no_month.trim() === "") {
+          const months = [
+            "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+            "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+          ];
+          const currentMonth = new Date().getMonth();
+          return {
+            ...prev,
+            ref_no_month: `SFW-${months[currentMonth]}-`,
+          };
+        }
+        return prev;
+      });
+      return; // Gracefully do nothing when data is null
+    }
 
     // Validate that the report belongs to the current order
     if (currentReport?.order_id && currentReport.order_id !== parseInt(id)) {
@@ -419,6 +467,16 @@ function AVRReport() {
         // Try to set the field (both existing and dynamic fields)
         updated[key] = fieldValue;
       });
+
+      // Ensure ref_no_month has a default value if it's empty or null
+      if (!updated.ref_no_month || updated.ref_no_month.trim() === "") {
+        const months = [
+          "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+          "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+        ];
+        const currentMonth = new Date().getMonth();
+        updated.ref_no_month = `SFW-${months[currentMonth]}-`;
+      }
 
       return updated;
     });
@@ -847,6 +905,15 @@ function AVRReport() {
                         required
                       />
                       <span className="ref-no-slash">/</span>
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="ref_no_month"
+                        value={reportFormData.ref_no_month || ""}
+                        onChange={handleFormChange}
+                        placeholder="Enter Month"
+                        required
+                      />
                       <input
                         type="text"
                         className="form-field"

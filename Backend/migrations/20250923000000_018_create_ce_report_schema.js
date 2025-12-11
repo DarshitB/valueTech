@@ -17,12 +17,16 @@ exports.up = async function (knex) {
     table.integer("order_id").unsigned().notNullable()
       .references("id").inTable("orders").onDelete("CASCADE");
 
+    table.text("valueation_report_for_heading").nullable();
+    table.text("general_details_heading").nullable();
+
     // Reference number fields
     table.string("ref_no_year", 255).nullable();
     table.string("ref_no_bank", 255).nullable();
     table.string("state_name", 255).nullable();
     table.string("ref_no_code", 255).nullable();
     table.string("ref_no_id", 255).nullable();
+    table.string("ref_no_month", 255).nullable();
     table.string("rev_report_date", 255).nullable();
 
     // Report and valuer information
@@ -44,6 +48,8 @@ exports.up = async function (knex) {
     table.text("proposed_owner_address").nullable();
 
     // Asset registration/details (mirroring machinery fields)
+    table.text("inspected_equipment_heading").nullable();
+
     table.string("registration_no", 255).nullable();
     table.string("registration_date", 255).nullable();
     table.string("registered_location", 255).nullable();
@@ -66,6 +72,8 @@ exports.up = async function (knex) {
     // Hypothecation details
     table.text("hyp_with").nullable();
     table.string("hyp_from_date", 255).nullable();
+
+    table.text("comments_on_equipment_heading").nullable();
 
     table.string("asset_classification", 255).nullable();
     table.string("no_of_cylinder", 255).nullable();
@@ -149,6 +157,8 @@ exports.up = async function (knex) {
     table.string("damages_if_any", 255).nullable();
 
     // Document verification
+    table.text("rc_permit_tax_fitness_insurance_heading").nullable();
+ 
     table.string("bill_of_entry", 255).nullable();
     table.string("proforma_invoice_verified", 255).nullable();
     table.string("tax_upto", 255).nullable();
@@ -165,6 +175,8 @@ exports.up = async function (knex) {
     table.string("insurance_verified", 255).nullable();
 
     // Valuation details
+    table.text("overall_feedback_heading").nullable();
+    
     table.string("invoice_cost", 255).nullable();
     table.string("depreciation", 255).nullable();
     table.string("depreciation_value", 255).nullable();

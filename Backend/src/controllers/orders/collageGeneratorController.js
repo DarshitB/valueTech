@@ -301,8 +301,12 @@ async function generateCollageImage(imagePaths, outputPath, text = "", stampBuff
     const y = Math.floor(actualIndex / cols) * thumbHeight;
 
     try {
-      // Resize and process image
+      // Process image to match browser display orientation
+      // Use rotate() without parameters to auto-rotate based on EXIF orientation
+      // This ensures the collage shows images exactly as they appear in the frontend/browser
+      // The browser automatically applies EXIF rotation, so we need to do the same
       const processedImage = await sharp(imagePaths[i])
+        .rotate() // Auto-rotate based on EXIF orientation to match browser display
         .resize(thumbWidth, thumbHeight, { fit: "fill" })
         .jpeg({ quality: 90 })
         .toBuffer();

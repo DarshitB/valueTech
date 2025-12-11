@@ -25,6 +25,7 @@ exports.up = async function (knex) {
     table.string("ref_no_bank", 255).nullable();
     table.string("ref_no_code", 255).nullable();
     table.string("ref_no_id", 255).nullable();
+    table.string("ref_no_month", 255).nullable();
     table.string("lan_no", 255).nullable();
     
     // Report and bank information

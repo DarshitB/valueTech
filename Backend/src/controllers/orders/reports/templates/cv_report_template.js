@@ -89,28 +89,25 @@ function generateCVReportHTML(
             <th colspan="6">${extraData.bank_name}</th>
         </tr>
         <tr>
-            <th colspan="6">VALUATION REPORT FOR ${extraData.cat} / ${
-    extraData.subCat
-  } ${extraData.childCat}</th>
+            <th colspan="6">
+              ${formData.valueation_report_for_heading}
+            </th>
         </tr>
         <tr>
-            <th colspan="6">GENERAL DETAILS OF THE INSPECTED ${
-              extraData.cat
-            } / ${extraData.subCat}
-            ${extraData.childCat}</th>
+            <th colspan="6">${formData.general_details_heading}</th>
         </tr>
         <tr>
             <td style="width: 20%;">REF NO.</td>
             <td colspan="2">${formData.ref_no_year}/${formData.ref_no_bank}/${
     formData.state_name
-  }/${formData.ref_no_code}/${formData.ref_no_id}</td>
+  }/${formData.ref_no_code}/${formData.ref_no_month}${formData.ref_no_id}</td>
             <td>REPORT DATE:</td>
             <td colspan="2">${formData.report_date}</td>
         </tr>
         <tr>
             <td>VALUER NAME:</td>
             <td colspan="2">${formData.valuer_name}</td>
-            <td>SLA NO:</td>
+            <td>${formData.valuer_name === "VALUETECH SOLUTIONS" ? "Licence No." : "SLA NO:"}</td>
             <td colspan="2">${formData.license_no}</td>
         </tr>
         <tr>
@@ -146,9 +143,7 @@ function generateCVReportHTML(
             <td colspan="5">${formData.proposed_owner_address}</td>
         </tr>
         <tr>
-            <th colspan="6">INSPECTED EQUIPMENT DETAILS OF ${extraData.cat} / ${
-    extraData.subCat
-  } ${extraData.childCat}</th>
+            <th colspan="6">${formData.inspected_equipment_heading}</th>
         </tr>
         <tr>
             <td>REGISTRATION NO:</td>
@@ -218,9 +213,7 @@ function generateCVReportHTML(
           "INSPECTED_EQUIPMENT_DETAILS"
         )}
         <tr>
-            <th colspan="6">COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION ${
-              extraData.cat
-            } / ${extraData.subCat} ${extraData.childCat}</th>
+            <th colspan="6">${formData.comments_on_equipment_heading}</th>
         </tr>
         <tr>
             <td>ASSET CLASSIFICATION:</td>
@@ -325,10 +318,7 @@ function generateCVReportHTML(
             </td>
         </tr>
         <tr>
-            <th colspan="6">RC, PERMIT, TAX, FITNESS & INSURANCE DETAILS OF ${
-              extraData.cat
-            } / ${extraData.subCat} ${extraData.childCat}
-            </th>
+            <th colspan="6">${formData.rc_permit_tax_fitness_insurance_heading}</th>
         </tr>
         <tr>
             <td>RC BOOK VERIFIED:</td>
@@ -407,10 +397,7 @@ function generateCVReportHTML(
             <td colspan="2">${formData.insurance_verified}</td>
         </tr>
         <tr>
-            <th colspan="6">OVER ALL FEED BACK OF THE INSPECTED ${
-              extraData.cat
-            } / ${extraData.subCat} ${extraData.childCat}
-            </th>
+            <th colspan="6">${formData.overall_feedback_heading}</th>
         </tr>
         <tr>
             <td>CURRENT INVOICE COST:</td>
@@ -481,7 +468,7 @@ responsible or concerned for the same.</td>
             <td colspan="6" style="height: 48px;position: relative;">
               ${
                 stampImageBase64
-                  ? `<img src="${stampImageBase64}" alt="stamp" style="position:absolute; left:50%; bottom: -15px; transform:translateX(calc(-50% - 170px)); height: 150px;  z-index:2; pointer-events:none;" />`
+                  ? `<img src="${stampImageBase64}" alt="stamp" style="position:absolute; left:50%; bottom: -5px; transform:translateX(calc(-50% - 250px)); height: 125px;  z-index:2; pointer-events:none;" />`
                   : ""
               }
               SIGNATURE WITH SEAL & STAMP

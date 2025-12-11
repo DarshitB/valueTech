@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import * as orderMediaDocumentsApi from "../../api/orderMediaDocuments.api"; // API functions for order media documents
+import * as orderReportsCollagesApi from "../../api/orderReportsCollages.api"; // API functions for order reports/collages upload
 import { toast } from "react-toastify";
 
 // Async action: Fetch order media documents by order ID
@@ -68,6 +69,32 @@ export const approveOrderMediaDocuments = createAsyncThunk(
   }
 );
 
+// Async action: Upload single report or collage
+export const uploadOrderReportCollage = createAsyncThunk(
+  "orderMediaDocuments/uploadReportCollage",
+  async (formData, { rejectWithValue }) => {
+    try {
+      const res = await orderReportsCollagesApi.uploadOrderReportCollage(formData);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+// Async action: Upload multiple reports or collages
+export const uploadMultipleOrderReportsCollages = createAsyncThunk(
+  "orderMediaDocuments/uploadMultipleReportsCollages",
+  async (formData, { rejectWithValue }) => {
+    try {
+      const res = await orderReportsCollagesApi.uploadMultipleOrderReportsCollages(formData);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
 // Initial state
 const initialState = {
   documents: null,              // Order media documents data
@@ -82,6 +109,8 @@ const initialState = {
   approvedError: null,          // Approved documents error state
   approveLoading: false,        // Approve documents loading state
   approveError: null,           // Approve documents error state
+  reportCollageUploadLoading: false, // Report/Collage upload loading state
+  reportCollageUploadError: null,    // Report/Collage upload error state
 };
 
 // Order media documents slice
@@ -191,6 +220,54 @@ const orderMediaDocumentsSlice = createSlice({
         state.approveLoading = false;
         state.approveError = action.payload;
         toast.error(`Failed to approve documents: ${action.payload}`);
+      })
+
+      // Upload single report or collage
+      .addCase(uploadOrderReportCollage.pending, (state) => {
+        state.reportCollageUploadLoading = true;
+        state.reportCollageUploadError = null;
+      })
+      .addCase(uploadOrderReportCollage.fulfilled, (state, action) => {
+        // Add the newly uploaded document to the existing documents array
+        if (state.documents && state.documents.documents && action.payload && action.payload.data) {
+          const newDoc = action.payload.data;
+          if (Array.isArray(state.documents.documents)) {
+            state.documents.documents.push(newDoc);
+          } else {
+            state.documents.documents = [newDoc];
+          }
+        }
+        state.reportCollageUploadLoading = false;
+        toast.success(action.payload?.message || "File uploaded successfully");
+      })
+      .addCase(uploadOrderReportCollage.rejected, (state, action) => {
+        state.reportCollageUploadLoading = false;
+        state.reportCollageUploadError = action.payload;
+        toast.error(`Failed to upload file: ${action.payload}`);
+      })
+
+      // Upload multiple reports or collages
+      .addCase(uploadMultipleOrderReportsCollages.pending, (state) => {
+        state.reportCollageUploadLoading = true;
+        state.reportCollageUploadError = null;
+      })
+      .addCase(uploadMultipleOrderReportsCollages.fulfilled, (state, action) => {
+        // Add the newly uploaded documents to the existing documents array
+        if (state.documents && state.documents.documents && action.payload && action.payload.data && action.payload.data.documents) {
+          const newDocs = action.payload.data.documents;
+          if (Array.isArray(state.documents.documents)) {
+            state.documents.documents.push(...newDocs);
+          } else {
+            state.documents.documents = newDocs;
+          }
+        }
+        state.reportCollageUploadLoading = false;
+        toast.success(action.payload?.message || "Files uploaded successfully");
+      })
+      .addCase(uploadMultipleOrderReportsCollages.rejected, (state, action) => {
+        state.reportCollageUploadLoading = false;
+        state.reportCollageUploadError = action.payload;
+        toast.error(`Failed to upload files: ${action.payload}`);
       });
   },
 });
