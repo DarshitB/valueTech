@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useState, useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -8,6 +8,7 @@ import {
   removeChildCategory,
 } from "../../redux/reducers/childCategoryReducer";
 import { fetchSubCategoryById } from "../../redux/reducers/subcategoryReducer";
+import { fetchOrders } from "../../redux/reducers/orderReducer";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
 import { hasPermission } from "../../utils/permissionUtils";
 import { toast } from "react-toastify";
@@ -30,6 +31,9 @@ function ChildCategories() {
     (state) => state.childCategories || {}
   );
 
+  // Get orders from Redux store
+  const { list: orders } = useSelector((state) => state.orders);
+
   // Filter child categories by subcategory ID
   const childCategories = allChildCategories.filter(
     (child) => child.sub_category_id === parseInt(subCategoryId)
@@ -39,7 +43,21 @@ function ChildCategories() {
   // Load all child categories
   useEffect(() => {
     dispatch(fetchChildCategories());
+    dispatch(fetchOrders());
   }, [dispatch]);
+
+  // Calculate order count per child category
+  const childCategoryOrderCounts = useMemo(() => {
+    const counts = {};
+    if (!orders) return {};
+
+    orders.forEach((order) => {
+      if (order.child_category_id) {
+        counts[order.child_category_id] = (counts[order.child_category_id] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [orders]);
 
   // Set dynamic breadcrumb title
   useLayoutEffect(() => {
@@ -148,6 +166,7 @@ function ChildCategories() {
               <tr>
                 <th style={{ width: "55px" }}>ID</th>
                 <th style={{ width: "150px" }}>Name</th>
+                <th style={{ width: "150px" }}>No. of Orders</th>
                 <th style={{ width: "150px" }}>Created By</th>
                 <th>Updated By</th>
                 <th style={{ width: "200px", textAlign: "center" }}>Action</th>
@@ -157,6 +176,7 @@ function ChildCategories() {
               <tr key={child.id}>
                 <td className="sequential-number">{index + 1}</td>
                 <td>{child.name}</td>
+                <td>{childCategoryOrderCounts[child.id] || 0}</td>
                 <td>{child.created_by}</td>
                 <td>{child.updated_by || "-"}</td>
                 <td style={{ textAlign: "center" }}>

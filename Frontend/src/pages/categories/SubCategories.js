@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useState, useMemo } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -8,6 +8,8 @@ import {
   removeSubCategory,
 } from "../../redux/reducers/subcategoryReducer";
 import { fetchCategoryById } from "../../redux/reducers/categoryReducer";
+import { fetchOrders } from "../../redux/reducers/orderReducer";
+import { fetchChildCategories } from "../../redux/reducers/childCategoryReducer";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
 import { hasPermission } from "../../utils/permissionUtils";
 import { toast } from "react-toastify";
@@ -29,6 +31,12 @@ function SubCategories() {
     (state) => state.subcategories
   );
 
+  // Get orders and child categories from Redux store
+  const { list: orders } = useSelector((state) => state.orders);
+  const { list: childCategories } = useSelector(
+    (state) => state.childCategories
+  );
+
   const subcategories = allSubCategories.filter(
     (sub) => sub.category_id === parseInt(id)
   );
@@ -36,7 +44,28 @@ function SubCategories() {
   // Load all subcategories and current category
   useEffect(() => {
     dispatch(fetchSubCategories());
+    dispatch(fetchOrders());
+    dispatch(fetchChildCategories());
   }, [dispatch]);
+
+  // Calculate order count per subcategory
+  const subCategoryOrderCounts = useMemo(() => {
+    const counts = {};
+    if (!orders || !childCategories) return {};
+
+    orders.forEach((order) => {
+      if (order.child_category_id) {
+        const childCategory = childCategories.find(
+          (child) => child.id === order.child_category_id
+        );
+        if (childCategory && childCategory.sub_category_id) {
+          const subCategoryId = childCategory.sub_category_id;
+          counts[subCategoryId] = (counts[subCategoryId] || 0) + 1;
+        }
+      }
+    });
+    return counts;
+  }, [orders, childCategories]);
 
   useLayoutEffect(() => {
     dispatch(fetchCategoryById(id)).then((res) => {
@@ -144,6 +173,7 @@ function SubCategories() {
               <tr>
                 <th style={{ width: "52px" }}>ID</th>
                 <th style={{ width: "200px" }}>Name</th>
+                <th style={{ width: "150px" }}>No. of Orders</th>
                 <th style={{ width: "150px" }}>Created By</th>
                 <th>Updated By</th>
                 <th style={{ textAlign: "center", width: "150px" }}>Action</th>
@@ -180,6 +210,7 @@ function SubCategories() {
                 >
                   {sub.name}
                 </td>
+                <td>{subCategoryOrderCounts[sub.id] || 0}</td>
                 <td>{sub.created_by}</td>
                 <td>{sub.updated_by || "-"}</td>
                 <td style={{ textAlign: "center" }}>
