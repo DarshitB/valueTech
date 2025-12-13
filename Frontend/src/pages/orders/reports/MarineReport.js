@@ -2826,13 +2826,7 @@ function MarineReport() {
                       className="form-field"
                       name="length_of_vessel"
                       value={reportFormData.length_of_vessel}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Only allow numbers
-                        const sanitized = value.replace(/[^0-9]/g, "");
-                        e.target.value = sanitized;
-                        handleFormChange(e);
-                      }}
+                      onChange={handleDimensionChange}
                       placeholder="Enter Length Of Vessel"
                       required
                     />
@@ -2853,13 +2847,7 @@ function MarineReport() {
                       className="form-field"
                       name="loa_length_overall"
                       value={reportFormData.loa_length_overall}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Only allow numbers
-                        const sanitized = value.replace(/[^0-9]/g, "");
-                        e.target.value = sanitized;
-                        handleFormChange(e);
-                      }}
+                      onChange={handleDimensionChange}
                       placeholder="Enter LOA - Length Overall"
                       required
                     />
@@ -2879,13 +2867,7 @@ function MarineReport() {
                       className="form-field"
                       name="lbp_length_by_perpendicular"
                       value={reportFormData.lbp_length_by_perpendicular}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Only allow numbers
-                        const sanitized = value.replace(/[^0-9]/g, "");
-                        e.target.value = sanitized;
-                        handleFormChange(e);
-                      }}
+                      onChange={handleDimensionChange}
                       placeholder="Enter LBP - Length By Perpendicular"
                     />
                   </div>
@@ -2905,13 +2887,7 @@ function MarineReport() {
                       className="form-field"
                       name="breadth_of_vessel"
                       value={reportFormData.breadth_of_vessel}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Only allow numbers
-                        const sanitized = value.replace(/[^0-9]/g, "");
-                        e.target.value = sanitized;
-                        handleFormChange(e);
-                      }}
+                      onChange={handleDimensionChange}
                       placeholder="Enter Breadth Of Vessel"
                       required
                     />
@@ -2932,13 +2908,7 @@ function MarineReport() {
                       className="form-field"
                       name="depth_of_vessel"
                       value={reportFormData.depth_of_vessel}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Only allow numbers
-                        const sanitized = value.replace(/[^0-9]/g, "");
-                        e.target.value = sanitized;
-                        handleFormChange(e);
-                      }}
+                      onChange={handleDimensionChange}
                       placeholder="Enter Depth Of Vessel"
                     />
                   </div>
@@ -2957,13 +2927,7 @@ function MarineReport() {
                       className="form-field"
                       name="draught_of_vessel"
                       value={reportFormData.draught_of_vessel}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Only allow numbers
-                        const sanitized = value.replace(/[^0-9]/g, "");
-                        e.target.value = sanitized;
-                        handleFormChange(e);
-                      }}
+                      onChange={handleDimensionChange}
                       placeholder="Enter Draught Of Vessel"
                     />
                   </div>
@@ -2982,13 +2946,7 @@ function MarineReport() {
                       className="form-field"
                       name="summer_draft_of_vessel"
                       value={reportFormData.summer_draft_of_vessel}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Only allow numbers
-                        const sanitized = value.replace(/[^0-9]/g, "");
-                        e.target.value = sanitized;
-                        handleFormChange(e);
-                      }}
+                      onChange={handleDimensionChange}
                       placeholder="Enter Summer Draft Of Vessel"
                     />
                   </div>
@@ -3007,13 +2965,7 @@ function MarineReport() {
                       className="form-field"
                       name="length_of_stroke"
                       value={reportFormData.length_of_stroke}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Only allow numbers
-                        const sanitized = value.replace(/[^0-9]/g, "");
-                        e.target.value = sanitized;
-                        handleFormChange(e);
-                      }}
+                      onChange={handleDimensionChange}
                       placeholder="Enter Length Of Stroke"
                     />
                   </div>
@@ -3032,13 +2984,7 @@ function MarineReport() {
                       className="form-field"
                       name="ballast_water_capacity"
                       value={reportFormData.ballast_water_capacity}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Only allow numbers
-                        const sanitized = value.replace(/[^0-9]/g, "");
-                        e.target.value = sanitized;
-                        handleFormChange(e);
-                      }}
+                      onChange={handleDimensionChange}
                       placeholder="Enter Ballast Water Capacity"
                     />
                   </div>
@@ -3057,13 +3003,7 @@ function MarineReport() {
                       className="form-field"
                       name="light_ship"
                       value={reportFormData.light_ship}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Only allow numbers
-                        const sanitized = value.replace(/[^0-9]/g, "");
-                        e.target.value = sanitized;
-                        handleFormChange(e);
-                      }}
+                      onChange={handleDimensionChange}
                       placeholder="Enter Light Ship"
                     />
                   </div>
@@ -3099,13 +3039,7 @@ function MarineReport() {
                       className="form-field"
                       name="gross_registered_tonnage_grt"
                       value={reportFormData.gross_registered_tonnage_grt}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Only allow numbers
-                        const sanitized = value.replace(/[^0-9]/g, "");
-                        e.target.value = sanitized;
-                        handleFormChange(e);
-                      }}
+                      onChange={handleDimensionChange}
                       placeholder="Enter Gross Registered Tonnage (GRT)"
                     />
                   </div>
@@ -3124,13 +3058,7 @@ function MarineReport() {
                       className="form-field"
                       name="net_registered_tonnage_nrt"
                       value={reportFormData.net_registered_tonnage_nrt}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Only allow numbers
-                        const sanitized = value.replace(/[^0-9]/g, "");
-                        e.target.value = sanitized;
-                        handleFormChange(e);
-                      }}
+                      onChange={handleDimensionChange}
                       placeholder="Enter Net Registered Tonnage (NRT)"
                     />
                   </div>
@@ -3149,13 +3077,7 @@ function MarineReport() {
                       className="form-field"
                       name="deadweight_tonnage_dwt"
                       value={reportFormData.deadweight_tonnage_dwt}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Only allow numbers
-                        const sanitized = value.replace(/[^0-9]/g, "");
-                        e.target.value = sanitized;
-                        handleFormChange(e);
-                      }}
+                      onChange={handleDimensionChange}
                       placeholder="Enter Deadweight Tonnage (DWT)"
                     />
                   </div>
@@ -3174,13 +3096,7 @@ function MarineReport() {
                       className="form-field"
                       name="free_board"
                       value={reportFormData.free_board}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Only allow numbers
-                        const sanitized = value.replace(/[^0-9]/g, "");
-                        e.target.value = sanitized;
-                        handleFormChange(e);
-                      }}
+                      onChange={handleDimensionChange}
                       placeholder="Enter Free Board"
                     />
                   </div>
@@ -3216,13 +3132,7 @@ function MarineReport() {
                       className="form-field"
                       name="regd_accommodation"
                       value={reportFormData.regd_accommodation}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Only allow numbers
-                        const sanitized = value.replace(/[^0-9]/g, "");
-                        e.target.value = sanitized;
-                        handleFormChange(e);
-                      }}
+                      onChange={handleDimensionChange}
                       placeholder="00"
                     />
                   </div>
@@ -3241,13 +3151,7 @@ function MarineReport() {
                       className="form-field"
                       name="bollard_pull_sustained"
                       value={reportFormData.bollard_pull_sustained}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Only allow numbers
-                        const sanitized = value.replace(/[^0-9]/g, "");
-                        e.target.value = sanitized;
-                        handleFormChange(e);
-                      }}
+                      onChange={handleDimensionChange}
                       placeholder="00"
                     />
                   </div>
@@ -3281,13 +3185,7 @@ function MarineReport() {
                       className="form-field"
                       name="no_of_decks"
                       value={reportFormData.no_of_decks}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Only allow numbers
-                        const sanitized = value.replace(/[^0-9]/g, "");
-                        e.target.value = sanitized;
-                        handleFormChange(e);
-                      }}
+                      onChange={handleDimensionChange}
                       placeholder="00"
                     />
                   </div>
@@ -3304,13 +3202,14 @@ function MarineReport() {
                       className="form-field"
                       name="no_of_masts"
                       value={reportFormData.no_of_masts}
-                      onChange={(e) => {
+                      onChange={handleDimensionChange}
+                      /* onChange={(e) => {
                         const value = e.target.value;
                         // Only allow numbers
                         const sanitized = value.replace(/[^0-9]/g, "");
                         e.target.value = sanitized;
                         handleFormChange(e);
-                      }}
+                      }} */
                       placeholder="00"
                     />
                   </div>
@@ -3327,13 +3226,7 @@ function MarineReport() {
                       className="form-field"
                       name="no_of_bulkheads"
                       value={reportFormData.no_of_bulkheads}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Only allow numbers
-                        const sanitized = value.replace(/[^0-9]/g, "");
-                        e.target.value = sanitized;
-                        handleFormChange(e);
-                      }}
+                      onChange={handleDimensionChange}
                       placeholder="00"
                     />
                   </div>
