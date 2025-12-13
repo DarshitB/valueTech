@@ -525,6 +525,36 @@ function MarineReport() {
   const handleCurrencyChange = useCallback(
     (e) => {
       const { name, value } = e.target;
+      
+      // Allow empty strings to clear the field
+      if (!value || value.trim() === "") {
+        setReportFormData((prev) => {
+          const updated = {
+            ...prev,
+            [name]: "",
+          };
+
+          // Auto-update corresponding "in words" field to empty
+          // Handle special field name mappings for insurance policy fields
+          let wordsFieldName;
+          if (name === "insured_value_insurance_policy") {
+            wordsFieldName = "insured_value_in_words_insurance_policy";
+          } else if (name === "insured_value_war_risk_policy") {
+            wordsFieldName = "insured_value_in_words_war_risk_policy";
+          } else if (name === "insured_value_hull_machinery_policy") {
+            wordsFieldName = "insured_value_in_words_hull_machinery_policy";
+          } else {
+            // Default: append _in_words for other fields
+            wordsFieldName = `${name}_in_words`;
+          }
+          
+          updated[wordsFieldName] = "";
+
+          return updated;
+        });
+        return;
+      }
+      
       const formattedValue = formatIndianCurrency(value);
 
       // Update form data with formatted value
@@ -660,6 +690,16 @@ function MarineReport() {
   // Handle date input formatting (DD-MM-YYYY)
   const handleDateChange = (e) => {
     const { name, value } = e.target;
+    
+    // Allow empty strings to clear the field
+    if (!value || value.trim() === "") {
+      setReportFormData((prev) => ({
+        ...prev,
+        [name]: "",
+      }));
+      return;
+    }
+    
     let numericValue = value.replace(/\D/g, ""); // Remove non-numeric characters
     if (numericValue.length > 8) numericValue = numericValue.substring(0, 8); // Limit to 8 digits (DDMMYYYY)
 

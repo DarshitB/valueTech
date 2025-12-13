@@ -176,11 +176,14 @@ function OrderDetails() {
   useEffect(() => {
     if (id) {
       dispatch(fetchOrderById(id));
-      dispatch(fetchComments(id));
+      // Only fetch comments if user has permission
+      if (hasPermission(allowedPermissions, "view_order_comments")) {
+        dispatch(fetchComments(id));
+      }
       dispatch(fetchOrderMediaDocuments(id));
       dispatch(fetchOfficers());
     }
-  }, [dispatch, id]);
+  }, [dispatch, id, allowedPermissions]);
 
   // Fetch approved documents and media when mail modal is opened
   useEffect(() => {
@@ -876,7 +879,10 @@ function OrderDetails() {
       ).then(() => {
         setComment("");
         setTaggedUserIds([]);
-        dispatch(fetchComments(id));
+        // Only refetch comments if user has permission to view them
+        if (hasPermission(allowedPermissions, "view_order_comments")) {
+          dispatch(fetchComments(id));
+        }
       });
     }
   };

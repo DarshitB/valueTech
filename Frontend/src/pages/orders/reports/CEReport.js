@@ -1114,7 +1114,18 @@ function CEReport() {
   // Handle date input formatting (DD-MM-YYYY)
   const handleDateChange = useCallback((e) => {
     const { name, value } = e.target;
-    if (!value || typeof value !== "string") return;
+    
+    // Allow empty strings to clear the field
+    if (!value || value.trim() === "") {
+      setReportFormData((prev) => ({
+        ...prev,
+        [name]: "",
+      }));
+      return;
+    }
+    
+    if (typeof value !== "string") return;
+    
     let numericValue = value.replace(/\D/g, ""); // Remove non-numeric characters
     if (numericValue.length > 8) numericValue = numericValue.substring(0, 8); // Limit to 8 digits (DDMMYYYY)
 
@@ -1142,7 +1153,17 @@ function CEReport() {
   // Handle currency input formatting (Indian number format)
   const handleCurrencyChange = useCallback((e) => {
     const { name, value } = e.target;
-    if (!value || typeof value !== "string") return;
+    
+    // Allow empty strings to clear the field
+    if (!value || value.trim() === "") {
+      setReportFormData((prev) => ({
+        ...prev,
+        [name]: "",
+      }));
+      return;
+    }
+    
+    if (typeof value !== "string") return;
 
     // Remove everything except digits and one dot
     let inputVal = value.replace(/[^0-9.]/g, "");

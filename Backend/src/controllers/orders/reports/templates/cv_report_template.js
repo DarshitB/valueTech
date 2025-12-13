@@ -385,9 +385,9 @@ function generateCVReportHTML(
             </td>
             <td>INSURED VALUE:</td>
             <td colspan="2">
-                RS. ${
+                 ${
                   formData.insured_value
-                    ? formData.insured_value
+                    ? "RS." + formData.insured_value
                     : "NOT AVAILABLE"
                 }
             </td>

@@ -46,7 +46,7 @@ function Orders() {
   const { list: fieldVerifiers } = useSelector((state) => state.fieldVerifier);
 
   // console.log("officers", officers);
-  /* console.log("orders", orders); */
+  console.log("orders", orders);
   // Fetch everything on mount
   useEffect(() => {
     dispatch(fetchOrders());

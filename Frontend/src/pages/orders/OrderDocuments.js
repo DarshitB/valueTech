@@ -24,6 +24,7 @@ import {
   DownloadDocumentIcon,
   ViewIcon,
   ApprovedIcon,
+  ReportIcon,
 } from "../../components/icons";
 import { PlusIcon } from "lucide-react";
 import ConfirmationModal from "../../components/ConfirmationModal";
@@ -118,6 +119,11 @@ function OrderDocuments() {
   const { id } = useParams();
   const dispatch = useDispatch();
   const allowedPermissions = useSelector(selectPermissions);
+  const currentUser = useSelector((state) => state.auth.user);
+  const isExemptAdmin =
+    currentUser?.role?.name.toUpperCase().includes("SUPER ADMIN") ||
+    currentUser?.role?.name === "developer_admin";
+  const isBankOfficer = currentUser?.role?.name?.toUpperCase() === "BANK OFFICER";
   const { setTitle } = usePageTitle();
   const abortControllerRef = useRef(null);
 
@@ -153,14 +159,27 @@ function OrderDocuments() {
       return { collage: [], report: [], documents: [] };
     }
 
+    // Filter documents based on user role
+    // BANK OFFICER can only see approved/verified collages and reports
+    const filterDocuments = (docArray, docType) => {
+      const filtered = docArray.filter((doc) => doc?.document_type === docType);
+      
+      // If user is BANK OFFICER, only show approved documents for collages and reports
+      if (isBankOfficer && (docType === "collage" || docType === "report")) {
+        return filtered.filter((doc) => doc?.status === "approved");
+      }
+      
+      return filtered;
+    };
+
     return {
-      collage: documentsArray.filter((doc) => doc?.document_type === "collage"),
-      report: documentsArray.filter((doc) => doc?.document_type === "report"),
+      collage: filterDocuments(documentsArray, "collage"),
+      report: filterDocuments(documentsArray, "report"),
       documents: documentsArray.filter(
         (doc) => doc?.document_type === "documents"
       ),
     };
-  }, [documents]);
+  }, [documents, isBankOfficer]);
 
   // Secure URL parsing utility
   const parseMediaUrl = useCallback((mediaUrl) => {
@@ -659,6 +678,72 @@ function OrderDocuments() {
     },
     [dispatch, orderId]
   );
+
+  // Helper function to show toast error for missing valuer name
+  const showValuerNameError = useCallback((reportType) => {
+    toast.error(
+      `Please set a valuer name for this order before accessing the ${reportType} report.`
+    );
+  }, []);
+
+  // Get report URL based on order category
+  const getReportUrl = useCallback(() => {
+    if (!order?.category_name) return null;
+
+    const categoryName = order.category_name.toUpperCase();
+    
+    if (categoryName === "COMMERCIAL VEHICLE") {
+      return `/orders/${id}/details/cv-report`;
+    } else if (categoryName === "CONSTRUCTION EQUIPMENT") {
+      return `/orders/${id}/details/ce-report`;
+    } else if (categoryName.includes("AVR")) {
+      return `/orders/${id}/details/avr-report`;
+    } else if (categoryName === "MACHINERY") {
+      return `/orders/${id}/details/machinery-report`;
+    } else if (categoryName === "MARINE") {
+      return `/orders/${id}/details/marine-report`;
+    }
+    
+    return null;
+  }, [order, id]);
+
+  // Get report type name for error messages
+  const getReportTypeName = useCallback(() => {
+    if (!order?.category_name) return "Report";
+
+    const categoryName = order.category_name.toUpperCase();
+    
+    if (categoryName === "COMMERCIAL VEHICLE") return "CV";
+    if (categoryName === "CONSTRUCTION EQUIPMENT") return "CE";
+    if (categoryName.includes("AVR")) return "AVR";
+    if (categoryName === "MACHINERY") return "Machinery";
+    if (categoryName === "MARINE") return "Marine";
+    
+    return "Report";
+  }, [order]);
+
+  // Handle report button click
+  const handleGenerateReportClick = useCallback(() => {
+    // Check if valuer name is set
+    if (!order?.valuer_name || order.valuer_name.trim() === "") {
+      showValuerNameError(getReportTypeName());
+      return;
+    }
+
+    // Check if order is in status 10 and user is not exempt admin
+    if (order?.current_status_id === 10 && !isExemptAdmin) {
+      toast.error("Report generation is disabled for completed orders");
+      return;
+    }
+
+    // Get the report URL and navigate
+    const reportUrl = getReportUrl();
+    if (reportUrl) {
+      window.location.href = reportUrl;
+    } else {
+      toast.error("No report type available for this order category");
+    }
+  }, [order, isExemptAdmin, getReportUrl, getReportTypeName, showValuerNameError]);
 
   // Drag and drop handlers
   const handleDragOver = useCallback((e) => {
@@ -1160,7 +1245,41 @@ function OrderDocuments() {
                   <div className="order-report-header">
                     <h3>Reports</h3>
                     <div style={{ display: "flex", gap: "10px" }}>
-                      <Link className="btn primary">Generate Report</Link>
+                      {hasPermission(allowedPermissions, "generate_order_report") && (
+                        <>
+                          {order?.valuer_name && order.valuer_name.trim() !== "" ? (
+                            order?.current_status_id === 10 && !isExemptAdmin ? (
+                              <button
+                                className="btn primary"
+                                disabled
+                                title="Report generation is disabled for completed orders"
+                              >
+                                Generate Report
+                              </button>
+                            ) : (
+                              <Link
+                                to={getReportUrl() || "#"}
+                                className="btn primary"
+                                onClick={(e) => {
+                                  if (!getReportUrl()) {
+                                    e.preventDefault();
+                                    toast.error("No report type available for this order category");
+                                  }
+                                }}
+                              >
+                                Generate Report
+                              </Link>
+                            )
+                          ) : (
+                            <button
+                              className="btn primary"
+                              onClick={handleGenerateReportClick}
+                            >
+                              Generate Report
+                            </button>
+                          )}
+                        </>
+                      )}
                       {hasPermission(
                         allowedPermissions,
                         "view_order_media_files"

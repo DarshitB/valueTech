@@ -524,6 +524,16 @@ function AVRReport() {
   // Handle date input formatting (DD-MM-YYYY)
   const handleDateChange = (e) => {
     const { name, value } = e.target;
+    
+    // Allow empty strings to clear the field
+    if (!value || value.trim() === "") {
+      setReportFormData((prev) => ({
+        ...prev,
+        [name]: "",
+      }));
+      return;
+    }
+    
     let numericValue = value.replace(/\D/g, ""); // Remove non-numeric characters
     if (numericValue.length > 8) numericValue = numericValue.substring(0, 8); // Limit to 8 digits (DDMMYYYY)
 
