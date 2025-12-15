@@ -183,6 +183,9 @@ function MachineryReport() {
 
     // Reset flexible fields
     setFlexibleFields([]);
+
+    // Clear the cleared fields tracking when form resets
+    clearedFieldsRef.current.clear();
   }, [id]);
 
   // Function to get license number based on valuer name
@@ -498,6 +501,9 @@ function MachineryReport() {
 
   // State for flexible fields
   const [flexibleFields, setFlexibleFields] = useState([]);
+
+  // Track fields that were explicitly cleared by the user (date and currency fields)
+  const clearedFieldsRef = useRef(new Set());
 
   // Auto-populate form data when order data is available
   useEffect(() => {
@@ -981,12 +987,17 @@ function MachineryReport() {
     
     // Allow empty strings to clear the field
     if (!value || value.trim() === "") {
+      // Track that this field was explicitly cleared
+      clearedFieldsRef.current.add(name);
       setReportFormData((prev) => ({
         ...prev,
         [name]: "",
       }));
       return;
     }
+    
+    // If field gets a value, remove it from cleared fields tracking
+    clearedFieldsRef.current.delete(name);
     
     if (typeof value !== "string") return;
     
@@ -1020,12 +1031,17 @@ function MachineryReport() {
     
     // Allow empty strings to clear the field
     if (!value || value.trim() === "") {
+      // Track that this field was explicitly cleared
+      clearedFieldsRef.current.add(name);
       setReportFormData((prev) => ({
         ...prev,
         [name]: "",
       }));
       return;
     }
+    
+    // If field gets a value, remove it from cleared fields tracking
+    clearedFieldsRef.current.delete(name);
     
     if (typeof value !== "string") return;
 
@@ -1438,8 +1454,12 @@ function MachineryReport() {
 
         reportData[key] = defaultValue;
       } else {
-        // Only include fields that have meaningful values (not null, undefined, or empty string)
-        if (value !== null && value !== undefined && value !== "") {
+        // Check if this field was explicitly cleared by the user
+        if (clearedFieldsRef.current.has(key)) {
+          // Include cleared fields as null in the payload
+          reportData[key] = null;
+        } else if (value !== null && value !== undefined && value !== "") {
+          // Only include fields that have meaningful values (not null, undefined, or empty string)
           reportData[key] = value;
         }
       }
@@ -1495,6 +1515,9 @@ function MachineryReport() {
 
     console.log("📤 Sending to backend - reportData:", reportData);
     console.log("📤 amount_in_words in payload:", reportData.amount_in_words);
+
+    // Clear the tracking set after save (fields will be tracked again if cleared after save)
+    clearedFieldsRef.current.clear();
 
     // Dispatch save action with JSON data
     dispatch(

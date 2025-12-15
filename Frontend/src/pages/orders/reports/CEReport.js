@@ -182,6 +182,9 @@ function CEReport() {
 
     // Reset chassis impression file
     setChassisImpressionFile(null);
+
+    // Clear the cleared fields tracking when form resets
+    clearedFieldsRef.current.clear();
   }, [id]);
 
   // Function to get license number based on valuer name
@@ -589,6 +592,9 @@ function CEReport() {
   // State for flexible fields
   const [flexibleFields, setFlexibleFields] = useState([]);
 
+  // Track fields that were explicitly cleared by the user (date and currency fields)
+  const clearedFieldsRef = useRef(new Set());
+
   // Auto-populate form data when order data is available
   useEffect(() => {
     if (order) {
@@ -719,6 +725,9 @@ function CEReport() {
       // Report belongs to different order, ignore it
       return;
     }
+
+    // Clear the cleared fields tracking when loading report data
+    clearedFieldsRef.current.clear();
 
     setReportFormData((prev) => {
       const updated = { ...prev };
@@ -1117,12 +1126,17 @@ function CEReport() {
     
     // Allow empty strings to clear the field
     if (!value || value.trim() === "") {
+      // Track that this field was explicitly cleared
+      clearedFieldsRef.current.add(name);
       setReportFormData((prev) => ({
         ...prev,
         [name]: "",
       }));
       return;
     }
+    
+    // If field gets a value, remove it from cleared fields tracking
+    clearedFieldsRef.current.delete(name);
     
     if (typeof value !== "string") return;
     
@@ -1156,12 +1170,17 @@ function CEReport() {
     
     // Allow empty strings to clear the field
     if (!value || value.trim() === "") {
+      // Track that this field was explicitly cleared
+      clearedFieldsRef.current.add(name);
       setReportFormData((prev) => ({
         ...prev,
         [name]: "",
       }));
       return;
     }
+    
+    // If field gets a value, remove it from cleared fields tracking
+    clearedFieldsRef.current.delete(name);
     
     if (typeof value !== "string") return;
 
@@ -1568,8 +1587,12 @@ function CEReport() {
         }
         reportData[key] = defaultValue;
       } else {
-        // Only include fields that have meaningful values (not null, undefined, or empty string)
-        if (value !== null && value !== undefined && value !== "") {
+        // Check if this field was explicitly cleared by the user
+        if (clearedFieldsRef.current.has(key)) {
+          // Include cleared fields as null in the payload
+          reportData[key] = null;
+        } else if (value !== null && value !== undefined && value !== "") {
+          // Only include fields that have meaningful values (not null, undefined, or empty string)
           reportData[key] = value;
         }
       }
@@ -1649,10 +1672,16 @@ function CEReport() {
     Object.entries(reportData).forEach(([key, value]) => {
       if (value instanceof File || value instanceof Blob) {
         formData.append(key, value);
-      } else if (value !== null && value !== undefined) {
+      } else if (value === null) {
+        // Explicitly send null values for cleared fields (as empty string for FormData)
+        formData.append(key, "");
+      } else if (value !== undefined) {
         formData.append(key, value);
       }
     });
+
+    // Clear the tracking set after save (fields will be tracked again if cleared after save)
+    clearedFieldsRef.current.clear();
 
     // Dispatch save action with FormData payload
     dispatch(

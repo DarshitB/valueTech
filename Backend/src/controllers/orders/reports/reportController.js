@@ -1539,7 +1539,7 @@ function filterValidReportFields(formData, reportType) {
       'registered_owner_name', 'registered_owner_address', 'proposed_owner_name', 'proposed_owner_address',
       'registration_no', 'registration_date', 'registered_location', 'owner_serial_no',
       'manufacture_year', 'asset_make', 'model', 'engine_no_detail', 'chassis_no',
-      'body_type', 'fuel_type', 'kilometer_reading', 'invoice_no_date',
+      'body_type', 'chassis_no_type', 'fuel_type', 'kilometer_reading', 'invoice_no_date',
       'hyp_with', 'hyp_from_date', 'asset_classification', 'no_of_cylinder',
       'engine_condition', 'chassis_condition', 'body_condition', 'cabin_condition',
       'electrical_condition', 'gear_transmission', 'battery_available', 'gross_vehicle_weight',

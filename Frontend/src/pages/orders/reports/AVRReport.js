@@ -3,6 +3,7 @@ import React, {
   useLayoutEffect,
   useState,
   useCallback,
+  useRef,
 } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -137,6 +138,9 @@ function AVRReport() {
 
     // Reset flexible fields
     setFlexibleFields([]);
+
+    // Clear the cleared fields tracking when form resets
+    clearedFieldsRef.current.clear();
   }, [id]);
 
   // Get current date in DD-MM-YYYY format
@@ -378,6 +382,9 @@ function AVRReport() {
   // State for flexible fields
   const [flexibleFields, setFlexibleFields] = useState([]);
 
+  // Track fields that were explicitly cleared by the user (date and currency fields)
+  const clearedFieldsRef = useRef(new Set());
+
   // Auto-populate form data when order data is available
   useEffect(() => {
     if (order) {
@@ -426,6 +433,9 @@ function AVRReport() {
       );
       return;
     }
+
+    // Clear the cleared fields tracking when loading report data
+    clearedFieldsRef.current.clear();
 
     setReportFormData((prev) => {
       const updated = { ...prev };
@@ -527,12 +537,17 @@ function AVRReport() {
     
     // Allow empty strings to clear the field
     if (!value || value.trim() === "") {
+      // Track that this field was explicitly cleared
+      clearedFieldsRef.current.add(name);
       setReportFormData((prev) => ({
         ...prev,
         [name]: "",
       }));
       return;
     }
+    
+    // If field gets a value, remove it from cleared fields tracking
+    clearedFieldsRef.current.delete(name);
     
     let numericValue = value.replace(/\D/g, ""); // Remove non-numeric characters
     if (numericValue.length > 8) numericValue = numericValue.substring(0, 8); // Limit to 8 digits (DDMMYYYY)
@@ -738,8 +753,12 @@ function AVRReport() {
         // Always include these fields, even if empty
         reportData[key] = value || "";
       } else {
-        // Only include fields that have meaningful values (not null, undefined, or empty string)
-        if (value !== null && value !== undefined && value !== "") {
+        // Check if this field was explicitly cleared by the user
+        if (clearedFieldsRef.current.has(key)) {
+          // Include cleared fields as null in the payload
+          reportData[key] = null;
+        } else if (value !== null && value !== undefined && value !== "") {
+          // Only include fields that have meaningful values (not null, undefined, or empty string)
           reportData[key] = value;
         }
       }
@@ -791,6 +810,9 @@ function AVRReport() {
       );
       return;
     }
+
+    // Clear the tracking set after save (fields will be tracked again if cleared after save)
+    clearedFieldsRef.current.clear();
 
     // Dispatch save action with JSON data
     dispatch(

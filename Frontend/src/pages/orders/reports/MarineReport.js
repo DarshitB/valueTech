@@ -4,6 +4,7 @@ import React, {
   useState,
   useCallback,
   useMemo,
+  useRef,
 } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -246,6 +247,9 @@ function MarineReport() {
   // State for image selection modal (fieldId => boolean)
   const [imageModalOpen, setImageModalOpen] = useState({});
 
+  // Track fields that were explicitly cleared by the user (date and currency fields)
+  const clearedFieldsRef = useRef(new Set());
+
   // Reset form data when component mounts or order ID changes
   useEffect(() => {
     // Get current date in DD-MM-YYYY format
@@ -326,6 +330,9 @@ function MarineReport() {
 
     // Reset flexible fields
     setFlexibleFields([]);
+
+    // Clear the cleared fields tracking when form resets
+    clearedFieldsRef.current.clear();
   }, [id, getCurrentDate]);
 
   // Auto-populate form data when order data is available
@@ -528,6 +535,8 @@ function MarineReport() {
       
       // Allow empty strings to clear the field
       if (!value || value.trim() === "") {
+        // Track that this field was explicitly cleared
+        clearedFieldsRef.current.add(name);
         setReportFormData((prev) => {
           const updated = {
             ...prev,
@@ -554,6 +563,9 @@ function MarineReport() {
         });
         return;
       }
+      
+      // If field gets a value, remove it from cleared fields tracking
+      clearedFieldsRef.current.delete(name);
       
       const formattedValue = formatIndianCurrency(value);
 
@@ -693,12 +705,17 @@ function MarineReport() {
     
     // Allow empty strings to clear the field
     if (!value || value.trim() === "") {
+      // Track that this field was explicitly cleared
+      clearedFieldsRef.current.add(name);
       setReportFormData((prev) => ({
         ...prev,
         [name]: "",
       }));
       return;
     }
+    
+    // If field gets a value, remove it from cleared fields tracking
+    clearedFieldsRef.current.delete(name);
     
     let numericValue = value.replace(/\D/g, ""); // Remove non-numeric characters
     if (numericValue.length > 8) numericValue = numericValue.substring(0, 8); // Limit to 8 digits (DDMMYYYY)

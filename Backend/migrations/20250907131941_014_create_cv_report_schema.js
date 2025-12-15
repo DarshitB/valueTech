@@ -63,6 +63,7 @@ exports.up = async function (knex) {
     table.string("chassis_no", 255).nullable();
     table.string("body_type", 255).nullable();
     table.string("fuel_type", 255).nullable();
+    table.string("chassis_no_type", 255).nullable();
     table.string("kilometer_reading", 255).nullable();
     table.string("invoice_no_date", 255).nullable();
     
