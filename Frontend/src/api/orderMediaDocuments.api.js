@@ -21,3 +21,7 @@ export const getApprovedOrderMediaDocuments = (orderId) =>
 // Approve order media documents
 export const approveOrderMediaDocuments = (orderId, payload) =>
   axios.post(`${ENDPOINT}/${orderId}/approve`, payload);
+
+// Remove approval from order media documents
+export const removeApproveOrderMediaDocuments = (orderId, payload) =>
+  axios.post(`${ENDPOINT}/${orderId}/remove-approve`, payload);

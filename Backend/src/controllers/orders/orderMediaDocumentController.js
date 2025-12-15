@@ -300,6 +300,40 @@ exports.approveByOrderId = async (req, res, next) => {
 };
 
 /**
+ * Remove approval (set status to null) for multiple documents for an order
+ * POST /api/order-media-document/:orderId/remove-approve
+ * Body: { document_ids: number[] }
+ */
+exports.removeApprovalByOrderId = async (req, res, next) => {
+  try {
+    const { orderId } = req.params;
+    const { document_ids } = req.body;
+
+    if (!orderId) {
+      throw new BadRequestError("orderId is required");
+    }
+
+    if (!Array.isArray(document_ids) || document_ids.length === 0) {
+      throw new BadRequestError("document_ids must be a non-empty array");
+    }
+
+    const { updated } = await orderMediaDocument.removeApprovalByIdsForOrder(
+      parseInt(orderId),
+      document_ids.map((id) => parseInt(id)),
+      req.user?.id
+    );
+
+    res.json({
+      success: true,
+      message: `${updated} document(s) approval removed`,
+      data: { updated },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * Determine media type from MIME type and filename
  */
 function determineMediaType(mimeType, filename) {

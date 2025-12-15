@@ -122,6 +122,23 @@ const orderMediaDocument = {
     return { updated: result };
   },
 
+  // Remove approval (set status to null) for documents by IDs for a given order
+  removeApprovalByIdsForOrder: async (orderId, documentIds, removedBy) => {
+    if (!Array.isArray(documentIds) || documentIds.length === 0) {
+      return { updated: 0 };
+    }
+
+    const result = await db("order_media_documents")
+      .where({ order_id: orderId })
+      .whereIn("id", documentIds)
+      .whereNull("deleted_at")
+      .update({
+        status: null,
+      });
+
+    return { updated: result };
+  },
+
   // Get document count by order ID
   countByOrderId: async (orderId) => {
     const result = await db("order_media_documents")

@@ -44,6 +44,17 @@ router.post(
   orderMediaDocumentController.approveByOrderId
 );
 
+// Remove approval (set status to null) for multiple documents for an order
+router.post(
+  "/:orderId/remove-approve",
+  activityLogger(
+    "order_media_documents",
+    (req) => req.params.orderId,
+    "Remove Approval from Media Documents"
+  ),
+  orderMediaDocumentController.removeApprovalByOrderId
+);
+
 // Delete document (soft delete with activity log)
 router.delete(
   "/:id",

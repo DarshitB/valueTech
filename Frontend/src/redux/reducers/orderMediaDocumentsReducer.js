@@ -69,6 +69,20 @@ export const approveOrderMediaDocuments = createAsyncThunk(
   }
 );
 
+// Async action: Remove approval from order media documents
+export const removeApproveOrderMediaDocuments = createAsyncThunk(
+  "orderMediaDocuments/removeApprove",
+  async ({ orderId, documentIds }, { rejectWithValue }) => {
+    try {
+      const payload = { document_ids: documentIds };
+      const res = await orderMediaDocumentsApi.removeApproveOrderMediaDocuments(orderId, payload);
+      return { ...res.data, removedApprovedIds: documentIds };
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
 // Async action: Upload single report or collage
 export const uploadOrderReportCollage = createAsyncThunk(
   "orderMediaDocuments/uploadReportCollage",
@@ -109,6 +123,8 @@ const initialState = {
   approvedError: null,          // Approved documents error state
   approveLoading: false,        // Approve documents loading state
   approveError: null,           // Approve documents error state
+  removeApproveLoading: false,  // Remove approve documents loading state
+  removeApproveError: null,     // Remove approve documents error state
   reportCollageUploadLoading: false, // Report/Collage upload loading state
   reportCollageUploadError: null,    // Report/Collage upload error state
 };
@@ -219,7 +235,39 @@ const orderMediaDocumentsSlice = createSlice({
       .addCase(approveOrderMediaDocuments.rejected, (state, action) => {
         state.approveLoading = false;
         state.approveError = action.payload;
-        toast.error(`Failed to approve documents: ${action.payload}`);
+        // Only show error toast if it's not a permission error (403)
+        const errorStatus = action.error?.response?.status || action.error?.status;
+        if (errorStatus !== 403) {
+          toast.error(`Failed to approve documents: ${action.payload}`);
+        }
+      })
+
+      // Remove approval from order media documents
+      .addCase(removeApproveOrderMediaDocuments.pending, (state) => {
+        state.removeApproveLoading = true;
+        state.removeApproveError = null;
+      })
+      .addCase(removeApproveOrderMediaDocuments.fulfilled, (state, action) => {
+        // Update the documents' approval status if we have the documents in state
+        if (state.documents && state.documents.documents && action.payload.removedApprovedIds) {
+          state.documents.documents = state.documents.documents.map((doc) => {
+            if (action.payload.removedApprovedIds.includes(doc.id)) {
+              return { ...doc, status: null };
+            }
+            return doc;
+          });
+        }
+        state.removeApproveLoading = false;
+        toast.success(action.payload?.message || "Document(s) approval removed successfully");
+      })
+      .addCase(removeApproveOrderMediaDocuments.rejected, (state, action) => {
+        state.removeApproveLoading = false;
+        state.removeApproveError = action.payload;
+        // Only show error toast if it's not a permission error (403)
+        const errorStatus = action.error?.response?.status || action.error?.status;
+        if (errorStatus !== 403) {
+          toast.error(`Failed to remove approval: ${action.payload}`);
+        }
       })
 
       // Upload single report or collage

@@ -858,7 +858,7 @@
 }
 .tooltip-link {
   &.button {
-    &:focus{
+    &:focus {
       border: unset !important;
       outline: unset !important;
       box-shadow: unset !important;
@@ -1151,6 +1151,22 @@
         &:hover {
           background-color: $color-success !important;
           color: $base-color !important;
+        }
+      }
+      &.remove-approve-report {
+        width: 50%;
+        height: 50px;
+        border-radius: 5px;
+        font-size: 16px;
+        font-weight: 500;
+        background-color: transparent;
+        border: 1px solid $color-danger;
+        background-color: $color-danger !important;
+        color: $base-color !important;
+        &:hover {
+          background-color: transparent !important;
+          color: $color-danger !important;
+          border-color: $color-danger !important;
         }
       }
     }

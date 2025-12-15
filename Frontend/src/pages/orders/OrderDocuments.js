@@ -15,6 +15,7 @@ import {
   uploadOrderMediaDocuments,
   deleteOrderMediaDocuments,
   approveOrderMediaDocuments,
+  removeApproveOrderMediaDocuments,
   uploadOrderReportCollage,
   uploadMultipleOrderReportsCollages,
 } from "../../redux/reducers/orderMediaDocumentsReducer";
@@ -123,7 +124,8 @@ function OrderDocuments() {
   const isExemptAdmin =
     currentUser?.role?.name.toUpperCase().includes("SUPER ADMIN") ||
     currentUser?.role?.name === "developer_admin";
-  const isBankOfficer = currentUser?.role?.name?.toUpperCase() === "BANK OFFICER";
+  const userRole = currentUser?.role?.name?.toUpperCase();
+  const isBankUser = userRole === "BANK OFFICER" || userRole === "BANK AUTHORITY";
   const { setTitle } = usePageTitle();
   const abortControllerRef = useRef(null);
 
@@ -138,7 +140,7 @@ function OrderDocuments() {
   }, [id]);
 
   const order = useSelector((state) => state.orders.selected);
-  const { documents, loading, uploadLoading, approveLoading, error, reportCollageUploadLoading } =
+  const { documents, loading, uploadLoading, approveLoading, removeApproveLoading, error, reportCollageUploadLoading } =
     useSelector((state) => state.orderMediaDocuments);
 
   // Refs for file inputs
@@ -160,12 +162,12 @@ function OrderDocuments() {
     }
 
     // Filter documents based on user role
-    // BANK OFFICER can only see approved/verified collages and reports
+    // BANK OFFICER and BANK AUTHORITY can only see approved/verified collages and reports
     const filterDocuments = (docArray, docType) => {
       const filtered = docArray.filter((doc) => doc?.document_type === docType);
       
-      // If user is BANK OFFICER, only show approved documents for collages and reports
-      if (isBankOfficer && (docType === "collage" || docType === "report")) {
+      // If user is BANK OFFICER or BANK AUTHORITY, only show approved documents for collages and reports
+      if (isBankUser && (docType === "collage" || docType === "report")) {
         return filtered.filter((doc) => doc?.status === "approved");
       }
       
@@ -179,7 +181,7 @@ function OrderDocuments() {
         (doc) => doc?.document_type === "documents"
       ),
     };
-  }, [documents, isBankOfficer]);
+  }, [documents, isBankUser]);
 
   // Secure URL parsing utility
   const parseMediaUrl = useCallback((mediaUrl) => {
@@ -513,6 +515,17 @@ function OrderDocuments() {
         return;
       }
 
+      // Check permissions before proceeding
+      const requiredPermission =
+        documentType === "collage"
+          ? "approve_order_collage"
+          : "approve_order_report";
+
+      if (!hasPermission(allowedPermissions, requiredPermission)) {
+        // Silently return without showing error if permission is missing
+        return;
+      }
+
       try {
         await dispatch(
           approveOrderMediaDocuments({
@@ -534,11 +547,87 @@ function OrderDocuments() {
           `${selectedIds.length} document(s) verified successfully`
         );
       } catch (error) {
-        console.error("Verification failed:", error);
-        toast.error("Failed to verify documents");
+        // Only show error if it's not a permission error
+        if (error?.response?.status !== 403) {
+          console.error("Verification failed:", error);
+          toast.error("Failed to verify documents");
+        }
       }
     },
-    [dispatch, orderId, documentState]
+    [dispatch, orderId, documentState, allowedPermissions]
+  );
+
+  // Enhanced remove approval with proper error handling
+  const handleRemoveApproveSelected = useCallback(
+    async (selectedIds, documentType) => {
+      if (!selectedIds?.length) {
+        toast.error("Please select documents to remove approval");
+        return;
+      }
+
+      if (!["collage", "report"].includes(documentType)) {
+        toast.error("Only reports and collages can have approval removed");
+        return;
+      }
+
+      // Check permissions before proceeding
+      const requiredPermission =
+        documentType === "collage"
+          ? "remove_approve_order_collage"
+          : "remove_approve_order_report";
+
+      if (!hasPermission(allowedPermissions, requiredPermission)) {
+        // Silently return without showing error if permission is missing
+        return;
+      }
+
+      try {
+        await dispatch(
+          removeApproveOrderMediaDocuments({
+            orderId,
+            documentIds: selectedIds,
+          })
+        ).unwrap();
+
+        await dispatch(fetchOrderMediaDocuments(orderId));
+
+        // Clear selections
+        if (documentType === "collage") {
+          documentState.setSelectedCollages([]);
+        } else if (documentType === "report") {
+          documentState.setSelectedReports([]);
+        }
+
+        toast.success(
+          `${selectedIds.length} document(s) approval removed successfully`
+        );
+      } catch (error) {
+        // Only show error if it's not a permission error
+        if (error?.response?.status !== 403) {
+          console.error("Remove approval failed:", error);
+          toast.error("Failed to remove approval from documents");
+        }
+      }
+    },
+    [dispatch, orderId, documentState, allowedPermissions]
+  );
+
+  // Helper function to check if any selected documents are approved
+  const hasApprovedDocuments = useCallback(
+    (selectedIds, documentType) => {
+      if (!selectedIds?.length) return false;
+
+      const documentsArray = documents?.documents || documents || [];
+      if (!Array.isArray(documentsArray)) return false;
+
+      const filteredDocs = documentsArray.filter(
+        (doc) =>
+          doc?.document_type === documentType && selectedIds.includes(doc.id)
+      );
+
+      return filteredDocs.some((doc) => doc?.status === "approved");
+    },
+    [documents]
   );
 
   // Enhanced file upload with validation
@@ -1221,20 +1310,48 @@ function OrderDocuments() {
                         >
                           Download selected collages
                         </button>
-                        <button
-                          className="btn approve-report"
-                          onClick={() =>
-                            handleVerifySelected(
-                              documentState.selectedCollages,
-                              "collage"
-                            )
-                          }
-                          disabled={approveLoading || loading}
-                        >
-                          {approveLoading
-                            ? "Verifying..."
-                            : "Verify selected collages"}
-                        </button>
+                        {hasPermission(
+                          allowedPermissions,
+                          "approve_order_collage"
+                        ) && (
+                          <button
+                            className="btn approve-report"
+                            onClick={() =>
+                              handleVerifySelected(
+                                documentState.selectedCollages,
+                                "collage"
+                              )
+                            }
+                            disabled={approveLoading || loading}
+                          >
+                            {approveLoading
+                              ? "Verifying..."
+                              : "Verify selected collages"}
+                          </button>
+                        )}
+                        {hasPermission(
+                          allowedPermissions,
+                          "remove_approve_order_collage"
+                        ) &&
+                          hasApprovedDocuments(
+                            documentState.selectedCollages,
+                            "collage"
+                          ) && (
+                            <button
+                              className="btn remove-approve-report"
+                              onClick={() =>
+                                handleRemoveApproveSelected(
+                                  documentState.selectedCollages,
+                                  "collage"
+                                )
+                              }
+                              disabled={removeApproveLoading || loading}
+                            >
+                              {removeApproveLoading
+                                ? "Removing approval..."
+                                : "Remove Approve"}
+                            </button>
+                          )}
                       </div>
                     )}
                   </div>
@@ -1329,20 +1446,48 @@ function OrderDocuments() {
                         >
                           Download selected reports
                         </button>
-                        <button
-                          className="btn approve-report"
-                          onClick={() =>
-                            handleVerifySelected(
-                              documentState.selectedReports,
-                              "report"
-                            )
-                          }
-                          disabled={approveLoading || loading}
-                        >
-                          {approveLoading
-                            ? "Verifying..."
-                            : "Verify selected reports"}
-                        </button>
+                        {hasPermission(
+                          allowedPermissions,
+                          "approve_order_report"
+                        ) && (
+                          <button
+                            className="btn approve-report"
+                            onClick={() =>
+                              handleVerifySelected(
+                                documentState.selectedReports,
+                                "report"
+                              )
+                            }
+                            disabled={approveLoading || loading}
+                          >
+                            {approveLoading
+                              ? "Verifying..."
+                              : "Verify selected reports"}
+                          </button>
+                        )}
+                        {hasPermission(
+                          allowedPermissions,
+                          "remove_approve_order_report"
+                        ) &&
+                          hasApprovedDocuments(
+                            documentState.selectedReports,
+                            "report"
+                          ) && (
+                            <button
+                              className="btn remove-approve-report"
+                              onClick={() =>
+                                handleRemoveApproveSelected(
+                                  documentState.selectedReports,
+                                  "report"
+                                )
+                              }
+                              disabled={removeApproveLoading || loading}
+                            >
+                              {removeApproveLoading
+                                ? "Removing approval..."
+                                : "Remove Approve"}
+                            </button>
+                          )}
                       </div>
                     )}
                   </div>
