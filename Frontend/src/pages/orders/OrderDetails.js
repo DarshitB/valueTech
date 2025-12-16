@@ -21,6 +21,9 @@ import {
   fetchApprovedOrderMediaDocuments,
   fetchOrderMediaDocuments,
 } from "../../redux/reducers/orderMediaDocumentsReducer";
+import {
+  fetchOrderReport,
+} from "../../redux/reducers/orderReportReducer";
 import { fetchOfficers } from "../../redux/reducers/officerReducer";
 import { getUsers } from "../../api/user.api";
 import { sendOrderMail } from "../../api/order.api";
@@ -123,6 +126,8 @@ function OrderDetails() {
     documents: orderMediaDocuments,
   } = orderMediaDocumentsState;
   const { list: officers } = useSelector((state) => state.officers);
+  // Get CV report data from Redux store
+  const { currentReport } = useSelector((state) => state.orderReports);
 
   // Set page title using custom hook
   const { setTitle } = usePageTitle(); // set page title
@@ -190,8 +195,14 @@ function OrderDetails() {
     if (showMailModal && id) {
       dispatch(fetchApprovedOrderMediaDocuments(id));
       dispatch(fetchOrderMedia(id)); // Fetch media like OrderImages does
+      // Fetch CV report if category is COMMERCIAL VEHICLE
+      if (order?.category_name === "COMMERCIAL VEHICLE") {
+        dispatch(
+          fetchOrderReport({ orderId: id, reportType: "report_cv", silent: true })
+        );
+      }
     }
-  }, [dispatch, id, showMailModal]);
+  }, [dispatch, id, showMailModal, order?.category_name]);
 
   // Fetch users for mentions with error handling
   useEffect(() => {
@@ -218,6 +229,77 @@ function OrderDetails() {
 
     fetchUsersData();
   }, []);
+
+  // Format registration number to uppercase with dashes (e.g., MH-04-KF-3598)
+  const formatRegistrationNumber = useCallback((regNo) => {
+    if (!regNo || typeof regNo !== "string") return "";
+    // Remove all spaces and convert to uppercase
+    let cleaned = regNo.replace(/\s/g, "").toUpperCase();
+    // If it already has dashes, return as is (already formatted)
+    if (cleaned.includes("-")) {
+      return cleaned;
+    }
+    // Try to format: Pattern 2 letters, 2 digits, 1-2 letters, 4+ digits
+    // Examples: MH04KF3598 -> MH-04-KF-3598, MH04K3598 -> MH-04-K-3598
+    const match = cleaned.match(/^([A-Z]{2})(\d{2})([A-Z]{1,2})(\d{4,})$/);
+    if (match) {
+      return `${match[1]}-${match[2]}-${match[3]}-${match[4]}`;
+    }
+    // If format doesn't match, return cleaned (uppercase, no spaces)
+    return cleaned;
+  }, []);
+
+  // Prefill email subject for COMMERCIAL VEHICLE orders
+  useEffect(() => {
+    if (
+      showMailModal &&
+      order?.category_name === "COMMERCIAL VEHICLE" &&
+      currentReport?.report &&
+      !mailFormData.subject // Only prefill if subject is empty
+    ) {
+      const report = currentReport.report;
+      const registeredOwnerName = report.registered_owner_name || "";
+      const subCategoryName = order.sub_category_name || "";
+      const childCategoryName = order.child_category_name || "";
+      const registrationNo = report.registration_no || "";
+      const bankName = order.bank_name || "";
+
+      // Build category part
+      const categoryPart = [subCategoryName, childCategoryName]
+        .filter(Boolean)
+        .join(" ");
+
+      // Format registration number
+      const formattedRegNo = formatRegistrationNumber(registrationNo);
+
+      // Build subject: Valuation Report_(Owner Name)_(Category)_(Reg No)_(Bank Name)
+      const parts = [
+        "Valuation Report",
+        registeredOwnerName,
+        categoryPart,
+        formattedRegNo,
+        bankName,
+      ].filter(Boolean); // Remove empty parts
+
+      const subject = parts.join("_");
+
+      if (subject && subject !== "Valuation Report") {
+        setMailFormData((prev) => ({
+          ...prev,
+          subject: subject,
+        }));
+      }
+    }
+  }, [
+    showMailModal,
+    order?.category_name,
+    order?.sub_category_name,
+    order?.child_category_name,
+    order?.bank_name,
+    currentReport?.report,
+    mailFormData.subject,
+    formatRegistrationNumber,
+  ]);
 
   // Prepare bank officers for email selection with validation
   const bankOfficersOptions = useMemo(() => {

@@ -1239,6 +1239,23 @@ function MachineryReport() {
           return;
         }
 
+        // Special handling for initiated_by - use edited value if present, otherwise use computed from order
+        if (key === "initiated_by") {
+          value = reportFormData.initiated_by || (order?.officer_name && order?.bank_name
+            ? `${order.officer_name}, ${order.bank_name}`
+            : "");
+        }
+
+        // Special handling for ref_no_bank - always use current order values
+        if (key === "ref_no_bank") {
+          value = order?.bank_initial || "";
+        }
+
+        // Special handling for ref_no_code - always use current order values
+        if (key === "ref_no_code") {
+          value = order?.valuer_name ? getRefNoCode(order.valuer_name) : "";
+        }
+
         // Skip disclaimer; it's handled separately and ALWAYS included
         if (key === "disclaimer") {
           return;
@@ -1382,6 +1399,7 @@ function MachineryReport() {
       dispatch,
       id,
       order,
+      getRefNoCode,
       parseCurrency,
       convertNumberToWordsIndian,
     ]
@@ -1454,6 +1472,37 @@ function MachineryReport() {
 
         reportData[key] = defaultValue;
       } else {
+        // Special handling for initiated_by - use edited value if present, otherwise use computed from order
+        if (key === "initiated_by") {
+          const editedValue = reportFormData.initiated_by;
+          const computedValue = order?.officer_name && order?.bank_name
+            ? `${order.officer_name}, ${order.bank_name}`
+            : "";
+          const finalValue = editedValue || computedValue;
+          if (finalValue) {
+            reportData[key] = finalValue;
+          }
+          return; // Skip the normal flow for this field
+        }
+
+        // Special handling for ref_no_bank - always use current order values
+        if (key === "ref_no_bank") {
+          const computedRefNoBank = order?.bank_initial || "";
+          if (computedRefNoBank) {
+            reportData[key] = computedRefNoBank;
+          }
+          return; // Skip the normal flow for this field
+        }
+
+        // Special handling for ref_no_code - always use current order values
+        if (key === "ref_no_code") {
+          const computedRefNoCode = order?.valuer_name ? getRefNoCode(order.valuer_name) : "";
+          if (computedRefNoCode) {
+            reportData[key] = computedRefNoCode;
+          }
+          return; // Skip the normal flow for this field
+        }
+        
         // Check if this field was explicitly cleared by the user
         if (clearedFieldsRef.current.has(key)) {
           // Include cleared fields as null in the payload
@@ -1531,8 +1580,10 @@ function MachineryReport() {
     flexibleFields,
     validateFlexibleFields,
     dispatch,
-    id,
-    parseCurrency,
+      id,
+      order,
+      getRefNoCode,
+      parseCurrency,
     convertNumberToWordsIndian,
   ]);
 
@@ -2099,14 +2150,9 @@ function MachineryReport() {
                       className="form-field"
                       id="initiated_by"
                       name="initiated_by"
-                      value={
-                        order?.officer_name && order?.bank_name
-                          ? `${order.officer_name}, ${order.bank_name}`
-                          : ""
-                      }
+                      value={reportFormData.initiated_by || ""}
                       onChange={handleFormChange}
                       rows="2"
-                      readOnly
                     />
                   </div>
                 </div>
