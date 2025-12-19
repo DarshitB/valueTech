@@ -1359,6 +1359,20 @@ exports.saveReportData = async (req, res, next) => {
       order_id
     );
 
+    // Create status history entry for report details saved (just logging, not updating status)
+    try {
+      const statusHistoryData = {
+        order_id: order.id,
+        changed_by: userId,
+        changed_at: new Date(),
+        activity_extra: "Report details saved",
+      };
+      await OrderStatusHistory.createStatusHistory(statusHistoryData);
+    } catch (statusHistoryError) {
+      console.error("Error creating status history:", statusHistoryError);
+      // Don't throw error - this is a non-critical operation
+    }
+
     res.json({
       success: true,
       message: "Report data saved successfully",

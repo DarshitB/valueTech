@@ -8,6 +8,7 @@ const upload = multer();
 const reportController = require("../../controllers/orders/reports/reportController");
 const auth = require("../../middleware/auth"); // Middleware to check authentication
 const checkPermission = require("../../middleware/permission"); // Middleware to check user permissions
+const activityLogger = require("../../middleware/activityLogger"); // Middleware to log user activity
 
 // Apply authentication middleware to all routes
 router.use(auth);
@@ -48,6 +49,7 @@ router.post(
   "/:order_id/save",
   upload.any(),
   /* checkPermission("save_order_reports"), */ // Check permission to add order reports
+  activityLogger("orders", (req) => req.params.order_id, "report details saved"), // Log report save activity
   reportController.saveReportData
 );
 

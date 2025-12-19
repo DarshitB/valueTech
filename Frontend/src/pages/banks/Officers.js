@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useSearchParams, useLocation } from "react-router-dom";
 import {
   fetchOfficers,
   addOfficer,
@@ -9,6 +10,7 @@ import {
 import { fetchRoles } from "../../redux/reducers/roleReducer";
 import { fetchBranches } from "../../redux/reducers/bankBranchReducer";
 import { fetchCategories } from "../../redux/reducers/categoryReducer";
+import { fetchOrders } from "../../redux/reducers/orderReducer";
 import CustomDataTable from "../../components/CustomDataTable";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import FormModel from "../../components/FormModel";
@@ -29,15 +31,20 @@ import {
   checkEmailExist,
   checkUserByMobile,
 } from "../../redux/reducers/userReducer";
+import { usePageTitle } from "../../context/PageTitleContext";
+import { Link } from "react-router-dom";
 
 function Officers() {
   const dispatch = useDispatch();
   const allowedPermissions = useSelector(selectPermissions);
+  const [searchParams] = useSearchParams();
+  const branchIdParam = searchParams.get("branch_id");
 
   const { list: officers, loading } = useSelector((state) => state.officers);
   const { list: roles } = useSelector((state) => state.roles);
   const { list: branches } = useSelector((state) => state.branches);
   const { list: categories } = useSelector((state) => state.categories);
+  const { list: orders } = useSelector((state) => state.orders);
 
   // get loggedin user
   const users = useSelector(selectUser);
@@ -47,7 +54,84 @@ function Officers() {
     dispatch(fetchRoles());
     dispatch(fetchBranches());
     dispatch(fetchCategories());
+    dispatch(fetchOrders());
   }, [dispatch]);
+
+  // Filter officers by branch_id if branch_id param exists
+  const filteredOfficers = useMemo(() => {
+    if (!branchIdParam) {
+      return officers;
+    }
+    const branchId = parseInt(branchIdParam, 10);
+    return officers.filter((officer) => officer.branch_id === branchId);
+  }, [officers, branchIdParam]);
+
+  // Calculate order counts for each officer
+  const officerOrderCounts = useMemo(() => {
+    const counts = {};
+    filteredOfficers.forEach((officer) => {
+      const orderCount = orders.filter(
+        (order) => order.officer_id === officer.id
+      ).length;
+      counts[officer.id] = orderCount;
+    });
+    return counts;
+  }, [filteredOfficers, orders]);
+
+  // Calculate bank officers count for each officer
+  const bankOfficerCounts = useMemo(() => {
+    const counts = {};
+    
+    filteredOfficers.forEach((officer) => {
+      // If officer's role_name is BANK OFFICER, show "-" (set to null)
+      if (officer.role_name?.toUpperCase().includes("BANK OFFICER")) {
+        counts[officer.id] = null; // null means show "-"
+      }
+      // If officer's role_name is BANK AUTHORITY, count BANK OFFICERS created by them
+      else if (officer.role_name?.toUpperCase().includes("BANK AUTHORITY")) {
+        // Match authority's name with created_by field (string comparison)
+        const bankOfficersCreated = officers.filter(
+          (o) =>
+            o.created_by === officer.name &&
+            o.role_name?.toUpperCase().includes("BANK OFFICER")
+        ).length;
+        counts[officer.id] = bankOfficersCreated;
+      }
+    });
+
+    return counts;
+  }, [filteredOfficers, officers]);
+
+  // Get selected branch for breadcrumb
+  const selectedBranch = useMemo(() => {
+    if (!branchIdParam) return null;
+    const branchId = parseInt(branchIdParam, 10);
+    return branches.find((branch) => branch.id === branchId);
+  }, [branches, branchIdParam]);
+
+  // Set page title with breadcrumb
+  const { setTitle } = usePageTitle();
+  useEffect(() => {
+    if (selectedBranch) {
+      setTitle(
+        <>
+          <Link to="/banks" className="text-blue-600 hover:underline">
+            Banks
+          </Link>{" "}
+          &gt;{" "}
+          <Link
+            to={`/banks/${selectedBranch.bank_id}/branches`}
+            className="text-blue-600 hover:underline"
+          >
+            {selectedBranch.bank_name || "Bank"}
+          </Link>{" "}
+          &gt; {selectedBranch.name} &gt; Officers
+        </>
+      );
+    } else {
+      setTitle("Officers");
+    }
+  }, [selectedBranch, setTitle]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -71,17 +155,23 @@ function Officers() {
   /* console.log("users",users); */
 
   // Check if current user is BANK AUTHORITY - matches any role containing "BANK AUTHORITY"
-  const isBankAuthority = users?.role.name?.toUpperCase().includes("BANK AUTHORITY");
+  const isBankAuthority = users?.role.name
+    ?.toUpperCase()
+    .includes("BANK AUTHORITY");
 
   const officerRoles = roles.filter((role) => {
     // If user is BANK AUTHORITY or Bank Officer, allow only Bank Officer to be selected
-    if (users?.role.name?.toUpperCase().includes("BANK AUTHORITY") || 
-        users?.role.name?.toUpperCase().includes("BANK OFFICER")) {
+    if (
+      users?.role.name?.toUpperCase().includes("BANK AUTHORITY") ||
+      users?.role.name?.toUpperCase().includes("BANK OFFICER")
+    ) {
       return role.name?.toUpperCase().includes("BANK OFFICER");
     }
     // Otherwise, allow both
-    return role.name?.toUpperCase().includes("BANK AUTHORITY") || 
-           role.name?.toUpperCase().includes("BANK OFFICER");
+    return (
+      role.name?.toUpperCase().includes("BANK AUTHORITY") ||
+      role.name?.toUpperCase().includes("BANK OFFICER")
+    );
   });
 
   const openAddModal = () => {
@@ -116,7 +206,7 @@ function Officers() {
       }
 
       // Set default role to Bank Officer for BANK AUTHORITY users
-      const bankOfficerRole = roles.find((role) => 
+      const bankOfficerRole = roles.find((role) =>
         role.name?.toUpperCase().includes("BANK OFFICER")
       );
       if (bankOfficerRole) {
@@ -292,12 +382,14 @@ function Officers() {
                 <th>Branch</th>
                 <th>Mobile</th>
                 <th>Email</th>
+                <th style={{ textAlign: "center" }}>Orders</th>
+                <th style={{ textAlign: "center" }}>Bank Officers</th>
                 <th>Created By</th>
                 <th>Updated By</th>
                 <th>Action</th>
               </tr>
             ),
-            rows: officers.map((officer, index) => (
+            rows: filteredOfficers.map((officer, index) => (
               <tr key={officer.id}>
                 <td className="sequential-number">{index + 1}</td>
                 <td>{officer.name}</td>
@@ -306,6 +398,16 @@ function Officers() {
                 <td>{officer.branch_name}</td>
                 <td>{officer.mobile}</td>
                 <td>{officer.email}</td>
+                <td style={{ textAlign: "center" }}>
+                  {officerOrderCounts[officer.id] || 0}
+                </td>
+                <td style={{ textAlign: "center" }}>
+                  {bankOfficerCounts[officer.id] === null
+                    ? "-"
+                    : bankOfficerCounts[officer.id] !== undefined
+                    ? bankOfficerCounts[officer.id]
+                    : "-"}
+                </td>
                 <td>{officer.created_by}</td>
                 <td>{officer.updated_by || "-"}</td>
                 <td>

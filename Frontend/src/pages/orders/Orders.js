@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import "./order.scss";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -91,11 +91,115 @@ function Orders() {
     admin_user_ids: [],
   });
 
-  // State for order type filter
-  const [selectedOrderType, setSelectedOrderType] = useState("");
+  // State for order type filter - load from localStorage (shared with Dashboard)
+  const [selectedOrderType, setSelectedOrderType] = useState(() => {
+    const saved = localStorage.getItem("filter_orderType");
+    return saved || "";
+  });
 
-  // State for priority filter
-  const [selectedPriority, setSelectedPriority] = useState("");
+  // State for priority filter - load from localStorage (shared with Dashboard)
+  const [selectedPriority, setSelectedPriority] = useState(() => {
+    const saved = localStorage.getItem("filter_priority");
+    return saved || "";
+  });
+
+  // State for additional filters - load from localStorage (shared with Dashboard)
+  const [selectedBank, setSelectedBank] = useState(() => {
+    const saved = localStorage.getItem("filter_bank");
+    return saved || "";
+  });
+
+  const [selectedBranch, setSelectedBranch] = useState(() => {
+    const saved = localStorage.getItem("filter_branch");
+    return saved || "";
+  });
+
+  const [selectedOfficer, setSelectedOfficer] = useState(() => {
+    const saved = localStorage.getItem("filter_officer");
+    return saved || "";
+  });
+
+  const [selectedManager, setSelectedManager] = useState(() => {
+    const saved = localStorage.getItem("filter_manager");
+    return saved || "";
+  });
+
+  const [selectedFieldVerifier, setSelectedFieldVerifier] = useState(() => {
+    const saved = localStorage.getItem("filter_fieldVerifier");
+    return saved || "";
+  });
+
+  const [selectedValuerName, setSelectedValuerName] = useState(() => {
+    const saved = localStorage.getItem("filter_valuerName");
+    return saved || "";
+  });
+
+  const [selectedOrderStatus, setSelectedOrderStatus] = useState(() => {
+    const saved = localStorage.getItem("filter_orderStatus");
+    return saved || "";
+  });
+
+  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState(() => {
+    const saved = localStorage.getItem("filter_paymentStatus");
+    return saved || "";
+  });
+
+  // Get distinct filter values from orders
+  const distinctBanks = useMemo(() => {
+    const banks = orders
+      .map((order) => order.bank_name)
+      .filter((name) => name && name.trim() !== "");
+    return [...new Set(banks)].sort();
+  }, [orders]);
+
+  const distinctBranches = useMemo(() => {
+    const branches = orders
+      .map((order) => order.branch_name)
+      .filter((name) => name && name.trim() !== "");
+    return [...new Set(branches)].sort();
+  }, [orders]);
+
+  const distinctOfficers = useMemo(() => {
+    const officers = orders
+      .map((order) => order.officer_name)
+      .filter((name) => name && name.trim() !== "");
+    return [...new Set(officers)].sort();
+  }, [orders]);
+
+  const distinctManagers = useMemo(() => {
+    const managers = orders
+      .map((order) => order.manager_name)
+      .filter((name) => name && name.trim() !== "");
+    return [...new Set(managers)].sort();
+  }, [orders]);
+
+  const distinctFieldVerifiers = useMemo(() => {
+    const fieldVerifiers = orders
+      .map((order) => order.field_verifier_name)
+      .filter((name) => name && name.trim() !== "");
+    return [...new Set(fieldVerifiers)].sort();
+  }, [orders]);
+
+  const distinctValuerNames = useMemo(() => {
+    const valuerNames = orders
+      .map((order) => order.valuer_name)
+      .filter((name) => name && name.trim() !== "");
+    return [...new Set(valuerNames)].sort();
+  }, [orders]);
+
+  const distinctOrderStatuses = useMemo(() => {
+    const statuses = orders
+      .map((order) => order.current_status_name)
+      .filter((name) => name && name.trim() !== "");
+    return [...new Set(statuses)].sort();
+  }, [orders]);
+
+  const distinctPaymentStatuses = useMemo(() => {
+    const paymentStatuses = orders
+      .map((order) => order.payment_status)
+      .filter((status) => status && status.trim() !== "");
+    return [...new Set(paymentStatuses)].sort();
+  }, [orders]);
 
   // Check if current user is TELECALLER (case-insensitive) - matches any role containing "TELECALLER"
   const isTelecaller = currentUser?.role.name
@@ -543,7 +647,13 @@ function Orders() {
           {{
             buttons: (
               <div
-                style={{ display: "flex", gap: "10px", alignItems: "center" }}
+                style={{
+                  display: "flex",
+                  gap: "10px",
+                  alignItems: "center",
+                  justifyContent: "flex-end",
+                  flexWrap: "wrap",
+                }}
               >
                 {hasPermission(
                   allowedPermissions,
@@ -552,7 +662,11 @@ function Orders() {
                   <select
                     className="form-field type-priority-selector"
                     value={selectedOrderType}
-                    onChange={(e) => setSelectedOrderType(e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSelectedOrderType(value);
+                      localStorage.setItem("filter_orderType", value);
+                    }}
                   >
                     <option value="">All Types</option>
                     <option value="VKA1">VKA1</option>
@@ -567,11 +681,180 @@ function Orders() {
                   <select
                     className="form-field type-priority-selector"
                     value={selectedPriority}
-                    onChange={(e) => setSelectedPriority(e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSelectedPriority(value);
+                      localStorage.setItem("filter_priority", value);
+                    }}
                   >
                     <option value="">All Priorities</option>
                     <option value="High">High</option>
                     <option value="Low">Low</option>
+                  </select>
+                )}
+                {hasPermission(allowedPermissions, "view_order_table_Bank") && (
+                  <select
+                    className="form-field type-priority-selector"
+                    value={selectedBank}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSelectedBank(value);
+                      localStorage.setItem("filter_bank", value);
+                    }}
+                  >
+                    <option value="">All Banks</option>
+                    {distinctBanks.map((bank) => (
+                      <option key={bank} value={bank}>
+                        {bank}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_table_Bank_Branch"
+                ) && (
+                  <select
+                    className="form-field type-priority-selector"
+                    value={selectedBranch}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSelectedBranch(value);
+                      localStorage.setItem("filter_branch", value);
+                    }}
+                  >
+                    <option value="">All Branches</option>
+                    {distinctBranches.map((branch) => (
+                      <option key={branch} value={branch}>
+                        {branch}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_table_Branch_Officer"
+                ) && (
+                  <select
+                    className="form-field type-priority-selector"
+                    value={selectedOfficer}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSelectedOfficer(value);
+                      localStorage.setItem("filter_officer", value);
+                    }}
+                  >
+                    <option value="">All Officers</option>
+                    {distinctOfficers.map((officer) => (
+                      <option key={officer} value={officer}>
+                        {officer}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_table_manager"
+                ) && (
+                  <select
+                    className="form-field type-priority-selector"
+                    value={selectedManager}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSelectedManager(value);
+                      localStorage.setItem("filter_manager", value);
+                    }}
+                  >
+                    <option value="">All Managers</option>
+                    {distinctManagers.map((manager) => (
+                      <option key={manager} value={manager}>
+                        {manager}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_table_field_verifier"
+                ) && (
+                  <select
+                    className="form-field type-priority-selector"
+                    value={selectedFieldVerifier}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSelectedFieldVerifier(value);
+                      localStorage.setItem("filter_fieldVerifier", value);
+                    }}
+                  >
+                    <option value="">All Field Verifiers</option>
+                    {distinctFieldVerifiers.map((fieldVerifier) => (
+                      <option key={fieldVerifier} value={fieldVerifier}>
+                        {fieldVerifier}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_table_valuer_name"
+                ) && (
+                  <select
+                    className="form-field type-priority-selector"
+                    value={selectedValuerName}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSelectedValuerName(value);
+                      localStorage.setItem("filter_valuerName", value);
+                    }}
+                  >
+                    <option value="">All Valuers</option>
+                    {distinctValuerNames.map((valuer) => (
+                      <option key={valuer} value={valuer}>
+                        {valuer}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_table_status"
+                ) && (
+                  <select
+                    className="form-field type-priority-selector"
+                    value={selectedOrderStatus}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSelectedOrderStatus(value);
+                      localStorage.setItem("filter_orderStatus", value);
+                    }}
+                  >
+                    <option value="">All Statuses</option>
+                    {distinctOrderStatuses.map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_details_payment_status"
+                ) && (
+                  <select
+                    className="form-field type-priority-selector"
+                    value={selectedPaymentStatus}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSelectedPaymentStatus(value);
+                      localStorage.setItem("filter_paymentStatus", value);
+                    }}
+                  >
+                    <option value="">All Payment Statuses</option>
+                    {distinctPaymentStatuses.map((paymentStatus) => (
+                      <option key={paymentStatus} value={paymentStatus}>
+                        {paymentStatus}
+                      </option>
+                    ))}
                   </select>
                 )}
                 {hasPermission(allowedPermissions, "add_order") && (
@@ -667,8 +950,55 @@ function Orders() {
                   !selectedPriority ||
                   order.order_priority === selectedPriority;
 
-                // Show order only if both filters match (or no filter is selected)
-                return typeMatch && priorityMatch;
+                // Filter by bank if selected
+                const bankMatch =
+                  !selectedBank || order.bank_name === selectedBank;
+
+                // Filter by branch if selected
+                const branchMatch =
+                  !selectedBranch || order.branch_name === selectedBranch;
+
+                // Filter by officer if selected
+                const officerMatch =
+                  !selectedOfficer || order.officer_name === selectedOfficer;
+
+                // Filter by manager if selected
+                const managerMatch =
+                  !selectedManager || order.manager_name === selectedManager;
+
+                // Filter by field verifier if selected
+                const fieldVerifierMatch =
+                  !selectedFieldVerifier ||
+                  order.field_verifier_name === selectedFieldVerifier;
+
+                // Filter by valuer name if selected
+                const valuerMatch =
+                  !selectedValuerName ||
+                  order.valuer_name === selectedValuerName;
+
+                // Filter by order status if selected
+                const statusMatch =
+                  !selectedOrderStatus ||
+                  order.current_status_name === selectedOrderStatus;
+
+                // Filter by payment status if selected
+                const paymentStatusMatch =
+                  !selectedPaymentStatus ||
+                  order.payment_status === selectedPaymentStatus;
+
+                // Show order only if all filters match (or no filter is selected)
+                return (
+                  typeMatch &&
+                  priorityMatch &&
+                  bankMatch &&
+                  branchMatch &&
+                  officerMatch &&
+                  managerMatch &&
+                  fieldVerifierMatch &&
+                  valuerMatch &&
+                  statusMatch &&
+                  paymentStatusMatch
+                );
               })
               .map((order) => (
                 <tr

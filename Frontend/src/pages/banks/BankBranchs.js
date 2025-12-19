@@ -1,6 +1,6 @@
 // src/pages/BankBranches.jsx
 
-import React, { useEffect, useLayoutEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useState, useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -11,6 +11,8 @@ import {
 } from "../../redux/reducers/bankBranchReducer";
 import { fetchBankById, fetchBanks } from "../../redux/reducers/bankReducer";
 import { fetchCities } from "../../redux/reducers/cityReducer";
+import { fetchOfficers } from "../../redux/reducers/officerReducer";
+import { fetchOrders } from "../../redux/reducers/orderReducer";
 import CustomDataTable from "../../components/CustomDataTable";
 import FormModel from "../../components/FormModel";
 import ConfirmationModal from "../../components/ConfirmationModal";
@@ -31,22 +33,55 @@ function BankBranches() {
 
   const allowedPermissions = useSelector(selectPermissions);
 
-  // 🔁 Fetch branches and banks once
+  // 🔁 Fetch branches, officers, and orders once
   useEffect(() => {
     dispatch(fetchBranches());
     /* dispatch(fetchBanks()); */
     dispatch(fetchCities());
+    dispatch(fetchOfficers());
+    dispatch(fetchOrders());
   }, [dispatch]);
 
   // 🔀 Redux state selectors
   const { list: allBranches, loading } = useSelector((state) => state.branches);
   /* const { list: banks } = useSelector((state) => state.banks); */
   const { list: cities } = useSelector((state) => state.cities);
+  const { list: officers } = useSelector((state) => state.officers);
+  const { list: orders } = useSelector((state) => state.orders);
 
   /* const currentBank = banks.find((b) => b.id === parseInt(id)); */
   const branches = allBranches.filter(
     (branch) => branch.bank_id === parseInt(id)
   );
+
+  // Calculate officer and order counts for each branch
+  const branchCounts = useMemo(() => {
+    const counts = {};
+
+    // Count officers per branch
+    branches.forEach((branch) => {
+      const officerCount = officers.filter(
+        (officer) => officer.branch_id === branch.id
+      ).length;
+
+      // Get all officer IDs for this branch
+      const branchOfficerIds = officers
+        .filter((officer) => officer.branch_id === branch.id)
+        .map((officer) => officer.id);
+
+      // Count orders for officers of this branch
+      const orderCount = orders.filter((order) =>
+        branchOfficerIds.includes(order.officer_id)
+      ).length;
+
+      counts[branch.id] = {
+        officers: officerCount,
+        orders: orderCount,
+      };
+    });
+
+    return counts;
+  }, [branches, officers, orders]);
 
   // set page title
   useLayoutEffect(() => {
@@ -161,16 +196,31 @@ function BankBranches() {
                 <th style={{ width: "52px" }}>ID</th>
                 <th style={{ width: "200px" }}>Name</th>
                 <th style={{ width: "150px" }}>City</th>
+                <th style={{ width: "100px" }}>Officers</th>
+                <th>Orders</th>
                 <th style={{ width: "150px" }}>Created By</th>
-                <th>Updated By</th>
+                <th style={{ width: "150px" }}>Updated By</th>
                 <th style={{ textAlign: "center", width: "150px" }}>Action</th>
               </tr>
             ),
             rows: branches.map((branch, index) => (
               <tr key={branch.id}>
                 <td className="sequential-number">{index + 1}</td>
-                <td>{branch.name}</td>
+                <td>
+                  {hasPermission(allowedPermissions, "view_branch_officer") ? (
+                    <Link
+                      className="get-me-inside"
+                      to={`/officers?branch_id=${branch.id}`}
+                    >
+                      {branch.name}
+                    </Link>
+                  ) : (
+                    branch.name
+                  )}
+                </td>
                 <td>{branch.city_name}</td>
+                <td>{branchCounts[branch.id]?.officers || 0}</td>
+                <td>{branchCounts[branch.id]?.orders || 0}</td>
                 <td>{branch.created_by}</td>
                 <td>{branch.updated_by || "-"}</td>
                 <td style={{ textAlign: "center" }}>
@@ -218,7 +268,10 @@ function BankBranches() {
                       id="branchName"
                       value={formData.name}
                       onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value.toUpperCase() })
+                        setFormData({
+                          ...formData,
+                          name: e.target.value.toUpperCase(),
+                        })
                       }
                     />
                   </div>

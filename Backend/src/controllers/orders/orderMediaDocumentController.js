@@ -1,7 +1,9 @@
 const fs = require("fs");
 const path = require("path");
+const os = require("os");
 const { v4: uuidv4 } = require("uuid");
 const multer = require("multer");
+const yauzl = require("yauzl");
 
 // Import models and utilities
 const Order = require("../../models/orders/order");
@@ -30,7 +32,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit
+    fileSize: 300 * 1024 * 1024, // 300MB limit (increased for ZIP file uploads)
   },
   fileFilter: function (req, file, cb) {
     // Allow common document types
@@ -52,27 +54,122 @@ const upload = multer({
       // Text files
       "text/plain",
       "text/csv",
-      // Archives
+      // Archives - allow multiple ZIP MIME types
       "application/zip",
+      "application/x-zip-compressed",
       "application/x-rar-compressed",
       "application/x-7z-compressed",
     ];
 
+    // Check by MIME type
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
-    } else {
-      cb(new Error(`File type ${file.mimetype} is not allowed`), false);
+      return;
     }
+
+    // Also allow ZIP files by extension (fallback for cases where MIME type detection fails)
+    const fileExtension = path.extname(file.originalname).toLowerCase();
+    if ([".zip", ".rar", ".7z"].includes(fileExtension)) {
+      cb(null, true);
+      return;
+    }
+
+    cb(new Error(`File type ${file.mimetype} is not allowed`), false);
   },
 });
 
 /**
+ * Helper: Extract ZIP file and return array of extracted file paths
+ * Accepts all file types (not just images/videos)
+ */
+function extractZipFile(zipPath, extractDir) {
+  return new Promise((resolve, reject) => {
+    const extractedFiles = [];
+
+    yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
+      if (err) return reject(err);
+
+      zipfile.readEntry();
+      zipfile.on("entry", (entry) => {
+        // Skip directories
+        if (entry.fileName.endsWith("/")) {
+          zipfile.readEntry();
+          return;
+        }
+
+        zipfile.openReadStream(entry, (err, readStream) => {
+          if (err) {
+            zipfile.readEntry();
+            return;
+          }
+
+          // Create safe filename
+          const safeFileName = entry.fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
+          const extractPath = path.join(extractDir, safeFileName);
+
+          // Ensure directory exists
+          const extractDirPath = path.dirname(extractPath);
+          if (!fs.existsSync(extractDirPath)) {
+            fs.mkdirSync(extractDirPath, { recursive: true });
+          }
+
+          const writeStream = fs.createWriteStream(extractPath);
+
+          readStream.pipe(writeStream);
+
+          writeStream.on("close", () => {
+            extractedFiles.push({
+              originalName: entry.fileName,
+              extractedPath: extractPath,
+              size: entry.uncompressedSize,
+            });
+            zipfile.readEntry();
+          });
+
+          writeStream.on("error", (err) => {
+            zipfile.readEntry();
+          });
+        });
+      });
+
+      zipfile.on("end", () => {
+        resolve(extractedFiles);
+      });
+
+      zipfile.on("error", reject);
+    });
+  });
+}
+
+/**
+ * Helper: Recursively delete directory and its contents
+ */
+function deleteDirectory(dirPath) {
+  if (fs.existsSync(dirPath)) {
+    fs.readdirSync(dirPath).forEach((file) => {
+      const curPath = path.join(dirPath, file);
+      if (fs.lstatSync(curPath).isDirectory()) {
+        deleteDirectory(curPath);
+      } else {
+        fs.unlinkSync(curPath);
+      }
+    });
+    fs.rmdirSync(dirPath);
+  }
+}
+
+/**
  * Upload any type of document to the portal
+ * Supports both normal files and ZIP files
  * POST /api/order-media-document/upload
  */
 exports.upload = [
   upload.any(), // Accept any field name for files (documents, files, etc.)
   async (req, res, next) => {
+    // Declare cleanup arrays outside try block so they're accessible in catch
+    const zipFilesToCleanup = [];
+    const extractDirsToCleanup = [];
+
     try {
       const { order_id } = req.body;
       const { id: userId } = req.user;
@@ -114,58 +211,165 @@ exports.upload = [
 
       for (const uploadedFile of uploadedFiles) {
         try {
-          // Determine media type from file
-          const mediaType = determineMediaType(
-            uploadedFile.mimetype,
-            uploadedFile.originalname
-          );
+          // Check if file is a ZIP file
+          const isZipFile =
+            uploadedFile.mimetype === "application/zip" ||
+            uploadedFile.mimetype === "application/x-zip-compressed" ||
+            uploadedFile.originalname.toLowerCase().endsWith(".zip");
 
-          // Determine document type based on media type
-          const documentType = determineDocumentType(mediaType);
+          if (isZipFile) {
+            // Extract ZIP file
+            const extractDir = path.join(os.tmpdir(), `zip_extract_${uuidv4()}`);
+            fs.mkdirSync(extractDir, { recursive: true });
+            extractDirsToCleanup.push(extractDir);
+            zipFilesToCleanup.push(uploadedFile.path);
 
-          // Generate unique filename for the document
-          const fileExtension = path.extname(uploadedFile.originalname);
-          const fileNameWithoutExt = path.basename(uploadedFile.originalname, fileExtension);
-          const randomNumber = Math.floor(Math.random() * 10000); // Random 4-digit number
-          const fileName = `${fileNameWithoutExt}_${randomNumber}${fileExtension}`;
-          const finalPath = path.join(uploadDir, fileName);
+            console.log(`📦 Extracting ZIP file: ${uploadedFile.originalname}`);
+            const extractedFiles = await extractZipFile(uploadedFile.path, extractDir);
 
-          // Move file from temp to final location
-          fs.renameSync(uploadedFile.path, finalPath);
+            if (extractedFiles.length === 0) {
+              console.warn(`No files found in ZIP: ${uploadedFile.originalname}`);
+              continue;
+            }
 
-          // Verify file was moved successfully
-          if (!fs.existsSync(finalPath)) {
-            throw new Error(`Failed to save uploaded file: ${uploadedFile.originalname}`);
+            console.log(`📁 Extracted ${extractedFiles.length} files from ZIP`);
+
+            // Process each extracted file
+            for (const extractedFile of extractedFiles) {
+              try {
+                // Get file stats
+                const stats = fs.statSync(extractedFile.extractedPath);
+                if (!stats.isFile()) {
+                  continue; // Skip directories
+                }
+
+                // Determine media type from extracted file
+                const fileExtension = path.extname(extractedFile.originalName);
+                const mimeType = getMimeTypeFromExtension(extractedFile.originalName);
+                const mediaType = determineMediaType(mimeType, extractedFile.originalName);
+
+                // Determine document type based on media type
+                const documentType = determineDocumentType(mediaType);
+
+                // Generate unique filename for the document
+                const fileNameWithoutExt = path.basename(extractedFile.originalName, fileExtension);
+                const randomNumber = Math.floor(Math.random() * 10000);
+                const fileName = `${fileNameWithoutExt}_${randomNumber}${fileExtension}`;
+                const finalPath = path.join(uploadDir, fileName);
+
+                // Copy extracted file to final location
+                fs.copyFileSync(extractedFile.extractedPath, finalPath);
+
+                // Verify file was copied successfully
+                if (!fs.existsSync(finalPath)) {
+                  throw new Error(`Failed to save extracted file: ${extractedFile.originalName}`);
+                }
+
+                // Save document record to database
+                const documentData = {
+                  order_id: order.id,
+                  media_url: `/uploads/${year}/${month}/${orderNumber}/documents/${fileName}`,
+                  media_type: mediaType,
+                  document_type: "documents",
+                  created_type: "upload",
+                  created_by: userId,
+                  created_at: new Date(),
+                };
+
+                const documentId = await orderMediaDocument.createDocument(documentData);
+
+                // Add to uploaded documents list
+                uploadedDocuments.push({
+                  id: documentId,
+                  filename: extractedFile.originalName,
+                  media_type: mediaType,
+                  document_type: "documents",
+                  created_type: "upload",
+                  download_url: `/uploads/${year}/${month}/${orderNumber}/documents/${fileName}`,
+                  file_size: extractedFile.size || stats.size,
+                  uploaded_at: new Date(),
+                });
+              } catch (extractedFileError) {
+                console.error(
+                  `Error processing extracted file ${extractedFile.originalName}:`,
+                  extractedFileError
+                );
+                // Continue with other files even if one fails
+              }
+            }
+          } else {
+            // Process normal (non-ZIP) file
+            // Determine media type from file
+            const mediaType = determineMediaType(
+              uploadedFile.mimetype,
+              uploadedFile.originalname
+            );
+
+            // Determine document type based on media type
+            const documentType = determineDocumentType(mediaType);
+
+            // Generate unique filename for the document
+            const fileExtension = path.extname(uploadedFile.originalname);
+            const fileNameWithoutExt = path.basename(uploadedFile.originalname, fileExtension);
+            const randomNumber = Math.floor(Math.random() * 10000); // Random 4-digit number
+            const fileName = `${fileNameWithoutExt}_${randomNumber}${fileExtension}`;
+            const finalPath = path.join(uploadDir, fileName);
+
+            // Move file from temp to final location
+            fs.renameSync(uploadedFile.path, finalPath);
+
+            // Verify file was moved successfully
+            if (!fs.existsSync(finalPath)) {
+              throw new Error(`Failed to save uploaded file: ${uploadedFile.originalname}`);
+            }
+
+            // Save document record to database
+            const documentData = {
+              order_id: order.id,
+              media_url: `/uploads/${year}/${month}/${orderNumber}/documents/${fileName}`,
+              media_type: mediaType,
+              document_type: "documents",
+              created_type: "upload",
+              created_by: userId,
+              created_at: new Date(),
+            };
+
+            const documentId = await orderMediaDocument.createDocument(documentData);
+
+            // Add to uploaded documents list
+            uploadedDocuments.push({
+              id: documentId,
+              filename: uploadedFile.originalname,
+              media_type: mediaType,
+              document_type: "documents",
+              created_type: "upload",
+              download_url: `/uploads/${year}/${month}/${orderNumber}/documents/${fileName}`,
+              file_size: uploadedFile.size,
+              uploaded_at: new Date(),
+            });
           }
-
-          // Save document record to database
-          const documentData = {
-            order_id: order.id,
-            media_url: `/uploads/${year}/${month}/${orderNumber}/documents/${fileName}`,
-            media_type: mediaType,
-            document_type: "documents",
-            created_type: "upload",
-            created_by: userId,
-            created_at: new Date(),
-          };
-
-          const documentId = await orderMediaDocument.createDocument(documentData);
-
-          // Add to uploaded documents list
-          uploadedDocuments.push({
-            id: documentId,
-            filename: uploadedFile.originalname,
-            media_type: mediaType,
-            document_type: "documents",
-            created_type: "upload",
-            download_url: `/uploads/${year}/${month}/${orderNumber}/documents/${fileName}`,
-            file_size: uploadedFile.size,
-            uploaded_at: new Date(),
-          });
-
         } catch (fileError) {
           console.error(`Error processing file ${uploadedFile.originalname}:`, fileError);
           // Continue with other files even if one fails
+        }
+      }
+
+      // Clean up ZIP files and extraction directories
+      for (const zipPath of zipFilesToCleanup) {
+        try {
+          if (fs.existsSync(zipPath)) {
+            fs.unlinkSync(zipPath);
+          }
+        } catch (cleanupError) {
+          console.error(`Error cleaning up ZIP file ${zipPath}:`, cleanupError);
+        }
+      }
+
+      for (const extractDir of extractDirsToCleanup) {
+        try {
+          deleteDirectory(extractDir);
+        } catch (cleanupError) {
+          console.error(`Error cleaning up extraction directory ${extractDir}:`, cleanupError);
         }
       }
 
@@ -187,11 +391,34 @@ exports.upload = [
         },
       });
     } catch (err) {
+      // Clean up ZIP files and extraction directories
+      for (const zipPath of zipFilesToCleanup) {
+        try {
+          if (fs.existsSync(zipPath)) {
+            fs.unlinkSync(zipPath);
+          }
+        } catch (cleanupError) {
+          console.error(`Error cleaning up ZIP file ${zipPath}:`, cleanupError);
+        }
+      }
+
+      for (const extractDir of extractDirsToCleanup) {
+        try {
+          deleteDirectory(extractDir);
+        } catch (cleanupError) {
+          console.error(`Error cleaning up extraction directory ${extractDir}:`, cleanupError);
+        }
+      }
+
       // Clean up temp files if they exist
       if (req.files && Array.isArray(req.files)) {
         for (const file of req.files) {
           if (file.path && fs.existsSync(file.path)) {
-            fs.unlinkSync(file.path);
+            try {
+              fs.unlinkSync(file.path);
+            } catch (cleanupError) {
+              console.error(`Error cleaning up temp file ${file.path}:`, cleanupError);
+            }
           }
         }
       }
@@ -332,6 +559,39 @@ exports.removeApprovalByOrderId = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * Get MIME type from file extension
+ */
+function getMimeTypeFromExtension(filename) {
+  const extension = path.extname(filename).toLowerCase();
+  const mimeTypes = {
+    // Images
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".bmp": "image/bmp",
+    // Documents
+    ".pdf": "application/pdf",
+    ".doc": "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xls": "application/vnd.ms-excel",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".ppt": "application/vnd.ms-powerpoint",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    // Text files
+    ".txt": "text/plain",
+    ".csv": "text/csv",
+    // Archives
+    ".zip": "application/zip",
+    ".rar": "application/x-rar-compressed",
+    ".7z": "application/x-7z-compressed",
+  };
+
+  return mimeTypes[extension] || "application/octet-stream";
+}
 
 /**
  * Determine media type from MIME type and filename

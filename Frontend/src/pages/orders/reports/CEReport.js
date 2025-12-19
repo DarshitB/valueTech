@@ -86,8 +86,18 @@ function CEReport() {
     // Get current month in 3-letter uppercase format
     const getCurrentMonthAbbreviationLocal = () => {
       const months = [
-        "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-        "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+        "JAN",
+        "FEB",
+        "MAR",
+        "APR",
+        "MAY",
+        "JUN",
+        "JUL",
+        "AUG",
+        "SEP",
+        "OCT",
+        "NOV",
+        "DEC",
       ];
       const currentMonth = new Date().getMonth();
       return months[currentMonth];
@@ -214,19 +224,22 @@ function CEReport() {
   }, []);
 
   // Function to build category suffix from category data
-  const buildCategorySuffix = useCallback((categoryName, subCategoryName, childCategoryName) => {
-    const parts = [];
-    if (categoryName) parts.push(categoryName);
-    if (subCategoryName) parts.push(subCategoryName);
-    if (childCategoryName) parts.push(childCategoryName);
-    
-    if (parts.length === 0) return "";
-    
-    // Format: (category_name) / (sub_category_name) (child_category_name)
-    if (parts.length === 1) return parts[0];
-    if (parts.length === 2) return `${parts[0]} / ${parts[1]}`;
-    return `${parts[0]} / ${parts[1]} ${parts[2]}`;
-  }, []);
+  const buildCategorySuffix = useCallback(
+    (categoryName, subCategoryName, childCategoryName) => {
+      const parts = [];
+      if (categoryName) parts.push(categoryName);
+      if (subCategoryName) parts.push(subCategoryName);
+      if (childCategoryName) parts.push(childCategoryName);
+
+      if (parts.length === 0) return "";
+
+      // Format: (category_name) / (sub_category_name) (child_category_name)
+      if (parts.length === 1) return parts[0];
+      if (parts.length === 2) return `${parts[0]} / ${parts[1]}`;
+      return `${parts[0]} / ${parts[1]} ${parts[2]}`;
+    },
+    []
+  );
 
   // Function to get current date in DD-MM-YYYY format
   const getCurrentDate = useCallback(() => {
@@ -240,8 +253,18 @@ function CEReport() {
   // Function to get current month in 3-letter uppercase format (JAN, FEB, MAR, etc.)
   const getCurrentMonthAbbreviation = useCallback(() => {
     const months = [
-      "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-      "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+      "JAN",
+      "FEB",
+      "MAR",
+      "APR",
+      "MAY",
+      "JUN",
+      "JUL",
+      "AUG",
+      "SEP",
+      "OCT",
+      "NOV",
+      "DEC",
     ];
     const currentMonth = new Date().getMonth();
     return months[currentMonth];
@@ -609,12 +632,13 @@ function CEReport() {
         // Check if there's already a saved report - if so, don't override heading fields
         // The report loading effect will handle setting saved values
         // Also check if report fetch is complete - only prefill if fetch completed and no report exists
-        const hasSavedReport = reportFetchCompleted && 
-                               currentReport?.report && 
-                               currentReport.order_id === parseInt(id);
-        
+        const hasSavedReport =
+          reportFetchCompleted &&
+          currentReport?.report &&
+          currentReport.order_id === parseInt(id);
+
         // Also check if heading fields already have values (from saved report)
-        const hasSavedHeadingValues = 
+        const hasSavedHeadingValues =
           prev.valueation_report_for_heading ||
           prev.general_details_heading ||
           prev.inspected_equipment_heading ||
@@ -626,13 +650,16 @@ function CEReport() {
         // 1. No saved report exists, OR
         // 2. Headings are empty/null (need defaults)
         // This ensures headings always have values when category data is available
-        const shouldPrefillHeadings = (!hasSavedReport || !hasSavedHeadingValues) && categorySuffix;
+        const shouldPrefillHeadings =
+          (!hasSavedReport || !hasSavedHeadingValues) && categorySuffix;
 
         return {
           ...prev,
           ref_no_bank: order?.bank_initial || "",
           state_name: prev.state_name || "MUM",
-          ref_no_code: order?.valuer_name ? getRefNoCode(order.valuer_name) : "",
+          ref_no_code: order?.valuer_name
+            ? getRefNoCode(order.valuer_name)
+            : "",
           initiated_by:
             order?.officer_name && order?.bank_name
               ? `${order.officer_name}, ${order.bank_name}`
@@ -650,13 +677,22 @@ function CEReport() {
             : "",
           // Prefill category_suffix with category information
           // Only prefill if there's no saved report and no existing category_suffix value
-          category_suffix: shouldPrefillHeadings && categorySuffix
-            ? categorySuffix
-            : prev.category_suffix || "",
+          category_suffix:
+            shouldPrefillHeadings && categorySuffix
+              ? categorySuffix
+              : prev.category_suffix || "",
         };
       });
     }
-  }, [order, getLicenseNumber, getRefNoCode, buildCategorySuffix, currentReport, id, reportFetchCompleted]);
+  }, [
+    order,
+    getLicenseNumber,
+    getRefNoCode,
+    buildCategorySuffix,
+    currentReport,
+    id,
+    reportFetchCompleted,
+  ]);
 
   // Track when the initial report fetch completes
   // We need to ensure: (1) fetch has started (reportLoading = true), (2) fetch has completed (reportLoading = false)
@@ -705,8 +741,18 @@ function CEReport() {
         setReportFormData((prev) => {
           if (!prev.ref_no_month || prev.ref_no_month.trim() === "") {
             const months = [
-              "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-              "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+              "JAN",
+              "FEB",
+              "MAR",
+              "APR",
+              "MAY",
+              "JUN",
+              "JUL",
+              "AUG",
+              "SEP",
+              "OCT",
+              "NOV",
+              "DEC",
             ];
             const currentMonth = new Date().getMonth();
             return {
@@ -744,20 +790,30 @@ function CEReport() {
 
       // Extract category_suffix from saved headings or use default from order
       let extractedCategorySuffix = "";
-      
+
       // Try to extract category_suffix from any existing heading
-      if (report.valueation_report_for_heading && String(report.valueation_report_for_heading).trim() !== "") {
-        const match = String(report.valueation_report_for_heading).match(/VALUATION REPORT FOR (.+)/i);
+      if (
+        report.valueation_report_for_heading &&
+        String(report.valueation_report_for_heading).trim() !== ""
+      ) {
+        const match = String(report.valueation_report_for_heading).match(
+          /VALUATION REPORT FOR (.+)/i
+        );
         if (match && match[1]) {
           extractedCategorySuffix = match[1].trim();
         }
-      } else if (report.general_details_heading && String(report.general_details_heading).trim() !== "") {
-        const match = String(report.general_details_heading).match(/GENERAL DETAILS OF THE INSPECTED (.+)/i);
+      } else if (
+        report.general_details_heading &&
+        String(report.general_details_heading).trim() !== ""
+      ) {
+        const match = String(report.general_details_heading).match(
+          /GENERAL DETAILS OF THE INSPECTED (.+)/i
+        );
         if (match && match[1]) {
           extractedCategorySuffix = match[1].trim();
         }
       }
-      
+
       // If no category_suffix found in headings, use default from order
       if (!extractedCategorySuffix && order) {
         extractedCategorySuffix = buildCategorySuffix(
@@ -766,12 +822,14 @@ function CEReport() {
           order?.child_category_name
         );
       }
-      
+
       // Set category_suffix (this will trigger heading regeneration via handleFormChange)
       updated.category_suffix = extractedCategorySuffix;
-      
+
       // Generate headings from category_suffix
-      const categorySuffixUpper = extractedCategorySuffix ? extractedCategorySuffix.toUpperCase().trim() : "";
+      const categorySuffixUpper = extractedCategorySuffix
+        ? extractedCategorySuffix.toUpperCase().trim()
+        : "";
       updated.valueation_report_for_heading = categorySuffixUpper
         ? `VALUATION REPORT FOR ${categorySuffixUpper}`
         : "";
@@ -833,8 +891,18 @@ function CEReport() {
       // Ensure ref_no_month has a default value if it's empty or null
       if (!updated.ref_no_month || updated.ref_no_month.trim() === "") {
         const months = [
-          "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-          "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+          "JAN",
+          "FEB",
+          "MAR",
+          "APR",
+          "MAY",
+          "JUN",
+          "JUL",
+          "AUG",
+          "SEP",
+          "OCT",
+          "NOV",
+          "DEC",
         ];
         const currentMonth = new Date().getMonth();
         updated.ref_no_month = `SFW-${months[currentMonth]}-`;
@@ -889,7 +957,14 @@ function CEReport() {
 
       setFlexibleFields(combined);
     }
-  }, [currentReport, id, reportFetchCompleted, reportLoading, order, buildCategorySuffix]);
+  }, [
+    currentReport,
+    id,
+    reportFetchCompleted,
+    reportLoading,
+    order,
+    buildCategorySuffix,
+  ]);
 
   // Set page title with breadcrumb navigation
   useLayoutEffect(() => {
@@ -913,15 +988,22 @@ function CEReport() {
   // Auto-update all heading fields when category_suffix changes (for programmatic updates)
   useEffect(() => {
     const categorySuffix = reportFormData.category_suffix || "";
-    const categorySuffixUpper = categorySuffix ? categorySuffix.toUpperCase().trim() : "";
-    
+    const categorySuffixUpper = categorySuffix
+      ? categorySuffix.toUpperCase().trim()
+      : "";
+
     setReportFormData((prev) => {
       // Only update if category_suffix has changed to avoid infinite loops
-      if (prev.category_suffix === categorySuffix && 
-          prev.valueation_report_for_heading === (categorySuffixUpper ? `VALUATION REPORT FOR ${categorySuffixUpper}` : "")) {
+      if (
+        prev.category_suffix === categorySuffix &&
+        prev.valueation_report_for_heading ===
+          (categorySuffixUpper
+            ? `VALUATION REPORT FOR ${categorySuffixUpper}`
+            : "")
+      ) {
         return prev;
       }
-      
+
       return {
         ...prev,
         valueation_report_for_heading: categorySuffixUpper
@@ -1101,7 +1183,11 @@ function CEReport() {
       setChassisPreviewUrl(objectUrl);
     } else {
       const existingValue = reportFormData?.chassis_no_pencil_impression;
-      if (existingValue && existingValue !== null && existingValue !== undefined) {
+      if (
+        existingValue &&
+        existingValue !== null &&
+        existingValue !== undefined
+      ) {
         const resolved = resolveChassisImageUrl(existingValue);
         setChassisPreviewUrl(resolved);
       } else {
@@ -1123,7 +1209,7 @@ function CEReport() {
   // Handle date input formatting (DD-MM-YYYY)
   const handleDateChange = useCallback((e) => {
     const { name, value } = e.target;
-    
+
     // Allow empty strings to clear the field
     if (!value || value.trim() === "") {
       // Track that this field was explicitly cleared
@@ -1134,12 +1220,12 @@ function CEReport() {
       }));
       return;
     }
-    
+
     // If field gets a value, remove it from cleared fields tracking
     clearedFieldsRef.current.delete(name);
-    
+
     if (typeof value !== "string") return;
-    
+
     let numericValue = value.replace(/\D/g, ""); // Remove non-numeric characters
     if (numericValue.length > 8) numericValue = numericValue.substring(0, 8); // Limit to 8 digits (DDMMYYYY)
 
@@ -1167,7 +1253,7 @@ function CEReport() {
   // Handle currency input formatting (Indian number format)
   const handleCurrencyChange = useCallback((e) => {
     const { name, value } = e.target;
-    
+
     // Allow empty strings to clear the field
     if (!value || value.trim() === "") {
       // Track that this field was explicitly cleared
@@ -1178,10 +1264,10 @@ function CEReport() {
       }));
       return;
     }
-    
+
     // If field gets a value, remove it from cleared fields tracking
     clearedFieldsRef.current.delete(name);
-    
+
     if (typeof value !== "string") return;
 
     // Remove everything except digits and one dot
@@ -1319,11 +1405,15 @@ function CEReport() {
       // Compute and validate amount_in_words centrally based on fair_market_value
       const fmvRaw = reportFormData.fair_market_value;
       const fmvAmount = parseCurrency(fmvRaw);
-      const computedAmountInWords = fmvRaw ? convertNumberToWordsIndian(fmvAmount) : "";
+      const computedAmountInWords = fmvRaw
+        ? convertNumberToWordsIndian(fmvAmount)
+        : "";
 
       // If FMV is present but amount_in_words couldn't be computed, block submit
       if (fmvRaw && !computedAmountInWords) {
-        toast.error("Amount in words missing. Please enter a valid Fair Market Value.");
+        toast.error(
+          "Amount in words missing. Please enter a valid Fair Market Value."
+        );
         if (preOpenedTab && !preOpenedTab.closed) {
           preOpenedTab.close();
         }
@@ -1376,9 +1466,11 @@ function CEReport() {
 
         // Special handling for initiated_by - use edited value if present, otherwise use computed from order
         if (key === "initiated_by") {
-          value = reportFormData.initiated_by || (order?.officer_name && order?.bank_name
-            ? `${order.officer_name}, ${order.bank_name}`
-            : "");
+          value =
+            reportFormData.initiated_by ||
+            (order?.officer_name && order?.bank_name
+              ? `${order.officer_name}, ${order.bank_name}`
+              : "");
         }
 
         // Special handling for ref_no_bank - always use current order values
@@ -1558,11 +1650,15 @@ function CEReport() {
     // Compute and validate amount_in_words centrally based on fair_market_value
     const fmvRaw = reportFormData.fair_market_value;
     const fmvAmount = parseCurrency(fmvRaw);
-    const computedAmountInWords = fmvRaw ? convertNumberToWordsIndian(fmvAmount) : "";
+    const computedAmountInWords = fmvRaw
+      ? convertNumberToWordsIndian(fmvAmount)
+      : "";
 
     // If FMV is present but amount_in_words couldn't be computed, block save
     if (fmvRaw && !computedAmountInWords) {
-      toast.error("Amount in words missing. Please enter a valid Fair Market Value.");
+      toast.error(
+        "Amount in words missing. Please enter a valid Fair Market Value."
+      );
       return;
     }
 
@@ -1608,9 +1704,10 @@ function CEReport() {
         // Special handling for initiated_by - use edited value if present, otherwise use computed from order
         if (key === "initiated_by") {
           const editedValue = reportFormData.initiated_by;
-          const computedValue = order?.officer_name && order?.bank_name
-            ? `${order.officer_name}, ${order.bank_name}`
-            : "";
+          const computedValue =
+            order?.officer_name && order?.bank_name
+              ? `${order.officer_name}, ${order.bank_name}`
+              : "";
           const finalValue = editedValue || computedValue;
           if (finalValue) {
             reportData[key] = finalValue;
@@ -1629,13 +1726,15 @@ function CEReport() {
 
         // Special handling for ref_no_code - always use current order values
         if (key === "ref_no_code") {
-          const computedRefNoCode = order?.valuer_name ? getRefNoCode(order.valuer_name) : "";
+          const computedRefNoCode = order?.valuer_name
+            ? getRefNoCode(order.valuer_name)
+            : "";
           if (computedRefNoCode) {
             reportData[key] = computedRefNoCode;
           }
           return; // Skip the normal flow for this field
         }
-        
+
         // Check if this field was explicitly cleared by the user
         if (clearedFieldsRef.current.has(key)) {
           // Include cleared fields as null in the payload
@@ -2123,7 +2222,15 @@ function CEReport() {
         {/* Reference Number Form Section */}
         <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12 mb-5">
           <div className="order-report-container">
-            <h2>CE Report</h2>
+            <div className="d-flex justify-content-between align-items-center">
+              <h2>CE Report</h2>
+              <Link
+                to={`/orders/${id}/details/images`}
+                className="btn btn-primary"
+              >
+                View Images
+              </Link>
+            </div>
             <form onSubmit={handleReportSubmit} className="body-form-box">
               <div className="row">
                 <div className="col-12">
@@ -2141,7 +2248,9 @@ function CEReport() {
                       placeholder="Enter category/subcategory/child-category (e.g., COMMERCIAL VEHICLE / CV CV-IN 11)"
                     />
                     <small className="form-text text-muted">
-                      This field controls all heading fields below. Enter the category information in the format: (category_name) / (sub_category_name) (child_category_name)
+                      This field controls all heading fields below. Enter the
+                      category information in the format: (category_name) /
+                      (sub_category_name) (child_category_name)
                     </small>
                   </div>
                 </div>
@@ -3855,7 +3964,10 @@ function CEReport() {
                       className="form-field"
                       id="rc_permit_tax_fitness_insurance_heading"
                       name="rc_permit_tax_fitness_insurance_heading"
-                      value={reportFormData.rc_permit_tax_fitness_insurance_heading || ""}
+                      value={
+                        reportFormData.rc_permit_tax_fitness_insurance_heading ||
+                        ""
+                      }
                       readOnly
                       placeholder="Auto-generated from Category Suffix"
                     />
@@ -4055,7 +4167,7 @@ function CEReport() {
                   <h4>OVER ALL FEED BACK OF THE INSPECTED</h4>
                   <hr />
                 </div>
-                  <div className="col-12">
+                <div className="col-12">
                   <div className="form-group">
                     <label htmlFor="overall_feedback_heading">
                       Overall Feedback Heading

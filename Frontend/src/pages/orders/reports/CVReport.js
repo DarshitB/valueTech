@@ -2451,7 +2451,10 @@ function CVReport() {
         {/* Reference Number Form Section */}
         <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12 mb-5">
           <div className="order-report-container">
-            <h2>CV Report</h2>
+            <div className="d-flex justify-content-between align-items-center">
+              <h2>CV Report</h2>
+              <Link to={`/orders/${id}/details/images`} className="btn btn-primary">View Images</Link>
+            </div>
             <form onSubmit={handleReportSubmit} className="body-form-box">
               <div className="row">
                 <div className="col-12">

@@ -1,12 +1,19 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import "./CustomDataTable.scss";
 import { SearchIcon } from "./icons";
+
+const STORAGE_KEY = "customDataTable_entriesPerPage";
 
 const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = true }) => {
   const { header, rows, footer, buttons } = children;
 
+  // Load entries per page from localStorage or default to 10
+  const [entriesPerPage, setEntriesPerPage] = useState(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? parseInt(saved, 10) : 10;
+  });
+
   const [search, setSearch] = useState("");
-  const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({
     index: null,
@@ -64,6 +71,11 @@ const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = tr
     (currentPage - 1) * entriesPerPage,
     currentPage * entriesPerPage
   );
+
+  // Persist entriesPerPage to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, entriesPerPage.toString());
+  }, [entriesPerPage]);
 
   // Sort handler
   const handleSort = (index) => {

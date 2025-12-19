@@ -55,6 +55,7 @@
     }
     .dataTable-header-buttons {
       margin-left: auto;
+      max-width: calc(100% - 450px);
     }
   }
   .dataTable-table-container {

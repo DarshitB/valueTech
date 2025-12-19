@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchBanks,
@@ -6,6 +6,9 @@ import {
   editBank,
   removeBank,
 } from "../../redux/reducers/bankReducer";
+import { fetchBranches } from "../../redux/reducers/bankBranchReducer";
+import { fetchOfficers } from "../../redux/reducers/officerReducer";
+import { fetchOrders } from "../../redux/reducers/orderReducer";
 import CustomDataTable from "../../components/CustomDataTable";
 import FormModel from "../../components/FormModel";
 import ConfirmationModal from "../../components/ConfirmationModal";
@@ -23,11 +26,57 @@ function Banks() {
 
   // 🏦 Get bank list and loading status from Redux
   const { list: banks, loading } = useSelector((state) => state.banks);
+  const { list: branches } = useSelector((state) => state.branches);
+  const { list: officers } = useSelector((state) => state.officers);
+  const { list: orders } = useSelector((state) => state.orders);
 
-  // 🔃 Fetch banks on mount
+  // 🔃 Fetch banks, branches, officers, and orders on mount
   useEffect(() => {
     dispatch(fetchBanks());
+    dispatch(fetchBranches());
+    dispatch(fetchOfficers());
+    dispatch(fetchOrders());
   }, [dispatch]);
+
+  // Calculate counts for each bank
+  const bankCounts = useMemo(() => {
+    const counts = {};
+
+    banks.forEach((bank) => {
+      // Count branches for this bank
+      const branchCount = branches.filter(
+        (branch) => branch.bank_id === bank.id
+      ).length;
+
+      // Get all branch IDs for this bank
+      const bankBranchIds = branches
+        .filter((branch) => branch.bank_id === bank.id)
+        .map((branch) => branch.id);
+
+      // Count officers in branches of this bank
+      const officerCount = officers.filter((officer) =>
+        bankBranchIds.includes(officer.branch_id)
+      ).length;
+
+      // Get all officer IDs for this bank
+      const bankOfficerIds = officers
+        .filter((officer) => bankBranchIds.includes(officer.branch_id))
+        .map((officer) => officer.id);
+
+      // Count orders for officers of this bank
+      const orderCount = orders.filter((order) =>
+        bankOfficerIds.includes(order.officer_id)
+      ).length;
+
+      counts[bank.id] = {
+        branches: branchCount,
+        officers: officerCount,
+        orders: orderCount,
+      };
+    });
+
+    return counts;
+  }, [banks, branches, officers, orders]);
 
   // ✍️ Local state for form data and modal visibility
   const [formData, setFormData] = useState({ name: "", initial: "" });
@@ -122,8 +171,11 @@ function Banks() {
                 <th style={{ width: "52px" }}>ID</th>
                 <th style={{ width: "200px" }}>Name</th>
                 <th style={{ width: "150px" }}>Initial</th>
+                <th style={{ width: "100px" }}>Branches</th>
+                <th style={{ width: "100px" }}>Officers</th>
+                <th>Orders</th>
                 <th style={{ width: "150px" }}>Created By</th>
-                <th>Updated By</th>
+                <th style={{ width: "150px" }}>Updated By</th>
                 <th style={{ textAlign: "center", width: "150px" }}>Action</th>
               </tr>
             ),
@@ -143,6 +195,9 @@ function Banks() {
                   )}
                 </td>
                 <td>{bank.initial}</td>
+                <td>{bankCounts[bank.id]?.branches || 0}</td>
+                <td>{bankCounts[bank.id]?.officers || 0}</td>
+                <td>{bankCounts[bank.id]?.orders || 0}</td>
                 <td>{bank.created_by}</td>
                 <td>{bank.updated_by || "-"}</td>
                 <td style={{ textAlign: "center" }}>
@@ -190,7 +245,10 @@ function Banks() {
                       id="bankName"
                       value={formData.name}
                       onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value.toUpperCase() })
+                        setFormData({
+                          ...formData,
+                          name: e.target.value.toUpperCase(),
+                        })
                       }
                     />
                   </div>
@@ -201,7 +259,10 @@ function Banks() {
                       id="bankInitial"
                       value={formData.initial}
                       onChange={(e) =>
-                        setFormData({ ...formData, initial: e.target.value.toUpperCase() })
+                        setFormData({
+                          ...formData,
+                          initial: e.target.value.toUpperCase(),
+                        })
                       }
                     />
                   </div>

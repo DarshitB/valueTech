@@ -1,5 +1,7 @@
 @use "./variables" as *;
-
+html {
+  zoom: 0.8;
+}
 .height-full-occupied {
   height: 100%;
   position: relative;

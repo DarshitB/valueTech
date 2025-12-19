@@ -90,8 +90,18 @@ function MachineryReport() {
     // Get current month in 3-letter uppercase format
     const getCurrentMonthAbbreviationLocal = () => {
       const months = [
-        "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-        "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+        "JAN",
+        "FEB",
+        "MAR",
+        "APR",
+        "MAY",
+        "JUN",
+        "JUL",
+        "AUG",
+        "SEP",
+        "OCT",
+        "NOV",
+        "DEC",
       ];
       const currentMonth = new Date().getMonth();
       return months[currentMonth];
@@ -244,8 +254,18 @@ function MachineryReport() {
   // Function to get current month in 3-letter uppercase format (JAN, FEB, MAR, etc.)
   const getCurrentMonthAbbreviation = useCallback(() => {
     const months = [
-      "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-      "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+      "JAN",
+      "FEB",
+      "MAR",
+      "APR",
+      "MAY",
+      "JUN",
+      "JUL",
+      "AUG",
+      "SEP",
+      "OCT",
+      "NOV",
+      "DEC",
     ];
     const currentMonth = new Date().getMonth();
     return months[currentMonth];
@@ -564,9 +584,10 @@ function MachineryReport() {
             : "",
           // Prefill category_suffix with category information
           // Only prefill if there's no saved report and no existing category_suffix value
-          category_suffix: shouldPrefillHeadings && categorySuffix
-            ? categorySuffix
-            : prev.category_suffix || "",
+          category_suffix:
+            shouldPrefillHeadings && categorySuffix
+              ? categorySuffix
+              : prev.category_suffix || "",
         };
       });
     }
@@ -627,8 +648,18 @@ function MachineryReport() {
         setReportFormData((prev) => {
           if (!prev.ref_no_month || prev.ref_no_month.trim() === "") {
             const months = [
-              "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-              "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+              "JAN",
+              "FEB",
+              "MAR",
+              "APR",
+              "MAY",
+              "JUN",
+              "JUL",
+              "AUG",
+              "SEP",
+              "OCT",
+              "NOV",
+              "DEC",
             ];
             const currentMonth = new Date().getMonth();
             return {
@@ -663,20 +694,30 @@ function MachineryReport() {
 
       // Extract category_suffix from saved headings or use default from order
       let extractedCategorySuffix = "";
-      
+
       // Try to extract category_suffix from any existing heading
-      if (report.valueation_report_for_heading && String(report.valueation_report_for_heading).trim() !== "") {
-        const match = String(report.valueation_report_for_heading).match(/VALUATION REPORT FOR (.+)/i);
+      if (
+        report.valueation_report_for_heading &&
+        String(report.valueation_report_for_heading).trim() !== ""
+      ) {
+        const match = String(report.valueation_report_for_heading).match(
+          /VALUATION REPORT FOR (.+)/i
+        );
         if (match && match[1]) {
           extractedCategorySuffix = match[1].trim();
         }
-      } else if (report.general_details_heading && String(report.general_details_heading).trim() !== "") {
-        const match = String(report.general_details_heading).match(/GENERAL DETAILS OF THE INSPECTED (.+)/i);
+      } else if (
+        report.general_details_heading &&
+        String(report.general_details_heading).trim() !== ""
+      ) {
+        const match = String(report.general_details_heading).match(
+          /GENERAL DETAILS OF THE INSPECTED (.+)/i
+        );
         if (match && match[1]) {
           extractedCategorySuffix = match[1].trim();
         }
       }
-      
+
       // If no category_suffix found in headings, use default from order
       if (!extractedCategorySuffix && order) {
         extractedCategorySuffix = buildCategorySuffix(
@@ -685,12 +726,14 @@ function MachineryReport() {
           order?.child_category_name
         );
       }
-      
+
       // Set category_suffix (this will trigger heading regeneration via handleFormChange)
       updated.category_suffix = extractedCategorySuffix;
-      
+
       // Generate headings from category_suffix
-      const categorySuffixUpper = extractedCategorySuffix ? extractedCategorySuffix.toUpperCase().trim() : "";
+      const categorySuffixUpper = extractedCategorySuffix
+        ? extractedCategorySuffix.toUpperCase().trim()
+        : "";
       updated.valueation_report_for_heading = categorySuffixUpper
         ? `VALUATION REPORT FOR ${categorySuffixUpper}`
         : "";
@@ -752,8 +795,18 @@ function MachineryReport() {
       // Ensure ref_no_month has a default value if it's empty or null
       if (!updated.ref_no_month || updated.ref_no_month.trim() === "") {
         const months = [
-          "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-          "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+          "JAN",
+          "FEB",
+          "MAR",
+          "APR",
+          "MAY",
+          "JUN",
+          "JUL",
+          "AUG",
+          "SEP",
+          "OCT",
+          "NOV",
+          "DEC",
         ];
         const currentMonth = new Date().getMonth();
         updated.ref_no_month = `SFW-${months[currentMonth]}-`;
@@ -839,15 +892,22 @@ function MachineryReport() {
   // Auto-update all heading fields when category_suffix changes (for programmatic updates)
   useEffect(() => {
     const categorySuffix = reportFormData.category_suffix || "";
-    const categorySuffixUpper = categorySuffix ? categorySuffix.toUpperCase().trim() : "";
-    
+    const categorySuffixUpper = categorySuffix
+      ? categorySuffix.toUpperCase().trim()
+      : "";
+
     setReportFormData((prev) => {
       // Only update if category_suffix has changed to avoid infinite loops
-      if (prev.category_suffix === categorySuffix && 
-          prev.valueation_report_for_heading === (categorySuffixUpper ? `VALUATION REPORT FOR ${categorySuffixUpper}` : "")) {
+      if (
+        prev.category_suffix === categorySuffix &&
+        prev.valueation_report_for_heading ===
+          (categorySuffixUpper
+            ? `VALUATION REPORT FOR ${categorySuffixUpper}`
+            : "")
+      ) {
         return prev;
       }
-      
+
       return {
         ...prev,
         valueation_report_for_heading: categorySuffixUpper
@@ -984,7 +1044,7 @@ function MachineryReport() {
   // Handle date input formatting (DD-MM-YYYY)
   const handleDateChange = useCallback((e) => {
     const { name, value } = e.target;
-    
+
     // Allow empty strings to clear the field
     if (!value || value.trim() === "") {
       // Track that this field was explicitly cleared
@@ -995,12 +1055,12 @@ function MachineryReport() {
       }));
       return;
     }
-    
+
     // If field gets a value, remove it from cleared fields tracking
     clearedFieldsRef.current.delete(name);
-    
+
     if (typeof value !== "string") return;
-    
+
     let numericValue = value.replace(/\D/g, ""); // Remove non-numeric characters
     if (numericValue.length > 8) numericValue = numericValue.substring(0, 8); // Limit to 8 digits (DDMMYYYY)
 
@@ -1028,7 +1088,7 @@ function MachineryReport() {
   // Handle currency input formatting (Indian number format)
   const handleCurrencyChange = useCallback((e) => {
     const { name, value } = e.target;
-    
+
     // Allow empty strings to clear the field
     if (!value || value.trim() === "") {
       // Track that this field was explicitly cleared
@@ -1039,10 +1099,10 @@ function MachineryReport() {
       }));
       return;
     }
-    
+
     // If field gets a value, remove it from cleared fields tracking
     clearedFieldsRef.current.delete(name);
-    
+
     if (typeof value !== "string") return;
 
     // Remove everything except digits and one dot
@@ -1241,9 +1301,11 @@ function MachineryReport() {
 
         // Special handling for initiated_by - use edited value if present, otherwise use computed from order
         if (key === "initiated_by") {
-          value = reportFormData.initiated_by || (order?.officer_name && order?.bank_name
-            ? `${order.officer_name}, ${order.bank_name}`
-            : "");
+          value =
+            reportFormData.initiated_by ||
+            (order?.officer_name && order?.bank_name
+              ? `${order.officer_name}, ${order.bank_name}`
+              : "");
         }
 
         // Special handling for ref_no_bank - always use current order values
@@ -1475,9 +1537,10 @@ function MachineryReport() {
         // Special handling for initiated_by - use edited value if present, otherwise use computed from order
         if (key === "initiated_by") {
           const editedValue = reportFormData.initiated_by;
-          const computedValue = order?.officer_name && order?.bank_name
-            ? `${order.officer_name}, ${order.bank_name}`
-            : "";
+          const computedValue =
+            order?.officer_name && order?.bank_name
+              ? `${order.officer_name}, ${order.bank_name}`
+              : "";
           const finalValue = editedValue || computedValue;
           if (finalValue) {
             reportData[key] = finalValue;
@@ -1496,13 +1559,15 @@ function MachineryReport() {
 
         // Special handling for ref_no_code - always use current order values
         if (key === "ref_no_code") {
-          const computedRefNoCode = order?.valuer_name ? getRefNoCode(order.valuer_name) : "";
+          const computedRefNoCode = order?.valuer_name
+            ? getRefNoCode(order.valuer_name)
+            : "";
           if (computedRefNoCode) {
             reportData[key] = computedRefNoCode;
           }
           return; // Skip the normal flow for this field
         }
-        
+
         // Check if this field was explicitly cleared by the user
         if (clearedFieldsRef.current.has(key)) {
           // Include cleared fields as null in the payload
@@ -1580,10 +1645,10 @@ function MachineryReport() {
     flexibleFields,
     validateFlexibleFields,
     dispatch,
-      id,
-      order,
-      getRefNoCode,
-      parseCurrency,
+    id,
+    order,
+    getRefNoCode,
+    parseCurrency,
     convertNumberToWordsIndian,
   ]);
 
@@ -1939,7 +2004,15 @@ function MachineryReport() {
         {/* Reference Number Form Section */}
         <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12 mb-5">
           <div className="order-report-container">
-            <h2>Machinery Report</h2>
+            <div className="d-flex justify-content-between align-items-center">
+              <h2>Machinery Report</h2>
+              <Link
+                to={`/orders/${id}/details/images`}
+                className="btn btn-primary"
+              >
+                View Images
+              </Link>
+            </div>
             <form onSubmit={handleReportSubmit} className="body-form-box">
               <div className="row">
                 <div className="col-12">
@@ -1957,7 +2030,9 @@ function MachineryReport() {
                       placeholder="Enter category/subcategory/child-category (e.g., COMMERCIAL VEHICLE / CV CV-IN 11)"
                     />
                     <small className="form-text text-muted">
-                      This field controls all heading fields below. Enter the category information in the format: (category_name) / (sub_category_name) (child_category_name)
+                      This field controls all heading fields below. Enter the
+                      category information in the format: (category_name) /
+                      (sub_category_name) (child_category_name)
                     </small>
                   </div>
                 </div>

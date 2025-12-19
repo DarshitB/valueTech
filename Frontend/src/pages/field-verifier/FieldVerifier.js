@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchFieldVerifiers,
@@ -10,6 +10,7 @@ import {
   toggleFieldVerifierStatus,
 } from "../../redux/reducers/fieldVerifierReducer";
 import { fetchCities } from "../../redux/reducers/cityReducer";
+import { fetchOrders } from "../../redux/reducers/orderReducer";
 import CustomDataTable from "../../components/CustomDataTable";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import FormModel from "../../components/FormModel";
@@ -33,6 +34,7 @@ function FieldVerifiers() {
   );
   /*  console.log(fieldVerifiers); */
   const { list: cities } = useSelector((state) => state.cities); // Fetch cities
+  const { list: orders } = useSelector((state) => state.orders);
 
   // Function to mask mobile number based on permission
   const getMaskedMobile = (mobile) => {
@@ -77,7 +79,20 @@ function FieldVerifiers() {
   useEffect(() => {
     dispatch(fetchFieldVerifiers());
     dispatch(fetchCities());
+    dispatch(fetchOrders());
   }, [dispatch]);
+
+  // Calculate order counts for each field verifier
+  const fieldVerifierOrderCounts = useMemo(() => {
+    const counts = {};
+    fieldVerifiers.forEach((verifier) => {
+      const orderCount = orders.filter(
+        (order) => order.field_verifier_id === verifier.id
+      ).length;
+      counts[verifier.id] = orderCount;
+    });
+    return counts;
+  }, [fieldVerifiers, orders]);
 
   const openAddModal = () => {
     setIsEdit(false);
@@ -254,8 +269,9 @@ function FieldVerifiers() {
                 <th style={{ width: "200px" }}>Username</th>
                 <th style={{ width: "125px" }}>Mobile</th>
                 <th style={{ width: "125px" }}>City</th>
+                <th>Orders</th>
                 <th style={{ width: "125px" }}>Created By</th>
-                <th>Updated By</th>
+                <th style={{ width: "125px" }}>Updated By</th>
                 <th style={{ width: "100px" }}>Status</th>
                 <th style={{ width: "150px" }}>Action</th>
               </tr>
@@ -267,6 +283,9 @@ function FieldVerifiers() {
                 <td>{verifier.username}</td>
                 <td>{getMaskedMobile(verifier.mobile)}</td>
                 <td>{verifier.city_name}</td>
+                <td>
+                  {fieldVerifierOrderCounts[verifier.id] || 0}
+                </td>
                 <td>{verifier.created_by}</td>
                 <td>{verifier.updated_by || "-"}</td>
                 <td>

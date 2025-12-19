@@ -47,6 +47,8 @@ const ALLOWED_FILE_TYPES = [
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "text/plain",
   "text/csv",
+  "application/zip",
+  "application/x-zip-compressed",
 ];
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
@@ -1514,7 +1516,7 @@ function OrderDocuments() {
                       multiple
                       hidden
                       onChange={handleFileInputChange}
-                      accept={ALLOWED_FILE_TYPES.join(",")}
+                      accept={[...ALLOWED_FILE_TYPES, ".zip"].join(",")}
                     />
                     <label
                       htmlFor="fileInput"

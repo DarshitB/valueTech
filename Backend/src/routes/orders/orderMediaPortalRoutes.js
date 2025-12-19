@@ -13,7 +13,7 @@ const permission = require("../../middleware/permission"); // Assuming you have 
 const upload = multer({
   dest: path.join(__dirname, "..", "..", "tmp_uploads"),
   limits: { 
-    fileSize: 100 * 1024 * 1024 // 100MB limit for ZIP files
+    fileSize: 300 * 1024 * 1024 // 300MB limit for ZIP files
   },
   fileFilter: (req, file, cb) => {
     // Only allow ZIP files

@@ -74,6 +74,47 @@ function timeAgo(dateString) {
   return `${weeks} week${weeks > 1 ? "s" : ""} ago`;
 }
 
+// Utility: Format date for Recent Activity
+function formatActivityTime(dateString) {
+  if (!dateString) return "-";
+  
+  const date = new Date(dateString);
+  const now = new Date();
+  
+  // Reset time to compare dates only
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const activityDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  
+  // Format time (12-hour format with AM/PM)
+  let hours = date.getHours();
+  const minutes = date.getMinutes();
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12;
+  hours = hours ? hours : 12; // the hour '0' should be '12'
+  const minutesStr = minutes.toString().padStart(2, "0");
+  const timeStr = `${hours}:${minutesStr} ${ampm}`;
+  
+  // Month abbreviations
+  const monthAbbr = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  
+  // Check if today
+  if (activityDate.getTime() === today.getTime()) {
+    return `Today at ${timeStr}`;
+  }
+  
+  // Check if yesterday
+  if (activityDate.getTime() === yesterday.getTime()) {
+    return `Yesterday at ${timeStr}`;
+  }
+  
+  // For older dates: "15 Dec at 7:30 PM"
+  const day = date.getDate();
+  const month = monthAbbr[date.getMonth()];
+  return `${day} ${month} at ${timeStr}`;
+}
+
 /**
  * OrderDetails Component
  *
@@ -2176,7 +2217,7 @@ function OrderDetails() {
                         </div>
                         <div className="activity-detail">
                           <p className="activity-time">
-                            {timeAgo(status.changed_at)}
+                            {formatActivityTime(status.changed_at)}
                           </p>
                           <p className="activity-description">
                             {status.status_name && status.activity_extra

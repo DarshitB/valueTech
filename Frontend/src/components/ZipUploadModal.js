@@ -53,10 +53,10 @@ const ZipUploadModal = ({ isOpen, onClose, orderId }) => {
       return;
     }
 
-    // Validate file size (e.g., max 100MB)
-    const maxSize = 100 * 1024 * 1024; // 100MB
+    // Validate file size (e.g., max 300MB)
+    const maxSize = 300 * 1024 * 1024; // 300MB
     if (file.size > maxSize) {
-      toast.error("File size must be less than 100MB");
+      toast.error("File size must be less than 300MB");
       return;
     }
 
