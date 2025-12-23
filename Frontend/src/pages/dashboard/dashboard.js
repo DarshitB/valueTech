@@ -167,6 +167,21 @@ function Dashboard() {
     return saved || "";
   });
 
+  const [selectedCategory, setSelectedCategory] = useState(() => {
+    const saved = localStorage.getItem("filter_category");
+    return saved || "";
+  });
+
+  const [selectedAssetCategory, setSelectedAssetCategory] = useState(() => {
+    const saved = localStorage.getItem("filter_assetCategory");
+    return saved || "";
+  });
+
+  const [selectedSubCategory, setSelectedSubCategory] = useState(() => {
+    const saved = localStorage.getItem("filter_subCategory");
+    return saved || "";
+  });
+
   // Get distinct filter values from orders
   const distinctBanks = useMemo(() => {
     const banks = orders
@@ -222,6 +237,27 @@ function Dashboard() {
       .map((order) => order.payment_status)
       .filter((status) => status && status.trim() !== "");
     return [...new Set(paymentStatuses)].sort();
+  }, [orders]);
+
+  const distinctCategories = useMemo(() => {
+    const categories = orders
+      .map((order) => order.category_name)
+      .filter((name) => name && name.trim() !== "");
+    return [...new Set(categories)].sort();
+  }, [orders]);
+
+  const distinctAssetCategories = useMemo(() => {
+    const assetCategories = orders
+      .map((order) => order.sub_category_name)
+      .filter((name) => name && name.trim() !== "");
+    return [...new Set(assetCategories)].sort();
+  }, [orders]);
+
+  const distinctSubCategories = useMemo(() => {
+    const subCategories = orders
+      .map((order) => order.child_category_name)
+      .filter((name) => name && name.trim() !== "");
+    return [...new Set(subCategories)].sort();
   }, [orders]);
 
   // Fetch filtered child categories for Bank Officers based on their departments
@@ -636,6 +672,71 @@ function Dashboard() {
   };
 
   // Submit Add/Edit
+  // Function to clear all filters
+  const handleClearFilters = () => {
+    setSelectedOrderType("");
+    setSelectedPriority("");
+    setSelectedBank("");
+    setSelectedBranch("");
+    setSelectedOfficer("");
+    setSelectedManager("");
+    setSelectedFieldVerifier("");
+    setSelectedValuerName("");
+    setSelectedOrderStatus("");
+    setSelectedPaymentStatus("");
+    setSelectedCategory("");
+    setSelectedAssetCategory("");
+    setSelectedSubCategory("");
+
+    // Clear from localStorage
+    localStorage.removeItem("filter_orderType");
+    localStorage.removeItem("filter_priority");
+    localStorage.removeItem("filter_bank");
+    localStorage.removeItem("filter_branch");
+    localStorage.removeItem("filter_officer");
+    localStorage.removeItem("filter_manager");
+    localStorage.removeItem("filter_fieldVerifier");
+    localStorage.removeItem("filter_valuerName");
+    localStorage.removeItem("filter_orderStatus");
+    localStorage.removeItem("filter_paymentStatus");
+    localStorage.removeItem("filter_category");
+    localStorage.removeItem("filter_assetCategory");
+    localStorage.removeItem("filter_subCategory");
+  };
+
+  // Check if any filter is set
+  const hasActiveFilters = useMemo(() => {
+    return (
+      selectedOrderType !== "" ||
+      selectedPriority !== "" ||
+      selectedBank !== "" ||
+      selectedBranch !== "" ||
+      selectedOfficer !== "" ||
+      selectedManager !== "" ||
+      selectedFieldVerifier !== "" ||
+      selectedValuerName !== "" ||
+      selectedOrderStatus !== "" ||
+      selectedPaymentStatus !== "" ||
+      selectedCategory !== "" ||
+      selectedAssetCategory !== "" ||
+      selectedSubCategory !== ""
+    );
+  }, [
+    selectedOrderType,
+    selectedPriority,
+    selectedBank,
+    selectedBranch,
+    selectedOfficer,
+    selectedManager,
+    selectedFieldVerifier,
+    selectedValuerName,
+    selectedOrderStatus,
+    selectedPaymentStatus,
+    selectedCategory,
+    selectedAssetCategory,
+    selectedSubCategory,
+  ]);
+
   const handleSubmit = () => {
     // Collect all validation errors
     if (!formData.customer_name.trim()) {
@@ -1312,7 +1413,7 @@ function Dashboard() {
                       showFooter={true}
                     >
                       {{
-                        buttons: (
+                        filters: (
                           <div
                             style={{
                               display: "flex",
@@ -1359,10 +1460,61 @@ function Dashboard() {
                                 <option value="Low">Low</option>
                               </select>
                             )}
-                            {hasPermission(
-                              allowedPermissions,
-                              "view_order_table_Bank_db"
-                            ) && (
+                            {hasPermission(allowedPermissions, "view_category_filter") && (
+                              <select
+                                className="form-field type-priority-selector"
+                                value={selectedCategory}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setSelectedCategory(value);
+                                  localStorage.setItem("filter_category", value);
+                                }}
+                              >
+                                <option value="">All Categories</option>
+                                {distinctCategories.map((category) => (
+                                  <option key={category} value={category}>
+                                    {category}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                            {hasPermission(allowedPermissions, "view_asset_category_filter") && (
+                              <select
+                                className="form-field type-priority-selector"
+                                value={selectedAssetCategory}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setSelectedAssetCategory(value);
+                                  localStorage.setItem("filter_assetCategory", value);
+                                }}
+                              >
+                                <option value="">All Asset Categories</option>
+                                {distinctAssetCategories.map((assetCategory) => (
+                                  <option key={assetCategory} value={assetCategory}>
+                                    {assetCategory}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                            {hasPermission(allowedPermissions, "view_sub_category_filter") && (
+                              <select
+                                className="form-field type-priority-selector"
+                                value={selectedSubCategory}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setSelectedSubCategory(value);
+                                  localStorage.setItem("filter_subCategory", value);
+                                }}
+                              >
+                                <option value="">All Sub Categories</option>
+                                {distinctSubCategories.map((subCategory) => (
+                                  <option key={subCategory} value={subCategory}>
+                                    {subCategory}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                            {hasPermission(allowedPermissions, "view_bank_filter") && (
                               <select
                                 className="form-field type-priority-selector"
                                 value={selectedBank}
@@ -1382,7 +1534,7 @@ function Dashboard() {
                             )}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_Bank_Branch_db"
+                              "view_bank_branch_filter"
                             ) && (
                               <select
                                 className="form-field type-priority-selector"
@@ -1403,7 +1555,7 @@ function Dashboard() {
                             )}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_Branch_Officer_db"
+                              "view_branch_officer_filter"
                             ) && (
                               <select
                                 className="form-field type-priority-selector"
@@ -1424,7 +1576,7 @@ function Dashboard() {
                             )}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_manager_db"
+                              "view_manager_filter"
                             ) && (
                               <select
                                 className="form-field type-priority-selector"
@@ -1445,7 +1597,7 @@ function Dashboard() {
                             )}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_field_verifier_db"
+                              "view_field_verifier_filter"
                             ) && (
                               <select
                                 className="form-field type-priority-selector"
@@ -1469,7 +1621,7 @@ function Dashboard() {
                             )}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_valuer_name_db"
+                              "view_valuer_name_filter"
                             ) && (
                               <select
                                 className="form-field type-priority-selector"
@@ -1490,7 +1642,7 @@ function Dashboard() {
                             )}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_status_db"
+                              "view_status_filter"
                             ) && (
                               <select
                                 className="form-field type-priority-selector"
@@ -1511,7 +1663,7 @@ function Dashboard() {
                             )}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_payment_status_db"
+                              "view_payment_status_filter"
                             ) && (
                               <select
                                 className="form-field type-priority-selector"
@@ -1533,6 +1685,29 @@ function Dashboard() {
                                 ))}
                               </select>
                             )}
+                            {hasActiveFilters && (
+                              <button
+                                className="btn"
+                                onClick={handleClearFilters}
+                                style={{
+                                  marginLeft: "10px",
+                                }}
+                              >
+                                Clear Filters
+                              </button>
+                            )}
+                          </div>
+                        ),
+                        buttons: (
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: "10px",
+                              alignItems: "center",
+                              justifyContent: "flex-end",
+                              flexWrap: "wrap",
+                            }}
+                          >
                             {hasPermission(
                               allowedPermissions,
                               "add_order_db"
@@ -1707,10 +1882,27 @@ function Dashboard() {
                               !selectedPaymentStatus ||
                               order.payment_status === selectedPaymentStatus;
 
+                            // Filter by category if selected
+                            const categoryMatch =
+                              !selectedCategory || order.category_name === selectedCategory;
+
+                            // Filter by asset category if selected
+                            const assetCategoryMatch =
+                              !selectedAssetCategory ||
+                              order.sub_category_name === selectedAssetCategory;
+
+                            // Filter by sub category if selected
+                            const subCategoryMatch =
+                              !selectedSubCategory ||
+                              order.child_category_name === selectedSubCategory;
+
                             // Show order only if all filters match (or no filter is selected)
                             return (
                               typeMatch &&
                               priorityMatch &&
+                              categoryMatch &&
+                              assetCategoryMatch &&
+                              subCategoryMatch &&
                               bankMatch &&
                               branchMatch &&
                               officerMatch &&

@@ -32,27 +32,27 @@
   }
 }
 .type-priority-selector {
-  padding: 2px 15px;
+  padding: 2px 10px;
   border: 1px solid #ddd;
   border-radius: 4px;
-  min-width: 120px;
+  /* min-width: 120px; */
   border-radius: 50rem;
   outline: none;
   box-shadow: none;
-  width: 110px;
+ /*  width: 110px;
   max-width: 110px;
   text-overflow: ellipsis;
   overflow: hidden;
-  white-space: nowrap;
+  white-space: nowrap; */
   
-  option {
+ /*  option {
     max-width: none;
     overflow: visible;
     white-space: normal;
     text-overflow: clip;
     padding: 5px 15px;
     text-align: left;
-  }
+  } */
 }
 /*///////////////// order details  ////////////////////*/
 

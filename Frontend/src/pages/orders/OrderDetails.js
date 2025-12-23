@@ -213,6 +213,7 @@ function OrderDetails() {
     bcc: [],
     subject: "",
     comments: "",
+    regards: "",
   });
 
   // Track removed documents (by ID) - documents user removes from mail attachments
@@ -341,6 +342,29 @@ function OrderDetails() {
     mailFormData.subject,
     formatRegistrationNumber,
   ]);
+
+  // Prefill regards field based on valuer_name
+  useEffect(() => {
+    if (showMailModal && order?.valuer_name && !mailFormData.regards) {
+      const valuerName = order.valuer_name.trim().toUpperCase();
+      let regardsText = "";
+
+      if (valuerName.includes("VALUETECH SOLUTIONS")) {
+        regardsText = "Thanks & Regards\nValuetech Solutions";
+      } else if (valuerName.includes("V.K. ASSOCIATES") || valuerName.includes("V K ASSOCIATES")) {
+        regardsText = "Thanks & Regards\nV K Associates";
+      } else if (valuerName.includes("VISHAL D. KOTHARI") || valuerName.includes("VISHAL D KOTHARI")) {
+        regardsText = "Thanks & Regards\nVishal D Kothari";
+      }
+
+      if (regardsText) {
+        setMailFormData((prev) => ({
+          ...prev,
+          regards: regardsText,
+        }));
+      }
+    }
+  }, [showMailModal, order?.valuer_name, mailFormData.regards]);
 
   // Prepare bank officers for email selection with validation
   const bankOfficersOptions = useMemo(() => {
@@ -1429,6 +1453,7 @@ function OrderDetails() {
         : [],
       subject: mailFormData.subject?.trim() || "",
       comments: comments,
+      regards: mailFormData.regards?.trim() || "",
       document_ids: documentIds.map((doc) => doc.id), // Array of document IDs (collages and reports)
       // Add videos separately if there are any
       ...(videoIds.length > 0 && { video_ids: videoIds }), // Array of video IDs (only if videos exist)
@@ -1464,6 +1489,7 @@ function OrderDetails() {
           bcc: [],
           subject: "",
           comments: "",
+          regards: "",
         });
       }
     } catch (error) {
@@ -2652,6 +2678,22 @@ function OrderDetails() {
                       style={{ resize: "vertical" }}
                       maxLength="2000"
                       aria-label="Comments"
+                      disabled={isSendingMail}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="regards">Regards</label>
+                    <textarea
+                      className="form-field"
+                      id="regards"
+                      name="regards"
+                      value={mailFormData.regards}
+                      onChange={handleMailFormChange}
+                      rows="3"
+                      placeholder=""
+                      style={{ resize: "vertical" }}
+                      aria-label="Regards"
                       disabled={isSendingMail}
                     />
                   </div>

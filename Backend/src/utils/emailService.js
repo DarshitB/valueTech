@@ -2,38 +2,44 @@ const nodemailer = require("nodemailer");
 const path = require("path");
 const fs = require("fs").promises; // Use promises for async file operations
 
-// Cache transporter to reuse connection (avoids reconnecting each time)
-let cachedTransporter = null;
+// Cache transporters keyed by SMTP user to reuse connections per account
+const transporterCache = {};
 
 /**
  * Create and configure nodemailer transporter (reused for performance)
- * Uses EMAIL_USER and EMAIL_PASS from environment variables
+ * Uses provided SMTP user/pass or falls back to EMAIL_USER and EMAIL_PASS
  */
-const createTransporter = () => {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    throw new Error("EMAIL_USER and EMAIL_PASS must be configured in environment variables");
+const createTransporter = (smtpUser, smtpPass) => {
+  const user = smtpUser || process.env.EMAIL_USER;
+  const pass = smtpPass || process.env.EMAIL_PASS;
+
+  if (!user || !pass) {
+    throw new Error(
+      "EMAIL_USER and EMAIL_PASS must be configured in environment variables, or SMTP credentials must be provided"
+    );
   }
 
-  // Reuse existing transporter if available
-  if (cachedTransporter) {
-    return cachedTransporter;
+  // Reuse existing transporter for this user if available
+  if (transporterCache[user]) {
+    return transporterCache[user];
   }
 
   // Create new transporter with connection pooling
-  cachedTransporter = nodemailer.createTransport({
+  const transporter = nodemailer.createTransport({
     host: process.env.EMAIL_HOST || "smtp.gmail.com",
     port: process.env.EMAIL_PORT || 587,
     secure: process.env.EMAIL_SECURE === "true" ? true : false, // true for 465, false for other ports
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
+      user,
+      pass,
     },
     pool: true, // Enable connection pooling
     maxConnections: 5, // Maximum number of connections in pool
     maxMessages: 100, // Maximum messages per connection
   });
 
-  return cachedTransporter;
+  transporterCache[user] = transporter;
+  return transporter;
 };
 
 /**
@@ -46,14 +52,22 @@ const createTransporter = () => {
  * @param {string} [options.text] - Plain text email body
  * @param {string} [options.html] - HTML email body
  * @param {Array} [options.attachments] - Array of attachment objects { path, filename }
+ * @param {string} [options.smtpUser] - Optional SMTP user override
+ * @param {string} [options.smtpPass] - Optional SMTP password override
+ * @param {string} [options.from] - Optional "from" email override
  * @returns {Promise<Object>} - Result from nodemailer
  */
 const sendEmail = async (options) => {
   try {
-    const transporter = createTransporter();
+    // Allow overriding SMTP credentials per email, fallback to environment
+    const smtpUser = options.smtpUser || process.env.EMAIL_USER;
+    const smtpPass = options.smtpPass || process.env.EMAIL_PASS;
+
+    const transporter = createTransporter(smtpUser, smtpPass);
 
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      // Use explicitly provided "from" address or default to SMTP user
+      from: options.from || smtpUser,
       to: options.to.join(", "),
       subject: options.subject,
       text: options.text || "",

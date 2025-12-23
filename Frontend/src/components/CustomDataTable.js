@@ -5,7 +5,7 @@ import { SearchIcon } from "./icons";
 const STORAGE_KEY = "customDataTable_entriesPerPage";
 
 const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = true }) => {
-  const { header, rows, footer, buttons } = children;
+  const { header, rows, footer, buttons, filters } = children;
 
   // Load entries per page from localStorage or default to 10
   const [entriesPerPage, setEntriesPerPage] = useState(() => {
@@ -127,43 +127,46 @@ const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = tr
   return (
     <div className="dataTable-container">
       <div className="dataTable-header">
-        {showEntriesSelector && (
-          <div className="show-x-entries">
-            Show &nbsp;
-            <select
-              value={entriesPerPage}
+        {filters && <div className="dataTable-header-filters">{filters}</div>}
+        <div className="inner-dataTable-header">
+          {showEntriesSelector && (
+            <div className="show-x-entries">
+              Show &nbsp;
+              <select
+                value={entriesPerPage}
+                onChange={(e) => {
+                  setEntriesPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="count-of-page-selector"
+              >
+                {[10, 25, 50, 100].map((num) => (
+                  <option key={num} value={num}>
+                    {num}
+                  </option>
+                ))}
+              </select>{" "}
+              &nbsp; Entries
+            </div>
+          )}
+          <div className="search-bar-container">
+            <span className="search-icon">
+              <SearchIcon className="search-icon-svg" />
+            </span>
+            <input
+              type="text"
+              placeholder="Search..."
+              className="search-bar"
+              value={search}
               onChange={(e) => {
-                setEntriesPerPage(Number(e.target.value));
+                setSearch(e.target.value);
                 setCurrentPage(1);
               }}
-              className="count-of-page-selector"
-            >
-              {[10, 25, 50, 100].map((num) => (
-                <option key={num} value={num}>
-                  {num}
-                </option>
-              ))}
-            </select>{" "}
-            &nbsp; Entries
+            />
           </div>
-        )}
-        <div className="search-bar-container">
-          <span className="search-icon">
-            <SearchIcon className="search-icon-svg" />
-          </span>
-          <input
-            type="text"
-            placeholder="Search..."
-            className="search-bar"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setCurrentPage(1);
-            }}
-          />
-        </div>
 
-        <div className="dataTable-header-buttons">{buttons}</div>
+          <div className="dataTable-header-buttons">{buttons}</div>
+        </div>
       </div>
       <div className="dataTable-table-container">
         <table className="dataTable-table">

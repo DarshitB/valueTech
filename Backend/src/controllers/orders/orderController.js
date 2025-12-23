@@ -1228,12 +1228,21 @@ exports.updateOrderStatusAfterUnderReview = async (req, res, next) => {
 /**
  * Send email with order documents and videos
  * POST /api/orders/:orderId/send-mail
- * Body: { to: [], cc: [], bcc: [], subject: string, comments: string, document_ids: [], video_ids: [] }
+ * Body: { to: [], cc: [], bcc: [], subject: string, comments: string, regards: string, document_ids: [], video_ids: [] }
  */
 exports.sendMail = async (req, res, next) => {
   try {
     const { orderId } = req.params;
-    const { to, cc, bcc, subject, comments, document_ids, video_ids } =
+    const {
+      to,
+      cc,
+      bcc,
+      subject,
+      comments,
+      regards,
+      document_ids,
+      video_ids,
+    } =
       req.body;
 
     // Validate order exists
@@ -1425,6 +1434,11 @@ exports.sendMail = async (req, res, next) => {
       }.`;
     }
 
+    // Append regards at the end (plain text), if provided
+    if (regards && typeof regards === "string" && regards.trim() !== "") {
+      emailBody += `${emailBody ? "\n\n" : ""}Regards,\n${regards.trim()}`;
+    }
+
     let htmlEmailBody = comments ? comments.replace(/\n/g, "<br>") : "";
 
     if (!document_as_attachment && documentLinkGroups.size > 0) {
@@ -1459,6 +1473,25 @@ exports.sendMail = async (req, res, next) => {
       }.`;
     }
 
+    // Append regards at the end (HTML), if provided
+    if (regards && typeof regards === "string" && regards.trim() !== "") {
+      const safeRegards = regards.trim();
+      htmlEmailBody += `${
+        htmlEmailBody ? "<br><br>" : ""
+      }<div style="margin-top:16px;"><span style="font-weight:bold;">Regards,</span><br>${safeRegards}</div>`;
+    }
+
+    // Choose email credentials based on valuer_name
+    const valuerName = (order.valuer_name || "").trim().toUpperCase();
+    const isValuetechSolutions = valuerName === "VALUETECH SOLUTIONS";
+
+    const smtpUser = isValuetechSolutions
+      ? process.env.EMAIL_USER
+      : process.env.VIRAJ_EMAIL_USER || process.env.EMAIL_USER;
+    const smtpPass = isValuetechSolutions
+      ? process.env.EMAIL_PASS
+      : process.env.VIRAJ_EMAIL_PASS || process.env.EMAIL_PASS;
+
     const emailResult = await sendEmail({
       to: to,
       cc: cc || [],
@@ -1467,6 +1500,9 @@ exports.sendMail = async (req, res, next) => {
       text: emailBody,
       html: htmlEmailBody,
       attachments: attachments.length > 0 ? attachments : undefined,
+      smtpUser,
+      smtpPass,
+      from: smtpUser,
     });
 
     await Order.updateOrder(

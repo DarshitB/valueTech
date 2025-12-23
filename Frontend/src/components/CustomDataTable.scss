@@ -6,60 +6,69 @@
   box-shadow: 0 0 20px $box-shadow-color;
   padding: 20px 30px 30px 20px;
   height: 100%;
+  display: flex;
+  flex-direction: column;
   .dataTable-header {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 30px;
-    margin-bottom: 10px;
-    .show-x-entries {
-      font-size: 13px;
-      .count-of-page-selector {
-        border: 1px solid $border-color;
-        padding: 2px 5px;
-        border-radius: 4px;
-        font-size: 14px;
-        &:focus {
-          outline: none;
-          border-color: $primary-color;
-        }
-      }
+    flex-shrink: 0;
+    .dataTable-header-filters {
+      margin-bottom: 10px;
     }
-    .search-bar-container {
-      position: relative;
-      border-radius: 50rem;
-      overflow: hidden;
-      .search-icon {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 40px;
-        background-color: $primary-color;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: $primary-font-color;
-        pointer-events: none;
-      }
-      .search-bar {
-        padding: 4px 10px 4px 45px; /* Adjusted for search icon */
-        border: 1px solid $border-color;
+    .inner-dataTable-header {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 30px;
+      margin-bottom: 10px;
+      .show-x-entries {
         font-size: 13px;
-        border-radius: 50rem;
-        &:focus {
-          outline: none;
-          border-color: $primary-color;
+        .count-of-page-selector {
+          border: 1px solid $border-color;
+          padding: 2px 5px;
+          border-radius: 4px;
+          font-size: 14px;
+          &:focus {
+            outline: none;
+            border-color: $primary-color;
+          }
         }
       }
-    }
-    .dataTable-header-buttons {
-      margin-left: auto;
-      max-width: calc(100% - 450px);
+      .search-bar-container {
+        position: relative;
+        border-radius: 50rem;
+        overflow: hidden;
+        .search-icon {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 40px;
+          background-color: $primary-color;
+          height: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: $primary-font-color;
+          pointer-events: none;
+        }
+        .search-bar {
+          padding: 4px 10px 4px 45px; /* Adjusted for search icon */
+          border: 1px solid $border-color;
+          font-size: 13px;
+          border-radius: 50rem;
+          &:focus {
+            outline: none;
+            border-color: $primary-color;
+          }
+        }
+      }
+      .dataTable-header-buttons {
+        margin-left: auto;
+        max-width: calc(100% - 450px);
+      }
     }
   }
   .dataTable-table-container {
-    height: calc(100% - 95px);
+    flex: 1;
+    min-height: 0;
     overflow: auto;
     .dataTable-table {
       width: 100%;
@@ -122,6 +131,7 @@
     }
   }
   .dataTable-footer {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -188,34 +198,33 @@
   .dataTable-container {
     padding: 20px;
     .dataTable-header {
-      flex-wrap: wrap;
-      gap: 10px;
-      .show-x-entries {
-        width: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-      .search-bar-container {
-        width: 100%;
-        .search-bar {
+      .inner-dataTable-header {
+        flex-wrap: wrap;
+        gap: 10px;
+        .show-x-entries {
           width: 100%;
-        }
-      }
-      .dataTable-header-buttons {
-        margin-right: auto;
-        .add-action-buttons {
-          gap: 10px;
-          flex-wrap: wrap;
+          display: flex;
+          align-items: center;
           justify-content: center;
+        }
+        .search-bar-container {
+          width: 100%;
+          .search-bar {
+            width: 100%;
+          }
+        }
+        .dataTable-header-buttons {
+          margin-right: auto;
+          .add-action-buttons {
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+          }
         }
       }
     }
     .dataTable-footer {
       flex-direction: column;
-    }
-    .dataTable-table-container {
-      height: calc(100% - 190px);
     }
   }
 }
