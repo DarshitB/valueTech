@@ -78,6 +78,9 @@ function Orders() {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [confirmDeleteName, setConfirmDeleteName] = useState("");
 
+  // Accordion state for Advanced Filters
+  const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
+
   // State for filtered child categories for Bank Officers
   const [filteredChildCategories, setFilteredChildCategories] = useState([]);
 
@@ -741,290 +744,323 @@ function Orders() {
   }, [users]);
   return (
     <div className="height-full-occupied order-data-container">
+      {/* Filter Container - Outside dataTable-container */}
+      <div className="filter-container-card">
+        {/* Top Row Filters */}
+        <div className="filter-row">
+          {hasPermission(
+            allowedPermissions,
+            "view_order_type_filter"
+          ) && (
+            <SingleSearchSelect
+              className="search-selector"
+              options={[
+                { value: "", label: "All Types" },
+                { value: "VKA1", label: "VKA1" },
+                { value: "VKA2", label: "VKA2" },
+                { value: "VKA3", label: "VKA3" },
+              ]}
+              value={selectedOrderType || null}
+              onChange={(value) => {
+                const val = value || "";
+                setSelectedOrderType(val);
+                localStorage.setItem("filter_orderType", val);
+              }}
+              placeholder="All Types"
+            />
+          )}
+          {hasPermission(
+            allowedPermissions,
+            "view_order_priority_filter"
+          ) && (
+            <SingleSearchSelect
+              className="search-selector"
+              options={[
+                { value: "", label: "All Priorities" },
+                { value: "High", label: "High" },
+                { value: "Low", label: "Low" },
+              ]}
+              value={selectedPriority || null}
+              onChange={(value) => {
+                const val = value || "";
+                setSelectedPriority(val);
+                localStorage.setItem("filter_priority", val);
+              }}
+              placeholder="All Priorities"
+            />
+          )}
+          {hasPermission(
+            allowedPermissions,
+            "view_status_filter"
+          ) && (
+            <SingleSearchSelect
+              className="search-selector"
+              options={[
+                { value: "", label: "All Status" },
+                ...distinctOrderStatuses.map((status) => ({
+                  value: status,
+                  label: status,
+                })),
+              ]}
+              value={selectedOrderStatus || null}
+              onChange={(value) => {
+                const val = value || "";
+                setSelectedOrderStatus(val);
+                localStorage.setItem("filter_orderStatus", val);
+              }}
+              placeholder="All Status"
+            />
+          )}
+        </div>
+
+        {/* Advanced Filters Section */}
+        <div className={`advanced-filters-section ${isAdvancedFiltersOpen ? "open" : ""}`}>
+          <div 
+            className="advanced-filters-header"
+            onClick={() => setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)}
+            style={{ cursor: "pointer" }}
+          >
+            <span className={`advanced-filters-title ${isAdvancedFiltersOpen ? "open" : ""}`}>
+              Advanced Filters
+            </span>
+            {hasActiveFilters && (
+              <button
+                className="btn clear-filters-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleClearFilters();
+                }}
+              >
+                Clear Filters
+              </button>
+            )}
+          </div>
+          <div className="filter-row advanced-filters-content">
+              {hasPermission(allowedPermissions, "view_bank_filter") && (
+                <SingleSearchSelect
+                  className="search-selector"
+                  options={[
+                    { value: "", label: "All Banks" },
+                    ...distinctBanks.map((bank) => ({
+                      value: bank,
+                      label: bank,
+                    })),
+                  ]}
+                  value={selectedBank || null}
+                  onChange={(value) => {
+                    const val = value || "";
+                    setSelectedBank(val);
+                    localStorage.setItem("filter_bank", val);
+                  }}
+                  placeholder="All Banks"
+                />
+              )}
+              {hasPermission(
+                allowedPermissions,
+                "view_bank_branch_filter"
+              ) && (
+                <SingleSearchSelect
+                  className="search-selector"
+                  options={[
+                    { value: "", label: "All Branches" },
+                    ...distinctBranches.map((branch) => ({
+                      value: branch,
+                      label: branch,
+                    })),
+                  ]}
+                  value={selectedBranch || null}
+                  onChange={(value) => {
+                    const val = value || "";
+                    setSelectedBranch(val);
+                    localStorage.setItem("filter_branch", val);
+                  }}
+                  placeholder="All Branches"
+                />
+              )}
+              {hasPermission(
+                allowedPermissions,
+                "view_asset_category_filter"
+              ) && (
+                <SingleSearchSelect
+                  className="search-selector"
+                  options={[
+                    { value: "", label: "All Asset Categories" },
+                    ...distinctAssetCategories.map((assetCategory) => ({
+                      value: assetCategory,
+                      label: assetCategory,
+                    })),
+                  ]}
+                  value={selectedAssetCategory || null}
+                  onChange={(value) => {
+                    const val = value || "";
+                    setSelectedAssetCategory(val);
+                    localStorage.setItem("filter_assetCategory", val);
+                  }}
+                  placeholder="All Asset Categories"
+                />
+              )}
+              {hasPermission(
+                allowedPermissions,
+                "view_sub_category_filter"
+              ) && (
+                <SingleSearchSelect
+                  className="search-selector"
+                  options={[
+                    { value: "", label: "All Sub Categories" },
+                    ...distinctSubCategories.map((subCategory) => ({
+                      value: subCategory,
+                      label: subCategory,
+                    })),
+                  ]}
+                  value={selectedSubCategory || null}
+                  onChange={(value) => {
+                    const val = value || "";
+                    setSelectedSubCategory(val);
+                    localStorage.setItem("filter_subCategory", val);
+                  }}
+                  placeholder="All Sub Categories"
+                />
+              )}
+              {hasPermission(
+                allowedPermissions,
+                "view_manager_filter"
+              ) && (
+                <SingleSearchSelect
+                  className="search-selector"
+                  options={[
+                    { value: "", label: "All Managers" },
+                    ...distinctManagers.map((manager) => ({
+                      value: manager,
+                      label: manager,
+                    })),
+                  ]}
+                  value={selectedManager || null}
+                  onChange={(value) => {
+                    const val = value || "";
+                    setSelectedManager(val);
+                    localStorage.setItem("filter_manager", val);
+                  }}
+                  placeholder="All Managers"
+                />
+              )}
+              {hasPermission(
+                allowedPermissions,
+                "view_branch_officer_filter"
+              ) && (
+                <SingleSearchSelect
+                  className="search-selector"
+                  options={[
+                    { value: "", label: "All Officers" },
+                    ...distinctOfficers.map((officer) => ({
+                      value: officer,
+                      label: officer,
+                    })),
+                  ]}
+                  value={selectedOfficer || null}
+                  onChange={(value) => {
+                    const val = value || "";
+                    setSelectedOfficer(val);
+                    localStorage.setItem("filter_officer", val);
+                  }}
+                  placeholder="All Officers"
+                />
+              )}
+              {hasPermission(
+                allowedPermissions,
+                "view_field_verifier_filter"
+              ) && (
+                <SingleSearchSelect
+                  className="search-selector"
+                  options={[
+                    { value: "", label: "All Field Verifiers" },
+                    ...distinctFieldVerifiers.map((fieldVerifier) => ({
+                      value: fieldVerifier,
+                      label: fieldVerifier,
+                    })),
+                  ]}
+                  value={selectedFieldVerifier || null}
+                  onChange={(value) => {
+                    const val = value || "";
+                    setSelectedFieldVerifier(val);
+                    localStorage.setItem("filter_fieldVerifier", val);
+                  }}
+                  placeholder="All Field Verifiers"
+                />
+              )}
+              {hasPermission(
+                allowedPermissions,
+                "view_valuer_name_filter"
+              ) && (
+                <SingleSearchSelect
+                  className="search-selector"
+                  options={[
+                    { value: "", label: "All Valuers" },
+                    ...distinctValuerNames.map((valuer) => ({
+                      value: valuer,
+                      label: valuer,
+                    })),
+                  ]}
+                  value={selectedValuerName || null}
+                  onChange={(value) => {
+                    const val = value || "";
+                    setSelectedValuerName(val);
+                    localStorage.setItem("filter_valuerName", val);
+                  }}
+                  placeholder="All Valuers"
+                />
+              )}
+              {hasPermission(
+                allowedPermissions,
+                "view_payment_status_filter"
+              ) && (
+                <SingleSearchSelect
+                  className="search-selector"
+                  options={[
+                    { value: "", label: "All Payment Statuses" },
+                    ...distinctPaymentStatuses.map((paymentStatus) => ({
+                      value: paymentStatus,
+                      label: paymentStatus,
+                    })),
+                  ]}
+                  value={selectedPaymentStatus || null}
+                  onChange={(value) => {
+                    const val = value || "";
+                    setSelectedPaymentStatus(val);
+                    localStorage.setItem("filter_paymentStatus", val);
+                  }}
+                  placeholder="All Payment Statuses"
+                />
+              )}
+              {hasPermission(allowedPermissions, "view_category_filter") && (
+                <SingleSearchSelect
+                  className="search-selector"
+                  options={[
+                    { value: "", label: "All Categories" },
+                    ...distinctCategories.map((category) => ({
+                      value: category,
+                      label: category,
+                    })),
+                  ]}
+                  value={selectedCategory || null}
+                  onChange={(value) => {
+                    const val = value || "";
+                    setSelectedCategory(val);
+                    localStorage.setItem("filter_category", val);
+                  }}
+                  placeholder="All Categories"
+                />
+              )}
+          </div>
+        </div>
+      </div>
+
+      {/* Table Container */}
       {loading ? (
         <p>Loading...</p>
       ) : (
-        <CustomDataTable>
+        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+          <CustomDataTable>
           {{
-            filters: (
-              <div
-                style={{
-                  display: "flex",
-                  gap: "10px",
-                  alignItems: "center",
-                  justifyContent: "flex-end",
-                  flexWrap: "wrap",
-                }}
-              >
-                {hasPermission(
-                  allowedPermissions,
-                  "view_order_type_filter"
-                ) && (
-                  <select
-                    className="form-field type-priority-selector"
-                    value={selectedOrderType}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setSelectedOrderType(value);
-                      localStorage.setItem("filter_orderType", value);
-                    }}
-                  >
-                    <option value="">All Types</option>
-                    <option value="VKA1">VKA1</option>
-                    <option value="VKA2">VKA2</option>
-                    <option value="VKA3">VKA3</option>
-                  </select>
-                )}
-                {hasPermission(
-                  allowedPermissions,
-                  "view_order_priority_filter"
-                ) && (
-                  <select
-                    className="form-field type-priority-selector"
-                    value={selectedPriority}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setSelectedPriority(value);
-                      localStorage.setItem("filter_priority", value);
-                    }}
-                  >
-                    <option value="">All Priorities</option>
-                    <option value="High">High</option>
-                    <option value="Low">Low</option>
-                  </select>
-                )}
-                {hasPermission(allowedPermissions, "view_category_filter") && (
-                  <select
-                    className="form-field type-priority-selector"
-                    value={selectedCategory}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setSelectedCategory(value);
-                      localStorage.setItem("filter_category", value);
-                    }}
-                  >
-                    <option value="">All Categories</option>
-                    {distinctCategories.map((category) => (
-                      <option key={category} value={category}>
-                        {category}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {hasPermission(allowedPermissions, "view_asset_category_filter") && (
-                  <select
-                    className="form-field type-priority-selector"
-                    value={selectedAssetCategory}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setSelectedAssetCategory(value);
-                      localStorage.setItem("filter_assetCategory", value);
-                    }}
-                  >
-                    <option value="">All Asset Categories</option>
-                    {distinctAssetCategories.map((assetCategory) => (
-                      <option key={assetCategory} value={assetCategory}>
-                        {assetCategory}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {hasPermission(allowedPermissions, "view_sub_category_filter") && (
-                  <select
-                    className="form-field type-priority-selector"
-                    value={selectedSubCategory}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setSelectedSubCategory(value);
-                      localStorage.setItem("filter_subCategory", value);
-                    }}
-                  >
-                    <option value="">All Sub Categories</option>
-                    {distinctSubCategories.map((subCategory) => (
-                      <option key={subCategory} value={subCategory}>
-                        {subCategory}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {hasPermission(allowedPermissions, "view_bank_filter") && (
-                  <select
-                    className="form-field type-priority-selector"
-                    value={selectedBank}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setSelectedBank(value);
-                      localStorage.setItem("filter_bank", value);
-                    }}
-                  >
-                    <option value="">All Banks</option>
-                    {distinctBanks.map((bank) => (
-                      <option key={bank} value={bank}>
-                        {bank}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {hasPermission(
-                  allowedPermissions,
-                  "view_bank_branch_filter"
-                ) && (
-                  <select
-                    className="form-field type-priority-selector"
-                    value={selectedBranch}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setSelectedBranch(value);
-                      localStorage.setItem("filter_branch", value);
-                    }}
-                  >
-                    <option value="">All Branches</option>
-                    {distinctBranches.map((branch) => (
-                      <option key={branch} value={branch}>
-                        {branch}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {hasPermission(
-                  allowedPermissions,
-                  "view_branch_officer_filter"
-                ) && (
-                  <select
-                    className="form-field type-priority-selector"
-                    value={selectedOfficer}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setSelectedOfficer(value);
-                      localStorage.setItem("filter_officer", value);
-                    }}
-                  >
-                    <option value="">All Officers</option>
-                    {distinctOfficers.map((officer) => (
-                      <option key={officer} value={officer}>
-                        {officer}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {hasPermission(
-                  allowedPermissions,
-                  "view_manager_filter"
-                ) && (
-                  <select
-                    className="form-field type-priority-selector"
-                    value={selectedManager}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setSelectedManager(value);
-                      localStorage.setItem("filter_manager", value);
-                    }}
-                  >
-                    <option value="">All Managers</option>
-                    {distinctManagers.map((manager) => (
-                      <option key={manager} value={manager}>
-                        {manager}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {hasPermission(
-                  allowedPermissions,
-                  "view_field_verifier_filter"
-                ) && (
-                  <select
-                    className="form-field type-priority-selector"
-                    value={selectedFieldVerifier}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setSelectedFieldVerifier(value);
-                      localStorage.setItem("filter_fieldVerifier", value);
-                    }}
-                  >
-                    <option value="">All Field Verifiers</option>
-                    {distinctFieldVerifiers.map((fieldVerifier) => (
-                      <option key={fieldVerifier} value={fieldVerifier}>
-                        {fieldVerifier}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {hasPermission(
-                  allowedPermissions,
-                  "view_valuer_name_filter"
-                ) && (
-                  <select
-                    className="form-field type-priority-selector"
-                    value={selectedValuerName}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setSelectedValuerName(value);
-                      localStorage.setItem("filter_valuerName", value);
-                    }}
-                  >
-                    <option value="">All Valuers</option>
-                    {distinctValuerNames.map((valuer) => (
-                      <option key={valuer} value={valuer}>
-                        {valuer}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {hasPermission(
-                  allowedPermissions,
-                  "view_status_filter"
-                ) && (
-                  <select
-                    className="form-field type-priority-selector"
-                    value={selectedOrderStatus}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setSelectedOrderStatus(value);
-                      localStorage.setItem("filter_orderStatus", value);
-                    }}
-                  >
-                    <option value="">All Statuses</option>
-                    {distinctOrderStatuses.map((status) => (
-                      <option key={status} value={status}>
-                        {status}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {hasPermission(
-                  allowedPermissions,
-                  "view_payment_status_filter"
-                ) && (
-                  <select
-                    className="form-field type-priority-selector"
-                    value={selectedPaymentStatus}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setSelectedPaymentStatus(value);
-                      localStorage.setItem("filter_paymentStatus", value);
-                    }}
-                  >
-                    <option value="">All Payment Statuses</option>
-                    {distinctPaymentStatuses.map((paymentStatus) => (
-                      <option key={paymentStatus} value={paymentStatus}>
-                        {paymentStatus}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {hasActiveFilters && (
-                  <button
-                    className="btn"
-                    onClick={handleClearFilters}
-                    style={{
-                      marginLeft: "10px",
-                    }}
-                  >
-                    Clear Filters
-                  </button>
-                )}
-              </div>
-            ),
             buttons: (
               <div
                 style={{
@@ -1361,6 +1397,7 @@ function Orders() {
               )),
           }}
         </CustomDataTable>
+        </div>
       )}
 
       {/* 👤 Form Modal (Add/Edit) */}

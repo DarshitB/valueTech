@@ -1,5 +1,175 @@
 @use "../../assets/styles/variables" as *;
 
+// Orders component container - make it adaptive to viewport height
+.order-data-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+
+  .filter-container-card {
+    flex-shrink: 0;
+  }
+
+  // CustomDataTable wrapper should take remaining space
+  > div:last-child {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    
+    // Ensure CustomDataTable fills the wrapper
+    > div {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 20px 30px 20px 20px;
+    }
+  }
+}
+
+// Filter Container Card Styles
+.filter-container-card {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 15px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+
+  .filter-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 15px;
+    align-items: center;
+    .css-b62m3t-container{
+      min-width: 200px;
+    }
+    &:last-child {
+      margin-bottom: 0;
+    }
+
+    &.advanced-filters-content {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+
+      .type-priority-selector,
+      .search-selector {
+        flex: 0 0 calc((100% - 40px) / 5);
+        min-width: calc((100% - 40px) / 5);
+        max-width: calc((100% - 40px) / 5);
+        width: calc((100% - 40px) / 5);
+      }
+    }
+
+    .type-priority-selector {
+      flex: 1 1 calc(20% - 8px);
+      min-width: 150px;
+      max-width: calc(20% - 8px);
+    }
+  }
+
+  .advanced-filters-section {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #ddd;
+
+    .advanced-filters-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
+      padding-bottom: 10px;
+
+      .advanced-filters-title {
+        font-weight: 600;
+        color: #333;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 30px;
+        transition: all 0.3s ease;
+
+        &::before {
+          content: "▶";
+          color: $primary-color;
+          font-size: 10px;
+          transition: transform 0.3s ease;
+          display: inline-block;
+        }
+
+        &.open::before {
+          transform: rotate(90deg);
+        }
+      }
+
+      .clear-filters-btn {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 5px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 500;
+        line-height: 20px;
+        transition: background-color 0.2s;
+        &:hover {
+          background-color: #0056b3;
+        }
+      }
+    }
+
+    .advanced-filters-content {
+      max-height: 0;
+      overflow: hidden;
+      opacity: 0;
+      transition: max-height 0.4s ease-in-out, opacity 0.4s ease-in-out,
+        margin-bottom 0.4s ease-in-out;
+      margin-bottom: 0;
+      visibility: hidden;
+      .css-b62m3t-container {
+        width: calc((100% - 40px) / 5);
+        min-width: 200px;
+      }
+    }
+
+    &.open {
+      .advanced-filters-content {
+        max-height: 1000px;
+        opacity: 1;
+        margin-bottom: 15px;
+        visibility: visible;
+        overflow: visible;
+        border-top: 1px solid #ddd;
+        padding-top: 15px;
+      }
+    }
+  }
+
+  .type-priority-selector {
+    min-width: 150px;
+  }
+
+  // SingleSearchSelect styling in filters
+  .search-selector {
+    min-width: 150px;
+    flex: 1 1 calc(20% - 8px);
+    max-width: calc(20% - 8px);
+
+    .advanced-filters-content & {
+      flex: 0 0 calc((100% - 40px) / 5);
+      min-width: calc((100% - 40px) / 5);
+      max-width: calc((100% - 40px) / 5);
+      width: calc((100% - 40px) / 5);
+    }
+  }
+}
+
 .status-state {
   color: $primary-color;
   border-color: $primary-color;
@@ -39,13 +209,13 @@
   border-radius: 50rem;
   outline: none;
   box-shadow: none;
- /*  width: 110px;
+  /*  width: 110px;
   max-width: 110px;
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap; */
-  
- /*  option {
+
+  /*  option {
     max-width: none;
     overflow: visible;
     white-space: normal;

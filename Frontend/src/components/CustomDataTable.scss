@@ -181,6 +181,9 @@
     .dataTable-table-container {
       .dataTable-table {
         width: max-content;
+        thead {
+          z-index: 0;
+        }
       }
     }
   }
@@ -190,6 +193,9 @@
     .dataTable-table-container {
       .dataTable-table {
         width: max-content;
+        thead {
+          z-index: 0;
+        }
       }
     }
   }
