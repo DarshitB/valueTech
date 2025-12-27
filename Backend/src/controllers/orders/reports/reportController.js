@@ -531,11 +531,25 @@ exports.generateReport = async (req, res, next) => {
         assetMakeIdForDB = newAssetMakeRecord.id;
         assetMakeNameForTemplate = newAssetMakeRecord.name;
       } else if (formData.asset_make) {
-        // If asset_make ID is provided, fetch the name
-        const assetMakeRecord = await AssetMakesForReports.findById(formData.asset_make);
+        // Check if asset_make is a valid integer ID or a name string
+        const assetMakeValue = formData.asset_make;
+        const isNumericId = !isNaN(parseInt(assetMakeValue)) && isFinite(assetMakeValue) && Number.isInteger(Number(assetMakeValue));
+        
+        let assetMakeRecord = null;
+        if (isNumericId) {
+          // If it's a numeric ID, find by ID
+          assetMakeRecord = await AssetMakesForReports.findById(parseInt(assetMakeValue));
+        } else {
+          // If it's a name string, find by name and order type
+          assetMakeRecord = await AssetMakesForReports.findByName(assetMakeValue, requestedReportType);
+        }
+        
         if (assetMakeRecord) {
           assetMakeIdForDB = assetMakeRecord.id;
           assetMakeNameForTemplate = assetMakeRecord.name;
+        } else if (!isNumericId) {
+          // If name not found and it's a string, use it directly as the name
+          assetMakeNameForTemplate = assetMakeValue;
         }
       }
       
@@ -1246,8 +1260,21 @@ exports.saveReportData = async (req, res, next) => {
         
         assetMakeIdForDB = newAssetMakeRecord.id;
       } else if (formData.asset_make) {
-        // If asset_make ID is provided, use it as is
-        assetMakeIdForDB = formData.asset_make;
+        // Check if asset_make is a valid integer ID or a name string
+        const assetMakeValue = formData.asset_make;
+        const isNumericId = !isNaN(parseInt(assetMakeValue)) && isFinite(assetMakeValue) && Number.isInteger(Number(assetMakeValue));
+        
+        if (isNumericId) {
+          // If it's a numeric ID, use it directly
+          assetMakeIdForDB = parseInt(assetMakeValue);
+        } else {
+          // If it's a name string, try to find by name and order type
+          const assetMakeRecord = await AssetMakesForReports.findByName(assetMakeValue, requestedReportType);
+          if (assetMakeRecord) {
+            assetMakeIdForDB = assetMakeRecord.id;
+          }
+          // If not found, assetMakeIdForDB remains null (will not be saved)
+        }
       }
     }
 

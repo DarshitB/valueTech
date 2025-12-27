@@ -352,6 +352,10 @@ function MarineReport() {
 
   // Track fields that were explicitly cleared by the user (date and currency fields)
   const clearedFieldsRef = useRef(new Set());
+  // Refs to track previous generated "in words" values to detect user edits
+  const prevInsurancePolicyWordsRef = useRef("");
+  const prevWarRiskPolicyWordsRef = useRef("");
+  const prevHullMachineryPolicyWordsRef = useRef("");
 
   // Reset form data when component mounts or order ID changes
   useEffect(() => {
@@ -754,31 +758,56 @@ function MarineReport() {
 
   // Sync memoized "in words" values to reportFormData to ensure they're saved
   // This ensures the values are always in sync, especially when loading from API or when currency values change programmatically
+  // Only auto-updates if field is empty or matches previous generated value (preserves user edits)
   useEffect(() => {
     setReportFormData((prev) => {
       const updated = { ...prev };
       let hasChanges = false;
 
-      // Update insured_value_in_words_insurance_policy if it's different
+      // Update insured_value_in_words_insurance_policy only if:
+      // 1. Field is empty, OR
+      // 2. Field matches previous generated value (user hasn't manually edited)
       const currentInsuranceWords = updated.insured_value_in_words_insurance_policy || "";
-      if (currentInsuranceWords !== insurancePolicyAmountInWords) {
+      const shouldUpdateInsurance = 
+        currentInsuranceWords === "" || 
+        currentInsuranceWords === prevInsurancePolicyWordsRef.current;
+      
+      if (shouldUpdateInsurance && currentInsuranceWords !== insurancePolicyAmountInWords) {
         updated.insured_value_in_words_insurance_policy = insurancePolicyAmountInWords;
         hasChanges = true;
       }
+      // Always update ref to track current generated value (even if we don't update form field)
+      prevInsurancePolicyWordsRef.current = insurancePolicyAmountInWords;
 
-      // Update insured_value_in_words_war_risk_policy if it's different
+      // Update insured_value_in_words_war_risk_policy only if:
+      // 1. Field is empty, OR
+      // 2. Field matches previous generated value (user hasn't manually edited)
       const currentWarRiskWords = updated.insured_value_in_words_war_risk_policy || "";
-      if (currentWarRiskWords !== warRiskPolicyAmountInWords) {
+      const shouldUpdateWarRisk = 
+        currentWarRiskWords === "" || 
+        currentWarRiskWords === prevWarRiskPolicyWordsRef.current;
+      
+      if (shouldUpdateWarRisk && currentWarRiskWords !== warRiskPolicyAmountInWords) {
         updated.insured_value_in_words_war_risk_policy = warRiskPolicyAmountInWords;
         hasChanges = true;
       }
+      // Always update ref to track current generated value (even if we don't update form field)
+      prevWarRiskPolicyWordsRef.current = warRiskPolicyAmountInWords;
 
-      // Update insured_value_in_words_hull_machinery_policy if it's different
+      // Update insured_value_in_words_hull_machinery_policy only if:
+      // 1. Field is empty, OR
+      // 2. Field matches previous generated value (user hasn't manually edited)
       const currentHullMachineryWords = updated.insured_value_in_words_hull_machinery_policy || "";
-      if (currentHullMachineryWords !== hullMachineryPolicyAmountInWords) {
+      const shouldUpdateHullMachinery = 
+        currentHullMachineryWords === "" || 
+        currentHullMachineryWords === prevHullMachineryPolicyWordsRef.current;
+      
+      if (shouldUpdateHullMachinery && currentHullMachineryWords !== hullMachineryPolicyAmountInWords) {
         updated.insured_value_in_words_hull_machinery_policy = hullMachineryPolicyAmountInWords;
         hasChanges = true;
       }
+      // Always update ref to track current generated value (even if we don't update form field)
+      prevHullMachineryPolicyWordsRef.current = hullMachineryPolicyAmountInWords;
 
       // Only update if there are actual changes to avoid unnecessary re-renders
       return hasChanges ? updated : prev;
@@ -3740,8 +3769,8 @@ function MarineReport() {
                           type="text"
                           className="form-field"
                           name="insured_value_in_words_insurance_policy"
-                          value={insurancePolicyAmountInWords}
-                          readOnly
+                          value={reportFormData.insured_value_in_words_insurance_policy || ""}
+                          onChange={handleFormChange}
                           placeholder="Amount in Words"
                         />
                       </div>
@@ -3997,8 +4026,8 @@ function MarineReport() {
                           type="text"
                           className="form-field"
                           name="insured_value_in_words_war_risk_policy"
-                          value={warRiskPolicyAmountInWords}
-                          readOnly
+                          value={reportFormData.insured_value_in_words_war_risk_policy || ""}
+                          onChange={handleFormChange}
                           placeholder="Amount in Words"
                         />
                       </div>
@@ -4111,8 +4140,8 @@ function MarineReport() {
                           type="text"
                           className="form-field"
                           name="insured_value_in_words_hull_machinery_policy"
-                          value={hullMachineryPolicyAmountInWords}
-                          readOnly
+                          value={reportFormData.insured_value_in_words_hull_machinery_policy || ""}
+                          onChange={handleFormChange}
                           placeholder="Amount in Words"
                         />
                       </div>

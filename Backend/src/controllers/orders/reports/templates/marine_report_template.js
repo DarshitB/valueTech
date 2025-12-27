@@ -1,4 +1,20 @@
 /**
+ * Helper function to render HTML content from field values
+ * Preserves HTML tags and converts line breaks to <br> tags
+ * This is used by both generateMarineReportHTML and generateFlexibleFieldsForSection
+ */
+const renderFieldValue = (value) => {
+  if (!value) return "";
+  // Convert string to string if it's not already
+  const strValue = String(value);
+  // Replace \r\n and \n with <br> tags for proper line breaks
+  return strValue
+    .replace(/\r\n/g, "<br>")
+    .replace(/\n/g, "<br>")
+    .replace(/\r/g, "<br>");
+};
+
+/**
  * Marine Report Template
  * This template generates HTML for Marine reports
  *
@@ -161,11 +177,13 @@ function generateMarineReportHTML(
     if (!value || value === "null" || value === "undefined" || (typeof value === "string" && value.trim() === "")) {
       return "";
     }
+    // Render field value with HTML support
+    const renderedValue = renderFieldValue(value);
     return `
             <tr>
                 <td width="${labelWidth}" class="text-uppercase">${label}</td>
                 <td width="10%" style="text-align: center;">:</td>
-                <td width="${valueWidth}">${getValue(value)}</td>
+                <td width="${valueWidth}">${renderedValue}</td>
             </tr>
         `;
   };
@@ -964,7 +982,7 @@ function generateMarineReportHTML(
                 generateTableRow(
                   "Insured Value",
                   formData.insured_value_insurance_policy
-                    ? `₹ ${getValue(formData.insured_value_insurance_policy)} ANY CURRENCY VALUE /- (${getValue(formData.insured_value_in_words_insurance_policy)})`
+                    ? `${getValue(formData.insured_value_insurance_policy)} ANY CURRENCY VALUE /- (${getValue(formData.insured_value_in_words_insurance_policy)})`
                     : ""
                 )
               ].join("");
@@ -1038,7 +1056,7 @@ function generateMarineReportHTML(
                 generateTableRow(
                   "Insured Value",
                   formData.insured_value_war_risk_policy
-                    ? `Rs. ${getValue(formData.insured_value_war_risk_policy)}/- (${getValue(formData.insured_value_in_words_war_risk_policy)})`
+                    ? `${getValue(formData.insured_value_war_risk_policy)}/- (${getValue(formData.insured_value_in_words_war_risk_policy)})`
                     : ""
                 )
               ].join("");
@@ -3985,9 +4003,13 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName, getNextMa
 
       if (heading || description || imageUrl) {
         const counterValue = getNextMainCounter ? getNextMainCounter() : (field.field_order || "");
-        html += `<h2><span class="main-counter">${counterValue}</span>. ${heading}</h2>`;
+        // Render heading with HTML support
+        const renderedHeading = renderFieldValue(heading);
+        html += `<h2><span class="main-counter">${counterValue}</span>. ${renderedHeading}</h2>`;
         if (description) {
-          html += `<p>${description}</p>`;
+          // Render description with HTML support
+          const renderedDescription = renderFieldValue(description);
+          html += `<p>${renderedDescription}</p>`;
         }
         if (imageUrl) {
           // Convert relative URLs to absolute if needed
@@ -4014,9 +4036,9 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName, getNextMa
     const tableRows = [];
     
     sectionFields.forEach((field) => {
-      const name = field.field_1 || "";
-      const make = field.field_2 || "";
-      const model = field.field_3 || "";
+      const name = renderFieldValue(field.field_1 || "");
+      const make = renderFieldValue(field.field_2 || "");
+      const model = renderFieldValue(field.field_3 || "");
 
       if (name || make || model) {
         hasData = true;
@@ -4054,11 +4076,11 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName, getNextMa
     const tableRows = [];
     
     sectionFields.forEach((field) => {
-      const certName = field.field_1 || "";
-      const issued = field.field_2 || "";
-      const lastAnnual = field.field_3 || "";
-      const lastIntermediate = field.field_4 || "";
-      const expires = field.field_5 || "";
+      const certName = renderFieldValue(field.field_1 || "");
+      const issued = renderFieldValue(field.field_2 || "");
+      const lastAnnual = renderFieldValue(field.field_3 || "");
+      const lastIntermediate = renderFieldValue(field.field_4 || "");
+      const expires = renderFieldValue(field.field_5 || "");
 
       if (certName || issued || lastAnnual || lastIntermediate || expires) {
         hasData = true;
@@ -4101,7 +4123,8 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName, getNextMa
       const fields = [];
       for (let i = 1; i <= 10; i++) {
         if (field[`field_${i}`]) {
-          fields.push(field[`field_${i}`]);
+          // Render field value with HTML support
+          fields.push(renderFieldValue(field[`field_${i}`]));
         }
       }
 

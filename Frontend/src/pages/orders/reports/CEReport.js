@@ -737,9 +737,12 @@ function CEReport() {
     if (!report) {
       // If no report and fetch is completed, ensure default values are set
       if (reportFetchCompleted && !reportLoading) {
-        // Ensure ref_no_month has a default value if it's empty or null
+        // Ensure ref_no_month and fix_but_flex_heading fields have default values
         setReportFormData((prev) => {
-          if (!prev.ref_no_month || prev.ref_no_month.trim() === "") {
+          const updated = { ...prev };
+          
+          // Ensure ref_no_month has a default value if it's empty or null
+          if (!updated.ref_no_month || updated.ref_no_month.trim() === "") {
             const months = [
               "JAN",
               "FEB",
@@ -755,12 +758,28 @@ function CEReport() {
               "DEC",
             ];
             const currentMonth = new Date().getMonth();
-            return {
-              ...prev,
-              ref_no_month: `SFW-${months[currentMonth]}-`,
-            };
+            updated.ref_no_month = `SFW-${months[currentMonth]}-`;
           }
-          return prev;
+
+          // Ensure fix_but_flex_heading fields always have their default values
+          const defaultHeadingValues = {
+            fix_but_flex_heading_19: "MECHANICAL UNIT CONDITION",
+            fix_but_flex_heading_21: "TOOL KIT AVAILABLE",
+            fix_but_flex_heading_22: " SEATING CAPACITY",
+          };
+
+          Object.entries(defaultHeadingValues).forEach(([fieldName, defaultValue]) => {
+            // If the field is null, undefined, or empty string, use the default value
+            if (
+              !updated[fieldName] ||
+              updated[fieldName] === null ||
+              String(updated[fieldName]).trim() === ""
+            ) {
+              updated[fieldName] = defaultValue;
+            }
+          });
+
+          return updated;
         });
       }
       return; // Gracefully do nothing when data is null
@@ -886,6 +905,25 @@ function CEReport() {
 
         // Try to set the field (both existing and dynamic fields)
         updated[key] = fieldValue;
+      });
+
+      // Ensure fix_but_flex_heading fields always have their default values
+      // These fields should always show their defaults, even if database has null/empty values
+      const defaultHeadingValues = {
+        fix_but_flex_heading_19: "MECHANICAL UNIT CONDITION",
+        fix_but_flex_heading_21: "TOOL KIT AVAILABLE",
+        fix_but_flex_heading_22: " SEATING CAPACITY",
+      };
+
+      Object.entries(defaultHeadingValues).forEach(([fieldName, defaultValue]) => {
+        // If the field is null, undefined, or empty string, use the default value
+        if (
+          !updated[fieldName] ||
+          updated[fieldName] === null ||
+          String(updated[fieldName]).trim() === ""
+        ) {
+          updated[fieldName] = defaultValue;
+        }
       });
 
       // Ensure ref_no_month has a default value if it's empty or null

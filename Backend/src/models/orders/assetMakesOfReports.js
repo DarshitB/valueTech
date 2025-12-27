@@ -29,6 +29,21 @@ const assetMakesForReports = {
     return record;
   },
 
+  // Get asset makes record by name and order type
+  findByName: async (name, orderType) => {
+    const record = await db("asset_makes_for_reports")
+      .leftJoin("users as created_user", "asset_makes_for_reports.created_by", "created_user.id")
+      .where("asset_makes_for_reports.name", name)
+      .where("asset_makes_for_reports.order_type", orderType)
+      .select(
+        "asset_makes_for_reports.*",
+        "created_user.name as created_by_name"
+      )
+      .first();
+
+    return record;
+  },
+
   // Create new asset makes record
   create: async (data) => {
     const [result] = await db("asset_makes_for_reports")
