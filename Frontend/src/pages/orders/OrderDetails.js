@@ -356,11 +356,11 @@ function OrderDetails() {
       let regardsText = "";
 
       if (valuerName.includes("VALUETECH SOLUTIONS")) {
-        regardsText = "Thanks & Regards\nValuetech Solutions";
+        regardsText = "Valuetech Solutions";
       } else if (valuerName.includes("V.K. ASSOCIATES") || valuerName.includes("V K ASSOCIATES")) {
-        regardsText = "Thanks & Regards\nV K Associates";
+        regardsText = "V K Associates";
       } else if (valuerName.includes("VISHAL D. KOTHARI") || valuerName.includes("VISHAL D KOTHARI")) {
-        regardsText = "Thanks & Regards\nVishal D Kothari";
+        regardsText = "Vishal D Kothari";
       }
 
       if (regardsText) {

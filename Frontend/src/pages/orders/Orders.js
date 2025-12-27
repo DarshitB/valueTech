@@ -47,13 +47,13 @@ function Orders() {
 
   // console.log("officers", officers);
 /*   console.log("orders", orders); */
-  // Fetch everything on mount - only if data is not already loaded
+  // Fetch everything on mount - always fetch finalized orders when component mounts
+  // This ensures we get the correct data even if Dashboard's orders are in the store
   useEffect(() => {
-    // Only fetch if data is empty or not loaded
-    // Using a ref-like check to avoid re-fetching on every render
-    if (!orders || orders.length === 0) {
-      dispatch(fetchFinalizedOrders());
-    }
+    // Always fetch finalized orders when Orders component mounts
+    dispatch(fetchFinalizedOrders());
+    
+    // Only fetch other data if not already loaded
     if (!officers || officers.length === 0) {
       dispatch(fetchOfficers());
     }
@@ -67,7 +67,7 @@ function Orders() {
       dispatch(fetchFieldVerifiers());
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatch]); // Only run on mount, not when data changes
+  }, [dispatch]); // Only run on mount
   /* console.log("allChildCategories", allChildCategories); */
   // New/Edit Order State
   const [formData, setFormData] = useState({

@@ -52,14 +52,27 @@ function Dashboard() {
   const { lastRecord: lastAttendance, loading: attendanceLoading } =
     useSelector((state) => state.attendance);
 
-  // Fetch everything on mount
+  // Fetch everything on mount - always fetch orders when Dashboard component mounts
+  // This ensures we get the correct data even if Orders' finalized orders are in the store
   useEffect(() => {
+    // Always fetch orders when Dashboard component mounts
     dispatch(fetchOrders());
-    dispatch(fetchOfficers());
-    dispatch(fetchUsers());
-    dispatch(fetchChildCategories());
-    dispatch(fetchFieldVerifiers());
-  }, [dispatch]);
+    
+    // Only fetch other data if not already loaded
+    if (!officers || officers.length === 0) {
+      dispatch(fetchOfficers());
+    }
+    if (!users || users.length === 0) {
+      dispatch(fetchUsers());
+    }
+    if (!allChildCategories || allChildCategories.length === 0) {
+      dispatch(fetchChildCategories());
+    }
+    if (!fieldVerifiers || fieldVerifiers.length === 0) {
+      dispatch(fetchFieldVerifiers());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch]); // Only run on mount
 
   // Fetch last attendance record on mount
   useEffect(() => {
