@@ -12,6 +12,15 @@ export const fetchOrders = createAsyncThunk(
   }
 );
 
+// Async action: Fetch all finalized orders
+export const fetchFinalizedOrders = createAsyncThunk(
+  "orders/fetchFinalized",
+  async () => {
+    const res = await orderApi.getFinalizedOrders();
+    return res.data;
+  }
+);
+
 // Async action: Fetch a single order by ID
 export const fetchOrderById = createAsyncThunk(
   "orders/fetchById",
@@ -76,6 +85,19 @@ export const fetchOrderMedia = createAsyncThunk(
   async (orderId) => {
     const res = await orderMediaApi.getOrderMedia(orderId);
     return res.data;
+  }
+);
+
+// Async action: Fetch public order media (no authentication required, returns only approved media)
+export const fetchPublicOrderMedia = createAsyncThunk(
+  "orders/fetchPublicMedia",
+  async (orderId, { rejectWithValue }) => {
+    try {
+      const res = await orderMediaApi.getPublicOrderMedia(orderId);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
   }
 );
 
@@ -200,6 +222,21 @@ const orderSlice = createSlice({
         toast.error(`Failed to fetch orders: ${action.payload}`);
       })
 
+      // Fetch finalized orders
+      .addCase(fetchFinalizedOrders.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchFinalizedOrders.fulfilled, (state, action) => {
+        state.list = action.payload;
+        state.loading = false;
+      })
+      .addCase(fetchFinalizedOrders.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+        toast.error(`Failed to fetch finalized orders: ${action.payload}`);
+      })
+
       // Fetch order by ID
       .addCase(fetchOrderById.fulfilled, (state, action) => {
         state.selected = action.payload;
@@ -211,7 +248,7 @@ const orderSlice = createSlice({
       // Add new order
       .addCase(addOrder.fulfilled, (state, action) => {
         state.list.push(action.payload);
-        console.log("action.payload", action.payload);
+        /* console.log("action.payload", action.payload); */
         toast.success(`Order added successfully: Order ID ${action.payload.order_number}`);
       })
       .addCase(addOrder.rejected, (state, action) => {
@@ -270,6 +307,23 @@ const orderSlice = createSlice({
         state.mediaLoading = false;
         state.mediaError = action.payload;
         toast.error(`Failed to fetch order media: ${action.payload}`);
+      })
+
+      // Fetch public order media (no authentication required)
+      .addCase(fetchPublicOrderMedia.pending, (state) => {
+        state.mediaLoading = true;
+        state.mediaError = null;
+      })
+      .addCase(fetchPublicOrderMedia.fulfilled, (state, action) => {
+        // Store the data property since API returns {success: true, data: {...}}
+        // Backend already returns only approved media, so no filtering needed
+        state.media = action.payload.data;
+        state.mediaLoading = false;
+      })
+      .addCase(fetchPublicOrderMedia.rejected, (state, action) => {
+        state.mediaLoading = false;
+        state.mediaError = action.payload;
+        // Don't show toast error for public access to avoid disrupting user experience
       })
 
       // Update order media status

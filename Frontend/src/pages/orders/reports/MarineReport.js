@@ -24,6 +24,109 @@ import { toast } from "react-toastify";
 import "../order.scss";
 import { DeleteIcon, CloseIcon } from "../../../components/icons";
 
+// WYSIWYG Textarea Component - preserves HTML formatting
+const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "", name }) => {
+  const editorRef = useRef(null);
+  const isUpdatingRef = useRef(false);
+
+  // Update content when value prop changes (from external source)
+  useEffect(() => {
+    if (editorRef.current && !isUpdatingRef.current) {
+      const currentContent = editorRef.current.innerHTML;
+      const newContent = value || "";
+      
+      // Only update if the value is different to avoid cursor jumping
+      if (currentContent !== newContent) {
+        const selection = window.getSelection();
+        const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+        const wasFocused = document.activeElement === editorRef.current;
+        
+        isUpdatingRef.current = true;
+        editorRef.current.innerHTML = newContent;
+        
+        // Restore cursor position if it was focused
+        if (wasFocused && range) {
+          try {
+            selection.removeAllRanges();
+            selection.addRange(range);
+          } catch (e) {
+            // Ignore if range is invalid
+          }
+        }
+        
+        setTimeout(() => {
+          isUpdatingRef.current = false;
+        }, 0);
+      }
+    }
+  }, [value]);
+
+  const handleInput = (e) => {
+    if (!isUpdatingRef.current && onChange) {
+      const htmlContent = e.target.innerHTML;
+      onChange({
+        target: {
+          name: name,
+          value: htmlContent,
+        },
+      });
+    }
+  };
+
+  const handlePaste = (e) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData("text/html") || e.clipboardData.getData("text/plain");
+    document.execCommand("insertHTML", false, text);
+  };
+
+  // Handle placeholder display
+  useEffect(() => {
+    if (editorRef.current) {
+      if (!value || value === "" || value === "<br>") {
+        editorRef.current.classList.add("empty");
+      } else {
+        editorRef.current.classList.remove("empty");
+      }
+    }
+  }, [value]);
+
+  return (
+    <>
+      <style>{`
+        .wysiwyg-textarea {
+          min-height: 80px !important;
+          padding: 8px 12px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          outline: none;
+          white-space: pre-wrap;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          background-color: white;
+        }
+        .wysiwyg-textarea:focus {
+          border-color: #5864bd;
+          box-shadow: 0 0 0 2px rgba(88, 100, 189, 0.1);
+        }
+        .wysiwyg-textarea.empty:before {
+          content: attr(data-placeholder);
+          color: #999;
+          pointer-events: none;
+        }
+      `}</style>
+      <div
+        ref={editorRef}
+        contentEditable
+        suppressContentEditableWarning={true}
+        onInput={handleInput}
+        onPaste={handlePaste}
+        className={`form-field wysiwyg-textarea ${className}`}
+        data-placeholder={placeholder}
+      />
+    </>
+  );
+};
+
 function MarineReport() {
   const { id } = useParams();
   const dispatch = useDispatch();
@@ -1110,15 +1213,15 @@ function MarineReport() {
           <div className="col-md-12">
             <div className="form-group">
               <label>Description</label>
-              <textarea
+              <WysiwygTextarea
                 className="form-field"
-                rows="4"
+                rows={4}
                 value={field.field_2 || ""}
                 onChange={(e) =>
                   handleFlexibleFieldChange(field.id, "field_2", e.target.value)
                 }
                 placeholder="Enter description"
-              ></textarea>
+              />
             </div>
           </div>
 
@@ -1511,7 +1614,7 @@ function MarineReport() {
   useLayoutEffect(() => {
     setTitle(
       <>
-        <Link to="/orders" className="text-blue-600 hover:underline">
+        <Link to="/" className="text-blue-600 hover:underline">
           Orders
         </Link>{" "}
         &gt;{" "}
@@ -2387,14 +2490,14 @@ function MarineReport() {
                 <div className="col-md-6">
                   <div className="form-group">
                     <label>Client Name With Full Address </label>
-                    <textarea
+                    <WysiwygTextarea
                       className="form-field"
                       name="client_name_with_full_address"
                       value={reportFormData.client_name_with_full_address || ""}
                       onChange={handleFormChange}
                       placeholder="Enter Client Name With Full Address"
-                      rows="3"
-                    ></textarea>
+                      rows={3}
+                    />
                   </div>
                 </div>
                 <div className="col-md-6">
@@ -2464,14 +2567,14 @@ function MarineReport() {
                 </div>
                 <div className="col-md-6">
                   <div className="form-group">
-                    <textarea
+                    <WysiwygTextarea
                       className="form-field"
                       name="registered_or_proposed_owner"
                       value={reportFormData.registered_or_proposed_owner || ""}
                       onChange={handleFormChange}
                       placeholder="Enter Registered Or Proposed Owner"
-                      rows="3"
-                    ></textarea>
+                      rows={3}
+                    />
                   </div>
                 </div>
                 <div className="col-md-6">
@@ -2481,7 +2584,7 @@ function MarineReport() {
                 </div>
                 <div className="col-md-6">
                   <div className="form-group">
-                    <textarea
+                    <WysiwygTextarea
                       className="form-field"
                       name="registered_or_proposed_owner_address"
                       value={
@@ -2490,8 +2593,8 @@ function MarineReport() {
                       }
                       onChange={handleFormChange}
                       placeholder="Enter Registered Or Proposed Owner Address"
-                      rows="3"
-                    ></textarea>
+                      rows={3}
+                    />
                   </div>
                 </div>
                 <div className="col-md-6">
@@ -3713,7 +3816,7 @@ function MarineReport() {
                 </div>
                 <div className="col-md-6">
                   <div className="form-group">
-                    <textarea
+                    <WysiwygTextarea
                       className="form-field"
                       name="insurer_guarantor_name_address_damage_policy"
                       value={
@@ -3721,8 +3824,8 @@ function MarineReport() {
                       }
                       onChange={handleFormChange}
                       placeholder="Enter Insurer / Guarantor Name & Address"
-                      rows="3"
-                    ></textarea>
+                      rows={3}
+                    />
                   </div>
                 </div>
                 <div className="col-md-6">
@@ -4181,7 +4284,7 @@ function MarineReport() {
                 </div>
                 <div className="col-md-6">
                   <div className="form-group">
-                    <textarea
+                    <WysiwygTextarea
                       className="form-field"
                       name="is_vessel_subject_to_any_conditions"
                       value={
@@ -4189,8 +4292,8 @@ function MarineReport() {
                       }
                       onChange={handleFormChange}
                       placeholder="Enter Is the vessel subject to any conditions of class, class extensions, outstanding memorandums or class recommendations? If yes, give details:"
-                      rows="3"
-                    ></textarea>
+                      rows={3}
+                    />
                   </div>
                 </div>
                 <div className="col-md-6">
@@ -4203,7 +4306,7 @@ function MarineReport() {
                 </div>
                 <div className="col-md-6">
                   <div className="form-group">
-                    <textarea
+                    <WysiwygTextarea
                       className="form-field"
                       name="if_classification_society_changed_name"
                       value={
@@ -4212,8 +4315,8 @@ function MarineReport() {
                       }
                       onChange={handleFormChange}
                       placeholder="Enter If classification society changed, name of previous and date of change:"
-                      rows="3"
-                    ></textarea>
+                      rows={3}
+                    />
                   </div>
                 </div>
                 <div className="col-md-6">
@@ -4225,7 +4328,7 @@ function MarineReport() {
                 </div>
                 <div className="col-md-6">
                   <div className="form-group">
-                    <textarea
+                    <WysiwygTextarea
                       className="form-field"
                       name="does_the_vessel_have_ice_class"
                       value={
@@ -4233,8 +4336,8 @@ function MarineReport() {
                       }
                       onChange={handleFormChange}
                       placeholder="Enter Does the vessel have ice class? If yes, state what level:"
-                      rows="3"
-                    ></textarea>
+                      rows={3}
+                    />
                   </div>
                 </div>
                 <div className="col-md-6">
@@ -4244,14 +4347,14 @@ function MarineReport() {
                 </div>
                 <div className="col-md-6">
                   <div className="form-group">
-                    <textarea
+                    <WysiwygTextarea
                       className="form-field"
                       name="date_place_of_last_dry_dock"
                       value={reportFormData.date_place_of_last_dry_dock || ""}
                       onChange={handleFormChange}
                       placeholder="Enter Date/place of last dry−dock:"
-                      rows="3"
-                    ></textarea>
+                      rows={3}
+                    />
                   </div>
                 </div>
                 <div className="col-md-6">
@@ -4340,7 +4443,7 @@ function MarineReport() {
                 </div>
                 <div className="col-md-6">
                   <div className="form-group">
-                    <textarea
+                    <WysiwygTextarea
                       className="form-field"
                       name="if_ship_has_condition_assessment"
                       value={
@@ -4348,8 +4451,8 @@ function MarineReport() {
                       }
                       onChange={handleFormChange}
                       placeholder="Enter If ship has Condition Assessment Program (CAP), what is the latest overall rating:"
-                      rows="3"
-                    ></textarea>
+                      rows={3}
+                    />
                   </div>
                 </div>
               </div>
@@ -4362,14 +4465,14 @@ function MarineReport() {
                 </div>
                 <div className="col-md-12">
                   <div className="form-group">
-                    <textarea
+                    <WysiwygTextarea
                       className="form-field"
                       name="hull_design"
                       value={reportFormData.hull_design || ""}
                       onChange={handleFormChange}
                       placeholder="Enter Hull Design"
-                      rows="3"
-                    ></textarea>
+                      rows={3}
+                    />
                   </div>
                 </div>
               </div>
@@ -4383,40 +4486,40 @@ function MarineReport() {
                 <div className="col-md-12">
                   <div className="form-group">
                     <label>Present Condition 1</label>
-                    <textarea
+                    <WysiwygTextarea
                       className="form-field"
                       name="present_condition_1"
                       value={reportFormData.present_condition_1 || ""}
                       onChange={handleFormChange}
                       placeholder="Enter Present Condition 1"
-                      rows="5"
-                    ></textarea>
+                      rows={5}
+                    />
                   </div>
                 </div>
                 <div className="col-md-12">
                   <div className="form-group">
                     <label>Present Condition 2</label>
-                    <textarea
+                    <WysiwygTextarea
                       className="form-field"
                       name="present_condition_2"
                       value={reportFormData.present_condition_2 || ""}
                       onChange={handleFormChange}
                       placeholder="Enter Present Condition 2"
-                      rows="5"
-                    ></textarea>
+                      rows={5}
+                    />
                   </div>
                 </div>
                 <div className="col-md-12">
                   <div className="form-group">
                     <label>Present Condition 3</label>
-                    <textarea
+                    <WysiwygTextarea
                       className="form-field"
                       name="present_condition_3"
                       value={reportFormData.present_condition_3 || ""}
                       onChange={handleFormChange}
                       placeholder="Enter Present Condition 3"
-                      rows="5"
-                    ></textarea>
+                      rows={5}
+                    />
                   </div>
                 </div>
               </div>
@@ -4645,14 +4748,14 @@ function MarineReport() {
                 </div>
                 <div className="col-md-12">
                   <div className="form-group">
-                    <textarea
+                    <WysiwygTextarea
                       className="form-field"
                       name="steering_details"
                       value={reportFormData.steering_details || ""}
                       onChange={handleFormChange}
                       placeholder="Enter Details of Steering"
-                      rows="5"
-                    ></textarea>
+                      rows={5}
+                    />
                   </div>
                 </div>
               </div>
@@ -5490,7 +5593,7 @@ function MarineReport() {
                 </div>
                 <div className="col-md-6">
                   <div className="form-group">
-                    <textarea
+                    <WysiwygTextarea
                       className="form-field"
                       name="company_guidelines_for_under_keel_clearance_ukc"
                       value={
@@ -5499,8 +5602,8 @@ function MarineReport() {
                       }
                       onChange={handleFormChange}
                       placeholder="Enter Company Guidelines for Under Keel Clearance (UKC)"
-                      rows="3"
-                    ></textarea>
+                      rows={3}
+                    />
                   </div>
                 </div>
                 <div className="col-md-6">

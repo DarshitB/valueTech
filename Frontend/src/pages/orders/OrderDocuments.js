@@ -1162,7 +1162,7 @@ function OrderDocuments() {
   useLayoutEffect(() => {
     setTitle(
       <>
-        <Link to="/orders" className="text-blue-600 hover:underline">
+        <Link to="/" className="text-blue-600 hover:underline">
           Orders
         </Link>{" "}
         &gt;{" "}
@@ -1205,7 +1205,7 @@ function OrderDocuments() {
       >
         <h3>Invalid Order</h3>
         <p>The order ID provided is not valid.</p>
-        <Link to="/orders" className="btn primary">
+        <Link to="/" className="btn primary">
           Back to Orders
         </Link>
       </div>

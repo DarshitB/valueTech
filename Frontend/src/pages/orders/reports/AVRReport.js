@@ -311,7 +311,7 @@ function AVRReport() {
   useLayoutEffect(() => {
     setTitle(
       <>
-        <Link to="/orders" className="text-blue-600 hover:underline">
+        <Link to="/" className="text-blue-600 hover:underline">
           Orders
         </Link>{" "}
         &gt;{" "}

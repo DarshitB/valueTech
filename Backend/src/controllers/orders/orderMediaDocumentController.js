@@ -430,12 +430,33 @@ exports.upload = [
 /**
  * Get all documents for a specific order
  * GET /api/order-media-document/:orderId
+ * For BANK OFFICER and BANK AUTHORITY: only returns approved reports and collages
+ * For other users: returns all documents
  */
 exports.getCollagesByOrderId = async (req, res, next) => {
   try {
     const { orderId } = req.params;
+    const user = req.user;
 
-    const result = await orderMediaDocument.findByOrderId(parseInt(orderId));
+    // Check if user is BANK OFFICER or BANK AUTHORITY
+    const roleName = (user.role_name || "").toUpperCase();
+    const isBankOfficerOrAuthority = 
+      roleName.includes("BANK OFFICER") || roleName.includes("BANK AUTHORITY");
+
+    let result;
+
+    if (isBankOfficerOrAuthority) {
+      // For BANK OFFICER and BANK AUTHORITY: only get approved reports and collages
+      const allDocuments = await orderMediaDocument.findByOrderId(parseInt(orderId));
+      result = allDocuments.filter(
+        (doc) =>
+          doc.status === "approved" &&
+          (doc.document_type === "report" || doc.document_type === "collage")
+      );
+    } else {
+      // For other users: get all documents
+      result = await orderMediaDocument.findByOrderId(parseInt(orderId));
+    }
 
     res.json({
       success: true,

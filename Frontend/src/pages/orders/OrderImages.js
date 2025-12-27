@@ -35,6 +35,7 @@ import {
   SelectedIcon,
   UploadImageIcon,
   ValidateIcon,
+  ShareIcon,
 } from "../../components/icons";
 import { ZoomIn, Copy } from "lucide-react";
 import Lightbox from "yet-another-react-lightbox";
@@ -298,7 +299,7 @@ function OrderImages() {
   useLayoutEffect(() => {
     setTitle(
       <>
-        <Link to="/orders" className="text-blue-600 hover:underline">
+        <Link to="/" className="text-blue-600 hover:underline">
           Orders
         </Link>{" "}
         &gt;{" "}
@@ -337,6 +338,18 @@ function OrderImages() {
       const fullUrl = getImageUrl(mediaUrl);
       await navigator.clipboard.writeText(fullUrl);
       toast.success("Video URL copied to clipboard!");
+    } catch (err) {
+      console.error("Failed to copy URL:", err);
+      toast.error("Failed to copy URL to clipboard");
+    }
+  };
+
+  // Handle copying public share URL to clipboard
+  const handleShareUrl = async () => {
+    try {
+      const publicUrl = `${window.location.origin}/public/orders/${id}/images`;
+      await navigator.clipboard.writeText(publicUrl);
+      toast.success("Public URL copied to clipboard!");
     } catch (err) {
       console.error("Failed to copy URL:", err);
       toast.error("Failed to copy URL to clipboard");
@@ -733,6 +746,18 @@ function OrderImages() {
                 </button>
               </div>
               <div className="order-images-buttons">
+              {hasPermission(
+                  allowedPermissions,
+                  "share_public_url_of_media_files"
+                ) && (
+                <button
+                  onClick={handleShareUrl}
+                  title="Share Public URL"
+                  className="tooltip-link"
+                >
+                  <ShareIcon />
+                </button>
+                )}
                 {hasPermission(
                   allowedPermissions,
                   "upload_order_media_files"

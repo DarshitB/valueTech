@@ -970,7 +970,7 @@ function CEReport() {
   useLayoutEffect(() => {
     setTitle(
       <>
-        <Link to="/orders" className="text-blue-600 hover:underline">
+        <Link to="/" className="text-blue-600 hover:underline">
           Orders
         </Link>{" "}
         &gt;{" "}
@@ -1491,7 +1491,7 @@ function CEReport() {
           const total = front + middle + rear;
           const word = numberToWords(total);
           value = `${total} (${word})`;
-          console.log("🔍 CEReport Generate - no_of_tyres computed:", value);
+          /* console.log("🔍 CEReport Generate - no_of_tyres computed:", value); */
         }
 
         if (value !== null && value !== "") {
@@ -1694,10 +1694,10 @@ function CEReport() {
           const total = front + middle + rear;
           const word = numberToWords(total);
           defaultValue = `${total} (${word})`;
-          console.log(
+          /* console.log(
             "🔍 CEReport Save - no_of_tyres - Computed value:",
             defaultValue
-          );
+          ); */
         }
         reportData[key] = defaultValue;
       } else {
@@ -1798,14 +1798,14 @@ function CEReport() {
       return;
     }
 
-    console.log("📤 CEReport - Sending to backend - reportData:", reportData);
+    /* console.log("📤 CEReport - Sending to backend - reportData:", reportData);
     console.log(
       "📤 CEReport - amount_in_words in payload:",
       reportData.amount_in_words
-    );
+    ); */
 
     // Debug log for payload
-    console.log("🔍 CEReport Save - Final reportData:", reportData);
+    /* console.log("🔍 CEReport Save - Final reportData:", reportData);
     console.log(
       "🔍 CEReport Save - amount_in_words in payload:",
       reportData.amount_in_words
@@ -1813,7 +1813,7 @@ function CEReport() {
     console.log(
       "🔍 CEReport Save - fair_market_value:",
       reportFormData.fair_market_value
-    );
+    ); */
 
     // Convert reportData object to FormData for multipart submission
     const formData = new FormData();

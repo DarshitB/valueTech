@@ -91,6 +91,28 @@ function Dashboard() {
     ?.toUpperCase()
     .includes("SUPER ADMIN");
 
+  // Check if user has any filter permission
+  const hasAnyFilterPermission = React.useMemo(() => {
+    const filterPermissions = [
+      "view_order_type_filter",
+      "view_order_priority_filter",
+      "view_status_filter",
+      "view_bank_filter",
+      "view_bank_branch_filter",
+      "view_asset_category_filter",
+      "view_sub_category_filter",
+      "view_manager_filter",
+      "view_branch_officer_filter",
+      "view_field_verifier_filter",
+      "view_valuer_name_filter",
+      "view_payment_status_filter",
+      "view_category_filter",
+    ];
+    return filterPermissions.some((permission) =>
+      hasPermission(allowedPermissions, permission)
+    );
+  }, [allowedPermissions]);
+
   // Accordion state for Advanced Filters
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
 
@@ -1408,12 +1430,13 @@ function Dashboard() {
             {hasOrderTablePermission && (
               <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12">
                 {/* Filter Container - Outside dashboard-order-table */}
-                <div className="filter-container-card">
+                {hasAnyFilterPermission && (
+                  <div className="filter-container-card">
                   {/* Top Row Filters */}
                   <div className="filter-row">
                     {hasPermission(
                       allowedPermissions,
-                      "view_order_type_filter_db"
+                      "view_order_type_filter"
                     ) && (
                       <SingleSearchSelect
                         className="search-selector"
@@ -1434,7 +1457,7 @@ function Dashboard() {
                     )}
                     {hasPermission(
                       allowedPermissions,
-                      "view_order_priority_filter_db"
+                      "view_order_priority_filter"
                     ) && (
                       <SingleSearchSelect
                         className="search-selector"
@@ -1474,248 +1497,265 @@ function Dashboard() {
                         placeholder="All Status"
                       />
                     )}
+                    {hasActiveFilters && (
+                      <button
+                        className="btn clear-filters-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleClearFilters();
+                        }}
+                      >
+                        Clear Filters
+                      </button>
+                    )}
                   </div>
 
                   {/* Advanced Filters Section */}
-                  <div className={`advanced-filters-section ${isAdvancedFiltersOpen ? "open" : ""}`}>
-                    <div 
+                  <div
+                    className={`advanced-filters-section ${
+                      isAdvancedFiltersOpen ? "open" : ""
+                    }`}
+                  >
+                    <div
                       className="advanced-filters-header"
-                      onClick={() => setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)}
+                      onClick={() =>
+                        setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)
+                      }
                       style={{ cursor: "pointer" }}
                     >
-                      <span className={`advanced-filters-title ${isAdvancedFiltersOpen ? "open" : ""}`}>
+                      <span
+                        className={`advanced-filters-title ${
+                          isAdvancedFiltersOpen ? "open" : ""
+                        }`}
+                      >
                         Advanced Filters
                       </span>
-                      {hasActiveFilters && (
-                        <button
-                          className="btn clear-filters-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleClearFilters();
-                          }}
-                        >
-                          Clear Filters
-                        </button>
-                      )}
                     </div>
                     <div className="filter-row advanced-filters-content">
-                        {hasPermission(allowedPermissions, "view_bank_filter") && (
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "All Banks" },
-                              ...distinctBanks.map((bank) => ({
-                                value: bank,
-                                label: bank,
-                              })),
-                            ]}
-                            value={selectedBank || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              setSelectedBank(val);
-                              localStorage.setItem("filter_bank", val);
-                            }}
-                            placeholder="All Banks"
-                          />
-                        )}
-                        {hasPermission(
-                          allowedPermissions,
-                          "view_bank_branch_filter"
-                        ) && (
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "All Branches" },
-                              ...distinctBranches.map((branch) => ({
-                                value: branch,
-                                label: branch,
-                              })),
-                            ]}
-                            value={selectedBranch || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              setSelectedBranch(val);
-                              localStorage.setItem("filter_branch", val);
-                            }}
-                            placeholder="All Branches"
-                          />
-                        )}
-                        {hasPermission(
-                          allowedPermissions,
-                          "view_asset_category_filter"
-                        ) && (
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "All Asset Categories" },
-                              ...distinctAssetCategories.map((assetCategory) => ({
-                                value: assetCategory,
-                                label: assetCategory,
-                              })),
-                            ]}
-                            value={selectedAssetCategory || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              setSelectedAssetCategory(val);
-                              localStorage.setItem("filter_assetCategory", val);
-                            }}
-                            placeholder="All Asset Categories"
-                          />
-                        )}
-                        {hasPermission(
-                          allowedPermissions,
-                          "view_sub_category_filter"
-                        ) && (
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "All Sub Categories" },
-                              ...distinctSubCategories.map((subCategory) => ({
-                                value: subCategory,
-                                label: subCategory,
-                              })),
-                            ]}
-                            value={selectedSubCategory || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              setSelectedSubCategory(val);
-                              localStorage.setItem("filter_subCategory", val);
-                            }}
-                            placeholder="All Sub Categories"
-                          />
-                        )}
-                        {hasPermission(
-                          allowedPermissions,
-                          "view_manager_filter"
-                        ) && (
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "All Managers" },
-                              ...distinctManagers.map((manager) => ({
-                                value: manager,
-                                label: manager,
-                              })),
-                            ]}
-                            value={selectedManager || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              setSelectedManager(val);
-                              localStorage.setItem("filter_manager", val);
-                            }}
-                            placeholder="All Managers"
-                          />
-                        )}
-                        {hasPermission(
-                          allowedPermissions,
-                          "view_branch_officer_filter"
-                        ) && (
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "All Officers" },
-                              ...distinctOfficers.map((officer) => ({
-                                value: officer,
-                                label: officer,
-                              })),
-                            ]}
-                            value={selectedOfficer || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              setSelectedOfficer(val);
-                              localStorage.setItem("filter_officer", val);
-                            }}
-                            placeholder="All Officers"
-                          />
-                        )}
-                        {hasPermission(
-                          allowedPermissions,
-                          "view_field_verifier_filter"
-                        ) && (
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "All Field Verifiers" },
-                              ...distinctFieldVerifiers.map((fieldVerifier) => ({
-                                value: fieldVerifier,
-                                label: fieldVerifier,
-                              })),
-                            ]}
-                            value={selectedFieldVerifier || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              setSelectedFieldVerifier(val);
-                              localStorage.setItem("filter_fieldVerifier", val);
-                            }}
-                            placeholder="All Field Verifiers"
-                          />
-                        )}
-                        {hasPermission(
-                          allowedPermissions,
-                          "view_valuer_name_filter"
-                        ) && (
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "All Valuers" },
-                              ...distinctValuerNames.map((valuer) => ({
-                                value: valuer,
-                                label: valuer,
-                              })),
-                            ]}
-                            value={selectedValuerName || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              setSelectedValuerName(val);
-                              localStorage.setItem("filter_valuerName", val);
-                            }}
-                            placeholder="All Valuers"
-                          />
-                        )}
-                        {hasPermission(
-                          allowedPermissions,
-                          "view_payment_status_filter"
-                        ) && (
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "All Payment Statuses" },
-                              ...distinctPaymentStatuses.map((paymentStatus) => ({
-                                value: paymentStatus,
-                                label: paymentStatus,
-                              })),
-                            ]}
-                            value={selectedPaymentStatus || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              setSelectedPaymentStatus(val);
-                              localStorage.setItem("filter_paymentStatus", val);
-                            }}
-                            placeholder="All Payment Statuses"
-                          />
-                        )}
-                        {hasPermission(allowedPermissions, "view_category_filter") && (
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "All Categories" },
-                              ...distinctCategories.map((category) => ({
-                                value: category,
-                                label: category,
-                              })),
-                            ]}
-                            value={selectedCategory || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              setSelectedCategory(val);
-                              localStorage.setItem("filter_category", val);
-                            }}
-                            placeholder="All Categories"
-                          />
-                        )}
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_bank_filter"
+                      ) && (
+                        <SingleSearchSelect
+                          className="search-selector"
+                          options={[
+                            { value: "", label: "All Banks" },
+                            ...distinctBanks.map((bank) => ({
+                              value: bank,
+                              label: bank,
+                            })),
+                          ]}
+                          value={selectedBank || null}
+                          onChange={(value) => {
+                            const val = value || "";
+                            setSelectedBank(val);
+                            localStorage.setItem("filter_bank", val);
+                          }}
+                          placeholder="All Banks"
+                        />
+                      )}
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_bank_branch_filter"
+                      ) && (
+                        <SingleSearchSelect
+                          className="search-selector"
+                          options={[
+                            { value: "", label: "All Branches" },
+                            ...distinctBranches.map((branch) => ({
+                              value: branch,
+                              label: branch,
+                            })),
+                          ]}
+                          value={selectedBranch || null}
+                          onChange={(value) => {
+                            const val = value || "";
+                            setSelectedBranch(val);
+                            localStorage.setItem("filter_branch", val);
+                          }}
+                          placeholder="All Branches"
+                        />
+                      )}
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_asset_category_filter"
+                      ) && (
+                        <SingleSearchSelect
+                          className="search-selector"
+                          options={[
+                            { value: "", label: "All Asset Categories" },
+                            ...distinctAssetCategories.map((assetCategory) => ({
+                              value: assetCategory,
+                              label: assetCategory,
+                            })),
+                          ]}
+                          value={selectedAssetCategory || null}
+                          onChange={(value) => {
+                            const val = value || "";
+                            setSelectedAssetCategory(val);
+                            localStorage.setItem("filter_assetCategory", val);
+                          }}
+                          placeholder="All Asset Categories"
+                        />
+                      )}
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_sub_category_filter"
+                      ) && (
+                        <SingleSearchSelect
+                          className="search-selector"
+                          options={[
+                            { value: "", label: "All Sub Categories" },
+                            ...distinctSubCategories.map((subCategory) => ({
+                              value: subCategory,
+                              label: subCategory,
+                            })),
+                          ]}
+                          value={selectedSubCategory || null}
+                          onChange={(value) => {
+                            const val = value || "";
+                            setSelectedSubCategory(val);
+                            localStorage.setItem("filter_subCategory", val);
+                          }}
+                          placeholder="All Sub Categories"
+                        />
+                      )}
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_manager_filter"
+                      ) && (
+                        <SingleSearchSelect
+                          className="search-selector"
+                          options={[
+                            { value: "", label: "All Managers" },
+                            ...distinctManagers.map((manager) => ({
+                              value: manager,
+                              label: manager,
+                            })),
+                          ]}
+                          value={selectedManager || null}
+                          onChange={(value) => {
+                            const val = value || "";
+                            setSelectedManager(val);
+                            localStorage.setItem("filter_manager", val);
+                          }}
+                          placeholder="All Managers"
+                        />
+                      )}
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_branch_officer_filter"
+                      ) && (
+                        <SingleSearchSelect
+                          className="search-selector"
+                          options={[
+                            { value: "", label: "All Officers" },
+                            ...distinctOfficers.map((officer) => ({
+                              value: officer,
+                              label: officer,
+                            })),
+                          ]}
+                          value={selectedOfficer || null}
+                          onChange={(value) => {
+                            const val = value || "";
+                            setSelectedOfficer(val);
+                            localStorage.setItem("filter_officer", val);
+                          }}
+                          placeholder="All Officers"
+                        />
+                      )}
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_field_verifier_filter"
+                      ) && (
+                        <SingleSearchSelect
+                          className="search-selector"
+                          options={[
+                            { value: "", label: "All Field Verifiers" },
+                            ...distinctFieldVerifiers.map((fieldVerifier) => ({
+                              value: fieldVerifier,
+                              label: fieldVerifier,
+                            })),
+                          ]}
+                          value={selectedFieldVerifier || null}
+                          onChange={(value) => {
+                            const val = value || "";
+                            setSelectedFieldVerifier(val);
+                            localStorage.setItem("filter_fieldVerifier", val);
+                          }}
+                          placeholder="All Field Verifiers"
+                        />
+                      )}
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_valuer_name_filter"
+                      ) && (
+                        <SingleSearchSelect
+                          className="search-selector"
+                          options={[
+                            { value: "", label: "All Valuers" },
+                            ...distinctValuerNames.map((valuer) => ({
+                              value: valuer,
+                              label: valuer,
+                            })),
+                          ]}
+                          value={selectedValuerName || null}
+                          onChange={(value) => {
+                            const val = value || "";
+                            setSelectedValuerName(val);
+                            localStorage.setItem("filter_valuerName", val);
+                          }}
+                          placeholder="All Valuers"
+                        />
+                      )}
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_payment_status_filter"
+                      ) && (
+                        <SingleSearchSelect
+                          className="search-selector"
+                          options={[
+                            { value: "", label: "All Payment Statuses" },
+                            ...distinctPaymentStatuses.map((paymentStatus) => ({
+                              value: paymentStatus,
+                              label: paymentStatus,
+                            })),
+                          ]}
+                          value={selectedPaymentStatus || null}
+                          onChange={(value) => {
+                            const val = value || "";
+                            setSelectedPaymentStatus(val);
+                            localStorage.setItem("filter_paymentStatus", val);
+                          }}
+                          placeholder="All Payment Statuses"
+                        />
+                      )}
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_category_filter"
+                      ) && (
+                        <SingleSearchSelect
+                          className="search-selector"
+                          options={[
+                            { value: "", label: "All Categories" },
+                            ...distinctCategories.map((category) => ({
+                              value: category,
+                              label: category,
+                            })),
+                          ]}
+                          value={selectedCategory || null}
+                          onChange={(value) => {
+                            const val = value || "";
+                            setSelectedCategory(val);
+                            localStorage.setItem("filter_category", val);
+                          }}
+                          placeholder="All Categories"
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
+                )}
 
                 {/* Table Container */}
                 <div className="orders-container dashboard-order-table">
@@ -1894,7 +1934,8 @@ function Dashboard() {
                             // Filter by field verifier if selected
                             const fieldVerifierMatch =
                               !selectedFieldVerifier ||
-                              order.field_verifier_name === selectedFieldVerifier;
+                              order.field_verifier_name ===
+                                selectedFieldVerifier;
 
                             // Filter by valuer name if selected
                             const valuerMatch =
@@ -1913,7 +1954,8 @@ function Dashboard() {
 
                             // Filter by category if selected
                             const categoryMatch =
-                              !selectedCategory || order.category_name === selectedCategory;
+                              !selectedCategory ||
+                              order.category_name === selectedCategory;
 
                             // Filter by asset category if selected
                             const assetCategoryMatch =

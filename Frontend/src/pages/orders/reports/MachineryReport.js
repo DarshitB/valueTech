@@ -874,7 +874,7 @@ function MachineryReport() {
   useLayoutEffect(() => {
     setTitle(
       <>
-        <Link to="/orders" className="text-blue-600 hover:underline">
+        <Link to="/" className="text-blue-600 hover:underline">
           Orders
         </Link>{" "}
         &gt;{" "}
@@ -1627,8 +1627,8 @@ function MachineryReport() {
       return;
     }
 
-    console.log("📤 Sending to backend - reportData:", reportData);
-    console.log("📤 amount_in_words in payload:", reportData.amount_in_words);
+    /* console.log("📤 Sending to backend - reportData:", reportData);
+    console.log("📤 amount_in_words in payload:", reportData.amount_in_words); */
 
     // Clear the tracking set after save (fields will be tracked again if cleared after save)
     clearedFieldsRef.current.clear();

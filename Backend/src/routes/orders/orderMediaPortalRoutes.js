@@ -27,7 +27,16 @@ const upload = multer({
   },
 });
 
-// Apply authentication middleware to all routes
+/**
+ * GET /api/portal/order-media/public/:orderId
+ * Public API to get only approved media records (no authentication required)
+ */
+router.get(
+  "/public/:orderId",
+  orderMediaPortalController.getApprovedOrderMediaPublic
+);
+
+// Apply authentication middleware to all routes below
 router.use(auth);
 
 // Apply permission middleware if needed

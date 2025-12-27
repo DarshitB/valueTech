@@ -151,6 +151,12 @@ function OrderDetails() {
     currentUser?.role?.name.toUpperCase().includes("SUPER ADMIN") ||
     currentUser?.role?.name === "developer_admin";
 
+  // Check if user is BANK AUTHORITY or BANK OFFICER
+  const userRole = currentUser?.role?.name?.toUpperCase() || "";
+  const isBankUser = 
+    userRole.includes("BANK AUTHORITY") || 
+    userRole.includes("BANK OFFICER");
+
   // Select order and comments data from Redux store
   const order = useSelector((state) => state.orders.selected);
   const comments = useSelector((state) => state.orders.comments);
@@ -498,7 +504,7 @@ function OrderDetails() {
   useLayoutEffect(() => {
     setTitle(
       <>
-        <Link to="/orders" className="text-blue-600 hover:underline">
+        <Link to="/" className="text-blue-600 hover:underline">
           Orders
         </Link>{" "}
         &gt; {order && order.order_number ? order.order_number : "-"}
@@ -1793,10 +1799,13 @@ function OrderDetails() {
               ) && <h3>Recent Activity</h3>}
               <div className="recent-activity-buttons">
                 {/* Action buttons for uploading images and reports, validating, etc. */}
+                {/* For BANK AUTHORITY or BANK OFFICER, only show Documents button if status > 12 */}
+                {/* For other users, show normally (if they have permission) */}
                 {hasPermission(
                   allowedPermissions,
                   "view_order_media_documents"
-                ) && (
+                ) && 
+                (!isBankUser || (order?.current_status_id > 12)) && (
                   <Link
                     to={`/orders/${id}/details/documents`}
                     title="Documents"

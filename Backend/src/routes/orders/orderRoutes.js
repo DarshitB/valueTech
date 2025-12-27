@@ -13,6 +13,7 @@ const activityLogger = require("../../middleware/activityLogger"); // Middleware
 router.use(auth);
 
 router.get("/", orderController.getAll);
+router.get("/finalized-orders", orderController.getAllWithStatus13);
 router.get("/:id", orderController.getById);
 router.post(
   "/",

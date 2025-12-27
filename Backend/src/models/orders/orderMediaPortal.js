@@ -22,6 +22,26 @@ const orderMediaPortal = {
       .where({ order_id: orderId }),
 
   /**
+   * Get approved media records for a specific order ID (status = 1)
+   * Returns: Array of approved media records
+   */
+  getApprovedMediaByOrderId: (orderId) =>
+    db("order_media_image_video")
+      .select(
+        "id",
+        "order_id",
+        "uploader_type",
+        "uploader_id",
+        "media_url",
+        "media_type",
+        "status",
+        "created_at",
+        "updated_at",
+        "updated_by"
+      )
+      .where({ order_id: orderId, status: 1 }),
+
+  /**
    * Update status for multiple media records
    * payload: Array of objects with id and status
    * Returns: Promise that resolves to updated records
@@ -88,7 +108,7 @@ const orderMediaPortal = {
    */
   getOrderById: (orderId) =>
     db("orders")
-      .select("id", "order_number", "status")
+      .select("id", "order_number")
       .where("id", orderId)
       .first(),
 

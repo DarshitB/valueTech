@@ -35,4 +35,5 @@ export {
   FolderIcon,
   MoneyIcon,
   MailInputIcon,
+  ShareIcon,
 } from "./Icons";

@@ -23,6 +23,7 @@ import ChildCategories from "../pages/categories/ChildCategories";
 import Officers from "../pages/banks/Officers";
 import OrderDetails from "../pages/orders/OrderDetails";
 import OrderImages from "../pages/orders/OrderImages";
+import PublicOrderImages from "../pages/orders/PublicOrderImages";
 import OrderDocuments from "../pages/orders/OrderDocuments";
 import CVReport from "../pages/orders/reports/CVReport";
 import AVRReport from "../pages/orders/reports/AVRReport";
@@ -36,6 +37,11 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      {/* Public route for order images (no authentication required) */}
+      <Route
+        path="/public/orders/:id/images"
+        element={<PublicOrderImages />}
+      />
       <Route path="/" element={<Layout />}>
         <Route
           index

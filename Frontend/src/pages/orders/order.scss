@@ -19,7 +19,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    
+
     // Ensure CustomDataTable fills the wrapper
     > div {
       flex: 1;
@@ -46,13 +46,15 @@
     flex-wrap: wrap;
     margin-bottom: 15px;
     align-items: center;
-    .css-b62m3t-container{
+    .css-b62m3t-container {
       min-width: 200px;
     }
     &:last-child {
       margin-bottom: 0;
     }
-
+    .clear-filters-btn {
+      margin-left: auto;
+    }
     &.advanced-filters-content {
       display: flex;
       flex-wrap: wrap;
@@ -108,7 +110,7 @@
         }
       }
 
-      .clear-filters-btn {
+      /* .clear-filters-btn {
         background-color: #007bff;
         color: white;
         border: none;
@@ -121,7 +123,7 @@
         &:hover {
           background-color: #0056b3;
         }
-      }
+      } */
     }
 
     .advanced-filters-content {

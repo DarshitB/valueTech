@@ -185,7 +185,6 @@ function generateMarineReportHTML(
   let currentMainCounter = 0;     // Current main section number for sub-counters
   let subCounterMap = {};         // Map to track sub-counter per main section: {1: 0, 3: 0, ...}
   let subCounterSuffixMap = {};   // Map to track suffix letters (A, B, C...) for sub-counters: {1: {6: 'A'}, ...}
-  let customMediaCounter = 0;     // Independent counter for custom-media-counter sections
 
   // Helper to get next main-counter value (only increments if section has data)
   const getNextMainCounter = () => {
@@ -227,12 +226,6 @@ function generateMarineReportHTML(
       return `${currentMainCounter}.${currentSubNum} ${nextSuffix}.`;
     }
     return `${currentMainCounter}.${currentSubNum} ${suffix}.`;
-  };
-
-  // Helper to get next custom-media-counter value (independent)
-  const getNextCustomMediaCounter = () => {
-    customMediaCounter++;
-    return `${customMediaCounter}.0`;
   };
 
   // Helper to check if a section has data (used before incrementing counters)
@@ -3539,36 +3532,36 @@ function generateMarineReportHTML(
             ${generateFlexibleFieldsForSection(
               formData.flexible_fields || [],
               "HEADING_DESCRIPTION_IMAGE",
-              null,
-              getNextCustomMediaCounter
+              getNextMainCounter,
+              null
             )}
 
             ${generateFlexibleFieldsForSection(
               formData.flexible_fields || [],
               "EQUIPMENT_MAKE_MODEL",
-              null,
-              getNextCustomMediaCounter
+              getNextMainCounter,
+              null
             )}
             
             ${generateFlexibleFieldsForSection(
               formData.flexible_fields || [],
               "HEADING_DESCRIPTION_IMAGE_2",
-              null,
-              getNextCustomMediaCounter
+              getNextMainCounter,
+              null
             )}
             
             ${generateFlexibleFieldsForSection(
               formData.flexible_fields || [],
               "EQUIPMENT_MAKE_MODEL_2",
-              null,
-              getNextCustomMediaCounter
+              getNextMainCounter,
+              null
             )}
             
             ${generateFlexibleFieldsForSection(
               formData.flexible_fields || [],
               "HEADING_DESCRIPTION_IMAGE_3",
-              null,
-              getNextCustomMediaCounter
+              getNextMainCounter,
+              null
             )}
         </div>
 
@@ -3946,11 +3939,10 @@ function generateMarineReportHTML(
  * @param {Array} flexibleFields - Array of flexible field objects
  * @param {string} sectionName - The section name to filter fields for
  * @param {Function} getNextMainCounter - Optional function to get next main-counter value
- * @param {Function} getNextCustomMediaCounter - Optional function to get next custom-media-counter value
  * @param {Function} getNextSubCounter - Optional function to get next sub-counter value
  * @returns {string} HTML for flexible fields in the specified section
  */
-function generateFlexibleFieldsForSection(flexibleFields, sectionName, getNextMainCounter = null, getNextCustomMediaCounter = null, getNextSubCounter = null) {
+function generateFlexibleFieldsForSection(flexibleFields, sectionName, getNextMainCounter = null, getNextSubCounter = null) {
   if (!flexibleFields || flexibleFields.length === 0) {
     return "";
   }
@@ -3992,8 +3984,8 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName, getNextMa
       const imageId = field.field_4 || "";
 
       if (heading || description || imageUrl) {
-        const counterValue = getNextCustomMediaCounter ? getNextCustomMediaCounter() : (field.field_order || "");
-        html += `<h2><span class="custome-media-counter">${counterValue}</span>. ${heading}</h2>`;
+        const counterValue = getNextMainCounter ? getNextMainCounter() : (field.field_order || "");
+        html += `<h2><span class="main-counter">${counterValue}</span>. ${heading}</h2>`;
         if (description) {
           html += `<p>${description}</p>`;
         }
@@ -4043,8 +4035,8 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName, getNextMa
     }
     
     const firstField = sectionFields[0];
-    const counterValue = getNextCustomMediaCounter ? getNextCustomMediaCounter() : (firstField.field_order || "");
-    html += `<h2><span class="custome-media-counter">${counterValue}</span>. ${sectionName.replace(/_/g, " ")}</h2>`;
+    const counterValue = getNextMainCounter ? getNextMainCounter() : (firstField.field_order || "");
+    html += `<h2><span class="main-counter">${counterValue}</span>. ${sectionName.replace(/_/g, " ")}</h2>`;
     html += `<table class="border-table">`;
     html += `<tr>
                 <th width="40%" class="text-uppercase">NAME OF EQUIPMENT</th>
@@ -4134,25 +4126,9 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName, getNextMa
       counterClass = "sub-counter";
       counterValue = getNextSubCounter();
     } else {
-      // Determine counter class based on section type
-      counterClass =
-        sectionName.includes("DECK_EQUIPMENT") ||
-        sectionName.includes("TANK_STORAGE") ||
-        sectionName.includes("ADDITIONAL_SAFETY") ||
-        sectionName.includes("COMMUNICATION") ||
-        sectionName.includes("MAIN_ENGINES") ||
-        sectionName.includes("AUXILIARY") ||
-        sectionName.includes("PROPELLER") ||
-        sectionName.includes("MASTER") ||
-        sectionName.includes("ACCESSORIES")
-          ? "main-counter"
-          : "custome-media-counter";
-
-      if (counterClass === "main-counter") {
-        counterValue = getNextMainCounter ? getNextMainCounter() : (sectionFields[0].field_order || "");
-      } else {
-        counterValue = getNextCustomMediaCounter ? getNextCustomMediaCounter() : (sectionFields[0].field_order || "");
-      }
+      // Use main-counter for all sections
+      counterClass = "main-counter";
+      counterValue = getNextMainCounter ? getNextMainCounter() : (sectionFields[0].field_order || "");
     }
 
     html += `<h2><span class="${counterClass}">${counterValue}</span>. ${sectionName.replace(/_/g, " ")}</h2>`;

@@ -508,9 +508,53 @@ async function uploadZip(req, res, next) {
   }
 }
 
+/**
+ * GET /api/portal/order-media/public/:orderId
+ * Public API to get only approved media records for a specific order (no authentication required)
+ */
+async function getApprovedOrderMediaPublic(req, res, next) {
+  try {
+    const { orderId } = req.params;
+
+    if (!orderId) {
+      throw new BadRequestError("Order ID is required");
+    }
+
+    // Validate order ID is a number
+    const orderIdNum = parseInt(orderId);
+    if (isNaN(orderIdNum)) {
+      throw new BadRequestError("Invalid Order ID format");
+    }
+
+    // Check if order exists (basic check without user context)
+    const order = await orderMediaPortal.getOrderById(orderIdNum);
+    if (!order) {
+      throw new NotFoundError("Order not found");
+    }
+
+    // Get only approved media for the order (status = 1)
+    const approvedMediaRecords = await orderMediaPortal.getApprovedMediaByOrderId(orderIdNum);
+
+    res.json({
+      success: true,
+      data: {
+        order: {
+          id: order.id,
+          order_number: order.order_number,
+        },
+        media: approvedMediaRecords,
+        total_count: approvedMediaRecords.length,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getOrderMedia,
   updateMediaStatus,
   getOrderMediaCount,
   uploadZip,
+  getApprovedOrderMediaPublic,
 };

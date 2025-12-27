@@ -86,6 +86,16 @@ exports.getAll = async (req, res, next) => {
   }
 };
 
+// Get All Orders with status 13 based on user role
+exports.getAllWithStatus13 = async (req, res, next) => {
+  try {
+    const orders = await Order.getAllOrdersWithStatus13(req.user);
+    res.json(orders);
+  } catch (err) {
+    next(err);
+  }
+};
+
 // Get All Orders for Mobile App
 exports.getForMobile = async (req, res, next) => {
   try {

@@ -4,6 +4,9 @@ import axios from "./axios"; // Axios instance configured with base URL
 const ENDPOINT = "/api/orders"; // Base endpoint for all state-related requests
 
 export const getOrders = () => axios.get(ENDPOINT); // Fetch all orders
+
+export const getFinalizedOrders = () => axios.get(`${ENDPOINT}/finalized-orders`); // Fetch all finalized orders
+
 export const getOrderById = (id) => axios.get(`${ENDPOINT}/${id}`); // Get order by ID
 export const createOrder = (data) => axios.post(ENDPOINT, data); // Add order
 export const updateOrder = (id, payload) =>
