@@ -31,6 +31,7 @@ import {
   LucideHamburger,
 } from "lucide-react";
 import { usePageTitle } from "../context/PageTitleContext";
+import NotificationDropdown from "../components/NotificationDropdown";
 
 function Layout() {
   /* start get location for add active class */
@@ -83,23 +84,7 @@ function Layout() {
             <h1 className="page-title-heading">{title || pageTitle}</h1>
           </div>
           <ul className="navbar-nav navbar-right">
-            {/* <li className="dropdown dropdown-list-toggle">
-              <span
-                href="#"
-                data-toggle="dropdown"
-                className="nav-link notification-toggle nav-link-lg"
-              >
-                <NotificationBellIcon className="feather feather-bell bell" />
-              </span>
-              <div className="dropdown-menu dropdown-list dropdown-menu-right pullDown">
-                <div className="dropdown-header">
-                  Notifications
-                  <div className="float-right">
-                    <p href="#">Mark All As Read</p>
-                  </div>
-                </div>
-              </div>
-            </li> */}
+            <NotificationDropdown />
             <li className={`dropdown ${userProfile ? "show" : ""}`}>
               <span
                 data-toggle="dropdown"

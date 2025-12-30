@@ -43,6 +43,9 @@ const ordersReportsRoutes = require("./routes/orders/ordersReportsRoutes");
 const customReportRoutes = require("./routes/orders/customReportRoutes");
 const reportCollageUploadRoutes = require("./routes/orders/reportCollageUploadRoutes");
 
+// Notifications routes
+const notificationRoutes = require("./routes/notifications/notificationRoutes");
+
 // Field Verifier routes
 const fieldVerifierPortalOperationsRoutes = require("./routes/fieldVerifier/portalOperationsRoutes");
 const mobileAuthRoutes = require("./routes/fieldVerifier/authRoutes");
@@ -168,6 +171,7 @@ app.use("/api/order-media", orderMediaPortalRoutes);
 app.use("/api/collage-generator", collageGeneratorRoutes);
 app.use("/api/order-media-document", orderMediaDocumentRoutes);
 app.use("/api/asset-makes-of-reports", assetMakesOfReportsRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 /* mobile APIs */
 app.use("/api/mobile/auth", mobileAuthRoutes);

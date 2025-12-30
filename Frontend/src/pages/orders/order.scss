@@ -1473,6 +1473,25 @@
         font-size: 12px;
         letter-spacing: 0.5px;
       }
+      // Registration option buttons styling (match input field style)
+      .registration-option-btn {
+        background-color: #fdfdff;
+        border: 1px solid #a7a7a7;
+        border-radius: 5px;
+        color: #34395e;
+        font-size: 14px;
+        min-height: 38px;
+        transition: all 0.2s ease;
+        width: fit-content;
+        &:hover {
+          background-color: #f1f1f1;
+          border-color: #95a0f4;
+        }
+        &.active {
+          background-color: #878787;
+          color: #fff;
+        }
+      }
     }
     .ref-no-input {
       display: flex;
@@ -1564,4 +1583,7 @@
   100% {
     transform: rotate(360deg);
   }
+}
+.gap-2 {
+  gap: 5px;
 }

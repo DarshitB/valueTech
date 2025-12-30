@@ -3,6 +3,9 @@ const path = require("path");
 const puppeteer = require("puppeteer");
 const multer = require("multer");
 
+// Import database connection
+const db = require("../../../../db");
+
 // Import models and utilities
 const Order = require("../../../models/orders/order");
 const CvReport = require("../../../models/orders/reports/cvReport");
@@ -1177,6 +1180,200 @@ exports.getReportByOrderAndType = async (req, res, next) => {
 };
 
 /**
+ * Get last report by child_category_id and report_type
+ * GET /orders-reports/child-category/:child_category_id/:report_type
+ * 
+ * Returns the most recent report (by created_at) for the given child_category_id and report_type
+ */
+exports.getReportByChildCategoryAndType = async (req, res, next) => {
+  try {
+    const { child_category_id, report_type } = req.params;
+
+    // Validate parameters
+    if (!child_category_id) {
+      throw new BadRequestError("Child category ID is required");
+    }
+
+    if (!report_type) {
+      throw new BadRequestError("Report type is required");
+    }
+
+    const childCategoryId = parseInt(child_category_id);
+    if (isNaN(childCategoryId)) {
+      throw new BadRequestError("Invalid child category ID");
+    }
+
+    // Verify child category exists
+    const childCategory = await db("child_category")
+      .where("id", childCategoryId)
+      .first();
+
+    if (!childCategory) {
+      throw new NotFoundError("Child category not found");
+    }
+
+    let report = null;
+    let orderId = null;
+
+    // Handle different report types
+    switch (report_type.toLowerCase()) {
+      case "report_cv":
+        // Get last CV report for this child_category_id
+        const cvReport = await db("report_cv")
+          .leftJoin("orders", "report_cv.order_id", "orders.id")
+          .leftJoin("users as created_user", "report_cv.created_by", "created_user.id")
+          .leftJoin("users as updated_user", "report_cv.updated_by", "updated_user.id")
+          .where("orders.child_category_id", childCategoryId)
+          .whereNull("orders.deleted_at")
+          .select(
+            "report_cv.*",
+            "orders.order_number",
+            "orders.child_category_id",
+            "created_user.name as created_by_name",
+            "updated_user.name as updated_by_name"
+          )
+          .orderBy("report_cv.created_at", "desc")
+          .first();
+
+        if (cvReport) {
+          orderId = cvReport.order_id;
+          report = await CvReport.findByOrderIdWithFlexibleFields(orderId);
+        }
+        break;
+
+      case "report_avr":
+        const avrReport = await db("report_avr")
+          .leftJoin("orders", "report_avr.order_id", "orders.id")
+          .leftJoin("users as created_user", "report_avr.created_by", "created_user.id")
+          .leftJoin("users as updated_user", "report_avr.updated_by", "updated_user.id")
+          .where("orders.child_category_id", childCategoryId)
+          .whereNull("orders.deleted_at")
+          .select(
+            "report_avr.*",
+            "orders.order_number",
+            "orders.child_category_id",
+            "created_user.name as created_by_name",
+            "updated_user.name as updated_by_name"
+          )
+          .orderBy("report_avr.created_at", "desc")
+          .first();
+
+        if (avrReport) {
+          orderId = avrReport.order_id;
+          report = await AvrReport.findByOrderIdWithFlexibleFields(orderId);
+        }
+        break;
+
+      case "report_machinery":
+        const machineryReport = await db("report_machinery")
+          .leftJoin("orders", "report_machinery.order_id", "orders.id")
+          .leftJoin("users as created_user", "report_machinery.created_by", "created_user.id")
+          .leftJoin("users as updated_user", "report_machinery.updated_by", "updated_user.id")
+          .where("orders.child_category_id", childCategoryId)
+          .whereNull("orders.deleted_at")
+          .select(
+            "report_machinery.*",
+            "orders.order_number",
+            "orders.child_category_id",
+            "created_user.name as created_by_name",
+            "updated_user.name as updated_by_name"
+          )
+          .orderBy("report_machinery.created_at", "desc")
+          .first();
+
+        if (machineryReport) {
+          orderId = machineryReport.order_id;
+          report = await MachineryReport.findByOrderIdWithFlexibleFields(orderId);
+        }
+        break;
+
+      case "report_ce":
+        const ceReport = await db("report_ce")
+          .leftJoin("orders", "report_ce.order_id", "orders.id")
+          .leftJoin("users as created_user", "report_ce.created_by", "created_user.id")
+          .leftJoin("users as updated_user", "report_ce.updated_by", "updated_user.id")
+          .where("orders.child_category_id", childCategoryId)
+          .whereNull("orders.deleted_at")
+          .select(
+            "report_ce.*",
+            "orders.order_number",
+            "orders.child_category_id",
+            "created_user.name as created_by_name",
+            "updated_user.name as updated_by_name"
+          )
+          .orderBy("report_ce.created_at", "desc")
+          .first();
+
+        if (ceReport) {
+          orderId = ceReport.order_id;
+          report = await CeReport.findByOrderIdWithFlexibleFields(orderId);
+        }
+        break;
+
+      case "report_marine":
+        const marineReport = await db("report_marine")
+          .leftJoin("orders", "report_marine.order_id", "orders.id")
+          .leftJoin("users as created_user", "report_marine.created_by", "created_user.id")
+          .leftJoin("users as updated_user", "report_marine.updated_by", "updated_user.id")
+          .where("orders.child_category_id", childCategoryId)
+          .whereNull("orders.deleted_at")
+          .select(
+            "report_marine.*",
+            "orders.order_number",
+            "orders.child_category_id",
+            "created_user.name as created_by_name",
+            "updated_user.name as updated_by_name"
+          )
+          .orderBy("report_marine.created_at", "desc")
+          .first();
+
+        if (marineReport) {
+          orderId = marineReport.order_id;
+          report = await MarineReport.findByOrderIdWithFlexibleFields(orderId);
+        }
+        break;
+
+      default:
+        throw new BadRequestError(
+          `Report type '${report_type}' does not exist`
+        );
+    }
+
+    // If no report found for this child_category_id and report_type
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: `No ${report_type} found for child category ID ${childCategoryId}`,
+        data: null,
+      });
+    }
+
+    // If report has asset_make ID, fetch the name
+    if (report.asset_make) {
+      const assetMakeRecord = await AssetMakesForReports.findById(report.asset_make);
+      if (assetMakeRecord) {
+        report.asset_make_name = assetMakeRecord.name;
+      }
+    }
+
+    // Return the report data
+    res.status(200).json({
+      success: true,
+      message: `${report_type} retrieved successfully for child category`,
+      data: {
+        child_category_id: childCategoryId,
+        child_category_name: childCategory.name,
+        report_type: report_type,
+        order_id: orderId,
+        report: report,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * Save Report Data (step by step, allows partial data)
  * POST /orders-reports/:order_id/save
  * Works exactly like generateReport but saves data without creating PDF
@@ -1646,11 +1843,11 @@ function filterValidReportFields(formData, reportType) {
       'date_of_inspection', 'place_of_inspection',
       'registered_owner_name', 'registered_owner_address', 'proposed_owner_name', 'proposed_owner_address',
       'registration_no', 'registration_date', 'registered_location', 'owner_serial_no',
-      'manufacture_year', 'asset_make', 'model', 'engine_no_detail', 'crane_chassis_no',
+      'manufacture_year', 'asset_make', 'model', 'engine_no_heading','engine_no_detail', 'chassis_no_heading','crane_chassis_no',
       'body_type', 'crane_model_code', 'hours_meter_reading', 'invoice_no_date', 'invoice_no', 'invoice_date',
       'hyp_with', 'hyp_from_date', 'asset_classification', 'no_of_cylinder',
       'engine_condition', 'chassis_condition', 'body_condition', 'cabin_condition',
-      'electrical_condition', 'gear_transmission', 'battery_available', 'gross_machine_weight',
+      'electrical_condition', 'gear_transmission', 'battery_available', 'machine_weight_heading', 'gross_machine_weight',
       'fix_but_flex_heading_1', 'fix_but_flex_value_1', 'fix_but_flex_heading_2', 'fix_but_flex_value_2',
       'fix_but_flex_heading_3', 'fix_but_flex_value_3', 'fix_but_flex_title_1', 'fix_but_flex_title_2',
       'fix_but_flex_title_3', 'fix_but_flex_heading_4', 'fix_but_flex_value_4', 'fix_but_flex_heading_5',
@@ -1669,7 +1866,7 @@ function filterValidReportFields(formData, reportType) {
       'chartered_engineer_certificate', 'fitness_upto',
       'insurance_co_name', 'policy_no', 'insurance_valid_date', 'insured_value', 'insurance_verified',
       'invoice_cost', 'depreciation', 'depreciation_value', 'appraiser_value',
-      'fair_market_value', 'amount_in_words',
+      'fair_market_value_heading', 'fair_market_value', 'amount_in_words',
       'no_of_photograph', 'no_of_collage', 'valuer_comments_remarks',
       'declaration', 'disclaimer', 'chassis_no_pencil_impression'
     ],

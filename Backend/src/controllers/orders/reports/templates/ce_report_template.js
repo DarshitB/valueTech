@@ -161,15 +161,15 @@ function generateCEReportHTML(formData, extraData, bgImageBase64, stampImageBase
             <td colspan="2">${formData.model}</td>
         </tr>
         <tr>
-            <td>ENGINE NO./ DETAIL:</td>
+            <td>${formData.engine_no_heading || "ENGINE NO./ DETAIL:"}</td>
             <td colspan="2">${formData.engine_no_detail}</td>
-            <td>CRANE CHASSIS NO:</td>
+            <td>${formData.chassis_no_heading || "CRANE CHASSIS NO:"}</td>
             <td colspan="2">${formData.crane_chassis_no}</td>
         </tr>
         <tr>
             <td>BODY TYPE:</td>
             <td colspan="2">${formData.body_type}</td>
-            <td>CRANE MODEL CODE:</td>
+            <td>FUEL TYPE:</td>
             <td colspan="2">${formData.crane_model_code || "N/A"}</td>
         </tr>
         <tr>
@@ -231,7 +231,7 @@ function generateCEReportHTML(formData, extraData, bgImageBase64, stampImageBase
         <tr>
             <td>BATTERY AVAILABLE-YES/NO:</td>
             <td colspan="2">${formData.battery_available}</td>
-            <td>GROSS MACHINE WEIGHT:</td>
+            <td>${formData.machine_weight_heading || "GROSS MACHINE WEIGHT:"}</td>
             <td colspan="2">${formData.gross_machine_weight}</td>
         </tr>
         ${
@@ -543,7 +543,7 @@ function generateCEReportHTML(formData, extraData, bgImageBase64, stampImageBase
         <tr>
             <td>APPRAISER VALUE:</td>
             <td colspan="2">Rs. ${formData.appraiser_value}</td>
-            <td>FAIR MARKET VALUE:</td>
+            <td>${formData.fair_market_value_heading || "FAIR MARKET VALUE:"}</td>
             <th colspan="2">Rs. ${formData.fair_market_value}</th>
         </tr>
         <tr>

@@ -173,15 +173,17 @@ function generateCVReportHTML(
         </tr>
         <tr>
             <td>ENGINE NO./ DETAIL:</td>
-            <td colspan="2">${formData.engine_no_detail}</td>
+            <td>${formData.engine_no_detail}</td>
             <td>CHASSIS NO:</td>
-            <td colspan="2">${formData.chassis_no}</td>
+            <td>${formData.chassis_no}</td>
+            <td>BODY TYPE:</td>
+            <td>${formData.body_type}</td>
         </tr>
         <tr>
-            <td>BODY TYPE:</td>
-            <td colspan="2">${formData.body_type}</td>
             <td>CHASSIS NO. & TYPE:</td>
             <td colspan="2">${formData.chassis_no_type || "N/A"}</td>
+            <td>FUEL TYPE:</td>
+            <td colspan="2">${formData.fuel_type || "N/A"}</td>
         </tr>
         <tr>
             <td>KILOMETER READING:</td>

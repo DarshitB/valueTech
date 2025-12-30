@@ -7,6 +7,10 @@ const ENDPOINT = "/api/orders-reports"; // Base endpoint for all order report-re
 export const getOrderReport = (orderId, reportType) => 
   axios.get(`${ENDPOINT}/${orderId}/${reportType}`); // Fetch order report by order ID and report type
 
+// Get order report by child category ID and report type
+export const getOrderReportByChildCategory = (childCategoryId, reportType) => 
+  axios.get(`${ENDPOINT}/child-category/${childCategoryId}/${reportType}`); // Fetch order report by child category ID and report type
+
 // Generate/Create order report 
 export const generateOrderReport = (orderId, data) => 
   axios.post(`${ENDPOINT}/${orderId}/generate`, data, {

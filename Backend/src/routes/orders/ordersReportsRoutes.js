@@ -26,6 +26,19 @@ router.get(
 );
 
 /**
+ * GET /orders-reports/child-category/:child_category_id/:report_type
+ * Get last report by child category ID and report type
+ * Returns the most recent report (by created_at) for the given child_category_id and report_type
+ *
+ * Example: GET /orders-reports/child-category/5/report_cv
+ */
+router.get(
+  "/child-category/:child_category_id/:report_type",
+  /* checkPermission("view_order_reports"), */ // Check permission to view order reports
+  reportController.getReportByChildCategoryAndType
+);
+
+/**
  * POST /orders-reports/:order_id/generate
  * Generate report PDF
  *

@@ -59,7 +59,9 @@ exports.up = async function (knex) {
     table.string("asset_make", 255).nullable();
     table.string("model", 255).nullable();
 
+    table.string("engine_no_heading", 255).nullable();
     table.string("engine_no_detail", 255).nullable();
+    table.string("crane_chassis_heading", 255).nullable();
     table.string("crane_chassis_no", 255).nullable();
     table.string("body_type", 255).nullable();
     table.string("crane_model_code", 255).nullable();
@@ -87,6 +89,7 @@ exports.up = async function (knex) {
     table.string("gear_transmission", 255).nullable();
     
     table.string("battery_available", 255).nullable();
+    table.string("machine_weight_heading", 255).nullable();
     table.string("gross_machine_weight", 255).nullable();
 
     // Fixed but flexible heading/value pairs
@@ -181,6 +184,7 @@ exports.up = async function (knex) {
     table.string("depreciation", 255).nullable();
     table.string("depreciation_value", 255).nullable();
     table.string("appraiser_value", 255).nullable();
+    table.string("fair_market_value_heading", 255).nullable();
     table.string("fair_market_value", 255).nullable();
     table.string("amount_in_words", 255).nullable();
 

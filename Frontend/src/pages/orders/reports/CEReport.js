@@ -11,6 +11,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { fetchOrderById } from "../../../redux/reducers/orderReducer";
 import {
   fetchOrderReport,
+  fetchOrderReportByChildCategory,
   generateOrderReport,
   saveOrderReport,
   clearCurrentReport,
@@ -48,6 +49,12 @@ function CEReport() {
   const [reportFetchCompleted, setReportFetchCompleted] = useState(false);
   // Ref to track if we've seen the report loading state (to ensure we wait for the fetch to actually happen)
   const reportLoadingStartedRef = useRef(false);
+  // State to track if we're in initial loading phase (covers entire form)
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  // Ref to track if we've attempted the child category fallback
+  const childCategoryFallbackAttemptedRef = useRef(false);
+  // Ref to track if we've processed the child category report data
+  const childCategoryDataProcessedRef = useRef(false);
   // Set page title using custom hook
   const { setTitle } = usePageTitle();
 
@@ -58,6 +65,13 @@ function CEReport() {
     // Reset report fetch tracking flags when order changes
     reportLoadingStartedRef.current = false;
     setReportFetchCompleted(false); // Reset state
+    setIsInitialLoading(true); // Reset initial loading state
+    childCategoryFallbackAttemptedRef.current = false; // Reset fallback attempt flag
+    childCategoryDataProcessedRef.current = false; // Reset child category data processed flag
+    // Reset registration field options
+    setRegistrationNoOption(null);
+    setRegistrationDateOption(null);
+    setRegisteredLocationOption(null);
   }, [dispatch, id]);
 
   // Fetch order details when component mounts or ID changes
@@ -149,7 +163,9 @@ function CEReport() {
       asset_make: "",
       model: "",
 
+      engine_no_heading: "Engine No./ Details",
       engine_no_detail: "",
+      chassis_no_heading: "Asset Chassis No",
       crane_chassis_no: "",
       body_type: "",
       crane_model_code: "",
@@ -172,6 +188,7 @@ function CEReport() {
       gear_transmission: "",
 
       battery_available: "YES / TWO", // Fixed read-only value
+      machine_weight_heading: "Gross Machine Weight",
       gross_machine_weight: "",
 
       // FIX BUT FLEX
@@ -509,6 +526,7 @@ function CEReport() {
     gear_transmission: "",
 
     battery_available: "YES / TWO", // Fixed read-only value
+    machine_weight_heading: "Gross Machine Weight",
     gross_machine_weight: "",
 
     // FIX BUT FLEX
@@ -599,6 +617,8 @@ function CEReport() {
     depreciation_value: "",
     appraiser_value: "",
 
+    fair_market_value_heading: "Fair Market Value",
+    fair_market_value_heading: "Fair Market Value",
     fair_market_value: "",
     amount_in_words: "",
     no_of_photograph: "",
@@ -617,6 +637,12 @@ function CEReport() {
 
   // Track fields that were explicitly cleared by the user (date and currency fields)
   const clearedFieldsRef = useRef(new Set());
+
+  // State for registration field options (Not Available / Not Applicable)
+  const [registrationNoOption, setRegistrationNoOption] = useState(null); // null, "NOT_AVAILABLE", "NOT_APPLICABLE"
+  const [registrationDateOption, setRegistrationDateOption] = useState(null);
+  const [registeredLocationOption, setRegisteredLocationOption] =
+    useState(null);
 
   // Auto-populate form data when order data is available
   useEffect(() => {
@@ -694,7 +720,7 @@ function CEReport() {
     reportFetchCompleted,
   ]);
 
-  // Track when the initial report fetch completes
+  // Track when the initial report fetch completes and handle fallback to child category API
   // We need to ensure: (1) fetch has started (reportLoading = true), (2) fetch has completed (reportLoading = false)
   useEffect(() => {
     // Step 1: Mark that loading has started when reportLoading becomes true
@@ -712,6 +738,26 @@ function CEReport() {
       // Add a small delay to ensure Redux state has fully updated
       const timer = setTimeout(() => {
         setReportFetchCompleted(true); // Use setState to trigger re-renders
+
+        // Check if the first API returned null or no report data
+        const report = currentReport?.report;
+        if (
+          !report &&
+          order?.child_category_id &&
+          !childCategoryFallbackAttemptedRef.current
+        ) {
+          // First API returned no data, try fallback to child category API
+          childCategoryFallbackAttemptedRef.current = true;
+          dispatch(
+            fetchOrderReportByChildCategory({
+              childCategoryId: order.child_category_id,
+              reportType: "report_ce",
+            })
+          );
+        } else {
+          // Either we have a report or no child_category_id, so we're done loading
+          setIsInitialLoading(false);
+        }
       }, 300); // Small delay to ensure state propagation
 
       return () => clearTimeout(timer);
@@ -724,23 +770,58 @@ function CEReport() {
         if (!reportFetchCompleted) {
           reportLoadingStartedRef.current = true; // Mark as started
           setReportFetchCompleted(true); // Use setState to trigger re-renders
+
+          // Check if the first API returned null or no report data
+          const report = currentReport?.report;
+          if (
+            !report &&
+            order?.child_category_id &&
+            !childCategoryFallbackAttemptedRef.current
+          ) {
+            // First API returned no data, try fallback to child category API
+            childCategoryFallbackAttemptedRef.current = true;
+            dispatch(
+              fetchOrderReportByChildCategory({
+                childCategoryId: order.child_category_id,
+                reportType: "report_ce",
+              })
+            );
+          } else {
+            // Either we have a report or no child_category_id, so we're done loading
+            setIsInitialLoading(false);
+          }
         }
       }, 1500); // Wait 1.5 seconds before using fallback
 
       return () => clearTimeout(fallbackTimer);
     }
-  }, [reportLoading, currentReport, reportFetchCompleted]);
+  }, [reportLoading, currentReport, reportFetchCompleted, dispatch, order]);
 
   // Populate form data from fetched CE report (if available)
   useEffect(() => {
     const report = currentReport?.report;
+
+    // If we have a report and it belongs to the current order, mark initial loading as complete
+    if (
+      report &&
+      currentReport?.order_id === parseInt(id) &&
+      reportFetchCompleted
+    ) {
+      setIsInitialLoading(false);
+    }
+
     if (!report) {
       // If no report and fetch is completed, ensure default values are set
-      if (reportFetchCompleted && !reportLoading) {
+      // Only do this if we haven't attempted the child category fallback yet
+      if (
+        reportFetchCompleted &&
+        !reportLoading &&
+        !childCategoryFallbackAttemptedRef.current
+      ) {
         // Ensure ref_no_month and fix_but_flex_heading fields have default values
         setReportFormData((prev) => {
           const updated = { ...prev };
-          
+
           // Ensure ref_no_month has a default value if it's empty or null
           if (!updated.ref_no_month || updated.ref_no_month.trim() === "") {
             const months = [
@@ -768,16 +849,18 @@ function CEReport() {
             fix_but_flex_heading_22: " SEATING CAPACITY",
           };
 
-          Object.entries(defaultHeadingValues).forEach(([fieldName, defaultValue]) => {
-            // If the field is null, undefined, or empty string, use the default value
-            if (
-              !updated[fieldName] ||
-              updated[fieldName] === null ||
-              String(updated[fieldName]).trim() === ""
-            ) {
-              updated[fieldName] = defaultValue;
+          Object.entries(defaultHeadingValues).forEach(
+            ([fieldName, defaultValue]) => {
+              // If the field is null, undefined, or empty string, use the default value
+              if (
+                !updated[fieldName] ||
+                updated[fieldName] === null ||
+                String(updated[fieldName]).trim() === ""
+              ) {
+                updated[fieldName] = defaultValue;
+              }
             }
-          });
+          );
 
           return updated;
         });
@@ -888,6 +971,52 @@ function CEReport() {
         // Convert null to empty string
         const fieldValue = value !== null ? value : "";
 
+        // Special handling for registration fields - check for "NOT AVAILABLE" or "NOT APPLICABLE"
+        if (key === "registration_no") {
+          const upperValue = String(fieldValue).toUpperCase().trim();
+          if (upperValue === "NOT AVAILABLE") {
+            setRegistrationNoOption("NOT_AVAILABLE");
+            updated.registration_no = "";
+          } else if (upperValue === "NOT APPLICABLE") {
+            setRegistrationNoOption("NOT_APPLICABLE");
+            updated.registration_no = "";
+          } else {
+            setRegistrationNoOption(null);
+            updated.registration_no = fieldValue;
+          }
+          return;
+        }
+
+        if (key === "registration_date") {
+          const upperValue = String(fieldValue).toUpperCase().trim();
+          if (upperValue === "NOT AVAILABLE") {
+            setRegistrationDateOption("NOT_AVAILABLE");
+            updated.registration_date = "";
+          } else if (upperValue === "NOT APPLICABLE") {
+            setRegistrationDateOption("NOT_APPLICABLE");
+            updated.registration_date = "";
+          } else {
+            setRegistrationDateOption(null);
+            updated.registration_date = fieldValue;
+          }
+          return;
+        }
+
+        if (key === "registered_location") {
+          const upperValue = String(fieldValue).toUpperCase().trim();
+          if (upperValue === "NOT AVAILABLE") {
+            setRegisteredLocationOption("NOT_AVAILABLE");
+            updated.registered_location = "";
+          } else if (upperValue === "NOT APPLICABLE") {
+            setRegisteredLocationOption("NOT_APPLICABLE");
+            updated.registered_location = "";
+          } else {
+            setRegisteredLocationOption(null);
+            updated.registered_location = fieldValue;
+          }
+          return;
+        }
+
         // Special handling for invoice_no_date - split into separate fields
         if (key === "invoice_no_date" && fieldValue) {
           // Parse "12 Dated 12" format
@@ -915,16 +1044,18 @@ function CEReport() {
         fix_but_flex_heading_22: " SEATING CAPACITY",
       };
 
-      Object.entries(defaultHeadingValues).forEach(([fieldName, defaultValue]) => {
-        // If the field is null, undefined, or empty string, use the default value
-        if (
-          !updated[fieldName] ||
-          updated[fieldName] === null ||
-          String(updated[fieldName]).trim() === ""
-        ) {
-          updated[fieldName] = defaultValue;
+      Object.entries(defaultHeadingValues).forEach(
+        ([fieldName, defaultValue]) => {
+          // If the field is null, undefined, or empty string, use the default value
+          if (
+            !updated[fieldName] ||
+            updated[fieldName] === null ||
+            String(updated[fieldName]).trim() === ""
+          ) {
+            updated[fieldName] = defaultValue;
+          }
         }
-      });
+      );
 
       // Ensure ref_no_month has a default value if it's empty or null
       if (!updated.ref_no_month || updated.ref_no_month.trim() === "") {
@@ -1004,6 +1135,166 @@ function CEReport() {
     buildCategorySuffix,
   ]);
 
+  // Handle child category report data (fallback API) - populate only specified fields
+  useEffect(() => {
+    // Only process if:
+    // 1. We attempted the fallback
+    // 2. Loading is complete
+    // 3. We haven't processed this data yet
+    // 4. We have report data
+    if (
+      !childCategoryFallbackAttemptedRef.current ||
+      reportLoading ||
+      childCategoryDataProcessedRef.current ||
+      !currentReport?.report
+    ) {
+      return;
+    }
+
+    // Check if this report doesn't belong to current order (indicating it's from child category)
+    // OR if we attempted fallback and this is the first time we're seeing report data after fallback
+    const report = currentReport.report;
+    const isChildCategoryReport =
+      !currentReport.order_id ||
+      currentReport.order_id !== parseInt(id) ||
+      (childCategoryFallbackAttemptedRef.current &&
+        !childCategoryDataProcessedRef.current);
+
+    if (isChildCategoryReport) {
+      // Mark as processed to avoid re-processing
+      childCategoryDataProcessedRef.current = true;
+
+      // This is the child category report, populate only specified fields
+      setReportFormData((prev) => {
+        const updated = { ...prev };
+
+        // List of fields to populate from child category report
+        // NOTE: registration_no, registration_date, registered_location are handled separately below
+        const fieldsToPopulate = [
+          "engine_no_heading",
+          "chassis_no_heading",
+          "no_of_cylinder",
+          "machine_weight_heading",
+          "fix_but_flex_heading_1",
+          "fix_but_flex_heading_2",
+          "fix_but_flex_heading_3",
+          "fix_but_flex_title_1",
+          "fix_but_flex_title_3",
+          "fix_but_flex_heading_4",
+          "fix_but_flex_heading_5",
+          "fix_but_flex_heading_6",
+          "fix_but_flex_heading_7",
+          "fix_but_flex_heading_8",
+          "fix_but_flex_heading_9",
+          "fix_but_flex_heading_10",
+          "fix_but_flex_heading_11",
+          "fix_but_flex_heading_12",
+          "fix_but_flex_top_heading_13",
+          "fix_but_flex_value_13",
+          "fix_but_flex_value_14",
+          "fix_but_flex_heading_16",
+          "fix_but_flex_heading_17",
+          "fix_but_flex_heading_18",
+          "fix_but_flex_heading_24",
+          "fix_but_flex_heading_25",
+          "fair_market_value_heading",
+        ];
+
+        // Populate non-registration fields
+        fieldsToPopulate.forEach((fieldName) => {
+          if (report[fieldName] !== undefined && report[fieldName] !== null) {
+            updated[fieldName] = report[fieldName];
+          }
+        });
+
+        // Special handling for registration fields - check for "NOT AVAILABLE" or "NOT APPLICABLE"
+        // IMPORTANT: When value is "NOT AVAILABLE" or "NOT APPLICABLE":
+        // 1. Set the button state (so it appears selected in UI)
+        // 2. Leave input field empty (so user sees empty input)
+        // 3. The save/generate functions will check button state and add "NOT AVAILABLE" or "NOT APPLICABLE" to payload
+        if (
+          report.registration_no !== undefined &&
+          report.registration_no !== null
+        ) {
+          const upperValue = String(report.registration_no)
+            .toUpperCase()
+            .trim();
+          if (upperValue === "NOT AVAILABLE") {
+            setRegistrationNoOption("NOT_AVAILABLE");
+            updated.registration_no = ""; // Leave input empty - button state will be used in payload
+          } else if (upperValue === "NOT APPLICABLE") {
+            setRegistrationNoOption("NOT_APPLICABLE");
+            updated.registration_no = ""; // Leave input empty - button state will be used in payload
+          } else {
+            // Regular value - clear button state and set input value
+            setRegistrationNoOption(null);
+            updated.registration_no = report.registration_no;
+          }
+        }
+
+        if (
+          report.registration_date !== undefined &&
+          report.registration_date !== null
+        ) {
+          const upperValue = String(report.registration_date)
+            .toUpperCase()
+            .trim();
+          if (upperValue === "NOT AVAILABLE") {
+            setRegistrationDateOption("NOT_AVAILABLE");
+            updated.registration_date = ""; // Leave input empty - button state will be used in payload
+          } else if (upperValue === "NOT APPLICABLE") {
+            setRegistrationDateOption("NOT_APPLICABLE");
+            updated.registration_date = ""; // Leave input empty - button state will be used in payload
+          } else {
+            // Regular value - clear button state and set input value
+            setRegistrationDateOption(null);
+            updated.registration_date = report.registration_date;
+          }
+        }
+
+        if (
+          report.registered_location !== undefined &&
+          report.registered_location !== null
+        ) {
+          const upperValue = String(report.registered_location)
+            .toUpperCase()
+            .trim();
+          if (upperValue === "NOT AVAILABLE") {
+            setRegisteredLocationOption("NOT_AVAILABLE");
+            updated.registered_location = ""; // Leave input empty - button state will be used in payload
+          } else if (upperValue === "NOT APPLICABLE") {
+            setRegisteredLocationOption("NOT_APPLICABLE");
+            updated.registered_location = ""; // Leave input empty - button state will be used in payload
+          } else {
+            // Regular value - clear button state and set input value
+            setRegisteredLocationOption(null);
+            updated.registered_location = report.registered_location;
+          }
+        }
+
+        return updated;
+      });
+
+      // Mark initial loading as complete
+      setIsInitialLoading(false);
+    }
+  }, [currentReport, reportLoading, id]);
+
+  // Handle case where child category API also returns no data
+  useEffect(() => {
+    if (
+      !reportLoading &&
+      reportFetchCompleted &&
+      childCategoryFallbackAttemptedRef.current &&
+      !currentReport?.report &&
+      !childCategoryDataProcessedRef.current
+    ) {
+      // Child category API also returned no data, remove loader
+      childCategoryDataProcessedRef.current = true; // Mark as processed to prevent re-running
+      setIsInitialLoading(false);
+    }
+  }, [reportLoading, reportFetchCompleted, currentReport]);
+
   // Set page title with breadcrumb navigation
   useLayoutEffect(() => {
     setTitle(
@@ -1066,10 +1357,43 @@ function CEReport() {
     });
   }, [reportFormData.category_suffix]);
 
+  // Handle registration field option buttons
+  const handleRegistrationOption = useCallback((fieldName, option) => {
+    if (fieldName === "registration_no") {
+      setRegistrationNoOption(option);
+      setReportFormData((prev) => ({
+        ...prev,
+        registration_no: "", // Clear input when button is selected
+      }));
+    } else if (fieldName === "registration_date") {
+      setRegistrationDateOption(option);
+      setReportFormData((prev) => ({
+        ...prev,
+        registration_date: "", // Clear input when button is selected
+      }));
+    } else if (fieldName === "registered_location") {
+      setRegisteredLocationOption(option);
+      setReportFormData((prev) => ({
+        ...prev,
+        registered_location: "", // Clear input when button is selected
+      }));
+    }
+  }, []);
+
   // Handle form input changes
   const handleFormChange = useCallback(
     (e) => {
       const { name, value } = e.target;
+
+      // Clear button selection when user types in registration fields
+      if (name === "registration_no" && value) {
+        setRegistrationNoOption(null);
+      } else if (name === "registration_date" && value) {
+        setRegistrationDateOption(null);
+      } else if (name === "registered_location" && value) {
+        setRegisteredLocationOption(null);
+      }
+
       setReportFormData((prev) => {
         let updated = {
           ...prev,
@@ -1247,6 +1571,11 @@ function CEReport() {
   // Handle date input formatting (DD-MM-YYYY)
   const handleDateChange = useCallback((e) => {
     const { name, value } = e.target;
+
+    // Clear button selection when user types in registration_date
+    if (name === "registration_date" && value) {
+      setRegistrationDateOption(null);
+    }
 
     // Allow empty strings to clear the field
     if (!value || value.trim() === "") {
@@ -1429,6 +1758,31 @@ function CEReport() {
         }
       }
 
+      // Validate registration fields - must have either input value or button selected
+      const registrationErrors = [];
+      if (!reportFormData.registration_no && !registrationNoOption) {
+        registrationErrors.push(
+          "Registration No is required. Please enter a value or select an option."
+        );
+      }
+      if (!reportFormData.registration_date && !registrationDateOption) {
+        registrationErrors.push(
+          "Registration Date is required. Please enter a value or select an option."
+        );
+      }
+      if (!reportFormData.registered_location && !registeredLocationOption) {
+        registrationErrors.push(
+          "Registered Location is required. Please enter a value or select an option."
+        );
+      }
+      if (registrationErrors.length > 0) {
+        registrationErrors.forEach((error) => toast.error(error));
+        if (preOpenedTab && !preOpenedTab.closed) {
+          preOpenedTab.close();
+        }
+        return;
+      }
+
       // Validate flexible fields
       const validationErrors = validateFlexibleFields();
       if (validationErrors.length > 0) {
@@ -1519,6 +1873,32 @@ function CEReport() {
         // Special handling for ref_no_code - always use current order values
         if (key === "ref_no_code") {
           value = order?.valuer_name ? getRefNoCode(order.valuer_name) : "";
+        }
+
+        // Handle registration fields with options
+        if (key === "registration_no") {
+          if (registrationNoOption === "NOT_AVAILABLE") {
+            value = "NOT AVAILABLE";
+          } else if (registrationNoOption === "NOT_APPLICABLE") {
+            value = "NOT APPLICABLE";
+          }
+          // If option is null, use the input value (already set above)
+        }
+
+        if (key === "registration_date") {
+          if (registrationDateOption === "NOT_AVAILABLE") {
+            value = "NOT AVAILABLE";
+          } else if (registrationDateOption === "NOT_APPLICABLE") {
+            value = "NOT APPLICABLE";
+          }
+        }
+
+        if (key === "registered_location") {
+          if (registeredLocationOption === "NOT_AVAILABLE") {
+            value = "NOT AVAILABLE";
+          } else if (registeredLocationOption === "NOT_APPLICABLE") {
+            value = "NOT APPLICABLE";
+          }
         }
 
         // Special handling for no_of_tyres - compute from tyre numbers
@@ -1673,11 +2053,36 @@ function CEReport() {
       parseCurrency,
       convertNumberToWordsIndian,
       numberToWords,
+      registrationNoOption,
+      registrationDateOption,
+      registeredLocationOption,
     ]
   );
 
   // Handle save report data
   const handleSaveReport = useCallback(() => {
+    // Validate registration fields - must have either input value or button selected
+    const registrationErrors = [];
+    if (!reportFormData.registration_no && !registrationNoOption) {
+      registrationErrors.push(
+        "Registration No is required. Please enter a value or select an option."
+      );
+    }
+    if (!reportFormData.registration_date && !registrationDateOption) {
+      registrationErrors.push(
+        "Registration Date is required. Please enter a value or select an option."
+      );
+    }
+    if (!reportFormData.registered_location && !registeredLocationOption) {
+      registrationErrors.push(
+        "Registered Location is required. Please enter a value or select an option."
+      );
+    }
+    if (registrationErrors.length > 0) {
+      registrationErrors.forEach((error) => toast.error(error));
+      return;
+    }
+
     // Validate flexible fields
     const validationErrors = validateFlexibleFields();
     if (validationErrors.length > 0) {
@@ -1705,7 +2110,33 @@ function CEReport() {
 
     // Add report form data - only include fields with actual values
     Object.keys(reportFormData).forEach((key) => {
-      const value = reportFormData[key];
+      let value = reportFormData[key];
+
+      // Handle registration fields with options
+      if (key === "registration_no") {
+        if (registrationNoOption === "NOT_AVAILABLE") {
+          value = "NOT AVAILABLE";
+        } else if (registrationNoOption === "NOT_APPLICABLE") {
+          value = "NOT APPLICABLE";
+        }
+        // If option is null, use the input value
+      }
+
+      if (key === "registration_date") {
+        if (registrationDateOption === "NOT_AVAILABLE") {
+          value = "NOT AVAILABLE";
+        } else if (registrationDateOption === "NOT_APPLICABLE") {
+          value = "NOT APPLICABLE";
+        }
+      }
+
+      if (key === "registered_location") {
+        if (registeredLocationOption === "NOT_AVAILABLE") {
+          value = "NOT AVAILABLE";
+        } else if (registeredLocationOption === "NOT_APPLICABLE") {
+          value = "NOT APPLICABLE";
+        }
+      }
 
       // Always include important read-only fields even if empty
       const alwaysIncludeFields = [
@@ -2259,7 +2690,47 @@ function CEReport() {
       <div className="row">
         {/* Reference Number Form Section */}
         <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12 mb-5">
-          <div className="order-report-container">
+          <div
+            className="order-report-container"
+            style={{ position: "relative" }}
+          >
+            {/* Loading Overlay */}
+            {isInitialLoading && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: "rgba(255, 255, 255, 0.9)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 1000,
+                  borderRadius: "4px",
+                }}
+              >
+                <div style={{ textAlign: "center" }}>
+                  <div
+                    className="spinner-border text-primary"
+                    role="status"
+                    style={{ width: "3rem", height: "3rem" }}
+                  >
+                    <span className="sr-only">Loading...</span>
+                  </div>
+                  <p
+                    style={{
+                      marginTop: "1rem",
+                      fontSize: "1.1rem",
+                      color: "#5864bd",
+                    }}
+                  >
+                    Loading report data...
+                  </p>
+                </div>
+              </div>
+            )}
             <div className="d-flex justify-content-between align-items-center">
               <h2>CE Report</h2>
               <Link
@@ -2623,16 +3094,62 @@ function CEReport() {
                     <label htmlFor="registration_no">
                       Registration No <span class="text-danger">*</span>
                     </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="registration_no"
-                      name="registration_no"
-                      value={reportFormData.registration_no}
-                      onChange={handleFormChange}
-                      placeholder="MH01AB1234"
-                      required
-                    />
+                    <div className="d-flex gap-2 align-items-center">
+                      <input
+                        type="text"
+                        className="form-field flex-grow-1"
+                        id="registration_no"
+                        name="registration_no"
+                        value={reportFormData.registration_no}
+                        onChange={handleFormChange}
+                        placeholder="MH01AB1234"
+                        style={{ marginBottom: 0 }}
+                      />
+                      <button
+                        type="button"
+                        className={`form-field registration-option-btn ${
+                          registrationNoOption === "NOT_AVAILABLE"
+                            ? "active"
+                            : ""
+                        }`}
+                        onClick={() =>
+                          handleRegistrationOption(
+                            "registration_no",
+                            "NOT_AVAILABLE"
+                          )
+                        }
+                        style={{
+                          padding: "8px 12px",
+                          whiteSpace: "nowrap",
+                          cursor: "pointer",
+                          marginBottom: 0,
+                        }}
+                      >
+                        Not Available
+                      </button>
+                      <button
+                        type="button"
+                        className={`form-field registration-option-btn ${
+                          registrationNoOption === "NOT_APPLICABLE"
+                            ? "active"
+                            : ""
+                        }`}
+                        onClick={() =>
+                          handleRegistrationOption(
+                            "registration_no",
+                            "NOT_APPLICABLE"
+                          )
+                        }
+                        style={{
+                          padding: "8px 12px",
+                          whiteSpace: "nowrap",
+                          cursor: "pointer",
+                          marginBottom: 0,
+                        }}
+                      >
+                        Not Applicable
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div className="col-md-4">
@@ -2640,17 +3157,63 @@ function CEReport() {
                     <label htmlFor="registration_date">
                       Registration Date <span class="text-danger">*</span>
                     </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="registration_date"
-                      name="registration_date"
-                      value={reportFormData.registration_date}
-                      onChange={handleDateChange}
-                      placeholder="DD-MM-YYYY"
-                      maxLength="10"
-                      required
-                    />
+                    <div className="d-flex gap-2 align-items-center">
+                      <input
+                        type="text"
+                        className="form-field flex-grow-1"
+                        id="registration_date"
+                        name="registration_date"
+                        value={reportFormData.registration_date}
+                        onChange={handleDateChange}
+                        placeholder="DD-MM-YYYY"
+                        maxLength="10"
+                        style={{ marginBottom: 0 }}
+                      />
+                      <button
+                        type="button"
+                        className={`form-field registration-option-btn ${
+                          registrationDateOption === "NOT_AVAILABLE"
+                            ? "active"
+                            : ""
+                        }`}
+                        onClick={() =>
+                          handleRegistrationOption(
+                            "registration_date",
+                            "NOT_AVAILABLE"
+                          )
+                        }
+                        style={{
+                          padding: "8px 12px",
+                          whiteSpace: "nowrap",
+                          cursor: "pointer",
+                          marginBottom: 0,
+                        }}
+                      >
+                        Not Available
+                      </button>
+                      <button
+                        type="button"
+                        className={`form-field registration-option-btn ${
+                          registrationDateOption === "NOT_APPLICABLE"
+                            ? "active"
+                            : ""
+                        }`}
+                        onClick={() =>
+                          handleRegistrationOption(
+                            "registration_date",
+                            "NOT_APPLICABLE"
+                          )
+                        }
+                        style={{
+                          padding: "8px 12px",
+                          whiteSpace: "nowrap",
+                          cursor: "pointer",
+                          marginBottom: 0,
+                        }}
+                      >
+                        Not Applicable
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div className="col-md-4">
@@ -2658,15 +3221,61 @@ function CEReport() {
                     <label htmlFor="registered_location">
                       Registered Location <span class="text-danger">*</span>
                     </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="registered_location"
-                      name="registered_location"
-                      value={reportFormData.registered_location}
-                      onChange={handleFormChange}
-                      required
-                    />
+                    <div className="d-flex gap-2 align-items-center">
+                      <input
+                        type="text"
+                        className="form-field flex-grow-1"
+                        id="registered_location"
+                        name="registered_location"
+                        value={reportFormData.registered_location}
+                        onChange={handleFormChange}
+                        style={{ marginBottom: 0 }}
+                      />
+                      <button
+                        type="button"
+                        className={`form-field registration-option-btn ${
+                          registeredLocationOption === "NOT_AVAILABLE"
+                            ? "active"
+                            : ""
+                        }`}
+                        onClick={() =>
+                          handleRegistrationOption(
+                            "registered_location",
+                            "NOT_AVAILABLE"
+                          )
+                        }
+                        style={{
+                          padding: "8px 12px",
+                          whiteSpace: "nowrap",
+                          cursor: "pointer",
+                          marginBottom: 0,
+                        }}
+                      >
+                        Not Available
+                      </button>
+                      <button
+                        type="button"
+                        className={`form-field registration-option-btn ${
+                          registeredLocationOption === "NOT_APPLICABLE"
+                            ? "active"
+                            : ""
+                        }`}
+                        onClick={() =>
+                          handleRegistrationOption(
+                            "registered_location",
+                            "NOT_APPLICABLE"
+                          )
+                        }
+                        style={{
+                          padding: "8px 12px",
+                          whiteSpace: "nowrap",
+                          cursor: "pointer",
+                          marginBottom: 0,
+                        }}
+                      >
+                        Not Applicable
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2782,15 +3391,38 @@ function CEReport() {
                     <label htmlFor="engine_no_detail">
                       Engine No./ Detail <span class="text-danger">*</span>
                     </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="engine_no_detail"
-                      name="engine_no_detail"
-                      value={reportFormData.engine_no_detail}
-                      onChange={handleFormChange}
-                      required
-                    />
+                    <div className="d-flex gap-2 align-items-center">
+                      <SingleSearchSelect
+                        options={[
+                          {
+                            value: "Engine No./ Details",
+                            label: "Engine No./ Details",
+                          },
+                          {
+                            value: "Motor No./Details",
+                            label: "Motor No./Details",
+                          },
+                        ]}
+                        value={
+                          reportFormData.engine_no_heading ||
+                          "Engine No./ Details"
+                        }
+                        onChange={(value) =>
+                          handleSelectChange("engine_no_heading", value)
+                        }
+                        style={{ minWidth: "150px", flexShrink: 0 }}
+                      />
+                      <input
+                        type="text"
+                        className="form-field flex-grow-1"
+                        id="engine_no_detail"
+                        name="engine_no_detail"
+                        value={reportFormData.engine_no_detail}
+                        onChange={handleFormChange}
+                        required
+                        style={{ marginBottom: 0, width: "auto" }}
+                      />
+                    </div>
                   </div>
                 </div>
                 <div className="col-md-3">
@@ -2798,15 +3430,35 @@ function CEReport() {
                     <label htmlFor="crane_chassis_no">
                       Crane Chassis No <span class="text-danger">*</span>
                     </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="crane_chassis_no"
-                      name="crane_chassis_no"
-                      value={reportFormData.crane_chassis_no}
-                      onChange={handleFormChange}
-                      required
-                    />
+                    <div className="d-flex gap-2 align-items-center">
+                      <SingleSearchSelect
+                        options={[
+                          {
+                            value: "Asset Chassis No",
+                            label: "Asset Chassis No",
+                          },
+                          { value: "Asset Model No", label: "Asset Model No" },
+                        ]}
+                        value={
+                          reportFormData.chassis_no_heading ||
+                          "Asset Chassis No"
+                        }
+                        onChange={(value) =>
+                          handleSelectChange("chassis_no_heading", value)
+                        }
+                        style={{ minWidth: "150px", flexShrink: 0 }}
+                      />
+                      <input
+                        type="text"
+                        className="form-field flex-grow-1"
+                        id="crane_chassis_no"
+                        name="crane_chassis_no"
+                        value={reportFormData.crane_chassis_no}
+                        onChange={handleFormChange}
+                        required
+                        style={{ marginBottom: 0, width: "auto" }}
+                      />
+                    </div>
                   </div>
                 </div>
                 <div className="col-md-3">
@@ -2828,7 +3480,7 @@ function CEReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="crane_model_code">
-                      Crane Model Code <span class="text-danger">*</span>
+                      Fuel Type <span class="text-danger">*</span>
                     </label>
                     <input
                       type="text"
@@ -2990,6 +3642,7 @@ function CEReport() {
                     </label>
                     <SingleSearchSelect
                       options={[
+                        { value: "0 (ZERO)", label: "0 (ZERO)" },
                         { value: "1 (ONE)", label: "1 (ONE)" },
                         { value: "2 (TWO)", label: "2 (TWO)" },
                         { value: "3 (THREE)", label: "3 (THREE)" },
@@ -3000,6 +3653,7 @@ function CEReport() {
                         { value: "8 (EIGHT)", label: "8 (EIGHT)" },
                         { value: "9 (NINE)", label: "9 (NINE)" },
                         { value: "10 (TEN)", label: "10 (TEN)" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.no_of_cylinder}
                       onChange={(value) =>
@@ -3025,6 +3679,7 @@ function CEReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.engine_condition}
                       onChange={(value) =>
@@ -3047,6 +3702,7 @@ function CEReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.chassis_condition}
                       onChange={(value) =>
@@ -3069,6 +3725,7 @@ function CEReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.body_condition}
                       onChange={(value) =>
@@ -3091,6 +3748,7 @@ function CEReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.cabin_condition}
                       onChange={(value) =>
@@ -3113,6 +3771,7 @@ function CEReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.electrical_condition}
                       onChange={(value) =>
@@ -3135,6 +3794,7 @@ function CEReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.gear_transmission}
                       onChange={(value) =>
@@ -3169,15 +3829,38 @@ function CEReport() {
                     <label htmlFor="gross_machine_weight">
                       Gross Machine Weight <span class="text-danger">*</span>
                     </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="gross_machine_weight"
-                      name="gross_machine_weight"
-                      value={reportFormData.gross_machine_weight}
-                      onChange={handleFormChange}
-                      required
-                    />
+                    <div className="d-flex gap-2 align-items-center">
+                      <SingleSearchSelect
+                        options={[
+                          {
+                            value: "Gross Machine Weight",
+                            label: "Gross Machine Weight",
+                          },
+                          {
+                            value: "Gross Vehicle Weight",
+                            label: "Gross Vehicle Weight",
+                          },
+                        ]}
+                        value={
+                          reportFormData.machine_weight_heading ||
+                          "Gross Machine Weight"
+                        }
+                        onChange={(value) =>
+                          handleSelectChange("machine_weight_heading", value)
+                        }
+                        style={{ minWidth: "180px", flexShrink: 0 }}
+                      />
+                      <input
+                        type="text"
+                        className="form-field flex-grow-1"
+                        id="gross_machine_weight"
+                        name="gross_machine_weight"
+                        value={reportFormData.gross_machine_weight}
+                        onChange={handleFormChange}
+                        required
+                        style={{ marginBottom: 0, width: "auto" }}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -4295,16 +4978,36 @@ function CEReport() {
                     <label htmlFor="fair_market_value">
                       Fair Market Value <span class="text-danger">*</span>
                     </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fair_market_value"
-                      name="fair_market_value"
-                      value={reportFormData.fair_market_value}
-                      onChange={handleFormChange}
-                      placeholder="₹ 0.00"
-                      required
-                    />
+                    <div className="d-flex gap-2 align-items-center">
+                      <SingleSearchSelect
+                        options={[
+                          {
+                            value: "Fair Market Value",
+                            label: "Fair Market Value",
+                          },
+                          { value: "Distress Value", label: "Distress Value" },
+                        ]}
+                        value={
+                          reportFormData.fair_market_value_heading ||
+                          "Fair Market Value"
+                        }
+                        onChange={(value) =>
+                          handleSelectChange("fair_market_value_heading", value)
+                        }
+                        style={{ minWidth: "150px", flexShrink: 0 }}
+                      />
+                      <input
+                        type="text"
+                        className="form-field flex-grow-1"
+                        id="fair_market_value"
+                        name="fair_market_value"
+                        value={reportFormData.fair_market_value}
+                        onChange={handleFormChange}
+                        placeholder="₹ 0.00"
+                        required
+                        style={{ marginBottom: 0, width: "auto" }}
+                      />
+                    </div>
                   </div>
                 </div>
                 <div className="col-md-3">

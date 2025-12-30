@@ -15,6 +15,19 @@ export const fetchOrderReport = createAsyncThunk(
   }
 );
 
+// Async action: Fetch order report by child category ID and report type
+export const fetchOrderReportByChildCategory = createAsyncThunk(
+  "orderReports/fetchReportByChildCategory",
+  async ({ childCategoryId, reportType }, { rejectWithValue }) => {
+    try {
+      const res = await orderReportApi.getOrderReportByChildCategory(childCategoryId, reportType);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
 // Async action: Generate/Create order report
 export const generateOrderReport = createAsyncThunk(
   "orderReports/generateReport", 
@@ -106,6 +119,27 @@ const orderReportSlice = createSlice({
         // toast.success(action.payload.message || "Report fetched successfully");
       })
       .addCase(fetchOrderReport.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+        // Allow silent fetches (e.g., when missing report should not toast)
+        const isSilent = Boolean(action.meta?.arg?.silent);
+        if (!isSilent) {
+          toast.error(`Failed to fetch report: ${action.payload}`);
+        }
+      })
+
+      // Fetch order report by child category
+      .addCase(fetchOrderReportByChildCategory.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchOrderReportByChildCategory.fulfilled, (state, action) => {
+        state.loading = false;
+        state.currentReport = action.payload.data;
+        // Optional: Show success toast
+        // toast.success(action.payload.message || "Report fetched successfully");
+      })
+      .addCase(fetchOrderReportByChildCategory.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
         // Allow silent fetches (e.g., when missing report should not toast)

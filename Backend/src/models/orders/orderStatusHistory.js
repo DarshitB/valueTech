@@ -1,4 +1,5 @@
 const db = require("../../../db");
+const { createNotificationsForActivity } = require("../../utils/notificationHelper");
 
 const orderStatusHistory = {
   // Get status history for a specific order
@@ -65,6 +66,31 @@ const orderStatusHistory = {
   // Create new status history entry
   createStatusHistory: async (data) => {
     const [historyEntry] = await db("order_status_history").insert(data).returning("*");
+    
+    // Create notifications for this activity (async, don't wait for it)
+    if (historyEntry && historyEntry.order_id && historyEntry.changed_by) {
+      // Determine notification type
+      let notificationType = "status_change";
+      if (historyEntry.status_id) {
+        notificationType = "status_change";
+      } else if (historyEntry.activity_extra) {
+        notificationType = "update";
+      }
+
+      // Create notifications asynchronously (don't block the main flow)
+      createNotificationsForActivity(
+        historyEntry.order_id,
+        historyEntry.id,
+        historyEntry.changed_by,
+        notificationType,
+        null,
+        null
+      ).catch((error) => {
+        // Log error but don't throw - notification creation should not break the main flow
+        console.error("Error creating notifications for activity:", error);
+      });
+    }
+    
     return historyEntry;
   },
 

@@ -1,0 +1,287 @@
+.notification-dropdown {
+  position: relative;
+
+  .notification-toggle {
+    position: relative;
+    cursor: pointer;
+    padding: 0 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    .bell {
+      color: #6c757d;
+      transition: all 0.3s ease;
+      width: 30px !important;
+      height: 30px !important;
+
+      &.has-new {
+        animation: bellPulse 2s infinite;
+        color: yellow;
+      }
+    }
+
+    .notification-badge {
+      position: absolute;
+      top: 0;
+      right: 2px;
+      background-color: #dc3545;
+      color: white;
+      border-radius: 50%;
+      width: 1.25rem;
+      height: 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: bold;
+      line-height: 1;
+      padding: 0;
+      min-width: 1.25rem;
+      z-index: 1;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      animation: badgePulse 1.5s ease-in-out infinite;
+
+      // Ripple animation effect (like water ripples expanding outward)
+      &::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 1.25rem;
+        height: 1.25rem;
+        border-radius: 50%;
+        background-color: rgba(220, 53, 69, 0.4);
+        animation: badgeRipple 2s infinite;
+        z-index: -1;
+      }
+
+      &::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 1.25rem;
+        height: 1.25rem;
+        border-radius: 50%;
+        background-color: rgba(220, 53, 69, 0.3);
+        animation: badgeRipple 2s infinite 0.5s;
+        z-index: -1;
+      }
+    }
+  }
+
+  .dropdown-menu {
+    min-width: 350px;
+    max-width: 400px;
+    max-height: 500px;
+    overflow-y: auto;
+    padding: 0;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+
+    .dropdown-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem;
+      border-bottom: 1px solid #e9ecef;
+      background-color: #f8f9fa;
+      border-radius: 8px 8px 0 0;
+      font-weight: 600;
+      color: #495057;
+
+      .mark-all-read-btn {
+        background: none;
+        border: none;
+        color: #5864bd;
+        font-size: 0.875rem;
+        cursor: pointer;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        transition: background-color 0.2s;
+
+        &:hover {
+          background-color: #e9ecef;
+        }
+      }
+    }
+
+    .notification-list {
+      max-height: 400px;
+      overflow-y: auto;
+
+      .notification-item {
+        padding: 1rem;
+        border-bottom: 1px solid #f0f0f0;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        position: relative;
+        display: flex;
+        gap: 0.75rem;
+
+        &:hover {
+          background-color: #f8f9fa;
+        }
+
+        &:last-child {
+          border-bottom: none;
+        }
+
+        &.unread {
+          background-color: #f0f7ff;
+          border-left: 3px solid #5864bd;
+
+          .unread-dot {
+            position: absolute;
+            left: 0.5rem;
+            top: 0.5rem;
+            width: 8px;
+            height: 8px;
+            background-color: #dc3545;
+            border-radius: 50%;
+            flex-shrink: 0;
+          }
+        }
+
+        &.read {
+          opacity: 0.8;
+        }
+
+        &.notification-loading,
+        &.notification-empty {
+          justify-content: center;
+          padding: 2rem;
+          cursor: default;
+
+          p {
+            color: #6c757d;
+            margin: 0;
+          }
+        }
+
+        .notification-content {
+          flex: 1;
+          min-width: 0;
+
+          .notification-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+
+            .notification-order-link {
+              font-weight: 600;
+              color: #5864bd;
+              text-decoration: none;
+              font-size: 0.9rem;
+
+              &:hover {
+                text-decoration: underline;
+              }
+            }
+
+            .mark-read-btn {
+              background: none;
+              border: none;
+              color: #6c757d;
+              font-size: 1.25rem;
+              cursor: pointer;
+              padding: 0;
+              width: 20px;
+              height: 20px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              border-radius: 50%;
+              transition: all 0.2s;
+              flex-shrink: 0;
+
+              &:hover {
+                background-color: #e9ecef;
+                color: #495057;
+              }
+            }
+          }
+
+          .notification-description {
+            margin: 0 0 0.5rem 0;
+            color: #495057;
+            font-size: 0.875rem;
+            line-height: 1.4;
+            word-wrap: break-word;
+          }
+
+          .notification-time {
+            margin: 0;
+            color: #6c757d;
+            font-size: 0.75rem;
+          }
+        }
+      }
+    }
+  }
+}
+
+// Bell pulse animation
+@keyframes bellPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+// Badge pulse animation (scale up and down)
+@keyframes badgePulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+}
+
+// Badge ripple animation (like water ripples expanding from center)
+@keyframes badgeRipple {
+  0% {
+    width: 1.25rem;
+    height: 1.25rem;
+    opacity: 0.6;
+  }
+  50% {
+    width: 2rem;
+    height: 2rem;
+    opacity: 0.3;
+  }
+  100% {
+    width: 2.5rem;
+    height: 2.5rem;
+    opacity: 0;
+  }
+}
+
+// Scrollbar styling for notification list
+.notification-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.notification-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.notification-list::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+.notification-list::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
