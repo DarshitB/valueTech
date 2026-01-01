@@ -3392,26 +3392,27 @@ function CEReport() {
                       Engine No./ Detail <span class="text-danger">*</span>
                     </label>
                     <div className="d-flex gap-2 align-items-center">
-                      <SingleSearchSelect
-                        options={[
-                          {
-                            value: "Engine No./ Details",
-                            label: "Engine No./ Details",
-                          },
-                          {
-                            value: "Motor No./Details",
-                            label: "Motor No./Details",
-                          },
-                        ]}
-                        value={
-                          reportFormData.engine_no_heading ||
-                          "Engine No./ Details"
-                        }
-                        onChange={(value) =>
-                          handleSelectChange("engine_no_heading", value)
-                        }
-                        style={{ minWidth: "150px", flexShrink: 0 }}
-                      />
+                      <div style={{ width: "150px", flexShrink: 0 }}>
+                        <SingleSearchSelect
+                          options={[
+                            {
+                              value: "Engine No./ Details",
+                              label: "Engine No./ Details",
+                            },
+                            {
+                              value: "Motor No./Details",
+                              label: "Motor No./Details",
+                            },
+                          ]}
+                          value={
+                            reportFormData.engine_no_heading ||
+                            "Engine No./ Details"
+                          }
+                          onChange={(value) =>
+                            handleSelectChange("engine_no_heading", value)
+                          }
+                        />
+                      </div>
                       <input
                         type="text"
                         className="form-field flex-grow-1"
@@ -3420,7 +3421,7 @@ function CEReport() {
                         value={reportFormData.engine_no_detail}
                         onChange={handleFormChange}
                         required
-                        style={{ marginBottom: 0, width: "auto" }}
+                        style={{ marginBottom: 0, minWidth: 0 }}
                       />
                     </div>
                   </div>
@@ -3431,23 +3432,24 @@ function CEReport() {
                       Crane Chassis No <span class="text-danger">*</span>
                     </label>
                     <div className="d-flex gap-2 align-items-center">
-                      <SingleSearchSelect
-                        options={[
-                          {
-                            value: "Asset Chassis No",
-                            label: "Asset Chassis No",
-                          },
-                          { value: "Asset Model No", label: "Asset Model No" },
-                        ]}
-                        value={
-                          reportFormData.chassis_no_heading ||
-                          "Asset Chassis No"
-                        }
-                        onChange={(value) =>
-                          handleSelectChange("chassis_no_heading", value)
-                        }
-                        style={{ minWidth: "150px", flexShrink: 0 }}
-                      />
+                      <div style={{ width: "150px", flexShrink: 0 }}>
+                        <SingleSearchSelect
+                          options={[
+                            {
+                              value: "Asset Chassis No",
+                              label: "Asset Chassis No",
+                            },
+                            { value: "Asset Model No", label: "Asset Model No" },
+                          ]}
+                          value={
+                            reportFormData.chassis_no_heading ||
+                            "Asset Chassis No"
+                          }
+                          onChange={(value) =>
+                            handleSelectChange("chassis_no_heading", value)
+                          }
+                        />
+                      </div>
                       <input
                         type="text"
                         className="form-field flex-grow-1"
@@ -3456,7 +3458,7 @@ function CEReport() {
                         value={reportFormData.crane_chassis_no}
                         onChange={handleFormChange}
                         required
-                        style={{ marginBottom: 0, width: "auto" }}
+                        style={{ marginBottom: 0, minWidth: 0 }}
                       />
                     </div>
                   </div>
@@ -3830,26 +3832,27 @@ function CEReport() {
                       Gross Machine Weight <span class="text-danger">*</span>
                     </label>
                     <div className="d-flex gap-2 align-items-center">
-                      <SingleSearchSelect
-                        options={[
-                          {
-                            value: "Gross Machine Weight",
-                            label: "Gross Machine Weight",
-                          },
-                          {
-                            value: "Gross Vehicle Weight",
-                            label: "Gross Vehicle Weight",
-                          },
-                        ]}
-                        value={
-                          reportFormData.machine_weight_heading ||
-                          "Gross Machine Weight"
-                        }
-                        onChange={(value) =>
-                          handleSelectChange("machine_weight_heading", value)
-                        }
-                        style={{ minWidth: "180px", flexShrink: 0 }}
-                      />
+                      <div style={{ width: "200px", flexShrink: 0 }}>
+                        <SingleSearchSelect
+                          options={[
+                            {
+                              value: "Gross Machine Weight",
+                              label: "Gross Machine Weight",
+                            },
+                            {
+                              value: "Gross Vehicle Weight",
+                              label: "Gross Vehicle Weight",
+                            },
+                          ]}
+                          value={
+                            reportFormData.machine_weight_heading ||
+                            "Gross Machine Weight"
+                          }
+                          onChange={(value) =>
+                            handleSelectChange("machine_weight_heading", value)
+                          }
+                        />
+                      </div>
                       <input
                         type="text"
                         className="form-field flex-grow-1"
@@ -3858,7 +3861,7 @@ function CEReport() {
                         value={reportFormData.gross_machine_weight}
                         onChange={handleFormChange}
                         required
-                        style={{ marginBottom: 0, width: "auto" }}
+                        style={{ marginBottom: 0, minWidth: 0 }}
                       />
                     </div>
                   </div>
@@ -4979,23 +4982,24 @@ function CEReport() {
                       Fair Market Value <span class="text-danger">*</span>
                     </label>
                     <div className="d-flex gap-2 align-items-center">
-                      <SingleSearchSelect
-                        options={[
-                          {
-                            value: "Fair Market Value",
-                            label: "Fair Market Value",
-                          },
-                          { value: "Distress Value", label: "Distress Value" },
-                        ]}
-                        value={
-                          reportFormData.fair_market_value_heading ||
-                          "Fair Market Value"
-                        }
-                        onChange={(value) =>
-                          handleSelectChange("fair_market_value_heading", value)
-                        }
-                        style={{ minWidth: "150px", flexShrink: 0 }}
-                      />
+                      <div style={{ width: "150px", flexShrink: 0 }}>
+                        <SingleSearchSelect
+                          options={[
+                            {
+                              value: "Fair Market Value",
+                              label: "Fair Market Value",
+                            },
+                            { value: "Distress Value", label: "Distress Value" },
+                          ]}
+                          value={
+                            reportFormData.fair_market_value_heading ||
+                            "Fair Market Value"
+                          }
+                          onChange={(value) =>
+                            handleSelectChange("fair_market_value_heading", value)
+                          }
+                        />
+                      </div>
                       <input
                         type="text"
                         className="form-field flex-grow-1"
@@ -5005,7 +5009,7 @@ function CEReport() {
                         onChange={handleFormChange}
                         placeholder="₹ 0.00"
                         required
-                        style={{ marginBottom: 0, width: "auto" }}
+                        style={{ marginBottom: 0, minWidth: 0 }}
                       />
                     </div>
                   </div>

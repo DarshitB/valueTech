@@ -4,7 +4,7 @@ const notification = {
   // Get ALL notifications (read + unread) for a user with optional last_check filter
   // Filter based on order permissions (same logic as order model)
   getAllNotificationsWithFilter: async (userId, userRole, user, options = {}) => {
-    const { last_check, limit = 50, offset = 0 } = options;
+    const { last_check, limit = 200, offset = 0 } = options;
     
     try {
       const roleName = (userRole || "").toUpperCase();
@@ -248,7 +248,7 @@ const notification = {
   // Get unread notifications for a user (without last_check filter)
   // Filter based on order permissions (same logic as order model)
   getUnreadNotifications: async (userId, userRole, user, options = {}) => {
-    const { limit = 50, offset = 0 } = options;
+    const { limit = 200, offset = 0 } = options;
     
     try {
       const roleName = (userRole || "").toUpperCase();
@@ -389,7 +389,7 @@ const notification = {
   // Get all notifications for a user (read and unread)
   // Filter based on order permissions (same logic as order model)
   getAllNotifications: async (userId, userRole, user, options = {}) => {
-    const { limit = 50, offset = 0 } = options;
+    const { limit = 200, offset = 0 } = options;
     
     const roleName = (userRole || "").toUpperCase();
     

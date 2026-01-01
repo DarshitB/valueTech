@@ -74,13 +74,27 @@
   }
 
   .dropdown-menu {
-    min-width: 350px;
-    max-width: 400px;
+    // Responsive width: adapts to viewport, not parent
+    // min-width: ensures minimum readable width (350px on desktop, 85vw on mobile)
+    min-width: min(350px, 85vw);
+    
+    // width: allows content-based expansion but respects max-width
+    width: max-content;
+    
+    // max-width: never exceeds viewport (400px on desktop, 90vw on mobile)
+    max-width: min(60vw, 90vw);
+    
     max-height: 500px;
     overflow-y: auto;
     padding: 0;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    
+    // Ensure dropdown never goes outside viewport on small screens
+    @media (max-width: 576px) {
+      min-width: min(300px, 90vw);
+      max-width: 90vw;
+    }
 
     .dropdown-header {
       display: flex;
