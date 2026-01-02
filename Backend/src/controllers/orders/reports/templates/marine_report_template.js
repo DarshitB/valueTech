@@ -3609,17 +3609,15 @@ function generateMarineReportHTML(
     -->
     
      <script>
-        // Auto-pagination system
+         // Auto-pagination system
         function autoPaginate() {
             // Step 1: Collect all content elements from all pages
-            // We'll paginate: h1-h6, p, table, and preserve .report-hero-page, .report-info
             const allPages = document.querySelectorAll('.page');
             const allContentElements = [];
 
             allPages.forEach(page => {
                 const pageContent = page.querySelector('.page-content');
                 if (pageContent) {
-                    // Get all direct content elements
                     const heroPage = pageContent.querySelector('.report-hero-page');
                     const reportInfo = pageContent.querySelector('.report-info');
 
@@ -3630,7 +3628,7 @@ function generateMarineReportHTML(
                         allContentElements.push(reportInfo);
                     }
 
-                    // Get all other content elements: headings, paragraphs, tables, images
+                    // Get all other content elements
                     const contentElements = Array.from(pageContent.children).filter(el => {
                         return el.tagName && (
                             el.tagName.match(/^H[1-6]$/) ||
@@ -3643,24 +3641,18 @@ function generateMarineReportHTML(
 
                     contentElements.forEach(el => {
                         if (el !== heroPage && el !== reportInfo) {
-                            // For tables, break them down into individual rows for better pagination
                             if (el.tagName === 'TABLE') {
-                                // Get only direct child rows (not nested table rows)
                                 let rows = [];
                                 if (el.querySelector('tbody')) {
-                                    // If table has tbody, get direct children of tbody
                                     rows = Array.from(el.querySelector('tbody').children).filter(child => child.tagName === 'TR');
                                 } else {
-                                    // If no tbody, get direct children of table
                                     rows = Array.from(el.children).filter(child => child.tagName === 'TR');
                                 }
 
                                 if (rows.length > 0) {
-                                    // Store original table's className and attributes
                                     const tableClassName = el.className;
                                     const tableWidth = el.getAttribute('width') || el.style.width;
 
-                                    // Store table metadata
                                     rows.forEach((row, index) => {
                                         row._isTableRow = true;
                                         row._tableIndex = allContentElements.length;
@@ -3670,7 +3662,6 @@ function generateMarineReportHTML(
                                         allContentElements.push(row);
                                     });
                                 } else {
-                                    // If no rows found, add the table as-is
                                     allContentElements.push(el);
                                 }
                             } else {
@@ -3681,21 +3672,12 @@ function generateMarineReportHTML(
                 }
             });
 
-            if (allContentElements.length === 0) {
-                // console.warn('No content elements found to paginate');
-                return;
-            }
-
-            // console.log('Found ' + allContentElements.length + ' content elements to paginate');
+            if (allContentElements.length === 0) return;
 
             // Step 2: Clear all pages except the first one
             const firstPage = allPages[0];
-            if (!firstPage) {
-                // console.error('First page not found');
-                return;
-            }
+            if (!firstPage) return;
 
-            // Remove all subsequent pages
             for (let i = 1; i < allPages.length; i++) {
                 allPages[i].remove();
             }
@@ -3705,53 +3687,118 @@ function generateMarineReportHTML(
             let currentPageContent = currentPage.querySelector('.page-content');
             if (!currentPageContent) return;
 
-            // Store the available height for this page
             const pageContentHeight = currentPageContent.offsetHeight;
-
-            // Store hero page and report info if they exist
             const heroPage = currentPageContent.querySelector('.report-hero-page');
             const reportInfo = currentPageContent.querySelector('.report-info');
 
-            // Clear first page content
             currentPageContent.innerHTML = '';
-
-            // Initialize page number
             let currentPageNum = 1;
 
-            // MANDATORY: Always add hero page first (it must occupy entire first page)
+            // Add hero page first
             if (heroPage) {
-                // console.log('Adding hero page to first page');
                 currentPageContent.appendChild(heroPage);
-                // Hero page should occupy entire first page, so create a new page for other content
                 const secondPage = createNewPage(2);
                 currentPage.insertAdjacentElement('afterend', secondPage);
                 currentPage = secondPage;
                 currentPageContent = currentPage.querySelector('.page-content');
                 currentPageNum = 2;
-                // console.log('Created page 2 for remaining content');
             }
 
-            // Step 4: Add content elements one by one and check for overflow
-            // console.log('Starting to add content elements...');
-            let currentTable = null;  // Track current table being built
+            // Step 4: Add content with smart heading-content grouping
+            let currentTable = null;
+            let lastHeading = null;  // Track the last heading added
 
             for (let i = 0; i < allContentElements.length; i++) {
                 const element = allContentElements[i];
 
-                // Skip hero page (already added to first page)
-                if (element === heroPage) {
+                if (element === heroPage) continue;
+
+                // Check if this is a heading
+                const isHeading = element.tagName && element.tagName.match(/^H[1-6]$/);
+
+                // If this is a heading, we need to ensure it stays with its content
+                if (isHeading) {
+                    lastHeading = element;
+                    
+                    // Look ahead to see if there's immediate content (table rows or paragraph)
+                    let nextElement = i + 1 < allContentElements.length ? allContentElements[i + 1] : null;
+                    
+                    // Temporarily add heading to check if heading + some content fits
+                    currentTable = null;  // Reset table when we hit a heading
+                    currentPageContent.appendChild(element);
+                    void currentPageContent.offsetHeight;
+                    
+                    // Check if just the heading already overflows
+                    if (currentPageContent.scrollHeight > pageContentHeight) {
+                        // Heading alone doesn't fit, move to new page
+                        element.remove();
+                        currentPageNum++;
+                        const newPage = createNewPage(currentPageNum);
+                        currentPage.insertAdjacentElement('afterend', newPage);
+                        currentPage = newPage;
+                        currentPageContent = currentPage.querySelector('.page-content');
+                        currentPageContent.appendChild(element);
+                        void currentPageContent.offsetHeight;
+                        continue;
+                    }
+                    
+                    // Heading fits, now check if we can fit at least one content element
+                    if (nextElement) {
+                        // Create a test container to measure heading + content
+                        const testContainer = document.createElement('div');
+                        testContainer.style.visibility = 'hidden';
+                        testContainer.style.position = 'absolute';
+                        testContainer.appendChild(element.cloneNode(true));
+                        
+                        if (nextElement._isTableRow) {
+                            // For table rows, try to fit heading + first row
+                            const testTable = document.createElement('table');
+                            testTable.style.width = nextElement._tableWidth || '100%';
+                            testTable.style.borderCollapse = 'collapse';
+                            testTable.style.margin = '15px 0';
+                            if (nextElement._tableClassName) {
+                                testTable.className = nextElement._tableClassName;
+                            }
+                            const tbody = document.createElement('tbody');
+                            tbody.appendChild(nextElement.cloneNode(true));
+                            testTable.appendChild(tbody);
+                            testContainer.appendChild(testTable);
+                        } else if (nextElement.tagName === 'P') {
+                            // For paragraph elements, clone and append
+                            testContainer.appendChild(nextElement.cloneNode(true));
+                        } else {
+                            // For other elements, clone and append
+                            testContainer.appendChild(nextElement.cloneNode(true));
+                        }
+                        
+                        currentPageContent.appendChild(testContainer);
+                        void currentPageContent.offsetHeight;
+                        const testHeight = currentPageContent.scrollHeight;
+                        testContainer.remove();
+                        
+                        // If heading + first content doesn't fit, move heading to new page
+                        if (testHeight > pageContentHeight) {
+                            element.remove();
+                            currentPageNum++;
+                            const newPage = createNewPage(currentPageNum);
+                            currentPage.insertAdjacentElement('afterend', newPage);
+                            currentPage = newPage;
+                            currentPageContent = currentPage.querySelector('.page-content');
+                            currentPageContent.appendChild(element);
+                            void currentPageContent.offsetHeight;
+                        }
+                    }
+                    
                     continue;
                 }
 
-                // Handle table rows specially
+                // Handle table rows
                 if (element._isTableRow) {
-                    // If we don't have a current table or row is from a different table, create new table
                     if (!currentTable || element._rowIndex === 0) {
                         currentTable = document.createElement('table');
                         currentTable.style.width = element._tableWidth || '100%';
                         currentTable.style.borderCollapse = 'collapse';
                         currentTable.style.margin = '15px 0';
-                        // Apply original table's className
                         if (element._tableClassName) {
                             currentTable.className = element._tableClassName;
                         }
@@ -3760,88 +3807,61 @@ function generateMarineReportHTML(
                         currentPageContent.appendChild(currentTable);
                     }
 
-                    // Add the row to the current table
                     currentTable.querySelector('tbody').appendChild(element);
                 } else {
-                    // For non-table-row elements, reset current table and add normally
                     currentTable = null;
                     currentPageContent.appendChild(element);
                 }
 
-                // Force browser to recalculate layout
                 void currentPageContent.offsetHeight;
 
-                // Check if content now overflows the page
-                const contentHeight = currentPageContent.scrollHeight;
-                const availableHeight = pageContentHeight;
-
-                // If content overflows
-                if (contentHeight > availableHeight) {
-                    // Handle table rows differently
+                // Check for overflow
+                if (currentPageContent.scrollHeight > pageContentHeight) {
                     if (element._isTableRow) {
-                        // Remove the row that caused overflow
+                        // Row doesn't fit, move to new page
                         element.remove();
-
-                        // Create a new page for continuing the table
                         currentPageNum++;
                         const newPage = createNewPage(currentPageNum);
                         currentPage.insertAdjacentElement('afterend', newPage);
                         currentPage = newPage;
                         currentPageContent = currentPage.querySelector('.page-content');
 
-                        // Create a new table on the new page
                         currentTable = document.createElement('table');
                         currentTable.style.width = element._tableWidth || '100%';
                         currentTable.style.borderCollapse = 'collapse';
                         currentTable.style.margin = '15px 0';
-                        // Apply original table's className
                         if (element._tableClassName) {
                             currentTable.className = element._tableClassName;
                         }
                         const tbody = document.createElement('tbody');
                         currentTable.appendChild(tbody);
                         currentPageContent.appendChild(currentTable);
-
-                        // Add the row to the new table
                         currentTable.querySelector('tbody').appendChild(element);
                     } else {
-                        // Remove the element that caused overflow
                         element.remove();
-                        currentTable = null;  // Reset table tracking
+                        currentTable = null;
 
-                        // Check if current page is empty
                         const contentOnCurrentPage = Array.from(currentPageContent.children);
-
                         if (contentOnCurrentPage.length === 0) {
-                            // Page is empty, so add the element even though it's too large
-                            // (otherwise it would create infinite loop)
                             currentPageContent.appendChild(element);
-
-                            // Move to next page for subsequent content
                             currentPageNum++;
                             const newPage = createNewPage(currentPageNum);
                             currentPage.insertAdjacentElement('afterend', newPage);
                             currentPage = newPage;
                             currentPageContent = currentPage.querySelector('.page-content');
                         } else {
-                            // Create a new page and add the element there
                             currentPageNum++;
                             const newPage = createNewPage(currentPageNum);
                             currentPage.insertAdjacentElement('afterend', newPage);
                             currentPage = newPage;
                             currentPageContent = currentPage.querySelector('.page-content');
-
-                            // Add the element to the new page
                             currentPageContent.appendChild(element);
                         }
                     }
                 }
             }
 
-            // Update page numbers
             updatePageNumbers();
-
-            // Page count updated (removed page-count display element as PDF button is not needed)
         }
 
         function createNewPage(pageNum) {

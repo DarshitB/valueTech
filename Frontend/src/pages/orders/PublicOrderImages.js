@@ -79,12 +79,21 @@ function PublicOrderImages() {
   };
 
   // Backend already returns only approved media, so no filtering needed
-  // Show both images and videos
+  // Separate images and videos
   const approvedMedia = React.useMemo(() => {
     if (!media?.media) return [];
     // Backend returns only approved media, filter by image or video type
     return media.media.filter((item) => isImage(item.media_url) || isVideo(item.media_url));
   }, [media]);
+
+  // Separate images and videos into different arrays
+  const approvedImages = React.useMemo(() => {
+    return approvedMedia.filter((item) => isImage(item.media_url));
+  }, [approvedMedia]);
+
+  const approvedVideos = React.useMemo(() => {
+    return approvedMedia.filter((item) => isVideo(item.media_url));
+  }, [approvedMedia]);
 
   // Prepare lightbox slides array (approved images and videos)
   const lightboxSlides = React.useMemo(() => {
@@ -213,83 +222,114 @@ function PublicOrderImages() {
             <div className="row">
               <div className="col-12">
                 <div className="public-order-images-container">
-                  <div className="public-order-images-header">
-                    {approvedMedia.length > 0 && (
-                      <p className="text-muted">
-                        {approvedMedia.length} approved media file
-                        {approvedMedia.length !== 1 ? "s" : ""}
-                      </p>
-                    )}
-                  </div>
                   <div className="public-order-images-content">
                     {approvedMedia.length > 0 ? (
-                      <div className="public-order-images-grid">
-                        {approvedMedia.map((item, index) => {
-                          const mediaUrl = getImageUrl(item.media_url);
-                          const isImageFile = isImage(item.media_url);
-                          const isVideoFile = isVideo(item.media_url);
+                      <>
+                        {/* Images Section */}
+                        {approvedImages.length > 0 && (
+                          <div style={{ marginBottom: "40px" }}>
+                            <h2 className="section-heading" style={{ marginBottom: "20px", fontSize: "24px", fontWeight: "600" }}>
+                              Images ({approvedImages.length})
+                            </h2>
+                            <div className="public-order-images-grid">
+                              {approvedImages.map((item) => {
+                                const mediaUrl = getImageUrl(item.media_url);
 
-                          return (
-                            <div key={item.id} className="public-order-image-card">
-                              <div
-                                className="public-order-image-box"
-                                onClick={() => handleLightboxOpen(item)}
-                              >
-                                {isImageFile ? (
-                                  <img
-                                    src={mediaUrl}
-                                    alt={`Order Image ${item.id}`}
-                                    onError={(e) => {
-                                      e.target.src =
-                                        "https://via.placeholder.com/200x200?text=Image+Not+Found";
-                                    }}
-                                  />
-                                ) : isVideoFile ? (
-                                  <video
-                                    src={mediaUrl}
-                                    preload="metadata"
-                                    style={{
-                                      width: "100%",
-                                      height: "100%",
-                                      objectFit: "cover",
-                                    }}
-                                  >
-                                    Your browser does not support the video tag.
-                                  </video>
-                                ) : null}
-                                <div className="public-order-image-overlay">
-                                  <button
-                                    className="lightbox-btn"
-                                    title="View in lightbox"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleLightboxOpen(item);
-                                    }}
-                                  >
-                                    <ZoomIn size={20} />
-                                  </button>
-                                  {isVideoFile && (
-                                    <span
-                                      style={{
-                                        position: "absolute",
-                                        top: "10px",
-                                        right: "10px",
-                                        background: "rgba(0,0,0,0.7)",
-                                        color: "white",
-                                        padding: "4px 8px",
-                                        borderRadius: "4px",
-                                        fontSize: "12px",
-                                      }}
+                                return (
+                                  <div key={item.id} className="public-order-image-card">
+                                    <div
+                                      className="public-order-image-box"
+                                      onClick={() => handleLightboxOpen(item)}
                                     >
-                                      Video
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
+                                      <img
+                                        src={mediaUrl}
+                                        alt={`Order Image ${item.id}`}
+                                        onError={(e) => {
+                                          e.target.src =
+                                            "https://via.placeholder.com/200x200?text=Image+Not+Found";
+                                        }}
+                                      />
+                                      <div className="public-order-image-overlay">
+                                        <button
+                                          className="lightbox-btn"
+                                          title="View in lightbox"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleLightboxOpen(item);
+                                          }}
+                                        >
+                                          <ZoomIn size={20} />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
-                          );
-                        })}
-                      </div>
+                          </div>
+                        )}
+
+                        {/* Videos Section */}
+                        {approvedVideos.length > 0 && (
+                          <div>
+                            <h2 className="section-heading" style={{ marginBottom: "20px", fontSize: "24px", fontWeight: "600" }}>
+                              Videos ({approvedVideos.length})
+                            </h2>
+                            <div className="public-order-images-grid">
+                              {approvedVideos.map((item) => {
+                                const mediaUrl = getImageUrl(item.media_url);
+
+                                return (
+                                  <div key={item.id} className="public-order-image-card">
+                                    <div
+                                      className="public-order-image-box"
+                                      onClick={() => handleLightboxOpen(item)}
+                                    >
+                                      <video
+                                        src={mediaUrl}
+                                        preload="metadata"
+                                        style={{
+                                          width: "100%",
+                                          height: "100%",
+                                          objectFit: "cover",
+                                        }}
+                                      >
+                                        Your browser does not support the video tag.
+                                      </video>
+                                      <div className="public-order-image-overlay">
+                                        <button
+                                          className="lightbox-btn"
+                                          title="View in lightbox"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleLightboxOpen(item);
+                                          }}
+                                        >
+                                          <ZoomIn size={20} />
+                                        </button>
+                                        <span
+                                          style={{
+                                            position: "absolute",
+                                            top: "10px",
+                                            right: "10px",
+                                            background: "rgba(0,0,0,0.7)",
+                                            color: "white",
+                                            padding: "4px 8px",
+                                            borderRadius: "4px",
+                                            fontSize: "12px",
+                                          }}
+                                        >
+                                          Video
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     ) : (
                       <div className="text-center text-muted" style={{ padding: "50px" }}>
                         <p>No approved media available for this order.</p>

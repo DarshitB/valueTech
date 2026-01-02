@@ -511,7 +511,8 @@ const order = {
         "orders.valuer_name"
       )
       .whereNull("orders.deleted_at")
-      .where("orders.field_verifier_id", fieldVerifierId);
+      .where("orders.field_verifier_id", fieldVerifierId)
+      .whereNot("orders.current_status_id", 13);
 
     // Sort by newest first
     baseQuery.orderBy("orders.created_at", "desc");
@@ -607,6 +608,7 @@ const order = {
       )
       .whereNull("orders.deleted_at")
       .where("orders.id", id)
+      .whereNot("orders.current_status_id", 13)
       .first();
 
     if (!order) return null;
