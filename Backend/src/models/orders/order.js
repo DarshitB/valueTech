@@ -608,7 +608,6 @@ const order = {
       )
       .whereNull("orders.deleted_at")
       .where("orders.id", id)
-      .whereNot("orders.current_status_id", 13)
       .first();
 
     if (!order) return null;
