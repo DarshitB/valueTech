@@ -499,6 +499,16 @@ function AVRReport() {
   // Handle form input changes
   const handleFormChange = (e) => {
     const { name, value } = e.target;
+
+    // Track cleared fields - if field had a value and is now empty, mark it as cleared
+    if (!value || (typeof value === "string" && value.trim() === "")) {
+      // Field is being cleared - track it
+      clearedFieldsRef.current.add(name);
+    } else {
+      // Field has a value - remove from cleared fields tracking
+      clearedFieldsRef.current.delete(name);
+    }
+
     setReportFormData((prev) => {
       let updated = {
         ...prev,
@@ -516,6 +526,15 @@ function AVRReport() {
 
   // Handle SingleSearchSelect changes
   const handleSelectChange = (name, value) => {
+    // Track cleared fields - if field had a value and is now empty/null, mark it as cleared
+    if (!value || (typeof value === "string" && value.trim() === "")) {
+      // Field is being cleared - track it
+      clearedFieldsRef.current.add(name);
+    } else {
+      // Field has a value - remove from cleared fields tracking
+      clearedFieldsRef.current.delete(name);
+    }
+
     setReportFormData((prev) => {
       const updated = {
         ...prev,
@@ -663,8 +682,14 @@ function AVRReport() {
     Object.keys(reportFormData).forEach((key) => {
       let value = reportFormData[key];
 
-      // Always append the value, even if empty, to ensure all fields are in payload
-      formData.append(key, value || "");
+      // Check if this field was explicitly cleared by the user
+      if (clearedFieldsRef.current.has(key)) {
+        // Include cleared fields as empty string (null) in the payload
+        formData.append(key, "");
+      } else {
+        // Always append the value, even if empty, to ensure all fields are in payload
+        formData.append(key, value || "");
+      }
     });
 
     /* // Debug: Log the form data being sent
@@ -811,8 +836,8 @@ function AVRReport() {
       return;
     }
 
-    // Clear the tracking set after save (fields will be tracked again if cleared after save)
-    clearedFieldsRef.current.clear();
+    // Don't clear clearedFieldsRef after save - user might generate report next
+    // It will be cleared when component unmounts or order changes (handled in useEffect)
 
     // Dispatch save action with JSON data
     dispatch(

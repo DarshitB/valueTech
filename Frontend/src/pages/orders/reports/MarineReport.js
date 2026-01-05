@@ -710,6 +710,15 @@ function MarineReport() {
   const handleFormChange = useCallback((e) => {
     const { name, value } = e.target;
 
+    // Track cleared fields - if field had a value and is now empty, mark it as cleared
+    if (!value || (typeof value === "string" && value.trim() === "")) {
+      // Field is being cleared - track it
+      clearedFieldsRef.current.add(name);
+    } else {
+      // Field has a value - remove from cleared fields tracking
+      clearedFieldsRef.current.delete(name);
+    }
+
     // Fields that should be converted to uppercase
     const uppercaseFields = [
       "name_of_the_vessel",
@@ -816,6 +825,15 @@ function MarineReport() {
 
   // Handle SingleSearchSelect changes
   const handleSelectChange = (name, value) => {
+    // Track cleared fields - if field had a value and is now empty/null, mark it as cleared
+    if (!value || (typeof value === "string" && value.trim() === "")) {
+      // Field is being cleared - track it
+      clearedFieldsRef.current.add(name);
+    } else {
+      // Field has a value - remove from cleared fields tracking
+      clearedFieldsRef.current.delete(name);
+    }
+
     setReportFormData((prev) => {
       const updated = {
         ...prev,
@@ -1695,6 +1713,13 @@ function MarineReport() {
     Object.keys(reportFormData).forEach((key) => {
       let value = reportFormData[key];
 
+      // Check if this field was explicitly cleared by the user
+      if (clearedFieldsRef.current.has(key)) {
+        // Include cleared fields as empty string (null) in the payload
+        formData.append(key, "");
+        return;
+      }
+
       // Handle different value types properly:
       // - null/undefined -> empty string
       // - numbers (including 0) -> keep as is
@@ -1881,6 +1906,13 @@ function MarineReport() {
     // Add ALL form fields to FormData - ensure every field is included to prevent data loss
     Object.keys(reportFormData).forEach((key) => {
       let value = reportFormData[key];
+
+      // Check if this field was explicitly cleared by the user
+      if (clearedFieldsRef.current.has(key)) {
+        // Include cleared fields as empty string (null) in the payload
+        formData.append(key, "");
+        return;
+      }
 
       // Handle different value types properly:
       // - null/undefined -> empty string

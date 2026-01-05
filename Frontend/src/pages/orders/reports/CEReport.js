@@ -1385,6 +1385,15 @@ function CEReport() {
     (e) => {
       const { name, value } = e.target;
 
+      // Track cleared fields - if field had a value and is now empty, mark it as cleared
+      if (!value || (typeof value === "string" && value.trim() === "")) {
+        // Field is being cleared - track it
+        clearedFieldsRef.current.add(name);
+      } else {
+        // Field has a value - remove from cleared fields tracking
+        clearedFieldsRef.current.delete(name);
+      }
+
       // Clear button selection when user types in registration fields
       if (name === "registration_no" && value) {
         setRegistrationNoOption(null);
@@ -1485,6 +1494,15 @@ function CEReport() {
   // Handle SingleSearchSelect changes
   const handleSelectChange = useCallback(
     (name, value) => {
+      // Track cleared fields - if field had a value and is now empty/null, mark it as cleared
+      if (!value || (typeof value === "string" && value.trim() === "")) {
+        // Field is being cleared - track it
+        clearedFieldsRef.current.add(name);
+      } else {
+        // Field has a value - remove from cleared fields tracking
+        clearedFieldsRef.current.delete(name);
+      }
+
       setReportFormData((prev) => {
         const updated = {
           ...prev,
@@ -1912,13 +1930,25 @@ function CEReport() {
           /* console.log("🔍 CEReport Generate - no_of_tyres computed:", value); */
         }
 
-        if (value !== null && value !== "") {
+        // Check if this field was explicitly cleared by the user
+        if (clearedFieldsRef.current.has(key)) {
+          // Include cleared fields as null in the payload
+          formData.append(key, "");
+        } else if (value !== null && value !== "") {
+          // Only include fields that have meaningful values
           formData.append(key, value);
         }
       });
 
       // Add the combined invoice data
-      if (combinedInvoiceData) {
+      // Check if invoice_no_date was explicitly cleared (both invoice_no and invoice_date are cleared)
+      const invoiceNoCleared = clearedFieldsRef.current.has("invoice_no");
+      const invoiceDateCleared = clearedFieldsRef.current.has("invoice_date");
+      
+      if (invoiceNoCleared && invoiceDateCleared) {
+        // Both fields were cleared, send invoice_no_date as null
+        formData.append("invoice_no_date", "");
+      } else if (combinedInvoiceData) {
         formData.append("invoice_no_date", combinedInvoiceData);
       }
 
@@ -2297,8 +2327,8 @@ function CEReport() {
       }
     });
 
-    // Clear the tracking set after save (fields will be tracked again if cleared after save)
-    clearedFieldsRef.current.clear();
+    // Don't clear clearedFieldsRef after save - user might generate report next
+    // It will be cleared when component unmounts or order changes (handled in useEffect)
 
     // Dispatch save action with FormData payload
     dispatch(
