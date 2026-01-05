@@ -20,6 +20,7 @@ import { fetchAssetMakesForReports } from "../../../redux/reducers/assetMakesRed
 import { usePageTitle } from "../../../context/PageTitleContext";
 import SingleSearchSelect from "../../../components/SingleSearchSelect";
 import { toast } from "react-toastify";
+import axios from "axios";
 import "../order.scss";
 import { DeleteIcon } from "../../../components/icons";
 
@@ -55,6 +56,12 @@ function CEReport() {
   const childCategoryFallbackAttemptedRef = useRef(false);
   // Ref to track if we've processed the child category report data
   const childCategoryDataProcessedRef = useRef(false);
+  // State for external RC API loading
+  const [externalApiLoading, setExternalApiLoading] = useState(false);
+  // Ref to track if external RC API has been called
+  const externalApiCalledRef = useRef(false);
+  // Ref to track if we should auto-save after external API prefills data
+  const shouldAutoSaveAfterApiRef = useRef(false);
   // Set page title using custom hook
   const { setTitle } = usePageTitle();
 
@@ -68,6 +75,9 @@ function CEReport() {
     setIsInitialLoading(true); // Reset initial loading state
     childCategoryFallbackAttemptedRef.current = false; // Reset fallback attempt flag
     childCategoryDataProcessedRef.current = false; // Reset child category data processed flag
+    // Reset external RC API tracking
+    externalApiCalledRef.current = false;
+    shouldAutoSaveAfterApiRef.current = false;
     // Reset registration field options
     setRegistrationNoOption(null);
     setRegistrationDateOption(null);
@@ -1212,6 +1222,7 @@ function CEReport() {
         // 1. Set the button state (so it appears selected in UI)
         // 2. Leave input field empty (so user sees empty input)
         // 3. The save/generate functions will check button state and add "NOT AVAILABLE" or "NOT APPLICABLE" to payload
+        // BUT: If order has registration_number, use that instead of "NOT AVAILABLE" or empty
         if (
           report.registration_no !== undefined &&
           report.registration_no !== null
@@ -1220,16 +1231,40 @@ function CEReport() {
             .toUpperCase()
             .trim();
           if (upperValue === "NOT AVAILABLE") {
-            setRegistrationNoOption("NOT_AVAILABLE");
-            updated.registration_no = ""; // Leave input empty - button state will be used in payload
+            // If order has registration_number, use it instead of "NOT AVAILABLE"
+            if (order?.registration_number && order.registration_number.trim() !== "") {
+              setRegistrationNoOption(null);
+              updated.registration_no = order.registration_number;
+            } else {
+              setRegistrationNoOption("NOT_AVAILABLE");
+              updated.registration_no = ""; // Leave input empty - button state will be used in payload
+            }
           } else if (upperValue === "NOT APPLICABLE") {
-            setRegistrationNoOption("NOT_APPLICABLE");
-            updated.registration_no = ""; // Leave input empty - button state will be used in payload
+            // If order has registration_number, use it instead of "NOT APPLICABLE"
+            if (order?.registration_number && order.registration_number.trim() !== "") {
+              setRegistrationNoOption(null);
+              updated.registration_no = order.registration_number;
+            } else {
+              setRegistrationNoOption("NOT_APPLICABLE");
+              updated.registration_no = ""; // Leave input empty - button state will be used in payload
+            }
           } else {
-            // Regular value - clear button state and set input value
-            setRegistrationNoOption(null);
-            updated.registration_no = report.registration_no;
+            // Regular value from child category report
+            // BUT: If order has registration_number, prioritize order's value over child category report
+            if (order?.registration_number && order.registration_number.trim() !== "") {
+              // Order has registration_number - use it (priority to order)
+              setRegistrationNoOption(null);
+              updated.registration_no = order.registration_number;
+            } else {
+              // Order doesn't have registration_number - use child category report's value
+              setRegistrationNoOption(null);
+              updated.registration_no = report.registration_no;
+            }
           }
+        } else if (order?.registration_number && order.registration_number.trim() !== "") {
+          // If child category report doesn't have registration_no but order has it, use order's value
+          setRegistrationNoOption(null);
+          updated.registration_no = order.registration_number;
         }
 
         if (
@@ -1294,6 +1329,203 @@ function CEReport() {
       setIsInitialLoading(false);
     }
   }, [reportLoading, reportFetchCompleted, currentReport]);
+
+  // Function to call external RC API and prefill form data
+  const fetchRCDetailsFromExternalAPI = useCallback(
+    async (registrationNumber) => {
+      if (!registrationNumber || registrationNumber.trim() === "") {
+        return;
+      }
+
+      const apiToken = process.env.REACT_APP_ATTESTR_API_TOKEN;
+      if (!apiToken) {
+        // API token not found
+        return;
+      }
+
+      // Set loading state to true when external API starts
+      setExternalApiLoading(true);
+
+      // Clean and format registration number: remove spaces, dashes, and convert to uppercase
+      // Example: "GJ-03-BZ-0618" or "gj 03 bz 0618" → "GJ03BZ0618"
+      const cleanedRegistrationNumber = registrationNumber
+        .replace(/[\s\-]/g, "") // Remove spaces and dashes
+        .toUpperCase(); // Convert to uppercase
+
+      // Calling external RC API
+      try {
+        const response = await axios.post(
+          "https://api.attestr.com/api/v2/public/checkx/rc",
+          {
+            reg: cleanedRegistrationNumber,
+          },
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Basic ${apiToken}`,
+            },
+          }
+        );
+
+        if (response.data && response.data.valid) {
+          const rcData = response.data;
+
+          // Helper function to convert owner number to format (e.g., "1" -> "1ST OWNER")
+          const formatOwnerNumber = (ownerNum) => {
+            const num = parseInt(ownerNum);
+            if (isNaN(num) || num < 1) return "";
+
+            // Handle special cases: 11th, 12th, 13th use "TH"
+            const lastDigit = num % 10;
+            const lastTwoDigits = num % 100;
+
+            let suffix = "TH";
+            if (lastTwoDigits >= 11 && lastTwoDigits <= 13) {
+              suffix = "TH";
+            } else if (lastDigit === 1) {
+              suffix = "ST";
+            } else if (lastDigit === 2) {
+              suffix = "ND";
+            } else if (lastDigit === 3) {
+              suffix = "RD";
+            }
+
+            return `${num}${suffix} OWNER`;
+          };
+
+          // Helper function to convert cylinders to format (e.g., "6" -> "6 (SIX)")
+          const formatCylinders = (cylinders) => {
+            const num = parseInt(cylinders);
+            if (isNaN(num) || num < 1) return "";
+            const words = [
+              "",
+              "ONE",
+              "TWO",
+              "THREE",
+              "FOUR",
+              "FIVE",
+              "SIX",
+              "SEVEN",
+              "EIGHT",
+              "NINE",
+              "TEN",
+            ];
+            const word = num <= 10 ? words[num] : "";
+            return word ? `${num} (${word})` : cylinders;
+          };
+
+          // Map API response to form fields
+          setReportFormData((prev) => {
+            const updated = { ...prev };
+
+            // Basic vehicle information
+            // Note: registration_no is from user input (not in API response), so we keep the existing value
+            if (rcData.registered)
+              updated.registration_date = rcData.registered;
+            if (rcData.rto) updated.registered_location = rcData.rto;
+
+            // Owner information
+            if (rcData.owner) updated.registered_owner_name = rcData.owner;
+            if (rcData.currentAddress)
+              updated.registered_owner_address = rcData.currentAddress;
+            if (rcData.permanentAddress)
+              updated.proposed_owner_address = rcData.permanentAddress;
+
+            // Vehicle details
+            if (rcData.chassisNumber) updated.crane_chassis_no = rcData.chassisNumber;
+            if (rcData.engineNumber)
+              updated.engine_no_detail = rcData.engineNumber;
+            if (rcData.makerModel) {
+              updated.model = rcData.makerModel;
+              updated.asset_classification = rcData.makerModel;
+            }
+            if (rcData.bodyType) updated.body_type = rcData.bodyType;
+            if (rcData.fuelType) updated.crane_model_code = rcData.fuelType; // Fuel Type field in CE
+
+            // Manufacturing details
+            if (rcData.manufactured) {
+              // Convert "11/2024" to "2024" or keep as is
+              const manufacturedDate = rcData.manufactured.split("/");
+              if (manufacturedDate.length > 1) {
+                updated.manufacture_year = manufacturedDate[1];
+              } else {
+                updated.manufacture_year = rcData.manufactured;
+              }
+            }
+
+            // Technical specifications
+            if (rcData.cylinders) {
+              updated.no_of_cylinder = formatCylinders(rcData.cylinders);
+            }
+
+            // Owner serial number mapping (ownerNumber -> owner_serial_no)
+            if (rcData.ownerNumber) {
+              updated.owner_serial_no = formatOwnerNumber(rcData.ownerNumber);
+            }
+
+            // RC, Permit, Tax, Fitness & Insurance details
+            if (rcData.fitnessUpto) updated.fitness_upto = rcData.fitnessUpto;
+            if (rcData.taxUpto) updated.tax_upto = rcData.taxUpto;
+
+            // Insurance details mapping
+            if (rcData.insuranceProvider) {
+              updated.insurance_co_name = rcData.insuranceProvider;
+            }
+            if (rcData.insurancePolicyNumber) {
+              updated.policy_no = rcData.insurancePolicyNumber;
+            }
+            if (rcData.insuranceUpto) {
+              updated.insurance_valid_date = rcData.insuranceUpto;
+            }
+
+            return updated;
+          });
+
+          // Set flag to trigger auto-save after state is updated
+          shouldAutoSaveAfterApiRef.current = true;
+
+          // Set loading to false after data is prefilled (with small delay to ensure state update)
+          setTimeout(() => {
+            setExternalApiLoading(false);
+          }, 500);
+        } else {
+          // Invalid RC response
+          toast.warning("RC details could not be fetched or RC is invalid");
+          setExternalApiLoading(false);
+        }
+      } catch (error) {
+        // Error calling external API
+        if (error.response) {
+          toast.error(
+            "Failed to fetch RC details. Please check the registration number."
+          );
+        } else {
+          toast.error("Failed to fetch RC details. Please try again later.");
+        }
+        setExternalApiLoading(false);
+      }
+    },
+    []
+  );
+
+  // Call external RC API after fetchOrderReportByChildCategory completes (whether it has data or not)
+  useEffect(() => {
+    // Only call RC API if:
+    // 1. Child category fallback was attempted (fetchOrderReportByChildCategory was called)
+    // 2. Report loading is complete
+    // 3. RC API hasn't been called yet
+    // 4. Registration number exists in order
+    if (
+      childCategoryFallbackAttemptedRef.current && // Child category API was called
+      !reportLoading && // Report loading is complete
+      !externalApiCalledRef.current && // RC API hasn't been called yet
+      order?.registration_number && // Registration number exists
+      order.registration_number.trim() !== "" // Registration number is not empty
+    ) {
+      externalApiCalledRef.current = true; // Mark as called to prevent multiple calls
+      fetchRCDetailsFromExternalAPI(order.registration_number);
+    }
+  }, [reportLoading, order?.registration_number, fetchRCDetailsFromExternalAPI]);
 
   // Set page title with breadcrumb navigation
   useLayoutEffect(() => {
@@ -2349,6 +2581,32 @@ function CEReport() {
     convertNumberToWordsIndian,
     numberToWords,
   ]);
+
+  // Auto-save after external API prefills data
+  useEffect(() => {
+    // Only trigger if flag is set and we have some form data (indicating state was updated)
+    if (
+      shouldAutoSaveAfterApiRef.current &&
+      reportFormData &&
+      Object.keys(reportFormData).length > 0
+    ) {
+      // Check if we have some of the key fields that would be set by the API
+      const hasApiData =
+        reportFormData.crane_chassis_no ||
+        reportFormData.engine_no_detail ||
+        reportFormData.registered_owner_name ||
+        reportFormData.no_of_cylinder ||
+        reportFormData.owner_serial_no;
+
+      if (hasApiData) {
+        shouldAutoSaveAfterApiRef.current = false; // Reset flag to prevent multiple saves
+        // Use a small timeout to ensure all state updates are batched
+        setTimeout(() => {
+          handleSaveReport();
+        }, 100);
+      }
+    }
+  }, [reportFormData, handleSaveReport]);
 
   // Render flexible fields for a section
   const renderFlexibleFields = useCallback(
