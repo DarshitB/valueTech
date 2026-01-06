@@ -765,8 +765,15 @@ function CEReport() {
             })
           );
         } else {
-          // Either we have a report or no child_category_id, so we're done loading
+          // Either we have a report or no child_category_id
+          // If no child_category_id, child category API won't be called, so RC API also won't be called
+          // If we have a report, it's already handled in the populate report useEffect
+          // In both cases, all API calls are complete - remove loading
+          if (!order?.child_category_id) {
+            // No child_category_id - no child category API, no RC API - remove loading
           setIsInitialLoading(false);
+          }
+          // If child_category_id exists, child category API will be called, then RC API (if registration number exists)
         }
       }, 300); // Small delay to ensure state propagation
 
@@ -811,12 +818,14 @@ function CEReport() {
   useEffect(() => {
     const report = currentReport?.report;
 
-    // If we have a report and it belongs to the current order, mark initial loading as complete
+    // If we have a report and it belongs to the current order
+    // Main report has data - no child category API or RC API will be called, so remove loading
     if (
       report &&
       currentReport?.order_id === parseInt(id) &&
       reportFetchCompleted
     ) {
+      // Main report exists - all API calls are complete, remove loading
       setIsInitialLoading(false);
     }
 
@@ -1029,15 +1038,26 @@ function CEReport() {
 
         // Special handling for invoice_no_date - split into separate fields
         if (key === "invoice_no_date" && fieldValue) {
-          // Parse "12 Dated 12" format
-          const parts = fieldValue.split(" Dated ");
-          if (parts.length === 2) {
-            updated.invoice_no = parts[0].trim();
-            updated.invoice_date = parts[1].trim();
+          // Parse possible formats:
+          // 1. "InvoiceNo Dated Date" - both invoice number and date
+          // 2. "Dated Date" - only date (no invoice number)
+          // 3. "InvoiceNo" - only invoice number (no date)
+          if (fieldValue.startsWith("Dated ")) {
+            // Only date format: "Dated Date"
+            updated.invoice_no = "";
+            updated.invoice_date = fieldValue.replace("Dated ", "").trim();
           } else {
-            // If format doesn't match, put everything in invoice_no
-            updated.invoice_no = fieldValue;
-            updated.invoice_date = "";
+            // Check if it contains " Dated " separator
+            const parts = fieldValue.split(" Dated ");
+            if (parts.length === 2) {
+              // Both invoice number and date: "InvoiceNo Dated Date"
+              updated.invoice_no = parts[0].trim();
+              updated.invoice_date = parts[1].trim();
+            } else {
+              // Only invoice number: "InvoiceNo"
+              updated.invoice_no = fieldValue.trim();
+              updated.invoice_date = "";
+            }
           }
           return;
         }
@@ -1236,8 +1256,8 @@ function CEReport() {
               setRegistrationNoOption(null);
               updated.registration_no = order.registration_number;
             } else {
-              setRegistrationNoOption("NOT_AVAILABLE");
-              updated.registration_no = ""; // Leave input empty - button state will be used in payload
+            setRegistrationNoOption("NOT_AVAILABLE");
+            updated.registration_no = ""; // Leave input empty - button state will be used in payload
             }
           } else if (upperValue === "NOT APPLICABLE") {
             // If order has registration_number, use it instead of "NOT APPLICABLE"
@@ -1245,8 +1265,8 @@ function CEReport() {
               setRegistrationNoOption(null);
               updated.registration_no = order.registration_number;
             } else {
-              setRegistrationNoOption("NOT_APPLICABLE");
-              updated.registration_no = ""; // Leave input empty - button state will be used in payload
+            setRegistrationNoOption("NOT_APPLICABLE");
+            updated.registration_no = ""; // Leave input empty - button state will be used in payload
             }
           } else {
             // Regular value from child category report
@@ -1257,9 +1277,9 @@ function CEReport() {
               updated.registration_no = order.registration_number;
             } else {
               // Order doesn't have registration_number - use child category report's value
-              setRegistrationNoOption(null);
-              updated.registration_no = report.registration_no;
-            }
+            setRegistrationNoOption(null);
+            updated.registration_no = report.registration_no;
+          }
           }
         } else if (order?.registration_number && order.registration_number.trim() !== "") {
           // If child category report doesn't have registration_no but order has it, use order's value
@@ -1310,10 +1330,15 @@ function CEReport() {
         return updated;
       });
 
-      // Mark initial loading as complete
+      // Check if RC API will be called - if not, remove loading now
+      // RC API will only be called if registration number exists
+      if (!order?.registration_number || order.registration_number.trim() === "") {
+        // No registration number - RC API won't be called, all API calls complete
       setIsInitialLoading(false);
     }
-  }, [currentReport, reportLoading, id]);
+      // If registration number exists, RC API will be called and will remove loading
+    }
+  }, [currentReport, reportLoading, id, order]);
 
   // Handle case where child category API also returns no data
   useEffect(() => {
@@ -1324,22 +1349,30 @@ function CEReport() {
       !currentReport?.report &&
       !childCategoryDataProcessedRef.current
     ) {
-      // Child category API also returned no data, remove loader
+      // Child category API also returned no data
       childCategoryDataProcessedRef.current = true; // Mark as processed to prevent re-running
+      // Check if RC API will be called - if not, remove loading now
+      if (!order?.registration_number || order.registration_number.trim() === "") {
+        // No registration number, RC API won't be called - remove loading
       setIsInitialLoading(false);
     }
-  }, [reportLoading, reportFetchCompleted, currentReport]);
+      // If registration number exists, RC API will be called and will remove loading
+    }
+  }, [reportLoading, reportFetchCompleted, currentReport, order]);
 
   // Function to call external RC API and prefill form data
   const fetchRCDetailsFromExternalAPI = useCallback(
     async (registrationNumber) => {
       if (!registrationNumber || registrationNumber.trim() === "") {
+        // No registration number - all API calls complete, remove loading
+        setIsInitialLoading(false);
         return;
       }
 
       const apiToken = process.env.REACT_APP_ATTESTR_API_TOKEN;
       if (!apiToken) {
-        // API token not found
+        // API token not found - all API calls complete, remove loading
+        setIsInitialLoading(false);
         return;
       }
 
@@ -1484,14 +1517,18 @@ function CEReport() {
           // Set flag to trigger auto-save after state is updated
           shouldAutoSaveAfterApiRef.current = true;
 
-          // Set loading to false after data is prefilled (with small delay to ensure state update)
+          // Set external API loading to false after data is prefilled (with small delay to ensure state update)
           setTimeout(() => {
             setExternalApiLoading(false);
+            // All API calls are now complete - remove initial loading
+            setIsInitialLoading(false);
           }, 500);
         } else {
           // Invalid RC response
           toast.warning("RC details could not be fetched or RC is invalid");
           setExternalApiLoading(false);
+          // All API calls are now complete - remove initial loading
+          setIsInitialLoading(false);
         }
       } catch (error) {
         // Error calling external API
@@ -1503,6 +1540,8 @@ function CEReport() {
           toast.error("Failed to fetch RC details. Please try again later.");
         }
         setExternalApiLoading(false);
+        // All API calls are now complete - remove initial loading
+        setIsInitialLoading(false);
       }
     },
     []
@@ -2083,46 +2122,18 @@ function CEReport() {
         combinedInvoiceData = `Dated ${invoiceDate}`;
       }
 
-      // Add all form fields to FormData
+      // Add all form fields to FormData - simple logic: if value exists send it, if null/empty send null
       Object.keys(reportFormData).forEach((key) => {
         let value = reportFormData[key];
 
-        // Skip individual invoice fields and invoice_no_date - we'll add invoice_no_date separately
-        if (
-          key === "invoice_no" ||
-          key === "invoice_date" ||
-          key === "invoice_no_date"
-        ) {
-          return;
-        }
-
-        // Clear asset_make if new_asset_make has value
-        if (key === "asset_make" && reportFormData.new_asset_make) {
-          return; // Skip adding asset_make to payload if new_asset_make exists
-        }
-
-        // Skip here; amount_in_words is handled centrally above
+        // Skip amount_in_words - handled separately above
         if (key === "amount_in_words") {
           return;
         }
 
-        // Special handling for initiated_by - use edited value if present, otherwise use computed from order
-        if (key === "initiated_by") {
-          value =
-            reportFormData.initiated_by ||
-            (order?.officer_name && order?.bank_name
-              ? `${order.officer_name}, ${order.bank_name}`
-              : "");
-        }
-
-        // Special handling for ref_no_bank - always use current order values
-        if (key === "ref_no_bank") {
-          value = order?.bank_initial || "";
-        }
-
-        // Special handling for ref_no_code - always use current order values
-        if (key === "ref_no_code") {
-          value = order?.valuer_name ? getRefNoCode(order.valuer_name) : "";
+        // Skip invoice_no_date - will be added separately with fresh computed value
+        if (key === "invoice_no_date") {
+          return;
         }
 
         // Handle registration fields with options
@@ -2132,7 +2143,6 @@ function CEReport() {
           } else if (registrationNoOption === "NOT_APPLICABLE") {
             value = "NOT APPLICABLE";
           }
-          // If option is null, use the input value (already set above)
         }
 
         if (key === "registration_date") {
@@ -2151,38 +2161,16 @@ function CEReport() {
           }
         }
 
-        // Special handling for no_of_tyres - compute from tyre numbers
-        if (key === "no_of_tyres") {
-          const front = parseInt(reportFormData.front_tyre_no) || 0;
-          const middle = parseInt(reportFormData.middle_tyre_no) || 0;
-          const rear = parseInt(reportFormData.rear_tyre_no) || 0;
-          const total = front + middle + rear;
-          const word = numberToWords(total);
-          value = `${total} (${word})`;
-          /* console.log("🔍 CEReport Generate - no_of_tyres computed:", value); */
-        }
-
-        // Check if this field was explicitly cleared by the user
-        if (clearedFieldsRef.current.has(key)) {
-          // Include cleared fields as null in the payload
-          formData.append(key, "");
-        } else if (value !== null && value !== "") {
-          // Only include fields that have meaningful values
+        // Simple logic: if value exists, send it; if null/empty, send null
+        if (value !== null && value !== undefined && value !== "") {
           formData.append(key, value);
+        } else {
+          formData.append(key, ""); // Send empty string for null/empty values
         }
       });
 
-      // Add the combined invoice data
-      // Check if invoice_no_date was explicitly cleared (both invoice_no and invoice_date are cleared)
-      const invoiceNoCleared = clearedFieldsRef.current.has("invoice_no");
-      const invoiceDateCleared = clearedFieldsRef.current.has("invoice_date");
-      
-      if (invoiceNoCleared && invoiceDateCleared) {
-        // Both fields were cleared, send invoice_no_date as null
-        formData.append("invoice_no_date", "");
-      } else if (combinedInvoiceData) {
-        formData.append("invoice_no_date", combinedInvoiceData);
-      }
+      // Add invoice_no_date (combined from invoice_no and invoice_date) - always include with fresh computed value
+      formData.append("invoice_no_date", combinedInvoiceData || "");
 
       // Add chassis impression file if selected
       if (chassisImpressionFile) {
@@ -2370,9 +2358,20 @@ function CEReport() {
     // Create report data object with only non-empty fields
     const reportData = {};
 
-    // Add report form data - only include fields with actual values
+    // Add all form fields to reportData - simple logic: if value exists send it, if null/empty send null
     Object.keys(reportFormData).forEach((key) => {
       let value = reportFormData[key];
+
+      // Handle amount_in_words - use computed value
+      if (key === "amount_in_words") {
+        reportData[key] = computedAmountInWords || null;
+        return;
+      }
+
+      // Skip invoice_no_date - will be added separately with fresh computed value
+      if (key === "invoice_no_date") {
+        return;
+      }
 
       // Handle registration fields with options
       if (key === "registration_no") {
@@ -2381,7 +2380,6 @@ function CEReport() {
         } else if (registrationNoOption === "NOT_APPLICABLE") {
           value = "NOT APPLICABLE";
         }
-        // If option is null, use the input value
       }
 
       if (key === "registration_date") {
@@ -2400,82 +2398,26 @@ function CEReport() {
         }
       }
 
-      // Always include important read-only fields even if empty
-      const alwaysIncludeFields = [
-        "license_no",
-        "valuer_contact",
-        "amount_in_words",
-        "no_of_tyres",
-        "depreciation_value",
-      ];
-
-      if (alwaysIncludeFields.includes(key)) {
-        // Always include these fields, even if empty
-        let defaultValue = value || "";
-        // amount_in_words: use centralized computed value
-        if (key === "amount_in_words") {
-          reportData[key] = computedAmountInWords;
-          return; // Skip the normal flow for this field
-        }
-        // Use computed no_of_tyres value if this is no_of_tyres field
-        if (key === "no_of_tyres") {
-          const front = parseInt(reportFormData.front_tyre_no) || 0;
-          const middle = parseInt(reportFormData.middle_tyre_no) || 0;
-          const rear = parseInt(reportFormData.rear_tyre_no) || 0;
-          const total = front + middle + rear;
-          const word = numberToWords(total);
-          defaultValue = `${total} (${word})`;
-          /* console.log(
-            "🔍 CEReport Save - no_of_tyres - Computed value:",
-            defaultValue
-          ); */
-        }
-        reportData[key] = defaultValue;
+      // Simple logic: if value exists, send it; if null/empty, send null
+      if (value !== null && value !== undefined && value !== "") {
+        reportData[key] = value;
       } else {
-        // Special handling for initiated_by - use edited value if present, otherwise use computed from order
-        if (key === "initiated_by") {
-          const editedValue = reportFormData.initiated_by;
-          const computedValue =
-            order?.officer_name && order?.bank_name
-              ? `${order.officer_name}, ${order.bank_name}`
-              : "";
-          const finalValue = editedValue || computedValue;
-          if (finalValue) {
-            reportData[key] = finalValue;
-          }
-          return; // Skip the normal flow for this field
-        }
-
-        // Special handling for ref_no_bank - always use current order values
-        if (key === "ref_no_bank") {
-          const computedRefNoBank = order?.bank_initial || "";
-          if (computedRefNoBank) {
-            reportData[key] = computedRefNoBank;
-          }
-          return; // Skip the normal flow for this field
-        }
-
-        // Special handling for ref_no_code - always use current order values
-        if (key === "ref_no_code") {
-          const computedRefNoCode = order?.valuer_name
-            ? getRefNoCode(order.valuer_name)
-            : "";
-          if (computedRefNoCode) {
-            reportData[key] = computedRefNoCode;
-          }
-          return; // Skip the normal flow for this field
-        }
-
-        // Check if this field was explicitly cleared by the user
-        if (clearedFieldsRef.current.has(key)) {
-          // Include cleared fields as null in the payload
-          reportData[key] = null;
-        } else if (value !== null && value !== undefined && value !== "") {
-          // Only include fields that have meaningful values (not null, undefined, or empty string)
-          reportData[key] = value;
-        }
+        reportData[key] = null; // Send null for empty values
       }
     });
+
+    // Add invoice_no_date (combined from invoice_no and invoice_date) - always include with fresh computed value
+    const invoiceNo = reportFormData.invoice_no || "";
+    const invoiceDate = reportFormData.invoice_date || "";
+    let combinedInvoiceData = "";
+    if (invoiceNo && invoiceDate) {
+      combinedInvoiceData = `${invoiceNo} Dated ${invoiceDate}`;
+    } else if (invoiceNo) {
+      combinedInvoiceData = invoiceNo;
+    } else if (invoiceDate) {
+      combinedInvoiceData = `Dated ${invoiceDate}`;
+    }
+    reportData.invoice_no_date = combinedInvoiceData || null;
 
     // Add flexible fields in the same format as report generation
     let formDataIndex = 0;
@@ -3095,7 +3037,6 @@ function CEReport() {
                         name="ref_no_year"
                         value={reportFormData.ref_no_year}
                         onChange={handleFormChange}
-                        readOnly
                       />
                       <span className="ref-no-slash">/</span>
                       <input

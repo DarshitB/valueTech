@@ -474,6 +474,9 @@ function MarineReport() {
       return;
     }
 
+    // Clear the cleared fields tracking when loading report data
+    clearedFieldsRef.current.clear();
+
     setReportFormData((prev) => {
       const updated = { ...prev };
 
@@ -498,15 +501,26 @@ function MarineReport() {
 
         // Special handling for invoice_no_date - split into separate fields
         if (key === "invoice_no_date" && fieldValue) {
-          // Parse "12 Dated 12" format
-          const parts = fieldValue.split(" Dated ");
-          if (parts.length === 2) {
-            updated.invoice_no = parts[0].trim();
-            updated.invoice_date = parts[1].trim();
+          // Parse possible formats:
+          // 1. "InvoiceNo Dated Date" - both invoice number and date
+          // 2. "Dated Date" - only date (no invoice number)
+          // 3. "InvoiceNo" - only invoice number (no date)
+          if (fieldValue.startsWith("Dated ")) {
+            // Only date format: "Dated Date"
+            updated.invoice_no = "";
+            updated.invoice_date = fieldValue.replace("Dated ", "").trim();
           } else {
-            // If format doesn't match, put everything in invoice_no
-            updated.invoice_no = fieldValue;
-            updated.invoice_date = "";
+            // Check if it contains " Dated " separator
+            const parts = fieldValue.split(" Dated ");
+            if (parts.length === 2) {
+              // Both invoice number and date: "InvoiceNo Dated Date"
+              updated.invoice_no = parts[0].trim();
+              updated.invoice_date = parts[1].trim();
+            } else {
+              // Only invoice number: "InvoiceNo"
+              updated.invoice_no = fieldValue.trim();
+              updated.invoice_date = "";
+            }
           }
           return;
         }
@@ -1714,8 +1728,9 @@ function MarineReport() {
       let value = reportFormData[key];
 
       // Check if this field was explicitly cleared by the user
-      if (clearedFieldsRef.current.has(key)) {
-        // Include cleared fields as empty string (null) in the payload
+      // BUT: if field has a value now, send the value (user re-entered it)
+      if (clearedFieldsRef.current.has(key) && (!value || value === "")) {
+        // Field was cleared and is still empty - send as empty string (null)
         formData.append(key, "");
         return;
       }
@@ -1908,8 +1923,9 @@ function MarineReport() {
       let value = reportFormData[key];
 
       // Check if this field was explicitly cleared by the user
-      if (clearedFieldsRef.current.has(key)) {
-        // Include cleared fields as empty string (null) in the payload
+      // BUT: if field has a value now, send the value (user re-entered it)
+      if (clearedFieldsRef.current.has(key) && (!value || value === "")) {
+        // Field was cleared and is still empty - send as empty string (null)
         formData.append(key, "");
         return;
       }
@@ -2471,7 +2487,6 @@ function MarineReport() {
                         name="ref_no_year"
                         value={reportFormData.ref_no_year}
                         onChange={handleFormChange}
-                        readOnly
                       />
                       <span className="ref-no-slash">/</span>
                       <input

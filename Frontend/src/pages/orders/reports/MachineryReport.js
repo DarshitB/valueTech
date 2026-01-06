@@ -679,6 +679,9 @@ function MachineryReport() {
       return;
     }
 
+    // Clear the cleared fields tracking when loading report data
+    clearedFieldsRef.current.clear();
+
     setReportFormData((prev) => {
       const updated = { ...prev };
 
@@ -775,15 +778,26 @@ function MachineryReport() {
 
         // Special handling for invoice_no_date - split into separate fields
         if (key === "invoice_no_date" && fieldValue) {
-          // Parse "12 Dated 12" format
-          const parts = fieldValue.split(" Dated ");
-          if (parts.length === 2) {
-            updated.invoice_no = parts[0].trim();
-            updated.invoice_date = parts[1].trim();
+          // Parse possible formats:
+          // 1. "InvoiceNo Dated Date" - both invoice number and date
+          // 2. "Dated Date" - only date (no invoice number)
+          // 3. "InvoiceNo" - only invoice number (no date)
+          if (fieldValue.startsWith("Dated ")) {
+            // Only date format: "Dated Date"
+            updated.invoice_no = "";
+            updated.invoice_date = fieldValue.replace("Dated ", "").trim();
           } else {
-            // If format doesn't match, put everything in invoice_no
-            updated.invoice_no = fieldValue;
-            updated.invoice_date = "";
+            // Check if it contains " Dated " separator
+            const parts = fieldValue.split(" Dated ");
+            if (parts.length === 2) {
+              // Both invoice number and date: "InvoiceNo Dated Date"
+              updated.invoice_no = parts[0].trim();
+              updated.invoice_date = parts[1].trim();
+            } else {
+              // Only invoice number: "InvoiceNo"
+              updated.invoice_no = fieldValue.trim();
+              updated.invoice_date = "";
+            }
           }
           return;
         }
@@ -1295,67 +1309,35 @@ function MachineryReport() {
         combinedInvoiceData = `Dated ${invoiceDate}`;
       }
 
-      // Add all form fields to FormData
+      // Add all form fields to FormData - simple logic: if value exists send it, if null/empty send null
       Object.keys(reportFormData).forEach((key) => {
         let value = reportFormData[key];
 
-        // Skip individual invoice fields and invoice_no_date - we'll add invoice_no_date separately
-        if (
-          key === "invoice_no" ||
-          key === "invoice_date" ||
-          key === "invoice_no_date"
-        ) {
-          return;
-        }
-
-        // Clear asset_make if new_asset_make has value
-        if (key === "asset_make" && reportFormData.new_asset_make) {
-          return; // Skip adding asset_make to payload if new_asset_make exists
-        }
-
-        // Skip here; amount_in_words is handled centrally above
+        // Skip amount_in_words - handled separately above
         if (key === "amount_in_words") {
           return;
         }
 
-        // Special handling for initiated_by - use edited value if present, otherwise use computed from order
-        if (key === "initiated_by") {
-          value =
-            reportFormData.initiated_by ||
-            (order?.officer_name && order?.bank_name
-              ? `${order.officer_name}, ${order.bank_name}`
-              : "");
-        }
-
-        // Special handling for ref_no_bank - always use current order values
-        if (key === "ref_no_bank") {
-          value = order?.bank_initial || "";
-        }
-
-        // Special handling for ref_no_code - always use current order values
-        if (key === "ref_no_code") {
-          value = order?.valuer_name ? getRefNoCode(order.valuer_name) : "";
-        }
-
-        // Skip disclaimer; it's handled separately and ALWAYS included
+        // Skip disclaimer - handled separately below
         if (key === "disclaimer") {
           return;
         }
 
-        // Check if this field was explicitly cleared by the user
-        if (clearedFieldsRef.current.has(key)) {
-          // Include cleared fields as null in the payload
-          formData.append(key, "");
-        } else if (value !== null && value !== "") {
-          // Only include fields that have meaningful values
+        // Skip invoice_no_date - will be added separately with fresh computed value
+        if (key === "invoice_no_date") {
+          return;
+        }
+
+        // Simple logic: if value exists, send it; if null/empty, send null
+        if (value !== null && value !== undefined && value !== "") {
           formData.append(key, value);
+        } else {
+          formData.append(key, ""); // Send empty string for null/empty values
         }
       });
 
-      // Add the combined invoice data
-      if (combinedInvoiceData) {
-        formData.append("invoice_no_date", combinedInvoiceData);
-      }
+      // Add invoice_no_date (combined from invoice_no and invoice_date) - always include with fresh computed value
+      formData.append("invoice_no_date", combinedInvoiceData || "");
 
       // ALWAYS include disclaimer in payload
       const defaultDisclaimer =
@@ -1525,83 +1507,46 @@ function MachineryReport() {
     // ALWAYS include disclaimer in payload - no conditions
     reportData.disclaimer = reportFormData.disclaimer || defaultDisclaimer;
 
-    // Add report form data - only include fields with actual values
+    // Add all form fields to reportData - simple logic: if value exists send it, if null/empty send null
     Object.keys(reportFormData).forEach((key) => {
-      const value = reportFormData[key];
+      let value = reportFormData[key];
 
-      // Skip disclaimer as it's already handled above
+      // Skip disclaimer - handled separately above
       if (key === "disclaimer") {
         return;
       }
 
-      // Always include important read-only fields even if empty
-      const alwaysIncludeFields = [
-        "tax_invoice_copy",
-        "amount_in_words",
-        "license_no",
-        "valuer_contact",
-        "depreciation_value",
-      ];
+      // Handle amount_in_words - use computed value
+      if (key === "amount_in_words") {
+        reportData[key] = computedAmountInWords || null;
+        return;
+      }
 
-      if (alwaysIncludeFields.includes(key)) {
-        // Always include these fields with default values if empty
-        let defaultValue = value || "";
+      // Skip invoice_no_date - will be added separately with fresh computed value
+      if (key === "invoice_no_date") {
+        return;
+      }
 
-        // Set default values for read-only fields if they're empty
-        if (key === "tax_invoice_copy" && !defaultValue) {
-          defaultValue = "COPY AVAILABLE & VERIFIED";
-        }
-        // amount_in_words: use centralized computed value
-        if (key === "amount_in_words") {
-          defaultValue = computedAmountInWords;
-        }
-
-        reportData[key] = defaultValue;
+      // Simple logic: if value exists, send it; if null/empty, send null
+      if (value !== null && value !== undefined && value !== "") {
+        reportData[key] = value;
       } else {
-        // Special handling for initiated_by - use edited value if present, otherwise use computed from order
-        if (key === "initiated_by") {
-          const editedValue = reportFormData.initiated_by;
-          const computedValue =
-            order?.officer_name && order?.bank_name
-              ? `${order.officer_name}, ${order.bank_name}`
-              : "";
-          const finalValue = editedValue || computedValue;
-          if (finalValue) {
-            reportData[key] = finalValue;
-          }
-          return; // Skip the normal flow for this field
-        }
-
-        // Special handling for ref_no_bank - always use current order values
-        if (key === "ref_no_bank") {
-          const computedRefNoBank = order?.bank_initial || "";
-          if (computedRefNoBank) {
-            reportData[key] = computedRefNoBank;
-          }
-          return; // Skip the normal flow for this field
-        }
-
-        // Special handling for ref_no_code - always use current order values
-        if (key === "ref_no_code") {
-          const computedRefNoCode = order?.valuer_name
-            ? getRefNoCode(order.valuer_name)
-            : "";
-          if (computedRefNoCode) {
-            reportData[key] = computedRefNoCode;
-          }
-          return; // Skip the normal flow for this field
-        }
-
-        // Check if this field was explicitly cleared by the user
-        if (clearedFieldsRef.current.has(key)) {
-          // Include cleared fields as null in the payload
-          reportData[key] = null;
-        } else if (value !== null && value !== undefined && value !== "") {
-          // Only include fields that have meaningful values (not null, undefined, or empty string)
-          reportData[key] = value;
-        }
+        reportData[key] = null; // Send null for empty values
       }
     });
+
+    // Add invoice_no_date (combined from invoice_no and invoice_date) - always include with fresh computed value
+    const invoiceNo = reportFormData.invoice_no || "";
+    const invoiceDate = reportFormData.invoice_date || "";
+    let combinedInvoiceData = "";
+    if (invoiceNo && invoiceDate) {
+      combinedInvoiceData = `${invoiceNo} Dated ${invoiceDate}`;
+    } else if (invoiceNo) {
+      combinedInvoiceData = invoiceNo;
+    } else if (invoiceDate) {
+      combinedInvoiceData = `Dated ${invoiceDate}`;
+    }
+    reportData.invoice_no_date = combinedInvoiceData || null;
 
     // Add flexible fields in the same format as report generation
     let formDataIndex = 0;
@@ -2104,7 +2049,6 @@ function MachineryReport() {
                         name="ref_no_year"
                         value={reportFormData.ref_no_year}
                         onChange={handleFormChange}
-                        readOnly
                       />
                       <span className="ref-no-slash">/</span>
                       <input

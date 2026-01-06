@@ -461,15 +461,26 @@ function AVRReport() {
 
         // Special handling for invoice_no_date - split into separate fields
         if (key === "invoice_no_date" && fieldValue) {
-          // Parse "12 Dated 12" format
-          const parts = fieldValue.split(" Dated ");
-          if (parts.length === 2) {
-            updated.invoice_no = parts[0].trim();
-            updated.invoice_date = parts[1].trim();
+          // Parse possible formats:
+          // 1. "InvoiceNo Dated Date" - both invoice number and date
+          // 2. "Dated Date" - only date (no invoice number)
+          // 3. "InvoiceNo" - only invoice number (no date)
+          if (fieldValue.startsWith("Dated ")) {
+            // Only date format: "Dated Date"
+            updated.invoice_no = "";
+            updated.invoice_date = fieldValue.replace("Dated ", "").trim();
           } else {
-            // If format doesn't match, put everything in invoice_no
-            updated.invoice_no = fieldValue;
-            updated.invoice_date = "";
+            // Check if it contains " Dated " separator
+            const parts = fieldValue.split(" Dated ");
+            if (parts.length === 2) {
+              // Both invoice number and date: "InvoiceNo Dated Date"
+              updated.invoice_no = parts[0].trim();
+              updated.invoice_date = parts[1].trim();
+            } else {
+              // Only invoice number: "InvoiceNo"
+              updated.invoice_no = fieldValue.trim();
+              updated.invoice_date = "";
+            }
           }
           return;
         }
@@ -678,17 +689,15 @@ function AVRReport() {
     // Create FormData for multipart/form-data submission
     const formData = new FormData();
 
-    // Add all form fields to FormData
+    // Add all form fields to FormData - simple logic: if value exists send it, if null/empty send null
     Object.keys(reportFormData).forEach((key) => {
       let value = reportFormData[key];
 
-      // Check if this field was explicitly cleared by the user
-      if (clearedFieldsRef.current.has(key)) {
-        // Include cleared fields as empty string (null) in the payload
-        formData.append(key, "");
+      // Simple logic: if value exists, send it; if null/empty, send null
+      if (value !== null && value !== undefined && value !== "") {
+        formData.append(key, value);
       } else {
-        // Always append the value, even if empty, to ensure all fields are in payload
-        formData.append(key, value || "");
+        formData.append(key, ""); // Send empty string for null/empty values
       }
     });
 
@@ -767,25 +776,15 @@ function AVRReport() {
     // Create report data object with only non-empty fields
     const reportData = {};
 
-    // Add report form data - only include fields with actual values
+    // Add all form fields to reportData - simple logic: if value exists send it, if null/empty send null
     Object.keys(reportFormData).forEach((key) => {
       const value = reportFormData[key];
 
-      // Always include important read-only fields even if empty
-      const alwaysIncludeFields = []; // AVR report may not have many read-only fields
-
-      if (alwaysIncludeFields.includes(key)) {
-        // Always include these fields, even if empty
-        reportData[key] = value || "";
+      // Simple logic: if value exists, send it; if null/empty, send null
+      if (value !== null && value !== undefined && value !== "") {
+        reportData[key] = value;
       } else {
-        // Check if this field was explicitly cleared by the user
-        if (clearedFieldsRef.current.has(key)) {
-          // Include cleared fields as null in the payload
-          reportData[key] = null;
-        } else if (value !== null && value !== undefined && value !== "") {
-          // Only include fields that have meaningful values (not null, undefined, or empty string)
-          reportData[key] = value;
-        }
+        reportData[key] = null; // Send null for empty values
       }
     });
 
@@ -944,7 +943,6 @@ function AVRReport() {
                         name="ref_no_year"
                         value={reportFormData.ref_no_year}
                         onChange={handleFormChange}
-                        readOnly
                       />
                       <span className="ref-no-slash">/</span>
                       <input

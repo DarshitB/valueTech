@@ -14,41 +14,191 @@ function generateCEReportHTML(formData, extraData, bgImageBase64, stampImageBase
 <html>
 <head>
     <style>
+        /* ============================================
+           CONFIGURABLE BOTTOM SPACE - CHANGE HERE
+           Same approach as top spacer (225px) - this repeats on every page
+           ============================================ */
+        :root {
+            --bottom-space: 80px; /* Bottom space reserved - change this value to adjust */
+        }
+        
         @page {
             margin: 0px;
             size: 8.5in 14in;
+            /* Initialize page counter - counter(page) is built-in */
         }
         
         body {
-            background-image: url('${bgImageBase64 || ""}');
-            background-size: 100% 100%;
-            background-repeat: no-repeat;
-            background-position: top left;
-            background-attachment: fixed;
             font-family: sans-serif;
             padding: 0px;
             margin: 0px;
-            width: 8.5in;
-            height: 14in;
-            min-height: 14in;
             box-sizing: border-box;
+            width: 8.5in;
+            background-image: url('${bgImageBase64 || ""}');
+            background-size: 8.5in 14in;
+            background-repeat: repeat-y;
+            background-position: top left;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            color-adjust: exact;
         }
         
         .content-wrapper {
-            padding: 30px 25px;
+            padding: 30px 25px; /* Consistent padding: top 30px, sides 25px */
+            /* Bottom space handled by tfoot spacer row (same approach as top spacer) */
             width: 100%;
-            height: 100%;
             box-sizing: border-box;
+            position: relative;
+            background: transparent;
+        }
+        
+        /* Footer for page numbers - positioned independently of content */
+        body {
+            position: relative;
+            min-height: 14in;
+        }
+        
+        .page-footer {
+            position: absolute;
+            bottom: 50px;
+            left: 50px;
+            right: 50px;
+            border-top: 1px solid #e0e0e0;
+            padding: 8px 10px;
+            font-size: 10px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.9);
+            pointer-events: none;
+        }
+        
+        /* Hide footer in screen view, show only in print */
+        @media screen {
+            .page-footer {
+                display: none;
+            }
+        }
+        
+        .footer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+        
+        .footer .page-number {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .footer .page-number .number {
+            font-weight: bold;
+            color: #000;
+        }
+        
+        /* Page numbers will be set via CSS counter in print media */
+        .footer .page-number .number {
+            /* Empty by default, will be populated by CSS counter in print */
+        }
+        
+        .footer .page-number .separator {
+            color: #000;
+        }
+        
+        .footer .page-number .label {
+            color: #999;
+            font-weight: normal;
         }
         
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 195px; /* adjust position */
-            page-break-inside: avoid;
+            margin-top: -30px; /* Adjusted: 195px desired - 225px spacer = -30px offset */
+            margin-bottom: 0; /* No bottom margin - bottom padding handled by wrapper */
+        }
+        
+        /* Single page: table should fill 100% height like CV report */
+        body.single-page table {
+            height: 100%;
+        }
+        
+        body.single-page .content-wrapper {
+            height: 100%;
+        }
+
+        thead {
+            display: table-header-group;
+        }
+        
+        /* Spacer row provides 225px spacing when thead repeats on new pages */
+        /* On first page: table margin -30px + spacer 225px = 195px total */
+        /* On new pages: spacer 225px = 225px total */
+        thead .spacer-row {
+            height: 225px; /* 225px spacing for new pages, also used on first page */
+            border: none;
+            visibility: hidden;
+        }
+        
+        thead .spacer-row td {
+            border: none;
+            padding: 0;
+            height: 225px;
+            line-height: 225px;
+        }
+        
+        tbody {
+            display: table-row-group;
+        }
+        
+        tfoot {
+            display: table-footer-group;
+        }
+        
+        /* Bottom spacer row provides reserved space at bottom (same approach as top spacer) */
+        /* This spacer repeats on every page, ensuring bottom space is always reserved */
+        tfoot .spacer-row {
+            height: var(--bottom-space); /* Uses CSS variable - change in one place */
+            border: none;
+            visibility: hidden;
+        }
+        
+        tfoot .spacer-row td {
+            border: none;
+            padding: 0;
+            height: var(--bottom-space);
+            line-height: var(--bottom-space);
         }
         
         tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        
+        /* Keep tyre image and signature rows together on same page */
+        tr.tyre-image-row {
+            page-break-after: avoid;
+            break-after: avoid;
+        }
+        
+        tr.signature-row {
+            page-break-before: avoid;
+            break-before: avoid;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        
+        /* Ensure tyre image and signature rows stay together */
+        tr.tyre-image-row + tr.signature-row {
+            page-break-before: avoid;
+            break-before: avoid;
+        }
+        
+        /* Ensure nested tables don't break across pages */
+        td table {
+            page-break-inside: avoid;
+        }
+        
+        td table tr {
             page-break-inside: avoid;
             break-inside: avoid;
         }
@@ -57,12 +207,100 @@ function generateCEReportHTML(formData, extraData, bgImageBase64, stampImageBase
         @media print {
             body {
                 background-image: url('${bgImageBase64 || ""}');
-                background-size: 100% 100%;
-                background-repeat: no-repeat;
+                background-size: 8.5in 14in;
+                background-repeat: repeat-y;
                 background-position: top left;
-                background-attachment: fixed;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
+                color-adjust: exact;
+            }
+            
+            .content-wrapper {
+                padding: 30px 25px; /* Consistent padding on all pages */
+                /* Bottom space handled by tfoot spacer row (repeats on every page) */
+            }
+            
+            /* Footer fixed to bottom of each page in print */
+            .page-footer {
+                position: fixed;
+                left: 50px;
+                right: 50px;
+                bottom: 35px;
+                background: rgba(255, 255, 255, 0.95);
+                display: block !important;
+                z-index: 1000;
+            }
+            
+            /* Ensure footer appears on each page */
+            .page-footer-marker {
+                page-break-after: always;
+            }
+            
+            /* Page counter for footer */
+            .footer .page-number .number::before {
+                content: counter(page);
+            }
+            
+            /* Ensure each page section has proper padding */
+            @page {
+                margin: 0;
+                size: 8.5in 14in;
+            }
+            
+            /* Page counter for footer - counter(page) is built-in for print media */
+            .footer .page-number .number {
+                display: inline-block;
+            }
+            
+            /* Page counter - counter(page) is built-in for print media */
+            /* Note: This may not work with Puppeteer, page numbers may need to be injected via JavaScript */
+            .footer .page-number .number::before {
+                content: counter(page);
+                font-weight: bold;
+                color: #000;
+            }
+            
+            thead {
+                display: table-header-group;
+            }
+            
+            tbody {
+                display: table-row-group;
+            }
+            
+            tfoot {
+                display: table-footer-group;
+            }
+            
+            tr {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            
+            /* Keep tyre image and signature rows together on same page */
+            tr.tyre-image-row {
+                page-break-after: avoid !important;
+                break-after: avoid !important;
+            }
+            
+            tr.signature-row {
+                page-break-before: avoid !important;
+                break-before: avoid !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            
+            /* Ensure tyre image and signature rows stay together */
+            tr.tyre-image-row + tr.signature-row {
+                page-break-before: avoid !important;
+                break-before: avoid !important;
+            }
+            
+            /* Force backgrounds and images to print */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
             }
         }
 
@@ -80,13 +318,17 @@ function generateCEReportHTML(formData, extraData, bgImageBase64, stampImageBase
 <body>
     <div class="content-wrapper">
         <table style="min-height: calc(100% - 225px);">
+        <thead>
+        <tr class="spacer-row">
+            <td colspan="6" style="height: 225px; border: none; padding: 0;"></td>
+        </tr>
         <tr>
             <th colspan="6">${extraData.bank_name}</th>
         </tr>
         <tr>
             <th colspan="6">${formData.valueation_report_for_heading}</th>
         </tr>
-        <tr>
+        <tr class="general-details-row">
             <th colspan="6">${formData.general_details_heading}</th>
         </tr>
         <tr>
@@ -97,6 +339,8 @@ function generateCEReportHTML(formData, extraData, bgImageBase64, stampImageBase
             <td>REV-REPORT DATE:</td>
             <td colspan="2">${formData.rev_report_date}</td>
         </tr>
+        </thead>
+        <tbody>
         <tr>
             <td>VALUER NAME:</td>
             <td colspan="2">${formData.valuer_name}</td>
@@ -586,7 +830,7 @@ function generateCEReportHTML(formData, extraData, bgImageBase64, stampImageBase
             } WHOM, THIS VALUATION REPORT IS ADDRESSED AND IS TO BE USED SOLELY BY THE SAID PARTY FOR THE STATED PURPOSE ONLY. VISHAL D. KOTHARI WILL NOT BE HELD LIBLE FOR ANY LOSS OR LIABLITY SUSTAINED BY ANY PARTY RELYING ON THIS VALUATION REPORT. VISHAL D. KOTHARI HAS RELIED ON THE DATA PROVIDED BY THE CLIENT & HAS NOT VERIFIED GENIUNENESS THEREOFF. AS THERE IS NO STANDARD PRICE LIST FOR PRE-OWNED/USED MACHINERY / CRANE, THIS VALUATION INDICATED IN THE REPORT IS OUR PROFESSIONAL OPINION ONLY ON THE MARKET VALUE OF THE PRODUCT SHOWN IN COLLAGE OR IN DETAILS BASED ON STANDARD VALUATION METHODOLOGY & PROCEDURES CALCULATING FLUCTUATIONS & LIMITATIONS OF VALUATED PRODUCTS. ACUAL REALISATION MAY DIFFER FROM THE VALUATION INDICATED IN THE REPORT. VISHAL D. KOTHARI (SIGNATORY & EMPLOYEES WILL NOT BE HELD LIABLE FOR ANY DIRECT, INDIRECT CONSEQUENTIAL OR EXEMPLARY DAMEGES FOR ANY LOSS RESULTING FROM THE USE OF THIS REPORT. VISHAL D. KOTHARI IS NOT RESPONSIBLE FOR VERIFYING THE GENUINENESS OF THE PROVIDED DOCUMENTS. THE VALUATION OF ASSET IS PRIMARILY BASED ON THE CONDITION OF THE MACHINERY AT THE TIME OF INSPECTION & SURVEY. TO GIVE LOAN TO THE APPLICANT IS THE RESPONSIIBLITY OF THE FINANCE COMPANY/BANK. WE ARE NOT RESPONSIBLE OR CONCERNED FOR THE SAME.
             </td>
         </tr>
-        <tr>
+        <tr class="tyre-image-row">
             <td colspan="6" style="height: 58px; position: relative;">
                 ${
                   formData.tyre_image_base64
@@ -595,13 +839,30 @@ function generateCEReportHTML(formData, extraData, bgImageBase64, stampImageBase
                 }
             </td>
         </tr>
-        <tr>
+        <tr class="signature-row">
             <td colspan="6" style="height: 48px; position: relative;">
                 ${stampImageBase64 ? `<img src="${stampImageBase64}" alt="stamp" style="position:absolute; left:50%; bottom: -5px; transform:translateX(calc(-50% - 250px)); height: 125px; z-index:2; pointer-events:none;" />` : ""}
                 SIGNATURE WITH SEAL & STAMP
             </td>
         </tr>
+        </tbody>
+        <tfoot>
+            <tr class="spacer-row">
+                <td colspan="6" style="height: var(--bottom-space); border: none; padding: 0;"></td>
+            </tr>
+        </tfoot>
     </table>
+    </div>
+    <!-- Footer is now handled by Puppeteer's displayHeaderFooter feature -->
+    <!-- The template footer is hidden since Puppeteer adds its own footer with page numbers -->
+    <div class="page-footer" style="display: none !important;">
+        <div class="footer">
+            <div class="page-number">
+                <span class="number"></span>
+                <span class="separator">|</span>
+                <span class="label">Page</span>
+            </div>
+        </div>
     </div>
 </body>
 </html>

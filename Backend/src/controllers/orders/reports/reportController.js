@@ -1005,7 +1005,9 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
 
     // Generate PDF with legal size dimensions (8.5" x 14")
     const pdfStartTime = Date.now();
-    await page.pdf({
+    
+    // For CV reports, use displayHeaderFooter to add page numbers
+    const pdfOptions = {
       path: outputPath,
       format: "Legal",
       printBackground: true,
@@ -1018,8 +1020,112 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
       width: "8.5in",
       height: "14in",
       preferCSSPageSize: true,
-      displayHeaderFooter: false,
-    });
+    };
+    
+    // CV, CE, and Machinery Report specific handling: Single-page detection and footer management
+    if (reportType.toLowerCase() === "report_cv" || reportType.toLowerCase() === "report_ce" || reportType.toLowerCase() === "report_machinery") {
+      // Constants for CV/CE report calculations (same structure for both)
+      const REPORT_CONSTANTS = {
+        PAGE_HEIGHT_INCHES: 14,
+        DPI: 96,
+        TOP_SPACER_HEIGHT: 225, // Top spacer row height (matches thead .spacer-row)
+        TOP_PADDING: 30, // Top padding from content-wrapper
+        DEFAULT_BOTTOM_SPACE: 80, // Default bottom space if CSS variable not found
+        STYLE_APPLY_DELAY: 300, // Delay for styles to apply (ms)
+      };
+
+      // Apply initial height styles for proper measurement
+      await page.evaluate(() => {
+        document.body.style.height = '14in';
+        document.body.style.minHeight = '14in';
+        const contentWrapper = document.querySelector('.content-wrapper');
+        if (contentWrapper) {
+          contentWrapper.style.height = '100%';
+          contentWrapper.style.minHeight = '100%';
+        }
+      });
+      
+      // Wait for styles to apply before measuring
+      await new Promise(resolve => setTimeout(resolve, REPORT_CONSTANTS.STYLE_APPLY_DELAY));
+      
+      // Measure content and get spacer values
+      const { actualContentHeight, topSpacerHeight, bottomSpace } = await page.evaluate((constants) => {
+        const contentWrapper = document.querySelector('.content-wrapper');
+        const styles = getComputedStyle(document.documentElement);
+        const bottomSpace = parseFloat(styles.getPropertyValue('--bottom-space')) || constants.DEFAULT_BOTTOM_SPACE;
+        const topSpacerHeight = constants.TOP_SPACER_HEIGHT;
+        const topPadding = constants.TOP_PADDING;
+        
+        // Calculate actual content height excluding padding and spacers
+        let actualContentHeight = 0;
+        if (contentWrapper) {
+          const wrapperHeight = contentWrapper.scrollHeight;
+          actualContentHeight = wrapperHeight - topPadding - topSpacerHeight - bottomSpace;
+        }
+        
+        return {
+          actualContentHeight: Math.max(0, actualContentHeight),
+          topSpacerHeight: topSpacerHeight,
+          bottomSpace: bottomSpace
+        };
+      }, REPORT_CONSTANTS);
+      
+      // Calculate page dimensions
+      const fullPageHeightPx = REPORT_CONSTANTS.PAGE_HEIGHT_INCHES * REPORT_CONSTANTS.DPI;
+      const usablePageHeightPx = fullPageHeightPx - topSpacerHeight - bottomSpace;
+      const totalPages = Math.ceil(actualContentHeight / usablePageHeightPx);
+      
+      // Configure PDF options based on page count
+      if (totalPages > 1) {
+        // Multi-page: Remove single-page class and enable footer
+        await page.evaluate(() => {
+          document.body.classList.remove('single-page');
+          const table = document.querySelector('table');
+          if (table) {
+            table.style.height = '';
+          }
+        });
+        
+        pdfOptions.displayHeaderFooter = true;
+        pdfOptions.footerTemplate = `
+          <div style="font-size: 10px; width: 100%; text-align: center; padding: 8px 10px; border-top: 1px solid #e0e0e0; background: rgba(255, 255, 255, 0.95); margin-left: 50px; margin-right: 50px; margin-bottom: 20px;">
+            <span style="font-weight: bold; color: #000;"><span class="pageNumber"></span></span>
+            <span style="color: #000;">|</span>
+            <span style="color: #999;">Page</span>
+          </div>
+        `;
+        pdfOptions.headerTemplate = '<div></div>';
+        pdfOptions.margin = {
+          top: "0px",
+          right: "0px",
+          bottom: "40px", // Footer area: 20px spacing + ~30px footer height
+          left: "0px",
+        };
+      } else {
+        // Single-page: Add single-page class and set table to fill height
+        await page.evaluate(() => {
+          document.body.classList.add('single-page');
+          const table = document.querySelector('table');
+          if (table) {
+            table.style.height = '100%';
+            table.style.minHeight = '';
+          }
+        });
+        
+        pdfOptions.displayHeaderFooter = false;
+        pdfOptions.margin = {
+          top: "0px",
+          right: "0px",
+          bottom: "0px",
+          left: "0px",
+        };
+      }
+    } else {
+      // Other reports: No footer by default
+      pdfOptions.displayHeaderFooter = false;
+    }
+    
+    await page.pdf(pdfOptions);
   } catch (error) {
     console.error("Puppeteer error during report generation:", error);
     throw new Error(`Failed to generate PDF: ${error.message}`);
