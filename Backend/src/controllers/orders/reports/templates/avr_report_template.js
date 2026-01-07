@@ -1,4 +1,20 @@
 /**
+ * Helper function to render HTML content from field values
+ * Preserves HTML tags and converts line breaks to <br> tags
+ * This is used by AVR report template
+ */
+const renderFieldValue = (value) => {
+  if (!value) return "";
+  // Convert string to string if it's not already
+  const strValue = String(value);
+  // Replace \r\n and \n with <br> tags for proper line breaks
+  return strValue
+    .replace(/\r\n/g, "<br>")
+    .replace(/\n/g, "<br>")
+    .replace(/\r/g, "<br>");
+};
+
+/**
  * AVR Report Template
  * This template generates HTML for Asset Verification Reports
  *
@@ -136,7 +152,7 @@ function generateAVRReportHTML(
             </tr>
             <tr>
                 <th style="width: 10%;">Address - as per KYC</th>
-                <td colspan="2">${formData.address_as_per_kyc || ""}</td>
+                <td colspan="2">${renderFieldValue(formData.address_as_per_kyc || "")}</td>
             </tr>
             <tr>
                 <th style="width: 10%;">Machinery Locations</th>
@@ -224,7 +240,7 @@ function generateAVRReportHTML(
             </tr>
             <tr>
                 <th style="width: 10%;">Pro.Owner & Address</th>
-                <td colspan="2">${formData.pro_owner_address || ""}</td>
+                <td colspan="2">${renderFieldValue(formData.pro_owner_address || "")}</td>
             </tr>
             <tr>
                 <th style="width: 10%;">Insurer / Policy no</th>
@@ -277,7 +293,7 @@ function generateAVRReportHTML(
                 <th colspan="3">OBSERVATION</th>
             </tr>
             <tr>
-                <td colspan="3">${formData.observation || ""}</td>
+                <td colspan="3">${renderFieldValue(formData.observation || "")}</td>
             </tr>
             <tr>
                 <th colspan="3">&nbsp;</th>

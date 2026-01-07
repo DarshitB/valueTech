@@ -21,6 +21,110 @@ import { toast } from "react-toastify";
 import "../order.scss";
 import { DeleteIcon } from "../../../components/icons";
 
+// WYSIWYG Textarea Component - preserves HTML formatting
+const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "", name, readOnly = false }) => {
+  const editorRef = useRef(null);
+  const isUpdatingRef = useRef(false);
+
+  // Update content when value prop changes (from external source)
+  useEffect(() => {
+    if (editorRef.current && !isUpdatingRef.current) {
+      const currentContent = editorRef.current.innerHTML;
+      const newContent = value || "";
+      
+      // Only update if the value is different to avoid cursor jumping
+      if (currentContent !== newContent) {
+        const selection = window.getSelection();
+        const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+        const wasFocused = document.activeElement === editorRef.current;
+        
+        isUpdatingRef.current = true;
+        editorRef.current.innerHTML = newContent;
+        
+        // Restore cursor position if it was focused
+        if (wasFocused && range) {
+          try {
+            selection.removeAllRanges();
+            selection.addRange(range);
+          } catch (e) {
+            // Ignore if range is invalid
+          }
+        }
+        
+        setTimeout(() => {
+          isUpdatingRef.current = false;
+        }, 0);
+      }
+    }
+  }, [value]);
+
+  const handleInput = (e) => {
+    if (!isUpdatingRef.current && onChange) {
+      const htmlContent = e.target.innerHTML;
+      onChange({
+        target: {
+          name: name,
+          value: htmlContent,
+        },
+      });
+    }
+  };
+
+  const handlePaste = (e) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData("text/html") || e.clipboardData.getData("text/plain");
+    document.execCommand("insertHTML", false, text);
+  };
+
+  // Handle placeholder display
+  useEffect(() => {
+    if (editorRef.current) {
+      if (!value || value === "" || value === "<br>") {
+        editorRef.current.classList.add("empty");
+      } else {
+        editorRef.current.classList.remove("empty");
+      }
+    }
+  }, [value]);
+
+  return (
+    <>
+      <style>{`
+        .wysiwyg-textarea {
+          min-height: 80px !important;
+          padding: 8px 12px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          outline: none;
+          white-space: pre-wrap;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          background-color: white;
+        }
+        .wysiwyg-textarea:focus {
+          border-color: #5864bd;
+          box-shadow: 0 0 0 2px rgba(88, 100, 189, 0.1);
+        }
+        .wysiwyg-textarea.empty:before {
+          content: attr(data-placeholder);
+          color: #999;
+          pointer-events: none;
+        }
+      `}</style>
+      <div
+        ref={editorRef}
+        contentEditable={!readOnly}
+        suppressContentEditableWarning={true}
+        onInput={handleInput}
+        onPaste={handlePaste}
+        className={`form-field wysiwyg-textarea ${className}`}
+        data-placeholder={placeholder}
+        style={readOnly ? { cursor: 'default', backgroundColor: '#f5f5f5' } : {}}
+      />
+    </>
+  );
+};
+
 function AVRReport() {
   const { id } = useParams();
   const dispatch = useDispatch();
@@ -694,8 +798,9 @@ function AVRReport() {
       let value = reportFormData[key];
 
       // Simple logic: if value exists, send it; if null/empty, send null
+      // Note: Textarea values (with line breaks, spaces, formatting) are preserved as-is
       if (value !== null && value !== undefined && value !== "") {
-        formData.append(key, value);
+        formData.append(key, String(value)); // Preserve all formatting including line breaks
       } else {
         formData.append(key, ""); // Send empty string for null/empty values
       }
@@ -729,7 +834,7 @@ function AVRReport() {
       );
       formData.append(
         `flexible_fields[${formDataIndex}][field_value]`,
-        field.field_value
+        String(field.field_value || "") // Preserve all formatting including line breaks
       );
       formData.append(
         `flexible_fields[${formDataIndex}][field_order]`,
@@ -781,8 +886,9 @@ function AVRReport() {
       const value = reportFormData[key];
 
       // Simple logic: if value exists, send it; if null/empty, send null
+      // Note: Textarea values (with line breaks, spaces, formatting) are preserved as-is
       if (value !== null && value !== undefined && value !== "") {
-        reportData[key] = value;
+        reportData[key] = String(value); // Preserve all formatting including line breaks
       } else {
         reportData[key] = null; // Send null for empty values
       }
@@ -800,7 +906,7 @@ function AVRReport() {
         reportData[`flexible_fields[${formDataIndex}][field_label]`] =
           field.field_label;
         reportData[`flexible_fields[${formDataIndex}][field_value]`] =
-          field.field_value;
+          String(field.field_value || ""); // Preserve all formatting including line breaks
         reportData[`flexible_fields[${formDataIndex}][field_order]`] =
           field.field_order;
         formDataIndex++;
@@ -819,7 +925,7 @@ function AVRReport() {
           reportData[`flexible_fields[${formDataIndex}][field_label]`] =
             field.field_label_2;
           reportData[`flexible_fields[${formDataIndex}][field_value]`] =
-            field.field_value_2;
+            String(field.field_value_2 || ""); // Preserve all formatting including line breaks
           reportData[`flexible_fields[${formDataIndex}][field_order]`] =
             field.field_order + 1;
           formDataIndex++;
@@ -1200,14 +1306,12 @@ function AVRReport() {
                       Address - as per KYC{" "}
                       <span className="text-danger">*</span>
                     </label>
-                    <textarea
-                      type="text"
+                    <WysiwygTextarea
                       className="form-field"
                       name="address_as_per_kyc"
                       value={reportFormData.address_as_per_kyc}
                       onChange={handleFormChange}
                       rows={2}
-                      required
                     />
                   </div>
                 </div>
@@ -1286,7 +1390,7 @@ function AVRReport() {
                     <label>
                       Invoice Price <span className="text-danger">*</span>
                     </label>
-                    <textarea
+                    <input
                       type="text"
                       className="form-field"
                       name="invoice_price"
@@ -1479,14 +1583,12 @@ function AVRReport() {
                     <label>
                       Pro.Owner & Address <span className="text-danger">*</span>
                     </label>
-                    <textarea
-                      type="text"
+                    <WysiwygTextarea
                       className="form-field"
                       name="pro_owner_address"
                       value={reportFormData.pro_owner_address}
                       onChange={handleFormChange}
                       rows={2}
-                      required
                     />
                   </div>
                 </div>
@@ -1608,13 +1710,12 @@ function AVRReport() {
                   <h4>OBSERVATION</h4>
                   <hr />
                   <div className="form-group">
-                    <textarea
+                    <WysiwygTextarea
                       className="form-field"
                       name="observation"
                       value={reportFormData.observation}
                       onChange={handleFormChange}
                       rows={5}
-                      required
                     />
                   </div>
                 </div>

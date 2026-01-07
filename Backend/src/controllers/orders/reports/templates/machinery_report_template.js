@@ -1,4 +1,20 @@
 /**
+ * Helper function to render HTML content from field values
+ * Preserves HTML tags and converts line breaks to <br> tags
+ * This is used by Machinery report template and its helper functions
+ */
+const renderFieldValue = (value) => {
+  if (!value) return "";
+  // Convert string to string if it's not already
+  const strValue = String(value);
+  // Replace \r\n and \n with <br> tags for proper line breaks
+  return strValue
+    .replace(/\r\n/g, "<br>")
+    .replace(/\n/g, "<br>")
+    .replace(/\r/g, "<br>");
+};
+
+/**
  * Machinery Report Template
  * This template generates HTML for Machinery reports
  *
@@ -19,12 +35,12 @@ function generateMachineryReportHTML(
 <html>
 <head>
     <style>
-        /* ============================================
+         /* ============================================
            CONFIGURABLE BOTTOM SPACE - CHANGE HERE
            Same approach as top spacer (225px) - this repeats on every page
            ============================================ */
         :root {
-            --bottom-space: 80px; /* Bottom space reserved - change this value to adjust */
+            --bottom-space: 30px; /* Bottom space reserved - change this value to adjust */
         }
         
         @page {
@@ -47,7 +63,6 @@ function generateMachineryReportHTML(
             print-color-adjust: exact;
             color-adjust: exact;
         }
-        
         .content-wrapper {
             padding: 30px 25px; /* Consistent padding: top 30px, sides 25px */
             /* Bottom space handled by tfoot spacer row (same approach as top spacer) */
@@ -61,26 +76,6 @@ function generateMachineryReportHTML(
         body {
             position: relative;
             min-height: 14in;
-        }
-        
-        .page-footer {
-            position: absolute;
-            bottom: 50px;
-            left: 50px;
-            right: 50px;
-            border-top: 1px solid #e0e0e0;
-            padding: 8px 10px;
-            font-size: 10px;
-            z-index: 1000;
-            background: rgba(255, 255, 255, 0.9);
-            pointer-events: none;
-        }
-        
-        /* Hide footer in screen view, show only in print */
-        @media screen {
-            .page-footer {
-                display: none;
-            }
         }
         
         .footer {
@@ -121,14 +116,29 @@ function generateMachineryReportHTML(
             margin-top: -30px; /* Adjusted: 195px desired - 225px spacer = -30px offset */
             margin-bottom: 0; /* No bottom margin - bottom padding handled by wrapper */
         }
-        
-        /* Single page: table should fill 100% height like CV report */
-        body.single-page table {
+       
+        /* Removed single-page stretching CSS to allow proper JS measurement */
+        /* This was causing JS to think all content fits on one page */
+body.single-page{
+        height: 100%;
+            min-height: 14in; /* Legal page height */
             height: 100%;
+            display: flex;
+            flex-direction: column;
         }
-        
+        body.single-page .main-table {
+            flex: 1;
+            height: 100% !important;
+            min-height: calc(100% - 225px);
+            /* background-color: red;
+            border-top: 5px solid green; */
+        }
+
         body.single-page .content-wrapper {
+            min-height: 14in; /* Legal page height */
             height: 100%;
+            display: flex;
+            flex-direction: column;
         }
 
         thead {
@@ -174,28 +184,43 @@ function generateMachineryReportHTML(
             line-height: var(--bottom-space);
         }
         
-        tr {
-            page-break-inside: avoid;
-            break-inside: avoid;
+        /* Footer row with page number and continue text */
+        tfoot .footer-row {
+            height: 30px;
+            border-top: 1px solid #e0e0e0;
         }
         
-        /* Keep signature row together on same page */
-        tr.signature-row {
-            page-break-before: avoid;
-            break-before: avoid;
-            page-break-inside: avoid;
-            break-inside: avoid;
+        tfoot .footer-row td {
+            border: none;
+            padding: 8px 10px;
+            font-size: 10px;
+            text-align: left;
+            vertical-align: middle;
         }
         
-        /* Ensure nested tables don't break across pages */
-        td table {
-            page-break-inside: avoid;
+        tfoot .footer-row .page-number {
+            font-weight: bold;
+            color: #000;
         }
         
-        td table tr {
-            page-break-inside: avoid;
-            break-inside: avoid;
+        tfoot .footer-row .continue-text {
+            text-align: right;
+            color: #666;
         }
+        
+        /* Hide continue text on last page */
+        body.last-page tfoot .footer-row .continue-text,
+        table.last-page tfoot .footer-row .continue-text {
+            display: none;
+        }
+        
+        /* Hide footer completely on single-page reports */
+        body.single-page tfoot .footer-row {
+            display: none !important;
+        }
+        
+        /* NO PAGE-BREAK CSS - All splitting is handled by JavaScript */
+        /* JS will ensure rows stay together and split at proper boundaries */
         
         /* Ensure background image appears on every page */
         @media print {
@@ -214,21 +239,7 @@ function generateMachineryReportHTML(
                 /* Bottom space handled by tfoot spacer row (repeats on every page) */
             }
             
-            /* Footer fixed to bottom of each page in print */
-            .page-footer {
-                position: fixed;
-                left: 50px;
-                right: 50px;
-                bottom: 35px;
-                background: rgba(255, 255, 255, 0.95);
-                display: block !important;
-                z-index: 1000;
-            }
-            
-            /* Ensure footer appears on each page */
-            .page-footer-marker {
-                page-break-after: always;
-            }
+            /* Footer appears on each page - no page-break needed (JS handles splitting) */
             
             /* Page counter for footer */
             .footer .page-number .number::before {
@@ -266,18 +277,31 @@ function generateMachineryReportHTML(
                 display: table-footer-group;
             }
             
-            tr {
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
+            /* Footer styling in print */
+            tfoot .footer-row {
+                border-top: 1px solid #e0e0e0;
             }
             
-            /* Keep signature row together on same page */
-            tr.signature-row {
-                page-break-before: avoid !important;
-                break-before: avoid !important;
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
+            /* Page number styling - JavaScript will set the actual page number */
+            tfoot .footer-row .page-number .page-number-value {
+                display: inline-block;
+                font-size: 10px;
+                font-weight: bold;
             }
+            
+            /* Hide continue text on last page */
+            body.last-page tfoot .footer-row .continue-text,
+            table.last-page tfoot .footer-row .continue-text {
+                display: none !important;
+            }
+            
+            /* Hide footer completely on single-page reports */
+            body.single-page tfoot .footer-row {
+                display: none !important;
+            }
+            
+            /* NO PAGE-BREAK CSS IN PRINT MODE - JavaScript handles all splitting */
+            /* This ensures rows are never broken mid-way across pages */
             
             /* Force backgrounds and images to print */
             * {
@@ -300,7 +324,7 @@ function generateMachineryReportHTML(
 </head>
 <body>
     <div class="content-wrapper">
-        <table style="min-height: calc(100% - 225px);">
+        <table class="main-table" style="min-height: calc(100% - 225px);">
         <thead>
         <tr class="spacer-row">
             <td colspan="6" style="height: 225px; border: none; padding: 0;"></td>
@@ -311,7 +335,7 @@ function generateMachineryReportHTML(
         <tr>
             <th colspan="6">${formData.valueation_report_for_heading}</th>
         </tr>
-        <tr class="general-details-row">
+        <tr class="general-details-row" data-first-page-only="true">
             <th colspan="6">${formData.general_details_heading}</th>
         </tr>
         <tr>
@@ -338,13 +362,13 @@ function generateMachineryReportHTML(
             <td>VALUATION PURPOSE:</td>
             <td colspan="2">${formData.valuation_purpose}</td>
             <td>INITIATED BY:</td>
-            <td colspan="2">${formData.initiated_by}</td>
+            <td colspan="2">${renderFieldValue(formData.initiated_by)}</td>
         </tr>
         <tr>
             <td>DATE OF INSPECTION:</td>
             <td colspan="2">${formData.date_of_inspection}</td>
             <td>PLACE OF INSPECTION:</td>
-            <td colspan="2">${formData.place_of_inspection}</td>
+            <td colspan="2">${renderFieldValue(formData.place_of_inspection)}</td>
         </tr>
         <tr>
             <td>REGISTERED OWNER NAME:</td>
@@ -352,15 +376,15 @@ function generateMachineryReportHTML(
         </tr>
         <tr>
             <td>ADDRESS:</td>
-            <td colspan="5">${formData.registered_owner_address}</td>
+            <td colspan="5">${renderFieldValue(formData.registered_owner_address)}</td>
         </tr>
         <tr>
             <td>PROPOSED OWNER NAME:</td>
             <th colspan="5">${formData.proposed_owner_name}</th>
         </tr>
-        <tr>
+        <tr data-proposed-owner-address="true">
             <td>ADDRESS:</td>
-            <td colspan="5">${formData.proposed_owner_address}</td>
+            <td colspan="5">${renderFieldValue(formData.proposed_owner_address)}</td>
         </tr>
         <tr>
             <th colspan="6">${formData.inspected_equipment_heading}</th>
@@ -381,7 +405,7 @@ function generateMachineryReportHTML(
         </tr>
         <tr>
             <td>LOCATION OF MACHINERY:</td>
-            <td colspan="5">${formData.location_of_machinery}</td>
+            <td colspan="5">${renderFieldValue(formData.location_of_machinery)}</td>
         </tr>
         <tr>
             <td>OWNER SERIAL NO:</td>
@@ -419,7 +443,7 @@ function generateMachineryReportHTML(
         </tr>
         <tr>
             <td>HYP WITH:</td>
-            <td colspan="2">${formData.hyp_with}</td>
+            <td colspan="2">${renderFieldValue(formData.hyp_with)}</td>
             <td>MACHINE TYPE:</td>
             <td colspan="2">
                 ${
@@ -488,14 +512,18 @@ function generateMachineryReportHTML(
           formData.fix_but_flex_value_7
             ? `<tr>
             <td>${formData.fix_but_flex_heading_5}:</td>
-            <td colspan="2">
-              <table style="margin: 0;border-collapse: collapse;width: 100%;">
-                  <tr>
-                      <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${formData.fix_but_flex_value_5}</td>
-                      <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${formData.fix_but_flex_heading_6}</td>
-                      <td style="border-top: 0px;border-bottom: 0px;border-left:0px;border-right:0px;">${formData.fix_but_flex_value_6}</td>
-                  </tr>
-              </table>
+            <td colspan="2" style="padding: 0; margin: 0;">
+                <div style="display: flex; width: 100%; height: 100%;">
+                    <div style="flex: 1; border-right: 1px solid #000; padding: 1.5px; text-align: center; font-size: 9.3px; text-transform: uppercase;">
+                        ${formData.fix_but_flex_value_5}
+                    </div>
+                    <div style="flex: 1; border-right: 1px solid #000; padding: 1.5px; text-align: center; font-size: 9.3px; text-transform: uppercase;">
+                        ${formData.fix_but_flex_heading_6}
+                    </div>
+                    <div style="flex: 1; padding: 1.5px; text-align: center; font-size: 9.3px; text-transform: uppercase;">
+                        ${formData.fix_but_flex_value_6}
+                    </div>
+                </div>
             </td>
             <td>${formData.fix_but_flex_heading_7}:</td>
             <td colspan="2">${formData.fix_but_flex_value_7}</td>
@@ -511,21 +539,25 @@ function generateMachineryReportHTML(
           formData.fix_but_flex_value_10
             ? `<tr>
             <td>${formData.fix_but_flex_heading_8}:</td>
-            <td colspan="2">
-              <table style="margin: 0;border-collapse: collapse;width: 100%;">
-                  <tr>
-                      <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${formData.fix_but_flex_value_8}</td>
-                      <td colspan="2" style="border-top: 0px;border-bottom: 0px;border-left:0px;border-right:0px;">${formData.fix_but_flex_heading_9}</td>
-                  </tr>
-              </table>
+            <td colspan="2" style="padding: 0; margin: 0;">
+                <div style="display: flex; width: 100%; height: 100%;">
+                    <div style="flex: 1; border-right: 1px solid #000; padding: 1.5px; text-align: center; font-size: 9.3px; text-transform: uppercase;">
+                        ${formData.fix_but_flex_value_8}
+                    </div>
+                    <div style="flex: 2; padding: 1.5px; text-align: center; font-size: 9.3px; text-transform: uppercase;">
+                        ${formData.fix_but_flex_heading_9}
+                    </div>
+                </div>
             </td>
-            <td>
-              <table style="margin: 0;border-collapse: collapse;width: 100%;">
-                  <tr>
-                      <td style="border-top: 0px;border-bottom: 0px;border-left:0px;">${formData.fix_but_flex_value_9}</td>
-                      <td style="border-top: 0px;border-bottom: 0px;border-left:0px; border-right:0px;">${formData.fix_but_flex_heading_10}</td>
-                  </tr>
-              </table>
+            <td style="padding: 0; margin: 0;">
+                <div style="display: flex; width: 100%; height: 100%;">
+                    <div style="flex: 1; border-right: 1px solid #000; padding: 1.5px; text-align: center; font-size: 9.3px; text-transform: uppercase;">
+                        ${formData.fix_but_flex_value_9}
+                    </div>
+                    <div style="flex: 1; padding: 1.5px; text-align: center; font-size: 9.3px; text-transform: uppercase;">
+                        ${formData.fix_but_flex_heading_10}
+                    </div>
+                </div>
             </td>
             <td colspan="2">${formData.fix_but_flex_value_10}</td>
         </tr>`
@@ -538,7 +570,7 @@ function generateMachineryReportHTML(
           formData.fix_but_flex_value_12
             ? `<tr>
             <td>${formData.fix_but_flex_heading_11}:</td>
-            <td colspan="2">${formData.fix_but_flex_value_11}</td>
+            <td colspan="2">${renderFieldValue(formData.fix_but_flex_value_11)}</td>
             <td>${formData.fix_but_flex_heading_12}:</td>
             <td colspan="2">${formData.fix_but_flex_value_12}</td>
         </tr>`
@@ -682,17 +714,17 @@ function generateMachineryReportHTML(
         </tr>
         <tr>
             <td>VALUER COMMENTS/REMARKS:</td>
-            <td colspan="5">${formData.valuer_comments_remarks}</td>
+            <td colspan="5">${renderFieldValue(formData.valuer_comments_remarks)}</td>
         </tr>
         <tr>
             <td>DECLARATION:</td>
             <td colspan="5">
-                ${formData.declaration}
+                ${renderFieldValue(formData.declaration)}
             </td>
         </tr>
         <tr>
             <td>DISCLAIMER:</td>
-            <td colspan="5">${formData.disclaimer}</td>
+            <td colspan="5">${renderFieldValue(formData.disclaimer)}</td>
         </tr>
         ${generateFlexibleFieldsForSection(
           formData.flexible_fields || [],
@@ -706,22 +738,19 @@ function generateMachineryReportHTML(
         </tr>
         </tbody>
         <tfoot>
+            <tr class="footer-row">
+                <td colspan="3" class="page-number">
+                    <span class="page-number-value" data-page-number="">Page 1</span>
+                </td>
+                <td colspan="3" class="continue-text">
+                    Continue to next page...
+                </td>
+            </tr>
             <tr class="spacer-row">
                 <td colspan="6" style="height: var(--bottom-space); border: none; padding: 0;"></td>
             </tr>
         </tfoot>
     </table>
-    </div>
-    <!-- Footer is now handled by Puppeteer's displayHeaderFooter feature -->
-    <!-- The template footer is hidden since Puppeteer adds its own footer with page numbers -->
-    <div class="page-footer" style="display: none !important;">
-        <div class="footer">
-            <div class="page-number">
-                <span class="number"></span>
-                <span class="separator">|</span>
-                <span class="label">Page</span>
-            </div>
-        </div>
     </div>
 </body>
 </html>

@@ -24,6 +24,110 @@ import axios from "axios";
 import "../order.scss";
 import { DeleteIcon } from "../../../components/icons";
 
+// WYSIWYG Textarea Component - preserves HTML formatting
+const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "", name, readOnly = false }) => {
+  const editorRef = useRef(null);
+  const isUpdatingRef = useRef(false);
+
+  // Update content when value prop changes (from external source)
+  useEffect(() => {
+    if (editorRef.current && !isUpdatingRef.current) {
+      const currentContent = editorRef.current.innerHTML;
+      const newContent = value || "";
+      
+      // Only update if the value is different to avoid cursor jumping
+      if (currentContent !== newContent) {
+        const selection = window.getSelection();
+        const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+        const wasFocused = document.activeElement === editorRef.current;
+        
+        isUpdatingRef.current = true;
+        editorRef.current.innerHTML = newContent;
+        
+        // Restore cursor position if it was focused
+        if (wasFocused && range) {
+          try {
+            selection.removeAllRanges();
+            selection.addRange(range);
+          } catch (e) {
+            // Ignore if range is invalid
+          }
+        }
+        
+        setTimeout(() => {
+          isUpdatingRef.current = false;
+        }, 0);
+      }
+    }
+  }, [value]);
+
+  const handleInput = (e) => {
+    if (!isUpdatingRef.current && onChange) {
+      const htmlContent = e.target.innerHTML;
+      onChange({
+        target: {
+          name: name,
+          value: htmlContent,
+        },
+      });
+    }
+  };
+
+  const handlePaste = (e) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData("text/html") || e.clipboardData.getData("text/plain");
+    document.execCommand("insertHTML", false, text);
+  };
+
+  // Handle placeholder display
+  useEffect(() => {
+    if (editorRef.current) {
+      if (!value || value === "" || value === "<br>") {
+        editorRef.current.classList.add("empty");
+      } else {
+        editorRef.current.classList.remove("empty");
+      }
+    }
+  }, [value]);
+
+  return (
+    <>
+      <style>{`
+        .wysiwyg-textarea {
+          min-height: 80px !important;
+          padding: 8px 12px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          outline: none;
+          white-space: pre-wrap;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          background-color: white;
+        }
+        .wysiwyg-textarea:focus {
+          border-color: #5864bd;
+          box-shadow: 0 0 0 2px rgba(88, 100, 189, 0.1);
+        }
+        .wysiwyg-textarea.empty:before {
+          content: attr(data-placeholder);
+          color: #999;
+          pointer-events: none;
+        }
+      `}</style>
+      <div
+        ref={editorRef}
+        contentEditable={!readOnly}
+        suppressContentEditableWarning={true}
+        onInput={handleInput}
+        onPaste={handlePaste}
+        className={`form-field wysiwyg-textarea ${className}`}
+        data-placeholder={placeholder}
+        style={readOnly ? { cursor: 'default', backgroundColor: '#f5f5f5' } : {}}
+      />
+    </>
+  );
+};
+
 function CEReport() {
   // Extract order ID from route parameters
   const { id } = useParams();
@@ -2162,8 +2266,9 @@ function CEReport() {
         }
 
         // Simple logic: if value exists, send it; if null/empty, send null
+        // Note: Textarea values (with line breaks, spaces, formatting) are preserved as-is
         if (value !== null && value !== undefined && value !== "") {
-          formData.append(key, value);
+          formData.append(key, String(value)); // Preserve all formatting including line breaks
         } else {
           formData.append(key, ""); // Send empty string for null/empty values
         }
@@ -2195,7 +2300,7 @@ function CEReport() {
         );
         formData.append(
           `flexible_fields[${formDataIndex}][field_value]`,
-          field.field_value
+          String(field.field_value || "") // Preserve all formatting including line breaks
         );
         formData.append(
           `flexible_fields[${formDataIndex}][field_order]`,
@@ -2219,7 +2324,7 @@ function CEReport() {
           );
           formData.append(
             `flexible_fields[${formDataIndex}][field_value]`,
-            field.field_value_2
+            String(field.field_value_2 || "") // Preserve all formatting including line breaks
           );
           formData.append(
             `flexible_fields[${formDataIndex}][field_order]`,
@@ -2399,8 +2504,9 @@ function CEReport() {
       }
 
       // Simple logic: if value exists, send it; if null/empty, send null
+      // Note: Textarea values (with line breaks, spaces, formatting) are preserved as-is
       if (value !== null && value !== undefined && value !== "") {
-        reportData[key] = value;
+        reportData[key] = String(value); // Preserve all formatting including line breaks
       } else {
         reportData[key] = null; // Send null for empty values
       }
@@ -2431,7 +2537,7 @@ function CEReport() {
         reportData[`flexible_fields[${formDataIndex}][field_label]`] =
           field.field_label;
         reportData[`flexible_fields[${formDataIndex}][field_value]`] =
-          field.field_value;
+          String(field.field_value || ""); // Preserve all formatting including line breaks
         reportData[`flexible_fields[${formDataIndex}][field_order]`] =
           field.field_order;
         formDataIndex++;
@@ -2450,7 +2556,7 @@ function CEReport() {
           reportData[`flexible_fields[${formDataIndex}][field_label]`] =
             field.field_label_2;
           reportData[`flexible_fields[${formDataIndex}][field_value]`] =
-            field.field_value_2;
+            String(field.field_value_2 || ""); // Preserve all formatting including line breaks
           reportData[`flexible_fields[${formDataIndex}][field_order]`] =
             field.field_order + 1;
           formDataIndex++;
@@ -2772,8 +2878,9 @@ function CEReport() {
                   <label>
                     Field Value <span className="text-danger">*</span>
                   </label>
-                  <textarea
+                  <WysiwygTextarea
                     className="form-field"
+                    name={`field_value_${field.id}`}
                     value={field.field_value}
                     onChange={(e) =>
                       handleFlexibleFieldChange(
@@ -2783,8 +2890,7 @@ function CEReport() {
                       )
                     }
                     placeholder="Enter field value"
-                    rows="2"
-                    required
+                    rows={2}
                   />
                 </div>
               </div>
@@ -2818,8 +2924,9 @@ function CEReport() {
                   <label>
                     First Value <span className="text-danger">*</span>
                   </label>
-                  <textarea
+                  <WysiwygTextarea
                     className="form-field"
+                    name={`field_value_${field.id}`}
                     value={field.field_value}
                     onChange={(e) =>
                       handleFlexibleFieldChange(
@@ -2829,8 +2936,7 @@ function CEReport() {
                       )
                     }
                     placeholder="Enter first value"
-                    rows="2"
-                    required
+                    rows={2}
                   />
                 </div>
               </div>
@@ -2860,8 +2966,9 @@ function CEReport() {
                   <label>
                     Second Value <span className="text-danger">*</span>
                   </label>
-                  <textarea
+                  <WysiwygTextarea
                     className="form-field"
+                    name={`field_value_2_${field.id}`}
                     value={field.field_value_2 || ""}
                     onChange={(e) =>
                       handleFlexibleFieldChange(
@@ -2871,8 +2978,7 @@ function CEReport() {
                       )
                     }
                     placeholder="Enter second value"
-                    rows="2"
-                    required
+                    rows={2}
                   />
                 </div>
               </div>
@@ -3177,13 +3283,13 @@ function CEReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="initiated_by">Initiated By</label>
-                    <textarea
+                    <WysiwygTextarea
                       className="form-field"
                       id="initiated_by"
                       name="initiated_by"
                       value={reportFormData.initiated_by || ""}
                       onChange={handleFormChange}
-                      rows="2"
+                      rows={2}
                     />
                   </div>
                 </div>
@@ -3210,15 +3316,14 @@ function CEReport() {
                     <label htmlFor="place_of_inspection">
                       Place of Inspection <span class="text-danger">*</span>
                     </label>
-                    <textarea
+                    <WysiwygTextarea
                       className="form-field"
                       id="place_of_inspection"
                       name="place_of_inspection"
                       value={reportFormData.place_of_inspection}
                       onChange={handleFormChange}
-                      rows="2"
-                      required
-                    ></textarea>
+                      rows={2}
+                    />
                   </div>
                 </div>
               </div>
@@ -3249,14 +3354,13 @@ function CEReport() {
                       Registered Owner Address{" "}
                       <span class="text-danger">*</span>
                     </label>
-                    <textarea
+                    <WysiwygTextarea
                       className="form-field"
                       id="registered_owner_address"
                       name="registered_owner_address"
                       value={reportFormData.registered_owner_address}
                       onChange={handleFormChange}
-                      rows="2"
-                      required
+                      rows={2}
                     />
                   </div>
                 </div>
@@ -3282,15 +3386,14 @@ function CEReport() {
                     <label htmlFor="proposed_owner_address">
                       Proposed Owner Address <span class="text-danger">*</span>
                     </label>
-                    <textarea
+                    <WysiwygTextarea
                       className="form-field"
                       id="proposed_owner_address"
                       name="proposed_owner_address"
                       value={reportFormData.proposed_owner_address}
                       onChange={handleFormChange}
-                      rows="2"
+                      rows={2}
                       placeholder="456 Corporate Avenue, Mumbai"
-                      required
                     />
                   </div>
                 </div>
@@ -3772,14 +3875,13 @@ function CEReport() {
                     <label htmlFor="hyp_with">
                       Hyp With <span class="text-danger">*</span>
                     </label>
-                    <textarea
+                    <WysiwygTextarea
                       className="form-field"
                       id="hyp_with"
                       name="hyp_with"
                       value={reportFormData.hyp_with}
                       onChange={handleFormChange}
-                      rows="2"
-                      required
+                      rows={2}
                     />
                   </div>
                 </div>
@@ -5315,14 +5417,13 @@ function CEReport() {
                     <label htmlFor="valuer_comments_remarks">
                       Valuer Comments/remarks <span class="text-danger">*</span>
                     </label>
-                    <textarea
+                    <WysiwygTextarea
                       className="form-field"
                       id="valuer_comments_remarks"
                       name="valuer_comments_remarks"
                       value={reportFormData.valuer_comments_remarks}
                       onChange={handleFormChange}
-                      rows="2"
-                      required
+                      rows={2}
                     />
                   </div>
                 </div>
