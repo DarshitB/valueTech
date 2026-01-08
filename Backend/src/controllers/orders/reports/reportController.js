@@ -942,20 +942,22 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
 
       if (name === "V.K. ASSOCIATES") {
         bgImageFileName = "marine-vs.webp"; // Marine letterhead for VKA
-        stampPngFile = "vka.png";
+        stampPngFile = "marine-vs-stamp.png";
       } else if (name === "VALUETECH SOLUTIONS") {
         bgImageFileName = "marine-vs.webp"; // Marine letterhead for VTS
-        stampPngFile = "vts.png";
+        stampPngFile = "marine-vs-stamp.png";
       } else if (name === "VISHAL D. KOTHARI") {
         bgImageFileName = "marine-vs.webp"; // Marine letterhead for VDK
-        stampPngFile = "vdk.png";
+        stampPngFile = "marine-vs-stamp.png";
       } else {
         // Default marine letterhead
         bgImageFileName = "marine-vs.webp";
+        stampPngFile = "marine-vs-stamp.png";
       }
     } else {
       // Default marine letterhead
       bgImageFileName = "marine-vs.webp";
+      stampPngFile = "marine-vs-stamp.png";
     }
   } else {
     // For other report types (CV, AVR, Machinery, CE), use regular letterheads

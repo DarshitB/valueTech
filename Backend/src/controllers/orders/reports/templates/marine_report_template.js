@@ -322,10 +322,87 @@ function generateMarineReportHTML(
 
         .page-content {
             position: relative;
-            height: calc(297mm - 50mm - 58px);
+            height: calc(297mm - 50mm - 58px - 20px);
             z-index: 1;
             background: transparent;
             overflow: hidden;
+        }
+
+        /* Stamp Overlay - appears on all pages */
+        .stamp-overlay {
+            position: absolute;
+            z-index: 5;
+            pointer-events: none;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            color-adjust: exact;
+        }
+
+        /* First page stamp - bottom left corner of vessel image (half on image, half outside) */
+        .first-page .stamp-overlay {
+            left: 80px;
+            top: 640px;
+            width: 180px;
+            height: 180px;
+            opacity: 1;
+        }
+
+        /* Subsequent pages stamp - right bottom corner (above footer) */
+        .subsequent-page .stamp-overlay {
+            right: 40px;
+            bottom: 30px;
+            width: 120px;
+            height: 120px;
+            opacity: 1;
+             z-index: 10000;
+        }
+
+        .stamp-overlay img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* Last page declaration section */
+        .last-page-declaration {
+            margin-top: 30px;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .last-page-declaration .declaration-text {
+            text-align: left;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 0;
+            text-transform: uppercase;
+        }
+
+        /* .last-page-declaration .stamp-signature {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 20px;
+        }
+ */
+        .last-page-declaration .stamp-signature .left-stamp {
+            width: 150px;
+            height: 150px;
+            opacity: 1;
+        }
+
+        .last-page-declaration .stamp-signature .left-stamp img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .last-page-declaration .stamp-signature .right-text {
+            text-align: left;
+            font-size: 13px;
+            font-weight: bold;
+            line-height: 1.5;
         }
 
         /* First Page Specific Styles */
@@ -544,7 +621,7 @@ function generateMarineReportHTML(
             border-top: 1px solid #e0e0e0;
             padding-top: 8px;
             font-size: 10px;
-            z-index: 3;
+            z-index: 11;
             background: rgba(255, 255, 255, 0.9);
             padding: 8px 10px;
         }
@@ -601,11 +678,41 @@ function generateMarineReportHTML(
                 page-break-after: auto;
             }
 
+            /* Ensure stamp prints on all pages */
+            .stamp-overlay {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+
+            .first-page .stamp-overlay {
+                left: 80px;
+                top: 640px;
+                opacity: 1;
+            }
+
+            .subsequent-page .stamp-overlay {
+                right: 50px;
+                bottom: 30px;
+                opacity: 1;
+                z-index: 10000;
+            }
+
+            .last-page-declaration {
+                page-break-inside: avoid;
+            }
+
+            .last-page-declaration .stamp-signature .left-stamp {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
             .footer {
                 left: 50px;
                 right: 50px;
                 bottom: 25px;
                 background: rgba(255, 255, 255, 0.95);
+                z-index: 11;
             }
 
             /* Ensure no content is cut in print */
@@ -734,6 +841,14 @@ function generateMarineReportHTML(
     
       <!-- First Page -->
     <div class="page first-page" data-page="1">
+        <!-- Stamp Overlay on First Page -->
+        ${
+          stampImageBase64
+            ? `<div class="stamp-overlay">
+            <img src="${stampImageBase64}" alt="Stamp">
+        </div>`
+            : ""
+        }
         <div class="page-content">
             <div class="report-hero-page">
                 <div class="report-hero-page-first">
@@ -3581,6 +3696,24 @@ function generateMarineReportHTML(
               getNextMainCounter,
               null
             )}
+
+            <!-- Last Page Declaration -->
+            <div class="last-page-declaration">
+                <div class="declaration-text">ISSUED WITHOUT PREJUDICE</div>
+                <div class="stamp-signature">
+                    <div class="left-stamp">
+                        ${
+                          stampImageBase64
+                            ? `<img src="${stampImageBase64}" alt="Stamp">`
+                            : ""
+                        }
+                    </div>
+                    <div class="right-text">
+                        <div>VALUETECH SOLUTIONS,</div>
+                        <div>MUMBAI SURVEYOR</div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="footer">
@@ -3869,6 +4002,16 @@ function generateMarineReportHTML(
             newPage.className = 'page subsequent-page';
             newPage.setAttribute('data-page', pageNum);
 
+            // Add stamp overlay to subsequent pages
+            ${
+              stampImageBase64
+                ? `const stampOverlay = document.createElement('div');
+            stampOverlay.className = 'stamp-overlay';
+            stampOverlay.innerHTML = '<img src="${stampImageBase64}" alt="Stamp">';
+            newPage.appendChild(stampOverlay);`
+                : "// No stamp image available"
+            }
+
             const pageContent = document.createElement('div');
             pageContent.className = 'page-content';
 
@@ -3896,6 +4039,18 @@ function generateMarineReportHTML(
                     numberSpan.setAttribute('data-page-num', pageNum);
                 }
             });
+            
+            // Remove stamp from last page if it has the declaration section
+            if (pages.length > 0) {
+                const lastPage = pages[pages.length - 1];
+                const hasDeclaration = lastPage.querySelector('.last-page-declaration');
+                if (hasDeclaration) {
+                    const stampOverlay = lastPage.querySelector('.stamp-overlay');
+                    if (stampOverlay) {
+                        stampOverlay.remove();
+                    }
+                }
+            }
         }
 
         function mmToPx(mm) {
