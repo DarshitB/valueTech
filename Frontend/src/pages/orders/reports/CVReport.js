@@ -74,8 +74,23 @@ const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "
 
   const handlePaste = (e) => {
     e.preventDefault();
-    const text = e.clipboardData.getData("text/html") || e.clipboardData.getData("text/plain");
-    document.execCommand("insertHTML", false, text);
+    // Get plain text only - strip all formatting (bold, italic, etc.)
+    let plainText = e.clipboardData.getData("text/plain");
+    
+    // Remove extra spaces and normalize line breaks
+    plainText = plainText
+      .replace(/\r\n/g, '\n') // Normalize line breaks
+      .replace(/\r/g, '\n') // Normalize line breaks
+      .split('\n')
+      .map(line => line.trim()) // Remove leading/trailing spaces from each line
+      .filter(line => line.length > 0) // Remove empty lines
+      .join('\n');
+    
+    // Convert to HTML with line breaks, but as plain text (no formatting)
+    const htmlText = plainText.replace(/\n/g, '<br>');
+    
+    // Insert as plain text with line breaks (no bold, italic, etc.)
+    document.execCommand("insertHTML", false, htmlText || '');
   };
 
   // Handle placeholder display

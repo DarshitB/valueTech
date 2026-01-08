@@ -966,7 +966,7 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName) {
       if (currentRowColumns + fieldColumns <= 6) {
         html += `
           <td style="font-weight: bold;">${field.field_label || ""}</td>
-          <td colspan="${valueColSpan}">${field.field_value || ""}</td>
+          <td colspan="${valueColSpan}">${renderFieldValue(field.field_value || "")}</td>
         `;
         currentRowColumns += fieldColumns;
         i++;
