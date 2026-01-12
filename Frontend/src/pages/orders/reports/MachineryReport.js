@@ -315,6 +315,7 @@ function MachineryReport() {
 
     // Clear the cleared fields tracking when form resets
     clearedFieldsRef.current.clear();
+    manuallyEditedHeadingsRef.current.clear(); // Reset manually edited headings when form resets
   }, [id]);
 
   // Function to generate disclaimer with valuer name
@@ -649,6 +650,8 @@ function MachineryReport() {
 
   // Track fields that were explicitly cleared by the user (date and currency fields)
   const clearedFieldsRef = useRef(new Set());
+  // Ref to track manually edited heading fields (so they don't get overwritten by category_suffix changes)
+  const manuallyEditedHeadingsRef = useRef(new Set());
 
   // Auto-populate form data when order data is available
   useEffect(() => {
@@ -813,6 +816,7 @@ function MachineryReport() {
 
     // Clear the cleared fields tracking when loading report data
     clearedFieldsRef.current.clear();
+    manuallyEditedHeadingsRef.current.clear(); // Reset manually edited headings when loading new report
 
     setReportFormData((prev) => {
       const updated = { ...prev };
@@ -1049,37 +1053,45 @@ function MachineryReport() {
 
     setReportFormData((prev) => {
       // Only update if category_suffix has changed to avoid infinite loops
-      if (
-        prev.category_suffix === categorySuffix &&
-        prev.valueation_report_for_heading ===
-          (categorySuffixUpper
-            ? `VALUATION REPORT FOR ${categorySuffixUpper}`
-            : "")
-      ) {
+      if (prev.category_suffix === categorySuffix) {
         return prev;
       }
 
-      return {
-        ...prev,
-        valueation_report_for_heading: categorySuffixUpper
+      const updated = { ...prev };
+      
+      // Only auto-update if not manually edited
+      if (!manuallyEditedHeadingsRef.current.has("valueation_report_for_heading")) {
+        updated.valueation_report_for_heading = categorySuffixUpper
           ? `VALUATION REPORT FOR ${categorySuffixUpper}`
-          : "",
-        general_details_heading: categorySuffixUpper
+          : "";
+      }
+      if (!manuallyEditedHeadingsRef.current.has("general_details_heading")) {
+        updated.general_details_heading = categorySuffixUpper
           ? `GENERAL DETAILS OF THE INSPECTED ${categorySuffixUpper}`
-          : "",
-        inspected_equipment_heading: categorySuffixUpper
+          : "";
+      }
+      if (!manuallyEditedHeadingsRef.current.has("inspected_equipment_heading")) {
+        updated.inspected_equipment_heading = categorySuffixUpper
           ? `INSPECTED EQUIPMENT DETAILS OF ${categorySuffixUpper}`
-          : "",
-        comments_on_equipment_heading: categorySuffixUpper
+          : "";
+      }
+      if (!manuallyEditedHeadingsRef.current.has("comments_on_equipment_heading")) {
+        updated.comments_on_equipment_heading = categorySuffixUpper
           ? `COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION ${categorySuffixUpper}`
-          : "",
-        insurance_details_heading: categorySuffixUpper
+          : "";
+      }
+      if (!manuallyEditedHeadingsRef.current.has("insurance_details_heading")) {
+        updated.insurance_details_heading = categorySuffixUpper
           ? `INSURANCE DETAILS OF ${categorySuffixUpper}`
-          : "",
-        overall_feedback_heading: categorySuffixUpper
+          : "";
+      }
+      if (!manuallyEditedHeadingsRef.current.has("overall_feedback_heading")) {
+        updated.overall_feedback_heading = categorySuffixUpper
           ? `OVER ALL FEED BACK OF THE INSPECTED ${categorySuffixUpper}`
-          : "",
-      };
+          : "";
+      }
+      
+      return updated;
     });
   }, [reportFormData.category_suffix]);
 
@@ -1103,27 +1115,53 @@ function MachineryReport() {
           [name]: value,
         };
 
+        // Track if user manually edits heading fields
+        if (name === "valueation_report_for_heading" || 
+            name === "general_details_heading" ||
+            name === "inspected_equipment_heading" ||
+            name === "comments_on_equipment_heading" ||
+            name === "insurance_details_heading" ||
+            name === "overall_feedback_heading") {
+          // Mark this heading field as manually edited
+          manuallyEditedHeadingsRef.current.add(name);
+        }
+
         // If category_suffix changes, update all heading fields automatically
+        // BUT only if they haven't been manually edited
         if (name === "category_suffix") {
           const categorySuffixUpper = value ? value.toUpperCase().trim() : "";
-          updated.valueation_report_for_heading = categorySuffixUpper
-            ? `VALUATION REPORT FOR ${categorySuffixUpper}`
-            : "";
-          updated.general_details_heading = categorySuffixUpper
-            ? `GENERAL DETAILS OF THE INSPECTED ${categorySuffixUpper}`
-            : "";
-          updated.inspected_equipment_heading = categorySuffixUpper
-            ? `INSPECTED EQUIPMENT DETAILS OF ${categorySuffixUpper}`
-            : "";
-          updated.comments_on_equipment_heading = categorySuffixUpper
-            ? `COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION ${categorySuffixUpper}`
-            : "";
-          updated.insurance_details_heading = categorySuffixUpper
-            ? `INSURANCE DETAILS OF ${categorySuffixUpper}`
-            : "";
-          updated.overall_feedback_heading = categorySuffixUpper
-            ? `OVER ALL FEED BACK OF THE INSPECTED ${categorySuffixUpper}`
-            : "";
+          
+          // Only auto-update if not manually edited
+          if (!manuallyEditedHeadingsRef.current.has("valueation_report_for_heading")) {
+            updated.valueation_report_for_heading = categorySuffixUpper
+              ? `VALUATION REPORT FOR ${categorySuffixUpper}`
+              : "";
+          }
+          if (!manuallyEditedHeadingsRef.current.has("general_details_heading")) {
+            updated.general_details_heading = categorySuffixUpper
+              ? `GENERAL DETAILS OF THE INSPECTED ${categorySuffixUpper}`
+              : "";
+          }
+          if (!manuallyEditedHeadingsRef.current.has("inspected_equipment_heading")) {
+            updated.inspected_equipment_heading = categorySuffixUpper
+              ? `INSPECTED EQUIPMENT DETAILS OF ${categorySuffixUpper}`
+              : "";
+          }
+          if (!manuallyEditedHeadingsRef.current.has("comments_on_equipment_heading")) {
+            updated.comments_on_equipment_heading = categorySuffixUpper
+              ? `COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION ${categorySuffixUpper}`
+              : "";
+          }
+          if (!manuallyEditedHeadingsRef.current.has("insurance_details_heading")) {
+            updated.insurance_details_heading = categorySuffixUpper
+              ? `INSURANCE DETAILS OF ${categorySuffixUpper}`
+              : "";
+          }
+          if (!manuallyEditedHeadingsRef.current.has("overall_feedback_heading")) {
+            updated.overall_feedback_heading = categorySuffixUpper
+              ? `OVER ALL FEED BACK OF THE INSPECTED ${categorySuffixUpper}`
+              : "";
+          }
         }
 
         // Handle currency formatting for currency fields
@@ -2155,7 +2193,7 @@ function MachineryReport() {
                       id="valueation_report_for_heading"
                       name="valueation_report_for_heading"
                       value={reportFormData.valueation_report_for_heading || ""}
-                      readOnly
+                      onChange={handleFormChange}
                       placeholder="Auto-generated from Category Suffix"
                     />
                   </div>
