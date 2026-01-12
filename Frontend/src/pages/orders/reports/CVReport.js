@@ -670,8 +670,6 @@ function CVReport() {
 
   // Track fields that were explicitly cleared by the user (date and currency fields)
   const clearedFieldsRef = useRef(new Set());
-  // Ref to track manually edited heading fields (so they don't get overwritten by category_suffix changes)
-  const manuallyEditedHeadingsRef = useRef(new Set());
 
   // Helper function to build category suffix for headings
   const buildCategorySuffix = useCallback((categoryName, subCategoryName, childCategoryName) => {
@@ -818,7 +816,6 @@ function CVReport() {
 
     // Clear the cleared fields tracking when loading report data
     clearedFieldsRef.current.clear();
-    manuallyEditedHeadingsRef.current.clear(); // Reset manually edited headings when loading new report
 
     setReportFormData((prev) => {
       const updated = { ...prev };
@@ -836,13 +833,10 @@ function CVReport() {
       // Extract category_suffix from saved headings or use default from order
       let extractedCategorySuffix = "";
       
-      // Try to extract category_suffix from any existing heading
-      if (report.valueation_report_for_heading && String(report.valueation_report_for_heading).trim() !== "") {
-        const match = String(report.valueation_report_for_heading).match(/VALUATION REPORT FOR (.+)/i);
-        if (match && match[1]) {
-          extractedCategorySuffix = match[1].trim();
-        }
-      } else if (report.general_details_heading && String(report.general_details_heading).trim() !== "") {
+      // IMPORTANT: Don't extract category_suffix from valueation_report_for_heading if it exists
+      // because user may have manually edited it with extra text
+      // Only extract from other headings or use default from order
+      if (report.general_details_heading && String(report.general_details_heading).trim() !== "") {
         const match = String(report.general_details_heading).match(/GENERAL DETAILS OF THE INSPECTED (.+)/i);
         if (match && match[1]) {
           extractedCategorySuffix = match[1].trim();
@@ -858,14 +852,24 @@ function CVReport() {
         );
       }
       
-      // Set category_suffix (this will trigger heading regeneration via handleFormChange)
+      // Set category_suffix
       updated.category_suffix = extractedCategorySuffix;
       
-      // Generate headings from category_suffix
+      // For valueation_report_for_heading: ALWAYS use saved value from database if exists
+      // Don't try to extract or regenerate - user may have manually edited it with extra text
+      if (report.valueation_report_for_heading !== undefined && report.valueation_report_for_heading !== null && String(report.valueation_report_for_heading).trim() !== "") {
+        // Use saved value from database exactly as saved - don't modify it
+        updated.valueation_report_for_heading = report.valueation_report_for_heading;
+      } else {
+        // Generate from category_suffix only if no saved value exists
+        const categorySuffixUpper = extractedCategorySuffix ? extractedCategorySuffix.toUpperCase().trim() : "";
+        updated.valueation_report_for_heading = categorySuffixUpper
+          ? `VALUATION REPORT FOR ${categorySuffixUpper}`
+          : "";
+      }
+      
+      // Generate other headings from category_suffix
       const categorySuffixUpper = extractedCategorySuffix ? extractedCategorySuffix.toUpperCase().trim() : "";
-      updated.valueation_report_for_heading = categorySuffixUpper
-        ? `VALUATION REPORT FOR ${categorySuffixUpper}`
-        : "";
       updated.general_details_heading = categorySuffixUpper
         ? `GENERAL DETAILS OF THE INSPECTED ${categorySuffixUpper}`
         : "";
@@ -1033,8 +1037,8 @@ function CVReport() {
     );
   }, [id, order, setTitle]);
 
-  // Auto-update all heading fields when category_suffix changes
-  // BUT only if they haven't been manually edited
+  // Auto-update heading fields when category_suffix changes
+  // BUT don't update valueation_report_for_heading if it has a value (manually edited)
   useEffect(() => {
     const categorySuffix = reportFormData.category_suffix || "";
     const categorySuffixUpper = categorySuffix ? categorySuffix.toUpperCase().trim() : "";
@@ -1047,37 +1051,29 @@ function CVReport() {
       
       const updated = { ...prev };
       
-      // Only auto-update if not manually edited
-      if (!manuallyEditedHeadingsRef.current.has("valueation_report_for_heading")) {
+      // Only auto-update valueation_report_for_heading if it's empty (not manually edited)
+      if (!prev.valueation_report_for_heading || prev.valueation_report_for_heading.trim() === "") {
         updated.valueation_report_for_heading = categorySuffixUpper
           ? `VALUATION REPORT FOR ${categorySuffixUpper}`
           : "";
       }
-      if (!manuallyEditedHeadingsRef.current.has("general_details_heading")) {
-        updated.general_details_heading = categorySuffixUpper
-          ? `GENERAL DETAILS OF THE INSPECTED ${categorySuffixUpper}`
-          : "";
-      }
-      if (!manuallyEditedHeadingsRef.current.has("inspected_equipment_heading")) {
-        updated.inspected_equipment_heading = categorySuffixUpper
-          ? `INSPECTED EQUIPMENT DETAILS OF ${categorySuffixUpper}`
-          : "";
-      }
-      if (!manuallyEditedHeadingsRef.current.has("comments_on_equipment_heading")) {
-        updated.comments_on_equipment_heading = categorySuffixUpper
-          ? `COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION ${categorySuffixUpper}`
-          : "";
-      }
-      if (!manuallyEditedHeadingsRef.current.has("rc_permit_tax_fitness_insurance_heading")) {
-        updated.rc_permit_tax_fitness_insurance_heading = categorySuffixUpper
-          ? `RC, PERMIT, TAX, FITNESS & INSURANCE DETAILS OF ${categorySuffixUpper}`
-          : "";
-      }
-      if (!manuallyEditedHeadingsRef.current.has("overall_feedback_heading")) {
-        updated.overall_feedback_heading = categorySuffixUpper
-          ? `OVER ALL FEED BACK OF THE INSPECTED ${categorySuffixUpper}`
-          : "";
-      }
+      
+      // Always update other headings (they are not editable)
+      updated.general_details_heading = categorySuffixUpper
+        ? `GENERAL DETAILS OF THE INSPECTED ${categorySuffixUpper}`
+        : "";
+      updated.inspected_equipment_heading = categorySuffixUpper
+        ? `INSPECTED EQUIPMENT DETAILS OF ${categorySuffixUpper}`
+        : "";
+      updated.comments_on_equipment_heading = categorySuffixUpper
+        ? `COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION ${categorySuffixUpper}`
+        : "";
+      updated.rc_permit_tax_fitness_insurance_heading = categorySuffixUpper
+        ? `RC, PERMIT, TAX, FITNESS & INSURANCE DETAILS OF ${categorySuffixUpper}`
+        : "";
+      updated.overall_feedback_heading = categorySuffixUpper
+        ? `OVER ALL FEED BACK OF THE INSPECTED ${categorySuffixUpper}`
+        : "";
       
       return updated;
     });
@@ -1103,53 +1099,38 @@ function CVReport() {
           [name]: value,
         };
 
-        // Track if user manually edits heading fields
-        if (name === "valueation_report_for_heading" || 
-            name === "general_details_heading" ||
-            name === "inspected_equipment_heading" ||
-            name === "comments_on_equipment_heading" ||
-            name === "rc_permit_tax_fitness_insurance_heading" ||
-            name === "overall_feedback_heading") {
-          // Mark this heading field as manually edited
-          manuallyEditedHeadingsRef.current.add(name);
+        // If valueation_report_for_heading changes, it's completely standalone - don't affect any other fields
+        if (name === "valueation_report_for_heading") {
+          // Just update this field, nothing else - completely independent
+          return updated;
         }
 
         // If category_suffix changes, update all heading fields automatically
-        // BUT only if they haven't been manually edited
+        // BUT don't update valueation_report_for_heading if it has been manually edited (has a value)
         if (name === "category_suffix") {
           const categorySuffixUpper = value ? value.toUpperCase().trim() : "";
           
-          // Only auto-update if not manually edited
-          if (!manuallyEditedHeadingsRef.current.has("valueation_report_for_heading")) {
+          // Only auto-update valueation_report_for_heading if it's empty (not manually edited)
+          if (!prev.valueation_report_for_heading || prev.valueation_report_for_heading.trim() === "") {
             updated.valueation_report_for_heading = categorySuffixUpper
               ? `VALUATION REPORT FOR ${categorySuffixUpper}`
               : "";
           }
-          if (!manuallyEditedHeadingsRef.current.has("general_details_heading")) {
-            updated.general_details_heading = categorySuffixUpper
-              ? `GENERAL DETAILS OF THE INSPECTED ${categorySuffixUpper}`
-              : "";
-          }
-          if (!manuallyEditedHeadingsRef.current.has("inspected_equipment_heading")) {
-            updated.inspected_equipment_heading = categorySuffixUpper
-              ? `INSPECTED EQUIPMENT DETAILS OF ${categorySuffixUpper}`
-              : "";
-          }
-          if (!manuallyEditedHeadingsRef.current.has("comments_on_equipment_heading")) {
-            updated.comments_on_equipment_heading = categorySuffixUpper
-              ? `COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION ${categorySuffixUpper}`
-              : "";
-          }
-          if (!manuallyEditedHeadingsRef.current.has("rc_permit_tax_fitness_insurance_heading")) {
-            updated.rc_permit_tax_fitness_insurance_heading = categorySuffixUpper
-              ? `RC, PERMIT, TAX, FITNESS & INSURANCE DETAILS OF ${categorySuffixUpper}`
-              : "";
-          }
-          if (!manuallyEditedHeadingsRef.current.has("overall_feedback_heading")) {
-            updated.overall_feedback_heading = categorySuffixUpper
-              ? `OVER ALL FEED BACK OF THE INSPECTED ${categorySuffixUpper}`
-              : "";
-          }
+          updated.general_details_heading = categorySuffixUpper
+            ? `GENERAL DETAILS OF THE INSPECTED ${categorySuffixUpper}`
+            : "";
+          updated.inspected_equipment_heading = categorySuffixUpper
+            ? `INSPECTED EQUIPMENT DETAILS OF ${categorySuffixUpper}`
+            : "";
+          updated.comments_on_equipment_heading = categorySuffixUpper
+            ? `COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION ${categorySuffixUpper}`
+            : "";
+          updated.rc_permit_tax_fitness_insurance_heading = categorySuffixUpper
+            ? `RC, PERMIT, TAX, FITNESS & INSURANCE DETAILS OF ${categorySuffixUpper}`
+            : "";
+          updated.overall_feedback_heading = categorySuffixUpper
+            ? `OVER ALL FEED BACK OF THE INSPECTED ${categorySuffixUpper}`
+            : "";
         }
 
         // Handle currency formatting for currency fields
