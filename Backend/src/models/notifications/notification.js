@@ -1,4 +1,85 @@
 const db = require("../../../db");
+const { PROTECTED_ROLE } = require("../../constants/protectedRoles");
+
+/**
+ * Check if a user has "view_order_comments" permission
+ * @param {number} userId - The user ID
+ * @param {number} roleId - The user's role ID
+ * @param {string} roleName - The user's role name
+ * @returns {Promise<boolean>} - True if user has permission
+ */
+async function hasViewOrderCommentsPermission(userId, roleId, roleName) {
+  try {
+    // Protected role (developer_admin) always has permission
+    if (roleName === PROTECTED_ROLE) {
+      return true;
+    }
+
+    // Check if user's role has "view_order_comments" permission
+    const permission = await db("permissions")
+      .join(
+        "role_permissions",
+        "permissions.id",
+        "role_permissions.permission_id"
+      )
+      .where({
+        "permissions.name": "view_order_comments",
+        "role_permissions.role_id": roleId,
+      })
+      .whereNull("role_permissions.deleted_at")
+      .first();
+
+    return !!permission;
+  } catch (error) {
+    // On error, default to false (no permission)
+    console.error("Error checking view_order_comments permission:", error);
+    return false;
+  }
+}
+
+/**
+ * Filter comment notifications based on "view_order_comments" permission
+ * @param {Array} notifications - Array of notification objects
+ * @returns {Promise<Array>} - Filtered notifications
+ */
+async function filterCommentNotifications(notifications) {
+  if (!notifications || notifications.length === 0) {
+    return notifications;
+  }
+
+  const filteredResults = [];
+  
+  for (const notif of notifications) {
+    // If it's a comment notification, check permission
+    if (notif.comment_id && notif.notification_type === "comment") {
+      // Get user's role information
+      const notificationUser = await db("users")
+        .leftJoin("roles", "users.role_id", "roles.id")
+        .select("users.id", "users.role_id", "roles.name as role_name")
+        .where("users.id", notif.user_id)
+        .whereNull("users.deleted_at")
+        .first();
+
+      if (notificationUser) {
+        const hasPermission = await hasViewOrderCommentsPermission(
+          notificationUser.id,
+          notificationUser.role_id,
+          notificationUser.role_name
+        );
+
+        // Only include if user has permission
+        if (hasPermission) {
+          filteredResults.push(notif);
+        }
+      }
+    } else {
+      // Not a comment notification, include it
+      filteredResults.push(notif);
+    }
+  }
+  
+  return filteredResults;
+}
 
 const notification = {
   // Get ALL notifications (read + unread) for a user with optional last_check filter
@@ -57,6 +138,7 @@ const notification = {
         .select("notifications.id")
         .leftJoin("orders", "notifications.order_id", "orders.id")
         .leftJoin("order_status_history", "notifications.activity_id", "order_status_history.id")
+        .leftJoin("order_comments", "notifications.comment_id", "order_comments.id")
         .leftJoin("officers", "orders.officer_id", "officers.id")
         .whereNull("orders.deleted_at")
         .whereNot("orders.current_status_id", 13); // Exclude status 13
@@ -87,8 +169,20 @@ const notification = {
       }
 
       // Exclude self-actions for admin roles
+      // For status history: exclude if user performed the action
+      // For comments: exclude if user is the commenter
       if (hasPrivilegedRole) {
-        baseNotificationQuery = baseNotificationQuery.where("order_status_history.changed_by", "!=", userId);
+        baseNotificationQuery = baseNotificationQuery.where(function() {
+          this.where(function() {
+            // Status history notifications: exclude if user performed action
+            this.whereNotNull("notifications.activity_id")
+              .where("order_status_history.changed_by", "!=", userId);
+          }).orWhere(function() {
+            // Comment notifications: exclude if user is the commenter
+            this.whereNotNull("notifications.comment_id")
+              .where("order_comments.user_id", "!=", userId);
+          });
+        });
       }
 
       // Apply last_check filter if provided
@@ -99,12 +193,12 @@ const notification = {
         }
       }
 
-      // STEP 3: Get unique notification IDs (only the oldest one for each activity_id)
-      // Since we now have one notification per activity, we just need to get unique activity_ids
+      // STEP 3: Get unique notification IDs (only the oldest one for each activity_id or comment_id)
+      // Group by both activity_id and comment_id to handle both types of notifications
       const uniqueIdsQuery = db("notifications")
         .select(db.raw("MIN(notifications.id) as id"))
         .whereIn("notifications.id", baseNotificationQuery)
-        .groupBy("notifications.activity_id");
+        .groupBy(db.raw("COALESCE(notifications.activity_id, 0), COALESCE(notifications.comment_id, 0)"));
 
       const uniqueIdsResult = await uniqueIdsQuery;
       const uniqueIds = uniqueIdsResult.map(row => row.id);
@@ -119,6 +213,7 @@ const notification = {
         .leftJoin("orders", "notifications.order_id", "orders.id")
         .leftJoin("order_status_history", "notifications.activity_id", "order_status_history.id")
         .leftJoin("order_status_master", "order_status_history.status_id", "order_status_master.id")
+        .leftJoin("order_comments", "notifications.comment_id", "order_comments.id")
         .leftJoin("users as notification_user", "notifications.user_id", "notification_user.id")
         .leftJoin("users as changed_by_user", function() {
           this.on("order_status_history.changed_by", "=", "changed_by_user.id")
@@ -128,6 +223,7 @@ const notification = {
           this.on("order_status_history.changed_by", "=", "field_verifiers.id")
               .andOn("order_status_history.user_type", "=", db.raw("'field_verifier'"));
         })
+        .leftJoin("users as comment_user", "order_comments.user_id", "comment_user.id")
         .select(
           "notifications.id",
           "notifications.user_id",
@@ -135,6 +231,10 @@ const notification = {
           "notifications.order_id",
           "orders.order_number",
           "notifications.activity_id",
+          "notifications.comment_id",
+          "notifications.notification_type",
+          "notifications.title",
+          "notifications.description",
           "notifications.is_read",
           "notifications.read_at",
           "notifications.created_at",
@@ -149,14 +249,20 @@ const notification = {
               ELSE changed_by_user.name 
             END as changed_by_name
           `),
-          "order_status_history.changed_at"
+          "order_status_history.changed_at",
+          "order_comments.comment as comment_text",
+          "order_comments.user_id as comment_user_id",
+          "comment_user.name as comment_user_name",
+          "order_comments.commented_at"
         )
         .orderBy("notifications.created_at", "desc")
         .limit(limit)
         .offset(offset);
 
       const results = await query;
-      return results || [];
+      // Filter comment notifications based on permission
+      const filteredResults = await filterCommentNotifications(results || []);
+      return filteredResults;
     } catch (error) {
       return [];
     }
@@ -185,6 +291,7 @@ const notification = {
     let query = db("notifications")
       .leftJoin("orders", "notifications.order_id", "orders.id")
       .leftJoin("order_status_history", "notifications.activity_id", "order_status_history.id")
+      .leftJoin("order_comments", "notifications.comment_id", "order_comments.id")
       .leftJoin("officers", "orders.officer_id", "officers.id")
       .where("notifications.is_read", false)
       .whereNull("orders.deleted_at")
@@ -234,7 +341,19 @@ const notification = {
         query = query.where("orders.manager_id", userId);
       }
       // Exclude self-actions for admin roles
-      query = query.where("order_status_history.changed_by", "!=", userId);
+      // For status history: exclude if user performed the action
+      // For comments: exclude if user is the commenter
+      query = query.where(function() {
+        this.where(function() {
+          // Status history notifications: exclude if user performed action
+          this.whereNotNull("notifications.activity_id")
+            .where("order_status_history.changed_by", "!=", userId);
+        }).orWhere(function() {
+          // Comment notifications: exclude if user is the commenter
+          this.whereNotNull("notifications.comment_id")
+            .where("order_comments.user_id", "!=", userId);
+        });
+      });
     }
 
     // Use distinct count to avoid duplicates from joins
@@ -299,6 +418,7 @@ const notification = {
         .select("notifications.id")
         .leftJoin("orders", "notifications.order_id", "orders.id")
         .leftJoin("order_status_history", "notifications.activity_id", "order_status_history.id")
+        .leftJoin("order_comments", "notifications.comment_id", "order_comments.id")
         .leftJoin("officers", "orders.officer_id", "officers.id")
         .where("notifications.is_read", false)
         .whereNull("orders.deleted_at")
@@ -323,13 +443,26 @@ const notification = {
         } else if (roleName.includes("MANAGER")) {
           baseNotificationQuery = baseNotificationQuery.where("orders.manager_id", userId);
         }
-        baseNotificationQuery = baseNotificationQuery.where("order_status_history.changed_by", "!=", userId);
+        // Exclude self-actions for admin roles
+        // For status history: exclude if user performed the action
+        // For comments: exclude if user is the commenter
+        baseNotificationQuery = baseNotificationQuery.where(function() {
+          this.where(function() {
+            // Status history notifications: exclude if user performed action
+            this.whereNotNull("notifications.activity_id")
+              .where("order_status_history.changed_by", "!=", userId);
+          }).orWhere(function() {
+            // Comment notifications: exclude if user is the commenter
+            this.whereNotNull("notifications.comment_id")
+              .where("order_comments.user_id", "!=", userId);
+          });
+        });
       }
 
       const uniqueIdsQuery = db("notifications")
         .select(db.raw("MIN(notifications.id) as id"))
         .whereIn("notifications.id", baseNotificationQuery)
-        .groupBy("notifications.activity_id");
+        .groupBy(db.raw("COALESCE(notifications.activity_id, 0), COALESCE(notifications.comment_id, 0)"));
 
       const uniqueIdsResult = await uniqueIdsQuery;
       const uniqueIds = uniqueIdsResult.map(row => row.id);
@@ -344,6 +477,7 @@ const notification = {
         .leftJoin("orders", "notifications.order_id", "orders.id")
         .leftJoin("order_status_history", "notifications.activity_id", "order_status_history.id")
         .leftJoin("order_status_master", "order_status_history.status_id", "order_status_master.id")
+        .leftJoin("order_comments", "notifications.comment_id", "order_comments.id")
         .leftJoin("users as notification_user", "notifications.user_id", "notification_user.id")
         .leftJoin("users as changed_by_user", function() {
           this.on("order_status_history.changed_by", "=", "changed_by_user.id")
@@ -353,6 +487,7 @@ const notification = {
           this.on("order_status_history.changed_by", "=", "field_verifiers.id")
               .andOn("order_status_history.user_type", "=", db.raw("'field_verifier'"));
         })
+        .leftJoin("users as comment_user", "order_comments.user_id", "comment_user.id")
         .select(
           "notifications.id",
           "notifications.user_id",
@@ -360,6 +495,10 @@ const notification = {
           "notifications.order_id",
           "orders.order_number",
           "notifications.activity_id",
+          "notifications.comment_id",
+          "notifications.notification_type",
+          "notifications.title",
+          "notifications.description",
           "notifications.is_read",
           "notifications.read_at",
           "notifications.created_at",
@@ -374,13 +513,20 @@ const notification = {
               ELSE changed_by_user.name 
             END as changed_by_name
           `),
-          "order_status_history.changed_at"
+          "order_status_history.changed_at",
+          "order_comments.comment as comment_text",
+          "order_comments.user_id as comment_user_id",
+          "comment_user.name as comment_user_name",
+          "order_comments.commented_at"
         )
         .orderBy("notifications.created_at", "desc")
         .limit(limit)
         .offset(offset);
 
-      return await query;
+      const results = await query;
+      // Filter comment notifications based on permission
+      const filteredResults = await filterCommentNotifications(results || []);
+      return filteredResults;
     } catch (error) {
       return [];
     }
@@ -439,6 +585,7 @@ const notification = {
       .select("notifications.id")
       .leftJoin("orders", "notifications.order_id", "orders.id")
       .leftJoin("order_status_history", "notifications.activity_id", "order_status_history.id")
+      .leftJoin("order_comments", "notifications.comment_id", "order_comments.id")
       .leftJoin("officers", "orders.officer_id", "officers.id")
       .whereNull("orders.deleted_at")
       .whereNot("orders.current_status_id", 13);
@@ -462,13 +609,26 @@ const notification = {
       } else if (roleName.includes("MANAGER")) {
         baseNotificationQuery = baseNotificationQuery.where("orders.manager_id", userId);
       }
-      baseNotificationQuery = baseNotificationQuery.where("order_status_history.changed_by", "!=", userId);
+      // Exclude self-actions for admin roles
+      // For status history: exclude if user performed the action
+      // For comments: exclude if user is the commenter
+      baseNotificationQuery = baseNotificationQuery.where(function() {
+        this.where(function() {
+          // Status history notifications: exclude if user performed action
+          this.whereNotNull("notifications.activity_id")
+            .where("order_status_history.changed_by", "!=", userId);
+        }).orWhere(function() {
+          // Comment notifications: exclude if user is the commenter
+          this.whereNotNull("notifications.comment_id")
+            .where("order_comments.user_id", "!=", userId);
+        });
+      });
     }
 
     const uniqueIdsQuery = db("notifications")
       .select(db.raw("MIN(notifications.id) as id"))
       .whereIn("notifications.id", baseNotificationQuery)
-      .groupBy("notifications.activity_id");
+      .groupBy(db.raw("COALESCE(notifications.activity_id, 0), COALESCE(notifications.comment_id, 0)"));
 
     const uniqueIdsResult = await uniqueIdsQuery;
     const uniqueIds = uniqueIdsResult.map(row => row.id);
@@ -483,6 +643,7 @@ const notification = {
       .leftJoin("orders", "notifications.order_id", "orders.id")
       .leftJoin("order_status_history", "notifications.activity_id", "order_status_history.id")
       .leftJoin("order_status_master", "order_status_history.status_id", "order_status_master.id")
+      .leftJoin("order_comments", "notifications.comment_id", "order_comments.id")
       .leftJoin("users as notification_user", "notifications.user_id", "notification_user.id")
       .leftJoin("users as changed_by_user", function() {
         this.on("order_status_history.changed_by", "=", "changed_by_user.id")
@@ -492,34 +653,46 @@ const notification = {
         this.on("order_status_history.changed_by", "=", "field_verifiers.id")
             .andOn("order_status_history.user_type", "=", db.raw("'field_verifier'"));
       })
+      .leftJoin("users as comment_user", "order_comments.user_id", "comment_user.id")
       .select(
         "notifications.id",
         "notifications.user_id",
         "notification_user.name as user_name",
         "notifications.order_id",
         "orders.order_number",
-        "notifications.activity_id",
-        "notifications.is_read",
-        "notifications.read_at",
-        "notifications.created_at",
-        "order_status_history.status_id",
-        "order_status_master.name as status_name",
-        "order_status_history.activity_extra",
-        "order_status_history.changed_by",
-        "order_status_history.user_type",
-        db.raw(`
-          CASE 
-            WHEN order_status_history.user_type = 'field_verifier' THEN field_verifiers.name 
-            ELSE changed_by_user.name 
-          END as changed_by_name
-        `),
-        "order_status_history.changed_at"
-      )
+          "notifications.activity_id",
+          "notifications.comment_id",
+          "notifications.notification_type",
+          "notifications.title",
+          "notifications.description",
+          "notifications.is_read",
+          "notifications.read_at",
+          "notifications.created_at",
+          "order_status_history.status_id",
+          "order_status_master.name as status_name",
+          "order_status_history.activity_extra",
+          "order_status_history.changed_by",
+          "order_status_history.user_type",
+          db.raw(`
+            CASE 
+              WHEN order_status_history.user_type = 'field_verifier' THEN field_verifiers.name 
+              ELSE changed_by_user.name 
+            END as changed_by_name
+          `),
+          "order_status_history.changed_at",
+          "order_comments.comment as comment_text",
+          "order_comments.user_id as comment_user_id",
+          "comment_user.name as comment_user_name",
+          "order_comments.commented_at"
+        )
       .orderBy("notifications.created_at", "desc")
       .limit(limit)
       .offset(offset);
 
-    return await query;
+    const results = await query;
+    // Filter comment notifications based on permission
+    const filteredResults = await filterCommentNotifications(results || []);
+    return filteredResults;
   },
 
   // Mark notification as read
@@ -629,6 +802,7 @@ const notification = {
     let query = db("notifications")
       .leftJoin("orders", "notifications.order_id", "orders.id")
       .leftJoin("order_status_history", "notifications.activity_id", "order_status_history.id")
+      .leftJoin("order_comments", "notifications.comment_id", "order_comments.id")
       .leftJoin("officers", "orders.officer_id", "officers.id")
       .where("notifications.is_read", false)
       .whereNull("orders.deleted_at")
@@ -678,7 +852,19 @@ const notification = {
         query = query.where("orders.manager_id", userId);
       }
       // Exclude self-actions for admin roles
-      query = query.where("order_status_history.changed_by", "!=", userId);
+      // For status history: exclude if user performed the action
+      // For comments: exclude if user is the commenter
+      query = query.where(function() {
+        this.where(function() {
+          // Status history notifications: exclude if user performed action
+          this.whereNotNull("notifications.activity_id")
+            .where("order_status_history.changed_by", "!=", userId);
+        }).orWhere(function() {
+          // Comment notifications: exclude if user is the commenter
+          this.whereNotNull("notifications.comment_id")
+            .where("order_comments.user_id", "!=", userId);
+        });
+      });
     }
 
     // Get notification IDs that match the permission filters
@@ -703,20 +889,30 @@ const notification = {
 
   // Create a notification
   create: async (data) => {
-    // Use insert with onConflict to prevent duplicates
+    // Prepare insert data
+    const insertData = {
+      user_id: data.user_id,
+      order_id: data.order_id,
+      notification_type: data.notification_type || "status_change",
+      title: data.title || null,
+      description: data.description || null,
+      is_read: false,
+      created_at: new Date()
+    };
+
+    // Add activity_id if provided (for status change notifications)
+    if (data.activity_id) {
+      insertData.activity_id = data.activity_id;
+    }
+
+    // Add comment_id if provided (for comment notifications)
+    if (data.comment_id) {
+      insertData.comment_id = data.comment_id;
+    }
+
+    // Use insert - conflict is now handled by partial unique indexes
     const [notification] = await db("notifications")
-      .insert({
-        user_id: data.user_id,
-        order_id: data.order_id,
-        activity_id: data.activity_id,
-        notification_type: data.notification_type || "status_change",
-        title: data.title || null,
-        description: data.description || null,
-        is_read: false,
-        created_at: new Date()
-      })
-      .onConflict(["user_id", "activity_id"])
-      .ignore()
+      .insert(insertData)
       .returning("*");
 
     return notification;
@@ -731,24 +927,53 @@ const notification = {
     // Use a transaction to ensure atomicity and prevent race conditions
     return await db.transaction(async (trx) => {
       // First, check which notifications already exist to avoid unnecessary inserts
-      const activityIds = [...new Set(notificationsArray.map(n => n.activity_id))];
+      const activityIds = [...new Set(notificationsArray.filter(n => n.activity_id).map(n => n.activity_id))];
+      const commentIds = [...new Set(notificationsArray.filter(n => n.comment_id).map(n => n.comment_id))];
       const userIds = [...new Set(notificationsArray.map(n => n.user_id))];
       
-      const existingNotifications = await trx("notifications")
-        .select("user_id", "activity_id")
-        .whereIn("activity_id", activityIds)
-        .whereIn("user_id", userIds)
-        .forUpdate(); // Lock rows to prevent concurrent inserts
+      let existingNotifications = [];
+      
+      // Check existing activity-based notifications
+      if (activityIds.length > 0) {
+        const activityNotifs = await trx("notifications")
+          .select("user_id", "activity_id", "comment_id")
+          .whereIn("activity_id", activityIds)
+          .whereIn("user_id", userIds)
+          .forUpdate(); // Lock rows to prevent concurrent inserts
+        existingNotifications = [...existingNotifications, ...activityNotifs];
+      }
+      
+      // Check existing comment-based notifications
+      if (commentIds.length > 0) {
+        const commentNotifs = await trx("notifications")
+          .select("user_id", "activity_id", "comment_id")
+          .whereIn("comment_id", commentIds)
+          .whereIn("user_id", userIds)
+          .forUpdate(); // Lock rows to prevent concurrent inserts
+        existingNotifications = [...existingNotifications, ...commentNotifs];
+      }
 
       // Create a Set of existing notification keys for fast lookup
       const existingKeys = new Set(
-        existingNotifications.map(n => `${n.user_id}_${n.activity_id}`)
+        existingNotifications.map(n => {
+          if (n.activity_id) {
+            return `${n.user_id}_activity_${n.activity_id}`;
+          } else if (n.comment_id) {
+            return `${n.user_id}_comment_${n.comment_id}`;
+          }
+          return null;
+        }).filter(k => k !== null)
       );
 
       // Filter out notifications that already exist
       const notificationsToInsert = notificationsArray.filter((n) => {
-        const key = `${n.user_id}_${n.activity_id}`;
-        return !existingKeys.has(key);
+        let key;
+        if (n.activity_id) {
+          key = `${n.user_id}_activity_${n.activity_id}`;
+        } else if (n.comment_id) {
+          key = `${n.user_id}_comment_${n.comment_id}`;
+        }
+        return key && !existingKeys.has(key);
       });
 
       if (notificationsToInsert.length === 0) {
@@ -758,19 +983,30 @@ const notification = {
       // Insert with conflict handling to prevent duplicates (triple safety)
       const inserted = await trx("notifications")
         .insert(
-          notificationsToInsert.map((n) => ({
-            user_id: n.user_id,
-            order_id: n.order_id,
-            activity_id: n.activity_id,
-            notification_type: n.notification_type || "status_change",
-            title: n.title || null,
-            description: n.description || null,
-            is_read: false,
-            created_at: new Date()
-          }))
+          notificationsToInsert.map((n) => {
+            const insertData = {
+              user_id: n.user_id,
+              order_id: n.order_id,
+              notification_type: n.notification_type || "status_change",
+              title: n.title || null,
+              description: n.description || null,
+              is_read: false,
+              created_at: new Date()
+            };
+
+            // Add activity_id if provided (for status change notifications)
+            if (n.activity_id) {
+              insertData.activity_id = n.activity_id;
+            }
+
+            // Add comment_id if provided (for comment notifications)
+            if (n.comment_id) {
+              insertData.comment_id = n.comment_id;
+            }
+
+            return insertData;
+          })
         )
-        .onConflict(["user_id", "activity_id"])
-        .ignore()
         .returning("*");
 
       return inserted || [];

@@ -1013,7 +1013,7 @@ function Dashboard() {
                       </div>
                     </div>
                     <div className="col-md-6 p-0">
-                      <div className="manager-dashboard-card-body-item border-right">
+                      <div className="manager-dashboard-card-body-item border-right ongoing-orders-gradient">
                         <span>Ongoing Orders</span>
                         <p>{formatTwoDigits(ongoingOrdersCount)}</p>
                       </div>

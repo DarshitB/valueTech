@@ -188,7 +188,8 @@
     &.order-status {
       min-height: 120px;
       &.ongoing-orders {
-        background: linear-gradient(to right, #444468, #474f8f);
+        background: linear-gradient(to right, #22c55e, #10b981);
+        /* background: linear-gradient(to right, #444468, #474f8f); */
         color: $primary-font-color;
       }
       &.submitted-orders {

@@ -25,7 +25,15 @@ import "../order.scss";
 import { DeleteIcon } from "../../../components/icons";
 
 // WYSIWYG Textarea Component - preserves HTML formatting
-const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "", name, readOnly = false }) => {
+const WysiwygTextarea = ({
+  value,
+  onChange,
+  placeholder,
+  rows = 4,
+  className = "",
+  name,
+  readOnly = false,
+}) => {
   const editorRef = useRef(null);
   const isUpdatingRef = useRef(false);
 
@@ -34,16 +42,16 @@ const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "
     if (editorRef.current && !isUpdatingRef.current) {
       const currentContent = editorRef.current.innerHTML;
       const newContent = value || "";
-      
+
       // Only update if the value is different to avoid cursor jumping
       if (currentContent !== newContent) {
         const selection = window.getSelection();
         const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
         const wasFocused = document.activeElement === editorRef.current;
-        
+
         isUpdatingRef.current = true;
         editorRef.current.innerHTML = newContent;
-        
+
         // Restore cursor position if it was focused
         if (wasFocused && range) {
           try {
@@ -53,7 +61,7 @@ const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "
             // Ignore if range is invalid
           }
         }
-        
+
         setTimeout(() => {
           isUpdatingRef.current = false;
         }, 0);
@@ -77,21 +85,21 @@ const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "
     e.preventDefault();
     // Get plain text only - strip all formatting (bold, italic, etc.)
     let plainText = e.clipboardData.getData("text/plain");
-    
+
     // Remove extra spaces and normalize line breaks
     plainText = plainText
-      .replace(/\r\n/g, '\n') // Normalize line breaks
-      .replace(/\r/g, '\n') // Normalize line breaks
-      .split('\n')
-      .map(line => line.trim()) // Remove leading/trailing spaces from each line
-      .filter(line => line.length > 0) // Remove empty lines
-      .join('\n');
-    
+      .replace(/\r\n/g, "\n") // Normalize line breaks
+      .replace(/\r/g, "\n") // Normalize line breaks
+      .split("\n")
+      .map((line) => line.trim()) // Remove leading/trailing spaces from each line
+      .filter((line) => line.length > 0) // Remove empty lines
+      .join("\n");
+
     // Convert to HTML with line breaks, but as plain text (no formatting)
-    const htmlText = plainText.replace(/\n/g, '<br>');
-    
+    const htmlText = plainText.replace(/\n/g, "<br>");
+
     // Insert as plain text with line breaks (no bold, italic, etc.)
-    document.execCommand("insertHTML", false, htmlText || '');
+    document.execCommand("insertHTML", false, htmlText || "");
   };
 
   // Handle placeholder display
@@ -137,7 +145,9 @@ const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "
         onPaste={handlePaste}
         className={`form-field wysiwyg-textarea ${className}`}
         data-placeholder={placeholder}
-        style={readOnly ? { cursor: 'default', backgroundColor: '#f5f5f5' } : {}}
+        style={
+          readOnly ? { cursor: "default", backgroundColor: "#f5f5f5" } : {}
+        }
       />
     </>
   );
@@ -300,6 +310,7 @@ function CEReport() {
       crane_model_code: "",
 
       hours_meter_reading: "",
+      invoice_no_heading: "Invoice No. & Date",
       invoice_no_date: "",
       invoice_no: "",
       invoice_date: "",
@@ -637,6 +648,7 @@ function CEReport() {
     crane_model_code: "",
 
     hours_meter_reading: "",
+    invoice_no_heading: "Invoice No. & Date",
     invoice_no_date: "",
     invoice_no: "",
     invoice_date: "",
@@ -890,7 +902,7 @@ function CEReport() {
           // In both cases, all API calls are complete - remove loading
           if (!order?.child_category_id) {
             // No child_category_id - no child category API, no RC API - remove loading
-          setIsInitialLoading(false);
+            setIsInitialLoading(false);
           }
           // If child_category_id exists, child category API will be called, then RC API (if registration number exists)
         }
@@ -1060,12 +1072,19 @@ function CEReport() {
 
       // For valueation_report_for_heading: ALWAYS use saved value from database if exists
       // Don't try to extract or regenerate - user may have manually edited it with extra text
-      if (report.valueation_report_for_heading !== undefined && report.valueation_report_for_heading !== null && String(report.valueation_report_for_heading).trim() !== "") {
+      if (
+        report.valueation_report_for_heading !== undefined &&
+        report.valueation_report_for_heading !== null &&
+        String(report.valueation_report_for_heading).trim() !== ""
+      ) {
         // Use saved value from database exactly as saved - don't modify it
-        updated.valueation_report_for_heading = report.valueation_report_for_heading;
+        updated.valueation_report_for_heading =
+          report.valueation_report_for_heading;
       } else {
         // Generate from category_suffix only if no saved value exists
-        const categorySuffixUpper = extractedCategorySuffix ? extractedCategorySuffix.toUpperCase().trim() : "";
+        const categorySuffixUpper = extractedCategorySuffix
+          ? extractedCategorySuffix.toUpperCase().trim()
+          : "";
         updated.valueation_report_for_heading = categorySuffixUpper
           ? `VALUATION REPORT FOR ${categorySuffixUpper}`
           : "";
@@ -1373,36 +1392,48 @@ function CEReport() {
             .trim();
           if (upperValue === "NOT AVAILABLE") {
             // If order has registration_number, use it instead of "NOT AVAILABLE"
-            if (order?.registration_number && order.registration_number.trim() !== "") {
+            if (
+              order?.registration_number &&
+              order.registration_number.trim() !== ""
+            ) {
               setRegistrationNoOption(null);
               updated.registration_no = order.registration_number;
             } else {
-            setRegistrationNoOption("NOT_AVAILABLE");
-            updated.registration_no = ""; // Leave input empty - button state will be used in payload
+              setRegistrationNoOption("NOT_AVAILABLE");
+              updated.registration_no = ""; // Leave input empty - button state will be used in payload
             }
           } else if (upperValue === "NOT APPLICABLE") {
             // If order has registration_number, use it instead of "NOT APPLICABLE"
-            if (order?.registration_number && order.registration_number.trim() !== "") {
+            if (
+              order?.registration_number &&
+              order.registration_number.trim() !== ""
+            ) {
               setRegistrationNoOption(null);
               updated.registration_no = order.registration_number;
             } else {
-            setRegistrationNoOption("NOT_APPLICABLE");
-            updated.registration_no = ""; // Leave input empty - button state will be used in payload
+              setRegistrationNoOption("NOT_APPLICABLE");
+              updated.registration_no = ""; // Leave input empty - button state will be used in payload
             }
           } else {
             // Regular value from child category report
             // BUT: If order has registration_number, prioritize order's value over child category report
-            if (order?.registration_number && order.registration_number.trim() !== "") {
+            if (
+              order?.registration_number &&
+              order.registration_number.trim() !== ""
+            ) {
               // Order has registration_number - use it (priority to order)
               setRegistrationNoOption(null);
               updated.registration_no = order.registration_number;
             } else {
               // Order doesn't have registration_number - use child category report's value
-            setRegistrationNoOption(null);
-            updated.registration_no = report.registration_no;
+              setRegistrationNoOption(null);
+              updated.registration_no = report.registration_no;
+            }
           }
-          }
-        } else if (order?.registration_number && order.registration_number.trim() !== "") {
+        } else if (
+          order?.registration_number &&
+          order.registration_number.trim() !== ""
+        ) {
           // If child category report doesn't have registration_no but order has it, use order's value
           setRegistrationNoOption(null);
           updated.registration_no = order.registration_number;
@@ -1453,10 +1484,13 @@ function CEReport() {
 
       // Check if RC API will be called - if not, remove loading now
       // RC API will only be called if registration number exists
-      if (!order?.registration_number || order.registration_number.trim() === "") {
+      if (
+        !order?.registration_number ||
+        order.registration_number.trim() === ""
+      ) {
         // No registration number - RC API won't be called, all API calls complete
-      setIsInitialLoading(false);
-    }
+        setIsInitialLoading(false);
+      }
       // If registration number exists, RC API will be called and will remove loading
     }
   }, [currentReport, reportLoading, id, order]);
@@ -1473,10 +1507,13 @@ function CEReport() {
       // Child category API also returned no data
       childCategoryDataProcessedRef.current = true; // Mark as processed to prevent re-running
       // Check if RC API will be called - if not, remove loading now
-      if (!order?.registration_number || order.registration_number.trim() === "") {
+      if (
+        !order?.registration_number ||
+        order.registration_number.trim() === ""
+      ) {
         // No registration number, RC API won't be called - remove loading
-      setIsInitialLoading(false);
-    }
+        setIsInitialLoading(false);
+      }
       // If registration number exists, RC API will be called and will remove loading
     }
   }, [reportLoading, reportFetchCompleted, currentReport, order]);
@@ -1586,7 +1623,8 @@ function CEReport() {
               updated.proposed_owner_address = rcData.permanentAddress;
 
             // Vehicle details
-            if (rcData.chassisNumber) updated.crane_chassis_no = rcData.chassisNumber;
+            if (rcData.chassisNumber)
+              updated.crane_chassis_no = rcData.chassisNumber;
             if (rcData.engineNumber)
               updated.engine_no_detail = rcData.engineNumber;
             if (rcData.makerModel) {
@@ -1685,7 +1723,11 @@ function CEReport() {
       externalApiCalledRef.current = true; // Mark as called to prevent multiple calls
       fetchRCDetailsFromExternalAPI(order.registration_number);
     }
-  }, [reportLoading, order?.registration_number, fetchRCDetailsFromExternalAPI]);
+  }, [
+    reportLoading,
+    order?.registration_number,
+    fetchRCDetailsFromExternalAPI,
+  ]);
 
   // Set page title with breadcrumb navigation
   useLayoutEffect(() => {
@@ -1720,14 +1762,17 @@ function CEReport() {
       }
 
       const updated = { ...prev };
-      
+
       // Only auto-update valueation_report_for_heading if it's empty (not manually edited)
-      if (!prev.valueation_report_for_heading || prev.valueation_report_for_heading.trim() === "") {
+      if (
+        !prev.valueation_report_for_heading ||
+        prev.valueation_report_for_heading.trim() === ""
+      ) {
         updated.valueation_report_for_heading = categorySuffixUpper
           ? `VALUATION REPORT FOR ${categorySuffixUpper}`
           : "";
       }
-      
+
       // Always update other headings (they are not editable)
       updated.general_details_heading = categorySuffixUpper
         ? `GENERAL DETAILS OF THE INSPECTED ${categorySuffixUpper}`
@@ -1744,7 +1789,7 @@ function CEReport() {
       updated.overall_feedback_heading = categorySuffixUpper
         ? `OVER ALL FEED BACK OF THE INSPECTED ${categorySuffixUpper}`
         : "";
-      
+
       return updated;
     });
   }, [reportFormData.category_suffix]);
@@ -1811,9 +1856,12 @@ function CEReport() {
         // BUT don't update valueation_report_for_heading if it has been manually edited (has a value)
         if (name === "category_suffix") {
           const categorySuffixUpper = value ? value.toUpperCase().trim() : "";
-          
+
           // Only auto-update valueation_report_for_heading if it's empty (not manually edited)
-          if (!prev.valueation_report_for_heading || prev.valueation_report_for_heading.trim() === "") {
+          if (
+            !prev.valueation_report_for_heading ||
+            prev.valueation_report_for_heading.trim() === ""
+          ) {
             updated.valueation_report_for_heading = categorySuffixUpper
               ? `VALUATION REPORT FOR ${categorySuffixUpper}`
               : "";
@@ -2564,8 +2612,9 @@ function CEReport() {
           field.col_span;
         reportData[`flexible_fields[${formDataIndex}][field_label]`] =
           field.field_label;
-        reportData[`flexible_fields[${formDataIndex}][field_value]`] =
-          String(field.field_value || ""); // Preserve all formatting including line breaks
+        reportData[`flexible_fields[${formDataIndex}][field_value]`] = String(
+          field.field_value || ""
+        ); // Preserve all formatting including line breaks
         reportData[`flexible_fields[${formDataIndex}][field_order]`] =
           field.field_order;
         formDataIndex++;
@@ -2583,8 +2632,9 @@ function CEReport() {
             field.col_span;
           reportData[`flexible_fields[${formDataIndex}][field_label]`] =
             field.field_label_2;
-          reportData[`flexible_fields[${formDataIndex}][field_value]`] =
-            String(field.field_value_2 || ""); // Preserve all formatting including line breaks
+          reportData[`flexible_fields[${formDataIndex}][field_value]`] = String(
+            field.field_value_2 || ""
+          ); // Preserve all formatting including line breaks
           reportData[`flexible_fields[${formDataIndex}][field_order]`] =
             field.field_order + 1;
           formDataIndex++;
@@ -3138,8 +3188,8 @@ function CEReport() {
                       id="valueation_report_for_heading"
                       name="valueation_report_for_heading"
                       value={reportFormData.valueation_report_for_heading || ""}
-                      readOnly
-                      placeholder="Auto-generated from Category Suffix"
+                      onChange={handleFormChange}
+                      placeholder="Auto-generated from Category Suffix (editable)"
                     />
                   </div>
                 </div>
@@ -3751,27 +3801,33 @@ function CEReport() {
                     <label htmlFor="engine_no_detail">
                       Engine No./ Detail <span class="text-danger">*</span>
                     </label>
+                    <div className="d-flex gap-2 align-items-center mb-2 drop-down-w-100">
+                      <div style={{ width: "100px", flexShrink: 0 }}>
+                        Heading:
+                      </div>
+                      <SingleSearchSelect
+                        options={[
+                          {
+                            value: "Engine No./ Details",
+                            label: "Engine No./ Details",
+                          },
+                          {
+                            value: "Motor No./Details",
+                            label: "Motor No./Details",
+                          },
+                        ]}
+                        value={
+                          reportFormData.engine_no_heading ||
+                          "Engine No./ Details"
+                        }
+                        onChange={(value) =>
+                          handleSelectChange("engine_no_heading", value)
+                        }
+                      />
+                    </div>
                     <div className="d-flex gap-2 align-items-center">
-                      <div style={{ width: "150px", flexShrink: 0 }}>
-                        <SingleSearchSelect
-                          options={[
-                            {
-                              value: "Engine No./ Details",
-                              label: "Engine No./ Details",
-                            },
-                            {
-                              value: "Motor No./Details",
-                              label: "Motor No./Details",
-                            },
-                          ]}
-                          value={
-                            reportFormData.engine_no_heading ||
-                            "Engine No./ Details"
-                          }
-                          onChange={(value) =>
-                            handleSelectChange("engine_no_heading", value)
-                          }
-                        />
+                      <div style={{ width: "100px", flexShrink: 0 }}>
+                        Value:
                       </div>
                       <input
                         type="text"
@@ -3791,24 +3847,37 @@ function CEReport() {
                     <label htmlFor="crane_chassis_no">
                       Crane Chassis No <span class="text-danger">*</span>
                     </label>
+                    <div className="d-flex gap-2 align-items-center mb-2 drop-down-w-100">
+                      <div style={{ width: "100px", flexShrink: 0 }}>
+                        Heading:
+                      </div>
+                      <SingleSearchSelect
+                        options={[
+                          {
+                            value: "Asset Chassis No",
+                            label: "Asset Chassis No",
+                          },
+                          {
+                            value: "Asset Model No",
+                            label: "Asset Model No",
+                          },
+                          {
+                            value: "Asset Serial No",
+                            label: "Asset Serial No",
+                          },
+                        ]}
+                        value={
+                          reportFormData.chassis_no_heading ||
+                          "Asset Chassis No"
+                        }
+                        onChange={(value) =>
+                          handleSelectChange("chassis_no_heading", value)
+                        }
+                      />
+                    </div>
                     <div className="d-flex gap-2 align-items-center">
-                      <div style={{ width: "150px", flexShrink: 0 }}>
-                        <SingleSearchSelect
-                          options={[
-                            {
-                              value: "Asset Chassis No",
-                              label: "Asset Chassis No",
-                            },
-                            { value: "Asset Model No", label: "Asset Model No" },
-                          ]}
-                          value={
-                            reportFormData.chassis_no_heading ||
-                            "Asset Chassis No"
-                          }
-                          onChange={(value) =>
-                            handleSelectChange("chassis_no_heading", value)
-                          }
-                        />
+                      <div style={{ width: "100px", flexShrink: 0 }}>
+                        Value:
                       </div>
                       <input
                         type="text"
@@ -3877,25 +3946,59 @@ function CEReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="invoice_no">Invoice No. & Date</label>
-                    <input
-                      type="text"
-                      className="form-field mb-2"
-                      id="invoice_no"
-                      name="invoice_no"
-                      value={reportFormData.invoice_no}
-                      onChange={handleFormChange}
-                      placeholder="Invoice No."
-                    />
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="invoice_date"
-                      name="invoice_date"
-                      value={reportFormData.invoice_date}
-                      placeholder="DD-MM-YYYY"
-                      maxLength="10"
-                      onChange={handleDateChange}
-                    />
+                    <div className="d-flex gap-2 align-items-center mb-2 drop-down-w-100">
+                      <div style={{ width: "100px", flexShrink: 0 }}>
+                        Heading:
+                      </div>
+                      <SingleSearchSelect
+                        options={[
+                          {
+                            value: "Invoice No. & Date",
+                            label: "Invoice No. & Date",
+                          },
+                          {
+                            value: "Proforma Invoice no. and date",
+                            label: "Proforma Invoice no. and date",
+                          },
+                        ]}
+                        value={
+                          reportFormData.invoice_no_heading ||
+                          "Invoice No. & Date"
+                        }
+                        onChange={(value) =>
+                          handleSelectChange("invoice_no_heading", value)
+                        }
+                      />
+                    </div>
+                    <div className="d-flex gap-2 align-items-center">
+                      <div style={{ width: "100px", flexShrink: 0 }}>
+                        Invoice No.:
+                      </div>
+                      <input
+                        type="text"
+                        className="form-field mb-2"
+                        id="invoice_no"
+                        name="invoice_no"
+                        value={reportFormData.invoice_no}
+                        onChange={handleFormChange}
+                        placeholder="Invoice No."
+                      />
+                    </div>
+                    <div className="d-flex gap-2 align-items-center">
+                      <div style={{ width: "100px", flexShrink: 0 }}>
+                        Invoice Date:
+                      </div>
+                      <input
+                        type="text"
+                        className="form-field"
+                        id="invoice_date"
+                        name="invoice_date"
+                        value={reportFormData.invoice_date}
+                        placeholder="DD-MM-YYYY"
+                        maxLength="10"
+                        onChange={handleDateChange}
+                      />
+                    </div>
                   </div>
                 </div>
                 <div className="col-md-3">
@@ -5340,24 +5443,33 @@ function CEReport() {
                     <label htmlFor="fair_market_value">
                       Fair Market Value <span class="text-danger">*</span>
                     </label>
+                    <div className="d-flex gap-2 align-items-center mb-2 drop-down-w-100">
+                      <div style={{ width: "100px", flexShrink: 0 }}>
+                        Heading:
+                      </div>
+                      <SingleSearchSelect
+                        options={[
+                          {
+                            value: "Fair Market Value",
+                            label: "Fair Market Value",
+                          },
+                          {
+                            value: "Distress Value",
+                            label: "Distress Value",
+                          },
+                        ]}
+                        value={
+                          reportFormData.fair_market_value_heading ||
+                          "Fair Market Value"
+                        }
+                        onChange={(value) =>
+                          handleSelectChange("fair_market_value_heading", value)
+                        }
+                      />
+                    </div>
                     <div className="d-flex gap-2 align-items-center">
-                      <div style={{ width: "150px", flexShrink: 0 }}>
-                        <SingleSearchSelect
-                          options={[
-                            {
-                              value: "Fair Market Value",
-                              label: "Fair Market Value",
-                            },
-                            { value: "Distress Value", label: "Distress Value" },
-                          ]}
-                          value={
-                            reportFormData.fair_market_value_heading ||
-                            "Fair Market Value"
-                          }
-                          onChange={(value) =>
-                            handleSelectChange("fair_market_value_heading", value)
-                          }
-                        />
+                      <div style={{ width: "100px", flexShrink: 0 }}>
+                        Value:
                       </div>
                       <input
                         type="text"

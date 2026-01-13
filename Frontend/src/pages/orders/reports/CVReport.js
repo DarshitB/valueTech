@@ -3498,7 +3498,7 @@ function CVReport() {
                     <div className="row">
                       <div className="col-md-6">
                         <label htmlFor="front_tyre_no">
-                          Number Of Front Tires{" "}
+                          Number Of Front Tyres{" "}
                           <span className="text-danger">*</span>
                         </label>
                         <input
@@ -3535,7 +3535,7 @@ function CVReport() {
                     <div className="row">
                       <div className="col-md-6">
                         <label htmlFor="middle_tyre_no">
-                          Number Of Middle Tires
+                          Number Of Middle Tyres
                         </label>
                         <input
                           type="text"
@@ -3568,7 +3568,7 @@ function CVReport() {
                     <div className="row">
                       <div className="col-md-6">
                         <label htmlFor="rear_tyre_no">
-                          Number Of Rear Tires{" "}
+                          Number Of Rear Tyres{" "}
                           <span className="text-danger">*</span>
                         </label>
                         <input

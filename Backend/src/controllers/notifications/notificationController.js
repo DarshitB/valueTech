@@ -57,13 +57,17 @@ exports.getNotifications = async (req, res, next) => {
     // Format notifications for response - match exact frontend format
     const formattedNotifications = (notifications || []).map((notif) => {
       // Ensure all required fields are present
-      return {
+      const formatted = {
         id: notif.id ? notif.id.toString() : null,
         user_id: notif.user_id || null,
         user_name: notif.user_name || null,
         order_id: notif.order_id || null,
         order_number: notif.order_number || null,
         activity_id: notif.activity_id || null,
+        comment_id: notif.comment_id || null,
+        notification_type: notif.notification_type || "status_change",
+        title: notif.title || null,
+        description: notif.description || null,
         status_name: notif.status_name || null,
         activity_extra: notif.activity_extra || null,
         changed_by_id: notif.changed_by || null,
@@ -72,6 +76,16 @@ exports.getNotifications = async (req, res, next) => {
         created_at: notif.created_at || new Date().toISOString(),
         is_read: notif.is_read !== undefined ? notif.is_read : false
       };
+
+      // Add comment data if this is a comment notification
+      if (notif.comment_id) {
+        formatted.comment_text = notif.comment_text || null;
+        formatted.comment_user_id = notif.comment_user_id || null;
+        formatted.comment_user_name = notif.comment_user_name || null;
+        formatted.commented_at = notif.commented_at || null;
+      }
+
+      return formatted;
     }).filter(notif => notif.id !== null); // Filter out any invalid notifications
 
     res.json({
@@ -185,13 +199,17 @@ exports.getAllNotifications = async (req, res, next) => {
 
     // Format notifications for response - match exact frontend format
     const formattedNotifications = notifications.map((notif) => {
-      return {
+      const formatted = {
         id: notif.id.toString(), // Use database ID as string
         user_id: notif.user_id || null,
         user_name: notif.user_name || null,
         order_id: notif.order_id,
         order_number: notif.order_number,
         activity_id: notif.activity_id,
+        comment_id: notif.comment_id || null,
+        notification_type: notif.notification_type || "status_change",
+        title: notif.title || null,
+        description: notif.description || null,
         status_name: notif.status_name || null,
         activity_extra: notif.activity_extra || null,
         changed_by_id: notif.changed_by || null,
@@ -200,6 +218,16 @@ exports.getAllNotifications = async (req, res, next) => {
         created_at: notif.created_at,
         is_read: notif.is_read || false
       };
+
+      // Add comment data if this is a comment notification
+      if (notif.comment_id) {
+        formatted.comment_text = notif.comment_text || null;
+        formatted.comment_user_id = notif.comment_user_id || null;
+        formatted.comment_user_name = notif.comment_user_name || null;
+        formatted.commented_at = notif.commented_at || null;
+      }
+
+      return formatted;
     });
 
     res.json({

@@ -3,6 +3,7 @@ const OrderComment = require("../../models/orders/orderComment");
 const Order = require("../../models/orders/order");
 const OrderCommentTag = require("../../models/orders/orderCommentTag");
 const { NotFoundError, BadRequestError } = require("../../utils/customErrors");
+const { createNotificationsForComment } = require("../../utils/notificationHelper");
 
 // Get all comments for a specific order
 exports.getByOrder = async (req, res, next) => {
@@ -74,6 +75,19 @@ exports.create = async (req, res, next) => {
     let tags = [];
     if (Array.isArray(tagged_user_ids) && tagged_user_ids.length > 0) {
       tags = await OrderCommentTag.addTags(newComment.id, tagged_user_ids);
+    }
+
+    // Create notifications for this comment (async, don't wait for it)
+    // Users with permission to see the order will be notified
+    if (newComment && newComment.id) {
+      createNotificationsForComment(
+        orderId,
+        newComment.id,
+        req.user.id
+      ).catch((error) => {
+        // Log error but don't throw - notification creation should not break the main flow
+        console.error("Error creating notifications for comment:", error);
+      });
     }
 
     res.status(201).json({ ...newComment, tags });

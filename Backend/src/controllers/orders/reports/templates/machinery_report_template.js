@@ -463,11 +463,13 @@ body.single-page{
         </tr>
         <tr>
             <td>ASSET CLASSIFICATION:</td>
-            <td colspan="5">${formData.asset_classification}</td>
-        </tr>
-        <tr>
+            <td colspan="2">${formData.asset_classification}</td>
             <td>MACHINE TECHNOLOGY:</td>
             <td colspan="2">${formData.machine_technology}</td>
+        </tr>
+        <tr>
+            <td>CONTROL PANEL UNIT:</td>
+            <td colspan="2">${formData.control_panel_unit}</td>
             <td>MACHINE CONDITION:</td>
             <td colspan="2">${formData.machine_condition}</td>
         </tr>

@@ -1,6 +1,7 @@
 const db = require("../../db");
 const Notification = require("../models/notifications/notification");
 const OrderStatusHistory = require("../models/orders/orderStatusHistory");
+const { PROTECTED_ROLE } = require("../constants/protectedRoles");
 
 /**
  * Determine which users should receive notifications for an order activity
@@ -381,9 +382,118 @@ async function createNotificationsForActivity(
   }
 }
 
+/**
+ * Check if a user has "view_order_comments" permission
+ * @param {number} userId - The user ID
+ * @param {number} roleId - The user's role ID
+ * @param {string} roleName - The user's role name
+ * @returns {Promise<boolean>} - True if user has permission
+ */
+async function hasViewOrderCommentsPermission(userId, roleId, roleName) {
+  try {
+    // Protected role (developer_admin) always has permission
+    if (roleName === PROTECTED_ROLE) {
+      return true;
+    }
+
+    // Check if user's role has "view_order_comments" permission
+    const permission = await db("permissions")
+      .join(
+        "role_permissions",
+        "permissions.id",
+        "role_permissions.permission_id"
+      )
+      .where({
+        "permissions.name": "view_order_comments",
+        "role_permissions.role_id": roleId,
+      })
+      .whereNull("role_permissions.deleted_at")
+      .first();
+
+    return !!permission;
+  } catch (error) {
+    // On error, default to false (no permission)
+    console.error("Error checking view_order_comments permission:", error);
+    return false;
+  }
+}
+
+/**
+ * Create notifications for an order comment
+ * @param {number} orderId - The order ID
+ * @param {number} commentId - The comment ID
+ * @param {number} commentUserId - The user who created the comment (will be excluded from notifications)
+ */
+async function createNotificationsForComment(orderId, commentId, commentUserId) {
+  try {
+    // Check if notifications already exist for this comment
+    const existingNotifications = await db("notifications")
+      .select("id", "user_id")
+      .where("comment_id", commentId)
+      .limit(1);
+
+    if (existingNotifications.length > 0) {
+      // Notifications already exist for this comment, skip creation
+      return existingNotifications;
+    }
+
+    // Get order details
+    const order = await db("orders")
+      .select("order_number")
+      .where("id", orderId)
+      .first();
+
+    if (!order) {
+      return [];
+    }
+
+    // Get comment details
+    const comment = await db("order_comments")
+      .leftJoin("users", "order_comments.user_id", "users.id")
+      .select(
+        "order_comments.*",
+        "users.name as commenter_name"
+      )
+      .where("order_comments.id", commentId)
+      .first();
+
+    if (!comment) {
+      return [];
+    }
+
+    // Build notification title and description
+    const notificationTitle = `New comment on Order ${order.order_number}`;
+    const notificationDescription = comment.commenter_name 
+      ? `${comment.commenter_name} commented: ${comment.comment.substring(0, 100)}${comment.comment.length > 100 ? '...' : ''}`
+      : `New comment added: ${comment.comment.substring(0, 100)}${comment.comment.length > 100 ? '...' : ''}`;
+
+    // Create ONLY ONE notification record per comment
+    // Use the user_id of the person who created the comment (same structure as status change)
+    const notificationToCreate = {
+      user_id: commentUserId, // Use the user who created the comment (same as activityUserId for status changes)
+      order_id: orderId,
+      comment_id: commentId,
+      notification_type: "comment",
+      title: notificationTitle,
+      description: notificationDescription
+    };
+
+    // Create single notification (with duplicate prevention via unique constraint)
+    const createdNotification = await Notification.create(notificationToCreate);
+
+    return createdNotification ? [createdNotification] : [];
+  } catch (error) {
+    // Silently fail - notification creation should not break the main flow
+    console.error("Error creating notifications for comment:", error);
+    return [];
+  }
+}
+
 module.exports = {
   createNotificationsForActivity,
+  createNotificationsForComment,
   getUsersToNotify,
-  canUserSeeOrder
+  canUserSeeOrder,
+  hasViewOrderCommentsPermission
 };
 

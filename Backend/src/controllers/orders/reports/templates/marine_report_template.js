@@ -897,8 +897,7 @@ function generateMarineReportHTML(
                         To execute above ${getValue(formData.execute_above)} valuer. 
                         ${getValue(formData.valuer_name)} (Viraj Kothari with Licence No. 
                         ${getValue(formData.license_no)}) has been taken the 
-                        task for Survey Inspection & Valuation / Condition Valuation / 
-                        Desktop Valuation (Any One Option) of Vessel Name on the basis of previous 
+                        task for ${getValue(formData.execute_above)} of Vessel Name on the basis of previous 
                         survey & inspection reports, certification, engine overhauling report 
                         provided by client and information shared in soft copy. Also completed the 
                         study of entire vessel located at ${getValue(formData.inspection_location_front_page)} on ${getValue(formData.inspection_date_front_page)}. 

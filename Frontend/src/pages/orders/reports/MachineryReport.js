@@ -23,7 +23,15 @@ import "../order.scss";
 import { DeleteIcon } from "../../../components/icons";
 
 // WYSIWYG Textarea Component - preserves HTML formatting
-const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "", name, readOnly = false }) => {
+const WysiwygTextarea = ({
+  value,
+  onChange,
+  placeholder,
+  rows = 4,
+  className = "",
+  name,
+  readOnly = false,
+}) => {
   const editorRef = useRef(null);
   const isUpdatingRef = useRef(false);
 
@@ -32,16 +40,16 @@ const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "
     if (editorRef.current && !isUpdatingRef.current) {
       const currentContent = editorRef.current.innerHTML;
       const newContent = value || "";
-      
+
       // Only update if the value is different to avoid cursor jumping
       if (currentContent !== newContent) {
         const selection = window.getSelection();
         const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
         const wasFocused = document.activeElement === editorRef.current;
-        
+
         isUpdatingRef.current = true;
         editorRef.current.innerHTML = newContent;
-        
+
         // Restore cursor position if it was focused
         if (wasFocused && range) {
           try {
@@ -51,7 +59,7 @@ const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "
             // Ignore if range is invalid
           }
         }
-        
+
         setTimeout(() => {
           isUpdatingRef.current = false;
         }, 0);
@@ -75,21 +83,21 @@ const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "
     e.preventDefault();
     // Get plain text only - strip all formatting (bold, italic, etc.)
     let plainText = e.clipboardData.getData("text/plain");
-    
+
     // Remove extra spaces and normalize line breaks
     plainText = plainText
-      .replace(/\r\n/g, '\n') // Normalize line breaks
-      .replace(/\r/g, '\n') // Normalize line breaks
-      .split('\n')
-      .map(line => line.trim()) // Remove leading/trailing spaces from each line
-      .filter(line => line.length > 0) // Remove empty lines
-      .join('\n');
-    
+      .replace(/\r\n/g, "\n") // Normalize line breaks
+      .replace(/\r/g, "\n") // Normalize line breaks
+      .split("\n")
+      .map((line) => line.trim()) // Remove leading/trailing spaces from each line
+      .filter((line) => line.length > 0) // Remove empty lines
+      .join("\n");
+
     // Convert to HTML with line breaks, but as plain text (no formatting)
-    const htmlText = plainText.replace(/\n/g, '<br>');
-    
+    const htmlText = plainText.replace(/\n/g, "<br>");
+
     // Insert as plain text with line breaks (no bold, italic, etc.)
-    document.execCommand("insertHTML", false, htmlText || '');
+    document.execCommand("insertHTML", false, htmlText || "");
   };
 
   // Handle placeholder display
@@ -135,7 +143,9 @@ const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "
         onPaste={handlePaste}
         className={`form-field wysiwyg-textarea ${className}`}
         data-placeholder={placeholder}
-        style={readOnly ? { cursor: 'default', backgroundColor: '#f5f5f5' } : {}}
+        style={
+          readOnly ? { cursor: "default", backgroundColor: "#f5f5f5" } : {}
+        }
       />
     </>
   );
@@ -276,6 +286,7 @@ function MachineryReport() {
       machine_serial_no: "",
       laf_id: "",
       application_usage: "",
+      control_panel_unit: "",
 
       invoice_no_date: "",
       invoice_no: "",
@@ -566,6 +577,7 @@ function MachineryReport() {
     machine_serial_no: "",
     laf_id: "",
     application_usage: "",
+    control_panel_unit: "",
 
     invoice_no_date: "",
     invoice_no: "",
@@ -717,11 +729,15 @@ function MachineryReport() {
               ? categorySuffix
               : prev.category_suffix || "",
           // Generate disclaimer with valuer name (use existing if already set, otherwise generate new)
-          disclaimer: prev.disclaimer && prev.disclaimer.trim() !== ""
-            ? (order?.valuer_name 
-                ? prev.disclaimer.replace(/VALUETECH SOLUTIONS/g, order.valuer_name)
-                : prev.disclaimer)
-            : getDisclaimer(order?.valuer_name || "VALUETECH SOLUTIONS"),
+          disclaimer:
+            prev.disclaimer && prev.disclaimer.trim() !== ""
+              ? order?.valuer_name
+                ? prev.disclaimer.replace(
+                    /VALUETECH SOLUTIONS/g,
+                    order.valuer_name
+                  )
+                : prev.disclaimer
+              : getDisclaimer(order?.valuer_name || "VALUETECH SOLUTIONS"),
         };
       });
     }
@@ -863,12 +879,19 @@ function MachineryReport() {
 
       // For valueation_report_for_heading: ALWAYS use saved value from database if exists
       // Don't try to extract or regenerate - user may have manually edited it with extra text
-      if (report.valueation_report_for_heading !== undefined && report.valueation_report_for_heading !== null && String(report.valueation_report_for_heading).trim() !== "") {
+      if (
+        report.valueation_report_for_heading !== undefined &&
+        report.valueation_report_for_heading !== null &&
+        String(report.valueation_report_for_heading).trim() !== ""
+      ) {
         // Use saved value from database exactly as saved - don't modify it
-        updated.valueation_report_for_heading = report.valueation_report_for_heading;
+        updated.valueation_report_for_heading =
+          report.valueation_report_for_heading;
       } else {
         // Generate from category_suffix only if no saved value exists
-        const categorySuffixUpper = extractedCategorySuffix ? extractedCategorySuffix.toUpperCase().trim() : "";
+        const categorySuffixUpper = extractedCategorySuffix
+          ? extractedCategorySuffix.toUpperCase().trim()
+          : "";
         updated.valueation_report_for_heading = categorySuffixUpper
           ? `VALUATION REPORT FOR ${categorySuffixUpper}`
           : "";
@@ -946,7 +969,10 @@ function MachineryReport() {
 
       // Update disclaimer to replace "VALUETECH SOLUTIONS" with actual valuer name if needed
       if (updated.disclaimer && order?.valuer_name) {
-        updated.disclaimer = updated.disclaimer.replace(/VALUETECH SOLUTIONS/g, order.valuer_name);
+        updated.disclaimer = updated.disclaimer.replace(
+          /VALUETECH SOLUTIONS/g,
+          order.valuer_name
+        );
       }
 
       // Ensure ref_no_month has a default value if it's empty or null
@@ -1060,9 +1086,12 @@ function MachineryReport() {
       }
 
       const updated = { ...prev };
-      
+
       // Only auto-update valueation_report_for_heading if it's empty (not manually edited)
-      if (!prev.valueation_report_for_heading || prev.valueation_report_for_heading.trim() === "") {
+      if (
+        !prev.valueation_report_for_heading ||
+        prev.valueation_report_for_heading.trim() === ""
+      ) {
         updated.valueation_report_for_heading = categorySuffixUpper
           ? `VALUATION REPORT FOR ${categorySuffixUpper}`
           : "";
@@ -1083,7 +1112,7 @@ function MachineryReport() {
       updated.overall_feedback_heading = categorySuffixUpper
         ? `OVER ALL FEED BACK OF THE INSPECTED ${categorySuffixUpper}`
         : "";
-      
+
       return updated;
     });
   }, [reportFormData.category_suffix]);
@@ -1109,12 +1138,14 @@ function MachineryReport() {
         };
 
         // Track if user manually edits heading fields
-        if (name === "valueation_report_for_heading" || 
-            name === "general_details_heading" ||
-            name === "inspected_equipment_heading" ||
-            name === "comments_on_equipment_heading" ||
-            name === "insurance_details_heading" ||
-            name === "overall_feedback_heading") {
+        if (
+          name === "valueation_report_for_heading" ||
+          name === "general_details_heading" ||
+          name === "inspected_equipment_heading" ||
+          name === "comments_on_equipment_heading" ||
+          name === "insurance_details_heading" ||
+          name === "overall_feedback_heading"
+        ) {
           // Mark this heading field as manually edited
           manuallyEditedHeadingsRef.current.add(name);
         }
@@ -1123,14 +1154,17 @@ function MachineryReport() {
         // BUT don't update valueation_report_for_heading if it has been manually edited (has a value)
         if (name === "category_suffix") {
           const categorySuffixUpper = value ? value.toUpperCase().trim() : "";
-          
+
           // Only auto-update valueation_report_for_heading if it's empty (not manually edited)
-          if (!prev.valueation_report_for_heading || prev.valueation_report_for_heading.trim() === "") {
+          if (
+            !prev.valueation_report_for_heading ||
+            prev.valueation_report_for_heading.trim() === ""
+          ) {
             updated.valueation_report_for_heading = categorySuffixUpper
               ? `VALUATION REPORT FOR ${categorySuffixUpper}`
               : "";
           }
-          
+
           // Always update other headings (they are not editable)
           updated.general_details_heading = categorySuffixUpper
             ? `GENERAL DETAILS OF THE INSPECTED ${categorySuffixUpper}`
@@ -1722,8 +1756,9 @@ function MachineryReport() {
           field.col_span;
         reportData[`flexible_fields[${formDataIndex}][field_label]`] =
           field.field_label;
-        reportData[`flexible_fields[${formDataIndex}][field_value]`] =
-          String(field.field_value || ""); // Preserve all formatting including line breaks
+        reportData[`flexible_fields[${formDataIndex}][field_value]`] = String(
+          field.field_value || ""
+        ); // Preserve all formatting including line breaks
         reportData[`flexible_fields[${formDataIndex}][field_order]`] =
           field.field_order;
         formDataIndex++;
@@ -1741,8 +1776,9 @@ function MachineryReport() {
             field.col_span;
           reportData[`flexible_fields[${formDataIndex}][field_label]`] =
             field.field_label_2;
-          reportData[`flexible_fields[${formDataIndex}][field_value]`] =
-            String(field.field_value_2 || ""); // Preserve all formatting including line breaks
+          reportData[`flexible_fields[${formDataIndex}][field_value]`] = String(
+            field.field_value_2 || ""
+          ); // Preserve all formatting including line breaks
           reportData[`flexible_fields[${formDataIndex}][field_order]`] =
             field.field_order + 1;
           formDataIndex++;
@@ -2826,13 +2862,29 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label htmlFor="machine_technology">
+                      Machine Technology <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="machine_technology"
+                      name="machine_technology"
+                      value={reportFormData.machine_technology}
+                      onChange={handleFormChange}
+                      placeholder="Enter Machine Technology"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="row">
                 <div className="col-md-3">
                   <div className="form-group">
-                    <label htmlFor="machine_technology">
-                      Machine Technology <span class="text-danger">*</span>
+                    <label htmlFor="control_panel_unit">
+                    Control Panel Unit <span class="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -2843,9 +2895,9 @@ function MachineryReport() {
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
                       ]}
-                      value={reportFormData.machine_technology}
+                      value={reportFormData.control_panel_unit}
                       onChange={(value) =>
-                        handleSelectChange("machine_technology", value)
+                        handleSelectChange("control_panel_unit", value)
                       }
                       required
                     />

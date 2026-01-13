@@ -421,7 +421,7 @@ body.single-page{
         <tr>
             <td>HOURS METER READING:</td>
             <td colspan="2">${formData.hours_meter_reading}</td>
-            <td>INVOICE NO. & DATE:</td>
+            <td style="text-transform: uppercase;">${formData.invoice_no_heading || "INVOICE NO. & DATE:"}</td>
             <td colspan="2">
                 ${
                   formData.invoice_no_date

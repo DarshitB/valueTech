@@ -287,6 +287,7 @@ function NotificationDropdown() {
 
   // Format notification description (exactly like OrderDetails component)
   const formatNotificationDescription = useCallback((notification) => {
+    console.log(notification);
     // Use description if provided by backend
     if (notification.description) {
       return notification.description;
@@ -347,14 +348,14 @@ function NotificationDropdown() {
           ) : notifications.length === 0 ? (
             <div className="notification-item notification-empty">
               <p>No notifications</p>
-              {process.env.NODE_ENV === 'development' && (
+             {/*  {process.env.NODE_ENV === 'development' && (
                 <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.5rem', textAlign: 'left' }}>
                   <p>Debug Info:</p>
                   <p>• unreadCount: {localUnreadCount}</p>
                   <p>• notifications.length: {notifications.length}</p>
                   <p>• Check console for detailed logs</p>
                 </div>
-              )}
+              )} */}
             </div>
           ) : (
             notifications.map((notification) => {
