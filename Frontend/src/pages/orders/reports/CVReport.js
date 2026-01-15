@@ -333,6 +333,20 @@ function CVReport() {
     return licenseMap[valuerName] || "";
   }, []);
 
+  // Build Initiated By: officer, bank, branch, city
+  const buildInitiatedBy = useCallback(() => {
+    if (!order) return "";
+    const parts = [
+      order.officer_name,
+      order.bank_name,
+      order.branch_name,
+      order.city || order.city_name,
+    ]
+      .filter((v) => v && String(v).trim() !== "")
+      .map((v) => String(v).trim());
+    return parts.join(", ");
+  }, [order]);
+
   // Function to get reference number code based on valuer name
   const getRefNoCode = useCallback((valuerName) => {
     if (!valuerName) return "";
@@ -726,9 +740,7 @@ function CVReport() {
           state_name: prev.state_name || "MUM",
           ref_no_code: order?.valuer_name ? getRefNoCode(order.valuer_name) : "",
           initiated_by:
-            order?.officer_name && order?.bank_name
-              ? `${order.officer_name}, ${order.bank_name}`
-              : "",
+            buildInitiatedBy() || "",
           model:
             order?.sub_category_name && order?.child_category_name
               ? `${order.sub_category_name}, ${order.child_category_name}`

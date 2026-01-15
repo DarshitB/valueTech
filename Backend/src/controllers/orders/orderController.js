@@ -1236,6 +1236,70 @@ exports.updateOrderStatusAfterUnderReview = async (req, res, next) => {
 };
 
 /**
+ * Directly update order status with history + notifications
+ * PATCH /api/orders/:id/update-status-direct
+ * Body: { status_id: number, note?: string }
+ */
+exports.updateOrderStatusDirect = async (req, res, next) => {
+  try {
+    const { id: orderId } = req.params;
+    const { status_id, note } = req.body;
+    const { id: userId } = req.user;
+
+    // Validate input
+    if (status_id === undefined || status_id === null) {
+      throw new BadRequestError("status_id is required in request body");
+    }
+
+    const statusIdNum = Number(status_id);
+    if (!Number.isInteger(statusIdNum)) {
+      throw new BadRequestError("status_id must be a valid integer");
+    }
+
+    // Ensure order exists
+    const existingOrder = await Order.findById(orderId, req.user);
+    if (!existingOrder) {
+      throw new NotFoundError("Order not found");
+    }
+
+    // Validate status exists
+    const statusExists = await OrderStatusMaster.findById(statusIdNum);
+    if (!statusExists) {
+      throw new BadRequestError(`Status ID ${statusIdNum} does not exist`);
+    }
+
+    // Update order status
+    await Order.updateOrder(orderId, {
+      current_status_id: statusIdNum,
+      updated_at: new Date(),
+      updated_by: userId,
+    });
+
+    // Record status history (this will also trigger notifications via model hook)
+    const historyEntry = await OrderStatusHistory.createStatusHistory({
+      order_id: orderId,
+      status_id: statusIdNum,
+      changed_by: userId,
+      changed_at: new Date(),
+      activity_extra: note || null,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Order status updated to ${statusIdNum} successfully`,
+      data: {
+        order_id: Number(orderId),
+        new_status_id: statusIdNum,
+        status_name: statusExists.name,
+        status_history_id: historyEntry?.id || null,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * Send email with order documents and videos
  * POST /api/orders/:orderId/send-mail
  * Body: { to: [], cc: [], bcc: [], subject: string, comments: string, regards: string, document_ids: [], video_ids: [] }

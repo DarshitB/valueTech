@@ -14,6 +14,9 @@ const renderFieldValue = (value) => {
     .replace(/\r/g, "<br>");
 };
 
+const isNotApplicable = (value) =>
+  typeof value === "string" && value.trim().toLowerCase() === "not applicable";
+
 /**
  * CE Report Template
  * This template generates HTML for Commercial Equipment reports
@@ -25,6 +28,17 @@ const renderFieldValue = (value) => {
  * @returns {string} HTML content
  */
 function generateCEReportHTML(formData, extraData, bgImageBase64, stampImageBase64) {
+  const registrationNo = formData.registration_no;
+  const registrationDateRaw = formData.registration_date;
+  const registeredLocation = formData.registered_location;
+  const showRegistrationSection = ![
+    registrationNo,
+    registrationDateRaw,
+    registeredLocation,
+  ].some(isNotApplicable);
+  const registrationDateDisplay =
+    registrationDateRaw === "00-00-0000" ? "NA" : registrationDateRaw;
+
   return `
 <!DOCTYPE html>
 <html>
@@ -384,16 +398,21 @@ body.single-page{
         <tr>
             <th colspan="6">${formData.inspected_equipment_heading}</th>
         </tr>
+        ${
+          showRegistrationSection
+            ? `
         <tr>
             <td>REGISTRATION NO:</td>
-            <td colspan="2">${formData.registration_no}</td>
+            <td colspan="2">${registrationNo}</td>
             <td>REGISTRATION DATE:</td>
-            <td colspan="2">${formData.registration_date === "00-00-0000" ? "NA" : formData.registration_date}</td>
+            <td colspan="2">${registrationDateDisplay}</td>
         </tr>
         <tr>
             <td>REGISTERED LOCATION:</td>
-            <td colspan="5">${formData.registered_location}</td>
-        </tr>
+            <td colspan="5">${registeredLocation}</td>
+        </tr>`
+            : ""
+        }
         <tr>
             <td>OWNER SERIAL NO:</td>
             <td colspan="2">${formData.owner_serial_no}</td>

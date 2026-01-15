@@ -346,6 +346,20 @@ function MachineryReport() {
     return licenseMap[valuerName] || "";
   }, []);
 
+  // Build Initiated By: officer, bank, branch, city
+  const buildInitiatedBy = useCallback(() => {
+    if (!order) return "";
+    const parts = [
+      order.officer_name,
+      order.bank_name,
+      order.branch_name,
+      order.city || order.city_name,
+    ]
+      .filter((v) => v && String(v).trim() !== "")
+      .map((v) => String(v).trim());
+    return parts.join(", ");
+  }, [order]);
+
   // Function to get reference number code based on valuer name
   const getRefNoCode = useCallback((valuerName) => {
     if (!valuerName) return "";
@@ -700,7 +714,7 @@ function MachineryReport() {
         const shouldPrefillHeadings =
           (!hasSavedReport || !hasSavedHeadingValues) && categorySuffix;
 
-        return {
+          return {
           ...prev,
           ref_no_bank: order?.bank_initial || "",
           state_name: prev.state_name || "MUM",
@@ -708,9 +722,7 @@ function MachineryReport() {
             ? getRefNoCode(order.valuer_name)
             : "",
           initiated_by:
-            order?.officer_name && order?.bank_name
-              ? `${order.officer_name}, ${order.bank_name}`
-              : "",
+            buildInitiatedBy() || "",
           model:
             order?.sub_category_name && order?.child_category_name
               ? `${order.sub_category_name}, ${order.child_category_name}`
@@ -2373,14 +2385,17 @@ function MachineryReport() {
                     <label htmlFor="valuation_purpose">
                       Valuation Purpose <span class="text-danger">*</span>
                     </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="valuation_purpose"
-                      name="valuation_purpose"
+                    <SingleSearchSelect
+                      options={[
+                        { value: "FINANCIAL USAGE", label: "FINANCIAL USAGE" },
+                        { value: "INUSRANCE USAGE", label: "INUSRANCE USAGE" },
+                        { value: "REPO PURPOSE", label: "REPO PURPOSE" },
+                      ]}
                       value={reportFormData.valuation_purpose}
-                      readOnly
-                      placeholder="Fixed purpose"
+                      onChange={(value) =>
+                        handleSelectChange("valuation_purpose", value)
+                      }
+                      required
                     />
                   </div>
                 </div>

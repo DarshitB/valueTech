@@ -26,6 +26,10 @@ export const updateOrderAttributes = (id, payload) =>
 export const updateOrderToStatus9 = (id) =>
   axios.patch(`${ENDPOINT}/${id}/update-status-under-review`); // Update order status to 10
 
+// Update order status directly (e.g., to Completed) with note
+export const updateOrderStatusDirect = (id, payload) =>
+  axios.patch(`${ENDPOINT}/${id}/update-status-direct`, payload);
+
 export const updateStatusAfterUnderReview = (id, payload) =>
   axios.patch(`${ENDPOINT}/${id}/update-status-after-under-review`, payload); // Update order status after under review
 

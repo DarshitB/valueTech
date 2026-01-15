@@ -287,7 +287,6 @@ function NotificationDropdown() {
 
   // Format notification description (exactly like OrderDetails component)
   const formatNotificationDescription = useCallback((notification) => {
-    console.log(notification);
     // Use description if provided by backend
     if (notification.description) {
       return notification.description;

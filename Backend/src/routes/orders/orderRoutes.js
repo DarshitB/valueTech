@@ -53,6 +53,12 @@ router.patch(
   activityLogger("orders", (req) => req.params.id), // Log update
   orderController.updateOrderStatusAfterUnderReview
 );
+router.patch(
+  "/:id/update-status-direct",
+  checkPermission("edit_order"), // Direct status change
+  activityLogger("orders", (req) => req.params.id), // Log update
+  orderController.updateOrderStatusDirect
+);
 router.delete(
   "/:id",
   checkPermission("delete_order"), // Check permission to delete order

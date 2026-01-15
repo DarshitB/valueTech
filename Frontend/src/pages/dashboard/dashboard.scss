@@ -1,5 +1,198 @@
 @use "../../assets/styles/variables" as *;
 
+// React DatePicker Custom Styles - Match react-select dropdown styling
+.date-picker-wrapper {
+  /*  display: block;
+  width: 100%; */
+  min-width: 150px;
+}
+
+.react-datepicker-wrapper {
+  display: block;
+  width: 150px;
+  min-width: 150px;
+
+  .react-datepicker__input-container {
+    display: block;
+
+    input {
+      width: 100%;
+      /* min-width: 150px; */
+      height: 38px;
+      padding: 10px 15px;
+      border: 1px solid #a7a7a7;
+      border-radius: 5px;
+      font-size: 14px;
+      color: #000;
+      background-color: #fdfdff;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: inherit;
+
+      &:hover {
+        border-color: #95a0f4;
+      }
+
+      &:focus {
+        outline: none;
+        border-color: #5864bd;
+        background-color: #fefeff;
+        box-shadow: none;
+      }
+
+      &::placeholder {
+        color: #98a6ad;
+      }
+    }
+  }
+}
+
+.react-datepicker-popper {
+  z-index: 9999;
+}
+
+.react-datepicker {
+  font-family: inherit;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: scale(1.25);
+  transform-origin: top left;
+
+  .react-datepicker__header {
+    background-color: white;
+    border-bottom: 1px solid #e3e6ff;
+    border-radius: 8px 8px 0 0;
+    padding: 10px;
+
+    .react-datepicker__current-month {
+      color: #2c2c34;
+      font-weight: 600;
+      margin-bottom: 10px;
+      font-size: 15px;
+    }
+
+    .react-datepicker__day-names {
+      .react-datepicker__day-name {
+        color: #2c2c34;
+        font-weight: 500;
+        font-size: 13px;
+        width: 2.2rem;
+        line-height: 2.2rem;
+      }
+    }
+  }
+
+  .react-datepicker__month {
+    padding: 10px;
+  }
+
+  .react-datepicker__day {
+    width: 30px;
+    height: 30px;
+    line-height: 30px;
+    font-size: 13px;
+    margin: 0.15rem;
+
+    &:hover {
+      background-color: #e6f2ff;
+      border-radius: 4px;
+    }
+
+    &--selected,
+    &--in-selecting-range,
+    &--in-range {
+      background-color: #007bff;
+      color: #fff;
+      border-radius: 4px;
+    }
+
+    &--keyboard-selected {
+      background-color: #0056b3;
+      color: #fff;
+    }
+
+    &--today {
+      font-weight: 600;
+      border: 1px solid #007bff;
+    }
+  }
+
+  .react-datepicker__triangle {
+    border-bottom-color: #007bff !important;
+    transform: scale(1.25);
+  }
+
+  .react-datepicker__day-name {
+    width: 30px;
+    height: 30px;
+    line-height: 30px;
+    font-size: 13px;
+  }
+
+  .react-datepicker__navigation {
+    top: 10px;
+    width: 2.2rem;
+    height: 2.2rem;
+
+    &-icon {
+      &::before {
+        border-width: 5px;
+      }
+    }
+  }
+
+  .dp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .dp-month-year {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    select {
+      padding: 6px 12px;
+      border: 1px solid white;
+      border-radius: 6px;
+      background: transparent;
+      color: white;
+      font-size: 14px;
+      height: 36px;
+      cursor: pointer;
+      outline: none;
+
+      /* &:hover {
+        border-color: #95a0f4;
+        background: #f7f7ff;
+      } */
+    }
+  }
+
+  .dp-nav {
+    width: 34px;
+    height: 34px;
+    border: 1px solid #cfd2ff;
+    border-radius: 8px;
+    background: #eef0ff;
+    color: #5864bd;
+    font-size: 18px;
+    cursor: pointer;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &:hover {
+      border-color: #95a0f4;
+      background: #dfe3ff;
+    }
+  }
+}
+
 // Filter Container Card Styles
 .filter-container-card {
   background-color: #ffffff;
@@ -188,7 +381,7 @@
     &.order-status {
       min-height: 120px;
       &.ongoing-orders {
-        background: linear-gradient(to right, #22c55e, #10b981);
+        background: linear-gradient(to right, #009b68, #22c55e);
         /* background: linear-gradient(to right, #444468, #474f8f); */
         color: $primary-font-color;
       }

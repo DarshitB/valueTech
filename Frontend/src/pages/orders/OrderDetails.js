@@ -15,6 +15,7 @@ import {
   updatePaymentStatus,
   updateOrderToStatus9,
   updateStatusAfterUnderReview,
+  updateOrderStatusDirect,
   fetchOrderMedia,
 } from "../../redux/reducers/orderReducer";
 import {
@@ -144,12 +145,15 @@ function OrderDetails() {
   /* get logged user permission */
   const allowedPermissions = useSelector(selectPermissions);
   const currentUser = useSelector((state) => state.auth.user);
+  const ordersLoading = useSelector((state) => state.orders.loading);
   const isSuperAdmin = currentUser?.role?.name
     ?.toUpperCase()
     .includes("SUPER ADMIN");
   const isExemptAdmin =
     currentUser?.role?.name.toUpperCase().includes("SUPER ADMIN") ||
     currentUser?.role?.name === "developer_admin";
+  const isDeveloperAdmin =
+    currentUser?.role?.name?.toUpperCase().includes("DEVELOPER_ADMIN");
 
   // Check if user is BANK AUTHORITY or BANK OFFICER
   const userRole = currentUser?.role?.name?.toUpperCase() || "";
@@ -198,6 +202,28 @@ function OrderDetails() {
     useState(false);
   const [showRevisionConfirmation, setShowRevisionConfirmation] =
     useState(false);
+  const [isCompletingOrder, setIsCompletingOrder] = useState(false);
+
+  // Complete order (status 13) via direct status update
+  const handleCompleteOrder = async () => {
+    if (!id) return;
+    setIsCompletingOrder(true);
+    try {
+      await dispatch(
+        updateOrderStatusDirect({
+          id,
+          data: {
+            status_id: 13,
+            note: "Manually set to Completed by admin",
+          },
+        })
+      ).unwrap();
+    } catch (err) {
+      // errors are toasted in reducer
+    } finally {
+      setIsCompletingOrder(false);
+    }
+  };
 
   // Form data state for payment details
   const [paymentFormData, setPaymentFormData] = useState({
@@ -1798,6 +1824,24 @@ function OrderDetails() {
                 "view_order_recent_activity"
               ) && <h3>Recent Activity</h3>}
               <div className="recent-activity-buttons">
+                {isDeveloperAdmin && (
+                  <button
+                    title="complete order"
+                    className={`tooltip-link${isCompletingOrder || ordersLoading ? " disabled" : ""}`}
+                    onClick={handleCompleteOrder}
+                    disabled={isCompletingOrder || ordersLoading}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      cursor: isCompletingOrder || ordersLoading ? "not-allowed" : "pointer",
+                      outline: "none",
+                      boxShadow: "none",
+                    }}
+                  >
+                    <SelectedIcon style={{ width: "40px", height: "40px" }} />
+                  </button>
+                )}
                 {/* Action buttons for uploading images and reports, validating, etc. */}
                 {/* For BANK AUTHORITY or BANK OFFICER, only show Documents button if status > 12 */}
                 {/* For other users, show normally (if they have permission) */}

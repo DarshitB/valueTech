@@ -436,9 +436,11 @@ function OrderImages() {
       return;
     }
 
+    const trimmedRemarks = remarks.trim();
     const payload = {
       order_id: id.toString(),
-      text: remarks.trim() || "",
+      // Only send remarks if they have non-whitespace content; preserve original (with spaces/newlines)
+      text: trimmedRemarks ? remarks : "",
       image_ids: selectedImageSequence.map((id) => id.toString()), // Use sequence order
       valuer_name: order?.valuer_name || "",
     };

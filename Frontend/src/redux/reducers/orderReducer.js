@@ -167,6 +167,19 @@ export const updateOrderToStatus9 = createAsyncThunk(
   }
 );
 
+// Async action: Update order status directly (custom status + note)
+export const updateOrderStatusDirect = createAsyncThunk(
+  "orders/updateStatusDirect",
+  async ({ id, data }, { rejectWithValue }) => {
+    try {
+      const res = await orderApi.updateOrderStatusDirect(id, data);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
 // Async action: Update order status after under review
 export const updateStatusAfterUnderReview = createAsyncThunk(
   "orders/updateStatusAfterUnderReview",
@@ -460,6 +473,38 @@ const orderSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
         toast.error(`Failed to update order status: ${action.payload}`);
+      })
+
+      // Update order status directly
+      .addCase(updateOrderStatusDirect.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateOrderStatusDirect.fulfilled, (state, action) => {
+        state.loading = false;
+
+        const response = action.payload;
+        const orderId = response?.data?.order_id;
+        const newStatusId = response?.data?.new_status_id;
+        const statusName = response?.data?.status_name;
+
+        if (state.selected && state.selected.id === orderId) {
+          if (newStatusId !== undefined) state.selected.current_status_id = newStatusId;
+          if (statusName !== undefined) state.selected.current_status_name = statusName;
+        }
+
+        const listIdx = state.list.findIndex((o) => o.id === orderId);
+        if (listIdx !== -1) {
+          if (newStatusId !== undefined) state.list[listIdx].current_status_id = newStatusId;
+          if (statusName !== undefined) state.list[listIdx].current_status_name = statusName;
+        }
+
+        toast.success(response?.message || "Order status updated successfully");
+      })
+      .addCase(updateOrderStatusDirect.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+        toast.error(action.payload || "Failed to update order status");
       })
 
       // Update order status after under review

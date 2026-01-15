@@ -399,6 +399,19 @@ function calculateGridLayout(imageCount, hasText) {
 }
 
 /**
+ * Escape special characters so user text is safe inside SVG
+ */
+function escapeSvgText(value) {
+  if (value === undefined || value === null) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
  * Create text image for overlay with proper text wrapping
  * @param {string} text - Text to display
  * @param {string[]} imagePaths - Array of image paths to determine count
@@ -407,6 +420,9 @@ function calculateGridLayout(imageCount, hasText) {
  * @returns {Buffer} Image buffer
  */
 async function createTextImage(text, imagePaths, width, height) {
+  const normalizedText =
+    typeof text === "string" ? text : text == null ? "" : String(text);
+
   // Calculate available text area (subtract padding)
   const textWidth = width - TEXT_STYLING.padding * 2;
   const textHeight = height - TEXT_STYLING.padding * 2;
@@ -436,8 +452,13 @@ async function createTextImage(text, imagePaths, width, height) {
   const maxFontSize = Math.min(width, height) / 12; // Reduced from /8 to /12 for better fit
   const fontSize = Math.min(adjustedFontSize, maxFontSize);
 
-  // Wrap text to fit within the available width with better calculation
-  const wrappedLines = wrapText(text, textWidth, fontSize);
+  // Wrap text to fit within the available width while preserving whitespace/newlines
+  const wrappedLines = wrapTextPreserveWhitespace(
+    normalizedText,
+    textWidth,
+    fontSize
+  );
+  const escapedLines = wrappedLines.map((line) => escapeSvgText(line));
 
   // Calculate total text height
   const lineHeight = fontSize * TEXT_STYLING.lineHeight;
@@ -465,7 +486,7 @@ async function createTextImage(text, imagePaths, width, height) {
         <rect width="100%" height="100%" fill="${
           TEXT_STYLING.backgroundColor
         }"/>
-        ${wrappedLines
+        ${escapedLines
           .map((line, index) => {
             const y = newStartY + index * newLineHeight;
             return `<text 
@@ -477,7 +498,8 @@ async function createTextImage(text, imagePaths, width, height) {
             fill="${TEXT_STYLING.textColor}" 
             text-anchor="middle" 
             dominant-baseline="middle"
-          >${line.toUpperCase()}</text>`;
+            xml:space="preserve"
+          >${line}</text>`;
           })
           .join("")}
       </svg>
@@ -496,7 +518,7 @@ async function createTextImage(text, imagePaths, width, height) {
   const svg = `
     <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
       <rect width="100%" height="100%" fill="${TEXT_STYLING.backgroundColor}"/>
-      ${wrappedLines
+      ${escapedLines
         .map((line, index) => {
           const y = startY + index * lineHeight;
           return `<text 
@@ -508,7 +530,8 @@ async function createTextImage(text, imagePaths, width, height) {
           fill="${TEXT_STYLING.textColor}" 
           text-anchor="middle" 
           dominant-baseline="middle"
-        >${line.toUpperCase()}</text>`;
+          xml:space="preserve"
+        >${line}</text>`;
         })
         .join("")}
     </svg>
@@ -519,57 +542,57 @@ async function createTextImage(text, imagePaths, width, height) {
 }
 
 /**
- * Wrap text to fit within specified width with proper calculation
- * @param {string} text - Text to wrap
- * @param {number} maxWidth - Maximum width in pixels
- * @param {number} fontSize - Font size in pixels
- * @returns {string[]} Array of wrapped lines
+ * Wrap text while preserving spaces and explicit newlines.
+ * Uses word-aware wrapping; only breaks inside a word if it exceeds max width.
  */
-function wrapText(text, maxWidth, fontSize) {
-  const words = text.split(" ");
+function wrapTextPreserveWhitespace(text, maxWidth, fontSize) {
   const lines = [];
-  let currentLine = "";
+  const rawLines = String(text).split(/\r?\n/);
+  const charWidth = fontSize * 0.7;
+  const maxChars = Math.max(2, Math.floor(maxWidth / charWidth)); // avoid 1-char lines
 
-  // Better character width calculation for different font sizes
-  const charWidth = fontSize * 0.7; // More accurate character width
+  for (const rawLine of rawLines) {
+    // Keep whitespace tokens so multiple spaces are preserved
+    const tokens = rawLine.split(/(\s+)/);
+    let current = "";
 
-  for (const word of words) {
-    const testLine = currentLine ? currentLine + " " + word : word;
-    // Calculate text width more accurately
-    const textWidth = testLine.length * charWidth;
+    for (const token of tokens) {
+      const tokenLen = token.length;
 
-    if (textWidth > maxWidth && currentLine) {
-      lines.push(currentLine.trim());
-      currentLine = word;
-    } else {
-      currentLine = testLine;
-    }
-  }
-
-  if (currentLine) {
-    lines.push(currentLine.trim());
-  }
-
-  // If any line is still too long, force break it
-  const finalLines = [];
-  for (const line of lines) {
-    if (line.length * charWidth > maxWidth) {
-      // Force break long lines by character count
-      const maxChars = Math.floor(maxWidth / charWidth);
-      let remainingLine = line;
-      while (remainingLine.length > maxChars) {
-        finalLines.push(remainingLine.substring(0, maxChars));
-        remainingLine = remainingLine.substring(maxChars);
+      // Handle tokens longer than the limit by chunking
+      if (tokenLen > maxChars) {
+        // Flush current line first
+        if (current) {
+          lines.push(current);
+          current = "";
+        }
+        const chunks = token.match(new RegExp(`.{1,${maxChars}}`, "g")) || [];
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i];
+          // If not the last chunk, push immediately to avoid trailing whitespace issues
+          if (i < chunks.length - 1) {
+            lines.push(chunk);
+          } else {
+            current = chunk; // keep last chunk to allow following tokens on same line
+          }
+        }
+        continue;
       }
-      if (remainingLine.length > 0) {
-        finalLines.push(remainingLine);
+
+      const nextLength = current.length + tokenLen;
+      if (current && nextLength > maxChars) {
+        lines.push(current);
+        // Start new line; avoid leading whitespace overflow
+        current = token.trim().length === 0 ? "" : token;
+      } else {
+        current += token;
       }
-    } else {
-      finalLines.push(line);
     }
+
+    lines.push(current);
   }
 
-  return finalLines;
+  return lines;
 }
 
 /**

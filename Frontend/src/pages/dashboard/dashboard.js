@@ -30,6 +30,8 @@ import "./dashboard.scss";
 import { DashboardIcon, CheckinIcon } from "../../components/icons/Icons";
 import { DeleteIcon, EditIcon, MoreIcon } from "../../components/icons";
 import ConfirmationModal from "../../components/ConfirmationModal";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 function Dashboard() {
   const dispatch = useDispatch();
@@ -57,7 +59,7 @@ function Dashboard() {
   useEffect(() => {
     // Always fetch orders when Dashboard component mounts
     dispatch(fetchOrders());
-    
+
     // Only fetch other data if not already loaded
     if (!officers || officers.length === 0) {
       dispatch(fetchOfficers());
@@ -120,6 +122,7 @@ function Dashboard() {
       "view_valuer_name_filter",
       "view_payment_status_filter",
       "view_category_filter",
+      "view_date_filter",
     ];
     return filterPermissions.some((permission) =>
       hasPermission(allowedPermissions, permission)
@@ -218,6 +221,21 @@ function Dashboard() {
   const [selectedSubCategory, setSelectedSubCategory] = useState(() => {
     const saved = localStorage.getItem("filter_subCategory");
     return saved || "";
+  });
+
+  // State for date filter
+  const [selectedDatePreset, setSelectedDatePreset] = useState(() => {
+    const saved = localStorage.getItem("filter_datePreset");
+    return saved || "";
+  });
+
+  const [selectedDateRange, setSelectedDateRange] = useState(() => {
+    const savedStart = localStorage.getItem("filter_dateRangeStart");
+    const savedEnd = localStorage.getItem("filter_dateRangeEnd");
+    return {
+      start: savedStart ? new Date(savedStart) : null,
+      end: savedEnd ? new Date(savedEnd) : null,
+    };
   });
 
   // Get distinct filter values from orders
@@ -421,6 +439,183 @@ function Dashboard() {
   ).length;
 
   const formatTwoDigits = (num) => String(num ?? 0).padStart(2, "0");
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return "-";
+
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "-";
+
+      return new Intl.DateTimeFormat("en-US", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      }).format(date);
+    } catch (error) {
+      console.warn("Date formatting error:", error);
+      return "-";
+    }
+  };
+
+  // Helper function to get date range based on preset
+  const getDateRangeFromPreset = (preset) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endDate = new Date();
+    endDate.setHours(23, 59, 59, 999);
+
+    switch (preset) {
+      case "today":
+        return { start: today, end: endDate };
+      case "thisWeek": {
+        const startOfWeek = new Date(today);
+        const day = startOfWeek.getDay();
+        const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1); // Monday
+        startOfWeek.setDate(diff);
+        return { start: startOfWeek, end: endDate };
+      }
+      case "thisMonth": {
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        return { start: startOfMonth, end: endDate };
+      }
+      default:
+        return null;
+    }
+  };
+
+  // Check if order date matches filter
+  const matchesDateFilter = (order) => {
+    if (
+      !selectedDatePreset &&
+      !selectedDateRange.start &&
+      !selectedDateRange.end
+    ) {
+      return true;
+    }
+
+    if (!order.created_at) return false;
+
+    const orderDate = new Date(order.created_at);
+    orderDate.setHours(0, 0, 0, 0);
+
+    // Check preset first (but not "fromTo" which uses date range)
+    if (selectedDatePreset && selectedDatePreset !== "fromTo") {
+      const range = getDateRangeFromPreset(selectedDatePreset);
+      if (range) {
+        return orderDate >= range.start && orderDate <= range.end;
+      }
+    }
+
+    // Check date range (for "fromTo" preset or manual date range)
+    if (
+      selectedDatePreset === "fromTo" ||
+      selectedDateRange.start ||
+      selectedDateRange.end
+    ) {
+      const startDate = selectedDateRange.start
+        ? new Date(selectedDateRange.start)
+        : null;
+      const endDate = selectedDateRange.end
+        ? new Date(selectedDateRange.end)
+        : null;
+
+      if (startDate) startDate.setHours(0, 0, 0, 0);
+      if (endDate) {
+        endDate.setHours(23, 59, 59, 999);
+      }
+
+      if (startDate && endDate) {
+        return orderDate >= startDate && orderDate <= endDate;
+      } else if (startDate) {
+        return orderDate >= startDate;
+      } else if (endDate) {
+        return orderDate <= endDate;
+      }
+    }
+
+    return true;
+  };
+
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+  const yearOptions = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const startYear = currentYear - 10;
+    const endYear = currentYear + 10;
+    const years = [];
+    for (let y = startYear; y <= endYear; y += 1) {
+      years.push(y);
+    }
+    return years;
+  }, []);
+
+  const renderDatePickerHeader = ({
+    date,
+    changeYear,
+    changeMonth,
+    decreaseMonth,
+    increaseMonth,
+  }) => (
+    <div className="dp-header">
+      <button
+        type="button"
+        className="dp-nav dp-prev"
+        onClick={decreaseMonth}
+        aria-label="Previous Month"
+      >
+        ‹
+      </button>
+      <div className="dp-month-year">
+        <select
+          value={date.getFullYear()}
+          onChange={(e) => changeYear(Number(e.target.value))}
+          aria-label="Select year"
+        >
+          {yearOptions.map((year) => (
+            <option key={year} value={year}>
+              {year}
+            </option>
+          ))}
+        </select>
+        <select
+          value={date.getMonth()}
+          onChange={(e) => changeMonth(Number(e.target.value))}
+          aria-label="Select month"
+        >
+          {monthNames.map((month, idx) => (
+            <option key={month} value={idx}>
+              {month}
+            </option>
+          ))}
+        </select>
+      </div>
+      <button
+        type="button"
+        className="dp-nav dp-next"
+        onClick={increaseMonth}
+        aria-label="Next Month"
+      >
+        ›
+      </button>
+    </div>
+  );
 
   // Format attendance date and time
   const formatAttendanceDateTime = (dateString) => {
@@ -725,6 +920,8 @@ function Dashboard() {
     setSelectedCategory("");
     setSelectedAssetCategory("");
     setSelectedSubCategory("");
+    setSelectedDatePreset("");
+    setSelectedDateRange({ start: null, end: null });
 
     // Clear from localStorage
     localStorage.removeItem("filter_orderType");
@@ -740,6 +937,9 @@ function Dashboard() {
     localStorage.removeItem("filter_category");
     localStorage.removeItem("filter_assetCategory");
     localStorage.removeItem("filter_subCategory");
+    localStorage.removeItem("filter_datePreset");
+    localStorage.removeItem("filter_dateRangeStart");
+    localStorage.removeItem("filter_dateRangeEnd");
   };
 
   // Check if any filter is set
@@ -757,7 +957,10 @@ function Dashboard() {
       selectedPaymentStatus !== "" ||
       selectedCategory !== "" ||
       selectedAssetCategory !== "" ||
-      selectedSubCategory !== ""
+      selectedSubCategory !== "" ||
+      selectedDatePreset !== "" ||
+      selectedDateRange.start !== null ||
+      selectedDateRange.end !== null
     );
   }, [
     selectedOrderType,
@@ -773,6 +976,8 @@ function Dashboard() {
     selectedCategory,
     selectedAssetCategory,
     selectedSubCategory,
+    selectedDatePreset,
+    selectedDateRange,
   ]);
 
   const handleSubmit = () => {
@@ -1013,7 +1218,7 @@ function Dashboard() {
                       </div>
                     </div>
                     <div className="col-md-6 p-0">
-                      <div className="manager-dashboard-card-body-item border-right ongoing-orders-gradient">
+                      <div className="manager-dashboard-card-body-item border-right">
                         <span>Ongoing Orders</span>
                         <p>{formatTwoDigits(ongoingOrdersCount)}</p>
                       </div>
@@ -1445,329 +1650,475 @@ function Dashboard() {
                 {/* Filter Container - Outside dashboard-order-table */}
                 {hasAnyFilterPermission && (
                   <div className="filter-container-card">
-                  {/* Top Row Filters */}
-                  <div className="filter-row">
-                    {hasPermission(
-                      allowedPermissions,
-                      "view_order_type_filter"
-                    ) && (
-                      <SingleSearchSelect
-                        className="search-selector"
-                        options={[
-                          { value: "", label: "All Types" },
-                          { value: "VKA1", label: "VKA1" },
-                          { value: "VKA2", label: "VKA2" },
-                          { value: "VKA3", label: "VKA3" },
-                        ]}
-                        value={selectedOrderType || null}
-                        onChange={(value) => {
-                          const val = value || "";
-                          setSelectedOrderType(val);
-                          localStorage.setItem("filter_orderType", val);
-                        }}
-                        placeholder="All Types"
-                      />
-                    )}
-                    {hasPermission(
-                      allowedPermissions,
-                      "view_order_priority_filter"
-                    ) && (
-                      <SingleSearchSelect
-                        className="search-selector"
-                        options={[
-                          { value: "", label: "All Priorities" },
-                          { value: "High", label: "High" },
-                          { value: "Low", label: "Low" },
-                        ]}
-                        value={selectedPriority || null}
-                        onChange={(value) => {
-                          const val = value || "";
-                          setSelectedPriority(val);
-                          localStorage.setItem("filter_priority", val);
-                        }}
-                        placeholder="All Priorities"
-                      />
-                    )}
-                    {hasPermission(
-                      allowedPermissions,
-                      "view_status_filter"
-                    ) && (
-                      <SingleSearchSelect
-                        className="search-selector"
-                        options={[
-                          { value: "", label: "All Status" },
-                          ...distinctOrderStatuses.map((status) => ({
-                            value: status,
-                            label: status,
-                          })),
-                        ]}
-                        value={selectedOrderStatus || null}
-                        onChange={(value) => {
-                          const val = value || "";
-                          setSelectedOrderStatus(val);
-                          localStorage.setItem("filter_orderStatus", val);
-                        }}
-                        placeholder="All Status"
-                      />
-                    )}
-                    {hasActiveFilters && (
-                      <button
-                        className="btn clear-filters-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleClearFilters();
-                        }}
-                      >
-                        Clear Filters
-                      </button>
-                    )}
-                  </div>
+                    {/* Top Row Filters */}
+                    <div className="filter-row">
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_order_type_filter"
+                      ) && (
+                        <SingleSearchSelect
+                          className="search-selector"
+                          options={[
+                            { value: "", label: "All Types" },
+                            { value: "VKA1", label: "VKA1" },
+                            { value: "VKA2", label: "VKA2" },
+                            { value: "VKA3", label: "VKA3" },
+                          ]}
+                          value={selectedOrderType || null}
+                          onChange={(value) => {
+                            const val = value || "";
+                            setSelectedOrderType(val);
+                            localStorage.setItem("filter_orderType", val);
+                          }}
+                          placeholder="All Types"
+                        />
+                      )}
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_order_priority_filter"
+                      ) && (
+                        <SingleSearchSelect
+                          className="search-selector"
+                          options={[
+                            { value: "", label: "All Priorities" },
+                            { value: "High", label: "High" },
+                            { value: "Low", label: "Low" },
+                          ]}
+                          value={selectedPriority || null}
+                          onChange={(value) => {
+                            const val = value || "";
+                            setSelectedPriority(val);
+                            localStorage.setItem("filter_priority", val);
+                          }}
+                          placeholder="All Priorities"
+                        />
+                      )}
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_status_filter"
+                      ) && (
+                        <SingleSearchSelect
+                          className="search-selector"
+                          options={[
+                            { value: "", label: "All Status" },
+                            ...distinctOrderStatuses.map((status) => ({
+                              value: status,
+                              label: status,
+                            })),
+                          ]}
+                          value={selectedOrderStatus || null}
+                          onChange={(value) => {
+                            const val = value || "";
+                            setSelectedOrderStatus(val);
+                            localStorage.setItem("filter_orderStatus", val);
+                          }}
+                          placeholder="All Status"
+                        />
+                      )}
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_date_filter"
+                      ) && (
+                        <>
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "Date Preset" },
+                              { value: "today", label: "Today" },
+                              { value: "thisWeek", label: "This Week" },
+                              { value: "thisMonth", label: "This Month" },
+                              { value: "fromTo", label: "From-To Date" },
+                            ]}
+                            value={selectedDatePreset || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              const previousValue = selectedDatePreset;
+                              setSelectedDatePreset(val);
+                              localStorage.setItem("filter_datePreset", val);
+                              // Clear date range when changing from "fromTo" to another preset or empty
+                              if (
+                                previousValue === "fromTo" &&
+                                val !== "fromTo"
+                              ) {
+                                setSelectedDateRange({
+                                  start: null,
+                                  end: null,
+                                });
+                                localStorage.removeItem(
+                                  "filter_dateRangeStart"
+                                );
+                                localStorage.removeItem("filter_dateRangeEnd");
+                              }
+                              // Clear date range when preset is selected (except for fromTo)
+                              if (val && val !== "fromTo") {
+                                setSelectedDateRange({
+                                  start: null,
+                                  end: null,
+                                });
+                                localStorage.removeItem(
+                                  "filter_dateRangeStart"
+                                );
+                                localStorage.removeItem("filter_dateRangeEnd");
+                              }
+                            }}
+                            placeholder="Date Preset"
+                          />
+                          {selectedDatePreset === "fromTo" && (
+                            <>
+                              <div className="date-picker-wrapper">
+                                <DatePicker
+                                  selected={selectedDateRange.start}
+                                  onChange={(date) => {
+                                    setSelectedDateRange((prev) => ({
+                                      ...prev,
+                                      start: date,
+                                    }));
+                                    if (date) {
+                                      localStorage.setItem(
+                                        "filter_dateRangeStart",
+                                        date.toISOString()
+                                      );
+                                    } else {
+                                      localStorage.removeItem(
+                                        "filter_dateRangeStart"
+                                      );
+                                    }
+                                    // Set preset to fromTo if dates are manually selected
+                                    if (
+                                      !selectedDatePreset &&
+                                      (date || selectedDateRange.end)
+                                    ) {
+                                      setSelectedDatePreset("fromTo");
+                                      localStorage.setItem(
+                                        "filter_datePreset",
+                                        "fromTo"
+                                      );
+                                    }
+                                  }}
+                                  selectsStart
+                                  startDate={selectedDateRange.start}
+                                  endDate={selectedDateRange.end}
+                                  placeholderText="Start Date"
+                                  className="form-field search-selector"
+                                  dateFormat="dd/MM/yyyy"
+                                  renderCustomHeader={renderDatePickerHeader}
+                                  showMonthDropdown
+                                  showYearDropdown
+                                  dropdownMode="select"
+                                />
+                              </div>
+                              <div className="date-picker-wrapper">
+                                <DatePicker
+                                  selected={selectedDateRange.end}
+                                  onChange={(date) => {
+                                    setSelectedDateRange((prev) => ({
+                                      ...prev,
+                                      end: date,
+                                    }));
+                                    if (date) {
+                                      localStorage.setItem(
+                                        "filter_dateRangeEnd",
+                                        date.toISOString()
+                                      );
+                                    } else {
+                                      localStorage.removeItem(
+                                        "filter_dateRangeEnd"
+                                      );
+                                    }
+                                    // Set preset to fromTo if dates are manually selected
+                                    if (
+                                      !selectedDatePreset &&
+                                      (selectedDateRange.start || date)
+                                    ) {
+                                      setSelectedDatePreset("fromTo");
+                                      localStorage.setItem(
+                                        "filter_datePreset",
+                                        "fromTo"
+                                      );
+                                    }
+                                  }}
+                                  selectsEnd
+                                  startDate={selectedDateRange.start}
+                                  endDate={selectedDateRange.end}
+                                  minDate={selectedDateRange.start}
+                                  placeholderText="End Date"
+                                  className="form-field search-selector"
+                                  dateFormat="dd/MM/yyyy"
+                                  renderCustomHeader={renderDatePickerHeader}
+                                  showMonthDropdown
+                                  showYearDropdown
+                                  dropdownMode="select"
+                                />
+                              </div>
+                            </>
+                          )}
+                        </>
+                      )}
+                      {hasActiveFilters && (
+                        <button
+                          className="btn clear-filters-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleClearFilters();
+                          }}
+                        >
+                          Clear Filters
+                        </button>
+                      )}
+                    </div>
 
-                  {/* Advanced Filters Section */}
-                  <div
-                    className={`advanced-filters-section ${
-                      isAdvancedFiltersOpen ? "open" : ""
-                    }`}
-                  >
+                    {/* Advanced Filters Section */}
                     <div
-                      className="advanced-filters-header"
-                      onClick={() =>
-                        setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)
-                      }
-                      style={{ cursor: "pointer" }}
+                      className={`advanced-filters-section ${
+                        isAdvancedFiltersOpen ? "open" : ""
+                      }`}
                     >
-                      <span
-                        className={`advanced-filters-title ${
-                          isAdvancedFiltersOpen ? "open" : ""
-                        }`}
+                      <div
+                        className="advanced-filters-header"
+                        onClick={() =>
+                          setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)
+                        }
+                        style={{ cursor: "pointer" }}
                       >
-                        Advanced Filters
-                      </span>
-                    </div>
-                    <div className="filter-row advanced-filters-content">
-                      {hasPermission(
-                        allowedPermissions,
-                        "view_bank_filter"
-                      ) && (
-                        <SingleSearchSelect
-                          className="search-selector"
-                          options={[
-                            { value: "", label: "All Banks" },
-                            ...distinctBanks.map((bank) => ({
-                              value: bank,
-                              label: bank,
-                            })),
-                          ]}
-                          value={selectedBank || null}
-                          onChange={(value) => {
-                            const val = value || "";
-                            setSelectedBank(val);
-                            localStorage.setItem("filter_bank", val);
-                          }}
-                          placeholder="All Banks"
-                        />
-                      )}
-                      {hasPermission(
-                        allowedPermissions,
-                        "view_bank_branch_filter"
-                      ) && (
-                        <SingleSearchSelect
-                          className="search-selector"
-                          options={[
-                            { value: "", label: "All Branches" },
-                            ...distinctBranches.map((branch) => ({
-                              value: branch,
-                              label: branch,
-                            })),
-                          ]}
-                          value={selectedBranch || null}
-                          onChange={(value) => {
-                            const val = value || "";
-                            setSelectedBranch(val);
-                            localStorage.setItem("filter_branch", val);
-                          }}
-                          placeholder="All Branches"
-                        />
-                      )}
-                      {hasPermission(
-                        allowedPermissions,
-                        "view_asset_category_filter"
-                      ) && (
-                        <SingleSearchSelect
-                          className="search-selector"
-                          options={[
-                            { value: "", label: "All Asset Categories" },
-                            ...distinctAssetCategories.map((assetCategory) => ({
-                              value: assetCategory,
-                              label: assetCategory,
-                            })),
-                          ]}
-                          value={selectedAssetCategory || null}
-                          onChange={(value) => {
-                            const val = value || "";
-                            setSelectedAssetCategory(val);
-                            localStorage.setItem("filter_assetCategory", val);
-                          }}
-                          placeholder="All Asset Categories"
-                        />
-                      )}
-                      {hasPermission(
-                        allowedPermissions,
-                        "view_sub_category_filter"
-                      ) && (
-                        <SingleSearchSelect
-                          className="search-selector"
-                          options={[
-                            { value: "", label: "All Sub Categories" },
-                            ...distinctSubCategories.map((subCategory) => ({
-                              value: subCategory,
-                              label: subCategory,
-                            })),
-                          ]}
-                          value={selectedSubCategory || null}
-                          onChange={(value) => {
-                            const val = value || "";
-                            setSelectedSubCategory(val);
-                            localStorage.setItem("filter_subCategory", val);
-                          }}
-                          placeholder="All Sub Categories"
-                        />
-                      )}
-                      {hasPermission(
-                        allowedPermissions,
-                        "view_manager_filter"
-                      ) && (
-                        <SingleSearchSelect
-                          className="search-selector"
-                          options={[
-                            { value: "", label: "All Managers" },
-                            ...distinctManagers.map((manager) => ({
-                              value: manager,
-                              label: manager,
-                            })),
-                          ]}
-                          value={selectedManager || null}
-                          onChange={(value) => {
-                            const val = value || "";
-                            setSelectedManager(val);
-                            localStorage.setItem("filter_manager", val);
-                          }}
-                          placeholder="All Managers"
-                        />
-                      )}
-                      {hasPermission(
-                        allowedPermissions,
-                        "view_branch_officer_filter"
-                      ) && (
-                        <SingleSearchSelect
-                          className="search-selector"
-                          options={[
-                            { value: "", label: "All Officers" },
-                            ...distinctOfficers.map((officer) => ({
-                              value: officer,
-                              label: officer,
-                            })),
-                          ]}
-                          value={selectedOfficer || null}
-                          onChange={(value) => {
-                            const val = value || "";
-                            setSelectedOfficer(val);
-                            localStorage.setItem("filter_officer", val);
-                          }}
-                          placeholder="All Officers"
-                        />
-                      )}
-                      {hasPermission(
-                        allowedPermissions,
-                        "view_field_verifier_filter"
-                      ) && (
-                        <SingleSearchSelect
-                          className="search-selector"
-                          options={[
-                            { value: "", label: "All Field Verifiers" },
-                            ...distinctFieldVerifiers.map((fieldVerifier) => ({
-                              value: fieldVerifier,
-                              label: fieldVerifier,
-                            })),
-                          ]}
-                          value={selectedFieldVerifier || null}
-                          onChange={(value) => {
-                            const val = value || "";
-                            setSelectedFieldVerifier(val);
-                            localStorage.setItem("filter_fieldVerifier", val);
-                          }}
-                          placeholder="All Field Verifiers"
-                        />
-                      )}
-                      {hasPermission(
-                        allowedPermissions,
-                        "view_valuer_name_filter"
-                      ) && (
-                        <SingleSearchSelect
-                          className="search-selector"
-                          options={[
-                            { value: "", label: "All Valuers" },
-                            ...distinctValuerNames.map((valuer) => ({
-                              value: valuer,
-                              label: valuer,
-                            })),
-                          ]}
-                          value={selectedValuerName || null}
-                          onChange={(value) => {
-                            const val = value || "";
-                            setSelectedValuerName(val);
-                            localStorage.setItem("filter_valuerName", val);
-                          }}
-                          placeholder="All Valuers"
-                        />
-                      )}
-                      {hasPermission(
-                        allowedPermissions,
-                        "view_payment_status_filter"
-                      ) && (
-                        <SingleSearchSelect
-                          className="search-selector"
-                          options={[
-                            { value: "", label: "All Payment Statuses" },
-                            ...distinctPaymentStatuses.map((paymentStatus) => ({
-                              value: paymentStatus,
-                              label: paymentStatus,
-                            })),
-                          ]}
-                          value={selectedPaymentStatus || null}
-                          onChange={(value) => {
-                            const val = value || "";
-                            setSelectedPaymentStatus(val);
-                            localStorage.setItem("filter_paymentStatus", val);
-                          }}
-                          placeholder="All Payment Statuses"
-                        />
-                      )}
-                      {hasPermission(
-                        allowedPermissions,
-                        "view_category_filter"
-                      ) && (
-                        <SingleSearchSelect
-                          className="search-selector"
-                          options={[
-                            { value: "", label: "All Categories" },
-                            ...distinctCategories.map((category) => ({
-                              value: category,
-                              label: category,
-                            })),
-                          ]}
-                          value={selectedCategory || null}
-                          onChange={(value) => {
-                            const val = value || "";
-                            setSelectedCategory(val);
-                            localStorage.setItem("filter_category", val);
-                          }}
-                          placeholder="All Categories"
-                        />
-                      )}
+                        <span
+                          className={`advanced-filters-title ${
+                            isAdvancedFiltersOpen ? "open" : ""
+                          }`}
+                        >
+                          Advanced Filters
+                        </span>
+                      </div>
+                      <div className="filter-row advanced-filters-content">
+                        {hasPermission(
+                          allowedPermissions,
+                          "view_category_filter"
+                        ) && (
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Categories" },
+                              ...distinctCategories.map((category) => ({
+                                value: category,
+                                label: category,
+                              })),
+                            ]}
+                            value={selectedCategory || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedCategory(val);
+                              localStorage.setItem("filter_category", val);
+                            }}
+                            placeholder="All Categories"
+                          />
+                        )}
+                        {hasPermission(
+                          allowedPermissions,
+                          "view_asset_category_filter"
+                        ) && (
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Asset Categories" },
+                              ...distinctAssetCategories.map(
+                                (assetCategory) => ({
+                                  value: assetCategory,
+                                  label: assetCategory,
+                                })
+                              ),
+                            ]}
+                            value={selectedAssetCategory || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedAssetCategory(val);
+                              localStorage.setItem("filter_assetCategory", val);
+                            }}
+                            placeholder="All Asset Categories"
+                          />
+                        )}
+                        {hasPermission(
+                          allowedPermissions,
+                          "view_sub_category_filter"
+                        ) && (
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Sub Categories" },
+                              ...distinctSubCategories.map((subCategory) => ({
+                                value: subCategory,
+                                label: subCategory,
+                              })),
+                            ]}
+                            value={selectedSubCategory || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedSubCategory(val);
+                              localStorage.setItem("filter_subCategory", val);
+                            }}
+                            placeholder="All Sub Categories"
+                          />
+                        )}
+                        {hasPermission(
+                          allowedPermissions,
+                          "view_valuer_name_filter"
+                        ) && (
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Valuers" },
+                              ...distinctValuerNames.map((valuer) => ({
+                                value: valuer,
+                                label: valuer,
+                              })),
+                            ]}
+                            value={selectedValuerName || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedValuerName(val);
+                              localStorage.setItem("filter_valuerName", val);
+                            }}
+                            placeholder="All Valuers"
+                          />
+                        )}
+                        {hasPermission(
+                          allowedPermissions,
+                          "view_manager_filter"
+                        ) && (
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Managers" },
+                              ...distinctManagers.map((manager) => ({
+                                value: manager,
+                                label: manager,
+                              })),
+                            ]}
+                            value={selectedManager || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedManager(val);
+                              localStorage.setItem("filter_manager", val);
+                            }}
+                            placeholder="All Managers"
+                          />
+                        )}
+                        {hasPermission(
+                          allowedPermissions,
+                          "view_bank_filter"
+                        ) && (
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Banks" },
+                              ...distinctBanks.map((bank) => ({
+                                value: bank,
+                                label: bank,
+                              })),
+                            ]}
+                            value={selectedBank || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedBank(val);
+                              localStorage.setItem("filter_bank", val);
+                            }}
+                            placeholder="All Banks"
+                          />
+                        )}
+                        {hasPermission(
+                          allowedPermissions,
+                          "view_bank_branch_filter"
+                        ) && (
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Branches" },
+                              ...distinctBranches.map((branch) => ({
+                                value: branch,
+                                label: branch,
+                              })),
+                            ]}
+                            value={selectedBranch || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedBranch(val);
+                              localStorage.setItem("filter_branch", val);
+                            }}
+                            placeholder="All Branches"
+                          />
+                        )}
+                        {hasPermission(
+                          allowedPermissions,
+                          "view_branch_officer_filter"
+                        ) && (
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Officers" },
+                              ...distinctOfficers.map((officer) => ({
+                                value: officer,
+                                label: officer,
+                              })),
+                            ]}
+                            value={selectedOfficer || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedOfficer(val);
+                              localStorage.setItem("filter_officer", val);
+                            }}
+                            placeholder="All Officers"
+                          />
+                        )}
+                        {hasPermission(
+                          allowedPermissions,
+                          "view_field_verifier_filter"
+                        ) && (
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Field Verifiers" },
+                              ...distinctFieldVerifiers.map(
+                                (fieldVerifier) => ({
+                                  value: fieldVerifier,
+                                  label: fieldVerifier,
+                                })
+                              ),
+                            ]}
+                            value={selectedFieldVerifier || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedFieldVerifier(val);
+                              localStorage.setItem("filter_fieldVerifier", val);
+                            }}
+                            placeholder="All Field Verifiers"
+                          />
+                        )}
+
+                        {hasPermission(
+                          allowedPermissions,
+                          "view_payment_status_filter"
+                        ) && (
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Payment Statuses" },
+                              ...distinctPaymentStatuses.map(
+                                (paymentStatus) => ({
+                                  value: paymentStatus,
+                                  label: paymentStatus,
+                                })
+                              ),
+                            ]}
+                            value={selectedPaymentStatus || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedPaymentStatus(val);
+                              localStorage.setItem("filter_paymentStatus", val);
+                            }}
+                            placeholder="All Payment Statuses"
+                          />
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
                 )}
 
                 {/* Table Container */}
@@ -1876,6 +2227,10 @@ function Dashboard() {
                             )}
                             {hasPermission(
                               allowedPermissions,
+                              "view_order_table_created_at_db"
+                            ) && <th style={{ width: "180px" }}>Created At</th>}
+                            {hasPermission(
+                              allowedPermissions,
                               "view_order_table_created_by_db"
                             ) && <th style={{ width: "120px" }}>Created By</th>}
                             {hasPermission(
@@ -1980,6 +2335,9 @@ function Dashboard() {
                               !selectedSubCategory ||
                               order.child_category_name === selectedSubCategory;
 
+                            // Filter by date if selected
+                            const dateMatch = matchesDateFilter(order);
+
                             // Show order only if all filters match (or no filter is selected)
                             return (
                               typeMatch &&
@@ -1994,7 +2352,8 @@ function Dashboard() {
                               fieldVerifierMatch &&
                               valuerMatch &&
                               statusMatch &&
-                              paymentStatusMatch
+                              paymentStatusMatch &&
+                              dateMatch
                             );
                           })
                           .map((order) => (
@@ -2088,6 +2447,10 @@ function Dashboard() {
                                 allowedPermissions,
                                 "view_order_table_payment_amount_db"
                               ) && <td>{order.payment_amount || "-"}</td>}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_created_at_db"
+                              ) && <td>{formatDate(order.created_at)}</td>}
                               {hasPermission(
                                 allowedPermissions,
                                 "view_order_table_created_by_db"
