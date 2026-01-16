@@ -1076,10 +1076,10 @@ function Orders() {
       if (isNaN(date.getTime())) return "-";
 
       return new Intl.DateTimeFormat("en-US", {
+        day: "numeric",
+        month: "short",
         year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
+        hour: "numeric",
         minute: "2-digit",
         hour12: true,
       }).format(date);
@@ -1216,7 +1216,7 @@ function Orders() {
                         endDate={selectedDateRange.end}
                         placeholderText="Start Date"
                         className="form-field search-selector"
-                        dateFormat="dd/MM/yyyy"
+                      dateFormat="d MMM yyyy"
                         renderCustomHeader={renderDatePickerHeader}
                         showMonthDropdown
                         showYearDropdown
@@ -1254,7 +1254,7 @@ function Orders() {
                         minDate={selectedDateRange.start}
                         placeholderText="End Date"
                         className="form-field search-selector"
-                        dateFormat="dd/MM/yyyy"
+                      dateFormat="d MMM yyyy"
                         renderCustomHeader={renderDatePickerHeader}
                         showMonthDropdown
                         showYearDropdown
