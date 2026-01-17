@@ -3411,6 +3411,7 @@ function filterValidReportFields(formData, reportType) {
       "any_outstanding_deficiencies_as_reported_by_any_port_state",
       "recent_oil_company_inspections_screenings",
       "date_place_of_last_sire_inspection",
+      "disclaimer",
     ],
   };
 
