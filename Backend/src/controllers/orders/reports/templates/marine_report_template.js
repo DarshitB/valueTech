@@ -469,27 +469,29 @@ function generateMarineReportHTML(
             position: relative;
             z-index: 2;
             margin-bottom: 0;
-            display: flex;
-            flex-direction: column;
+            display: grid;
+            grid-template-rows: 1fr auto; /* top fills remaining, bottom stays content height */
+            row-gap: 0;
             /* Fill available space to occupy entire first page */
             min-height: calc(297mm - 50mm - 58px - 20px);
             height: calc(297mm - 50mm - 58px - 20px);
+            overflow: hidden; /* prevent spill if content exceeds */
         }
 
         /* report-hero-page-second: occupies only its content height */
         .report-hero-page-second {
-            flex-shrink: 0;
-            flex-grow: 0;
             border: 3px solid black;
             margin-bottom: 5px;
         }
 
         /* report-hero-page-first: occupies rest of the space */
         .report-hero-page-first {
-            flex-grow: 1;
             border: 4px solid black;
             margin-bottom: 5px;
             padding: 30px 60px;
+            display: flex;
+            flex-direction: column;
+            min-height: 0; /* allow shrink inside grid */
         }
 
         /* Subsequent Pages */
@@ -882,7 +884,7 @@ function generateMarineReportHTML(
                             : ""
                         }
                     </div>
-                    <div style="max-width: 300px;margin: 0 auto;border: 1px solid black;padding: 10px;">
+                    <div style="min-width: 300px;max-width: 300px;margin: 0 auto;border: 1px solid black;padding: 10px;">
                         <p style="font-size: 14px;line-height: 1.2;text-align: center;margin-bottom: 0;">
                             On request of
                             <br>
