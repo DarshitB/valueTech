@@ -458,7 +458,7 @@ exports.generateReport = async (req, res, next) => {
     const { order_id } = req.params;
     const { report_type: requestedReportType } = req.body;
     const { id: userId } = req.user;
-    /* console.log("req.body", req.body); */
+    console.log("req.body", req.body);
 
     // Define report types that have asset_make field
     const reportTypesWithAssetMake = [
