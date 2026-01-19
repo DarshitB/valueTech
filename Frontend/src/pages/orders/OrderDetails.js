@@ -78,16 +78,16 @@ function timeAgo(dateString) {
 // Utility: Format date for Recent Activity
 function formatActivityTime(dateString) {
   if (!dateString) return "-";
-  
+
   const date = new Date(dateString);
   const now = new Date();
-  
+
   // Reset time to compare dates only
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
   const activityDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  
+
   // Format time (12-hour format with AM/PM)
   let hours = date.getHours();
   const minutes = date.getMinutes();
@@ -96,20 +96,20 @@ function formatActivityTime(dateString) {
   hours = hours ? hours : 12; // the hour '0' should be '12'
   const minutesStr = minutes.toString().padStart(2, "0");
   const timeStr = `${hours}:${minutesStr} ${ampm}`;
-  
+
   // Month abbreviations
   const monthAbbr = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  
+
   // Check if today
   if (activityDate.getTime() === today.getTime()) {
     return `Today at ${timeStr}`;
   }
-  
+
   // Check if yesterday
   if (activityDate.getTime() === yesterday.getTime()) {
     return `Yesterday at ${timeStr}`;
   }
-  
+
   // For older dates: "15 Dec at 7:30 PM"
   const day = date.getDate();
   const month = monthAbbr[date.getMonth()];
@@ -157,8 +157,8 @@ function OrderDetails() {
 
   // Check if user is BANK AUTHORITY or BANK OFFICER
   const userRole = currentUser?.role?.name?.toUpperCase() || "";
-  const isBankUser = 
-    userRole.includes("BANK AUTHORITY") || 
+  const isBankUser =
+    userRole.includes("BANK AUTHORITY") ||
     userRole.includes("BANK OFFICER");
 
   // Select order and comments data from Redux store
@@ -246,6 +246,7 @@ function OrderDetails() {
     subject: "",
     comments: "",
     regards: "",
+    mail_attachment: false,
   });
 
   // Track removed documents (by ID) - documents user removes from mail attachments
@@ -499,12 +500,12 @@ function OrderDetails() {
       // Validate mentions array
       const validMentions = Array.isArray(mentions)
         ? mentions.filter(
-            (mention) =>
-              mention &&
-              typeof mention === "object" &&
-              mention.id &&
-              Number.isInteger(Number(mention.id))
-          )
+          (mention) =>
+            mention &&
+            typeof mention === "object" &&
+            mention.id &&
+            Number.isInteger(Number(mention.id))
+        )
         : [];
 
       // Limit number of mentions to prevent spam
@@ -888,7 +889,7 @@ function OrderDetails() {
     const approvedVideosList = availableDocuments.filter(
       (doc) => doc?.media_url && isVideo(doc.media_url)
     );
-    
+
     // Documents are collages and reports (excluding videos)
     const approvedCollages = availableDocuments.filter(
       (doc) => doc.document_type === "collage" && !isVideo(doc?.media_url)
@@ -1127,6 +1128,11 @@ function OrderDetails() {
     setIsSendingMail(false); // Reset sending state when opening modal
     setRemovedDocumentIds([]); // Reset removed documents when opening modal
     setShowMailModal(true);
+    // Reset mail_attachment to false when opening modal
+    setMailFormData((prev) => ({
+      ...prev,
+      mail_attachment: false,
+    }));
   };
 
   // Handle form input changes with validation
@@ -1323,6 +1329,458 @@ function OrderDetails() {
     };
   }, [isSendingMail]);
 
+  // Reusable function to render action buttons
+  const renderActionButtons = useCallback(() => {
+    return (
+      <div
+        className="recent-activity-buttons"
+        style={{
+          display: "flex",
+          gap: "5px",
+          alignItems: "center",
+        }}
+      >
+        {isDeveloperAdmin && (
+          <button
+            title="complete order"
+            className={`tooltip-link${isCompletingOrder || ordersLoading ? " disabled" : ""}`}
+            onClick={handleCompleteOrder}
+            disabled={isCompletingOrder || ordersLoading}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              cursor: isCompletingOrder || ordersLoading ? "not-allowed" : "pointer",
+              outline: "none",
+              boxShadow: "none",
+            }}
+          >
+            <SelectedIcon style={{ width: "40px", height: "40px" }} />
+          </button>
+        )}
+        {/* Action buttons for uploading images and reports, validating, etc. */}
+        {/* For BANK AUTHORITY or BANK OFFICER, only show Documents button if status > 12 */}
+        {/* For other users, show normally (if they have permission) */}
+        {hasPermission(
+          allowedPermissions,
+          "view_order_media_documents"
+        ) &&
+          (!isBankUser || (order?.current_status_id > 12)) && (
+            <Link
+              to={`/orders/${id}/details/documents`}
+              title="Documents"
+              className="tooltip-link"
+            >
+              <FolderIcon />
+            </Link>
+          )}
+
+        {/* Conditional Report Buttons based on Category
+            - "COMMERCIAL VEHICLE" -> CV Report
+            - "CONSTRUCTION EQUIPMENTS" -> CE Report  
+            - Categories containing "AVR" -> AVR Report
+            - "MACHINERY" -> Machinery Report
+        */}
+        {hasPermission(allowedPermissions, "generate_order_report") && (
+          <>
+            {/* CV Report - Commercial Vehicle */}
+            {order?.category_name === "COMMERCIAL VEHICLE" && (
+              <>
+                {order?.valuer_name &&
+                  order.valuer_name.trim() !== "" ? (
+                  order?.current_status_id === 10 && !isExemptAdmin ? (
+                    <span
+                      title="CV Report (Disabled)"
+                      className="tooltip-link disabled"
+                      style={{ cursor: "not-allowed" }}
+                    >
+                      <ReportIcon />
+                    </span>
+                  ) : (
+                    <Link
+                      to={`/orders/${id}/details/cv-report`}
+                      title="CV Report"
+                      className="tooltip-link"
+                    >
+                      <ReportIcon />
+                    </Link>
+                  )
+                ) : (
+                  <button
+                    title="CV Report"
+                    className="tooltip-link"
+                    onClick={() => showValuerNameError("CV")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      cursor: "pointer",
+                      outline: "none",
+                      boxShadow: "none",
+                    }}
+                  >
+                    <ReportIcon />
+                  </button>
+                )}
+              </>
+            )}
+
+            {/* CE Report - Construction Equipment */}
+            {order?.category_name === "CONSTRUCTION EQUIPMENT" && (
+              <>
+                {order?.valuer_name &&
+                  order.valuer_name.trim() !== "" ? (
+                  order?.current_status_id === 10 && !isExemptAdmin ? (
+                    <span
+                      title="CE Report (Disabled)"
+                      className="tooltip-link disabled"
+                      style={{ cursor: "not-allowed" }}
+                    >
+                      <ReportIcon />
+                    </span>
+                  ) : (
+                    <Link
+                      to={`/orders/${id}/details/ce-report`}
+                      title="CE Report"
+                      className="tooltip-link"
+                    >
+                      <ReportIcon />
+                    </Link>
+                  )
+                ) : (
+                  <button
+                    title="CE Report"
+                    className="tooltip-link"
+                    onClick={() => showValuerNameError("CE")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      cursor: "pointer",
+                      outline: "none",
+                      boxShadow: "none",
+                    }}
+                  >
+                    <ReportIcon />
+                  </button>
+                )}
+              </>
+            )}
+
+            {/* AVR Report - Categories containing AVR */}
+            {order?.category_name &&
+              order.category_name.toUpperCase().includes("AVR") && (
+                <>
+                  {order?.valuer_name &&
+                    order.valuer_name.trim() !== "" ? (
+                    order?.current_status_id === 10 &&
+                      !isExemptAdmin ? (
+                      <span
+                        title="AVR Report (Disabled)"
+                        className="tooltip-link disabled"
+                        style={{ cursor: "not-allowed" }}
+                      >
+                        <ReportIcon />
+                      </span>
+                    ) : (
+                      <Link
+                        to={`/orders/${id}/details/avr-report`}
+                        title="AVR Report"
+                        className="tooltip-link"
+                      >
+                        <ReportIcon />
+                      </Link>
+                    )
+                  ) : (
+                    <button
+                      title="AVR Report"
+                      className="tooltip-link"
+                      onClick={() => showValuerNameError("AVR")}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                        cursor: "pointer",
+                        outline: "none",
+                        boxShadow: "none",
+                      }}
+                    >
+                      <ReportIcon />
+                    </button>
+                  )}
+                </>
+              )}
+
+            {/* Machinery Report */}
+            {order?.category_name === "MACHINERY" && (
+              <>
+                {order?.valuer_name &&
+                  order.valuer_name.trim() !== "" ? (
+                  order?.current_status_id === 10 && !isExemptAdmin ? (
+                    <span
+                      title="Machinery Report (Disabled)"
+                      className="tooltip-link disabled"
+                      style={{ cursor: "not-allowed" }}
+                    >
+                      <ReportIcon />
+                    </span>
+                  ) : (
+                    <Link
+                      to={`/orders/${id}/details/machinery-report`}
+                      title="Machinery Report"
+                      className="tooltip-link"
+                    >
+                      <ReportIcon />
+                    </Link>
+                  )
+                ) : (
+                  <button
+                    title="Machinery Report"
+                    className="tooltip-link"
+                    onClick={() => showValuerNameError("Machinery")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      cursor: "pointer",
+                      outline: "none",
+                      boxShadow: "none",
+                    }}
+                  >
+                    <ReportIcon />
+                  </button>
+                )}
+              </>
+            )}
+            {order?.category_name === "MARINE" && (
+              <>
+                {order?.valuer_name &&
+                  order.valuer_name.trim() !== "" ? (
+                  order?.current_status_id === 10 && !isExemptAdmin ? (
+                    <span
+                      title="Marine Report (Disabled)"
+                      className="tooltip-link disabled"
+                      style={{ cursor: "not-allowed" }}
+                    >
+                      <ReportIcon />
+                    </span>
+                  ) : (
+                    <Link
+                      to={`/orders/${id}/details/marine-report`}
+                      title="Marine Report"
+                      className="tooltip-link"
+                    >
+                      <ReportIcon />
+                    </Link>
+                  )
+                ) : (
+                  <button
+                    title="Marine Report"
+                    className="tooltip-link"
+                    onClick={() => showValuerNameError("Marine")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      cursor: "pointer",
+                      outline: "none",
+                      boxShadow: "none",
+                    }}
+                  >
+                    <ReportIcon />
+                  </button>
+                )}
+              </>
+            )}
+          </>
+        )}
+        {hasPermission(
+          allowedPermissions,
+          "view_order_media_files"
+        ) && (
+            <>
+              {order?.valuer_name && order.valuer_name.trim() !== "" ? (
+                order?.current_status_id === 10 && !isExemptAdmin ? (
+                  <span
+                    title="Images (Disabled)"
+                    className="tooltip-link disabled"
+                    style={{ cursor: "not-allowed" }}
+                  >
+                    <ImageCollageIcon />
+                  </span>
+                ) : (
+                  <Link
+                    to={`/orders/${id}/details/images`}
+                    title="Images"
+                    className="tooltip-link"
+                  >
+                    <ImageCollageIcon />
+                  </Link>
+                )
+              ) : (
+                <button
+                  title="Images"
+                  className="tooltip-link"
+                  onClick={() => showValuerNameError("Images")}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    cursor: "pointer",
+                    outline: "none",
+                    boxShadow: "none",
+                  }}
+                >
+                  <ImageCollageIcon />
+                </button>
+              )}
+            </>
+          )}
+
+        {/* Complete button - only show if:
+            1. Has permission to view complete button
+            2. Order status is 9
+            3. Has at least one approved report and one approved collage
+        */}
+        {(() => {
+          const hasCompletePermission = hasPermission(
+            allowedPermissions,
+            "view_order_complete_button"
+          );
+          const hasCorrectStatus = order?.current_status_id === 9;
+
+          // Get all documents from the Redux state
+          const allDocs =
+            orderMediaDocumentsState?.documents?.documents ||
+            orderMediaDocumentsState?.documents ||
+            [];
+
+          // Get all reports and collages first
+          const allReports = allDocs.filter(
+            (doc) => doc.document_type === "report"
+          );
+          const allCollages = allDocs.filter(
+            (doc) => doc.document_type === "collage"
+          );
+
+          // Then filter for approved ones
+          const approvedReports = allReports.filter(
+            (doc) => doc.status === "approved"
+          );
+          const approvedCollages = allCollages.filter(
+            (doc) => doc.status === "approved"
+          );
+
+          // Check if we have at least one of each
+          const hasApprovedReport = approvedReports.length > 0;
+          const hasApprovedCollage = approvedCollages.length > 0;
+
+          return (
+            hasCompletePermission &&
+            hasCorrectStatus &&
+            hasApprovedReport &&
+            hasApprovedCollage && (
+              <button
+                title="Complete"
+                className="tooltip-link button"
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                }}
+                onClick={() => setShowCompleteConfirmation(true)}
+              >
+                <ValidateIcon />
+              </button>
+            )
+          );
+        })()}
+        {hasCollageAndReport &&
+          hasPermission(
+            allowedPermissions,
+            "view_order_authenticate_button"
+          ) &&
+          isSuperAdmin &&
+          order?.current_status_id === 10 && (
+            <>
+              <button
+                title="Authenticate"
+                className="tooltip-link button"
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                }}
+                onClick={() => setShowAuthenticateConfirmation(true)}
+              >
+                <ApprovedIcon />
+              </button>
+              <button
+                title="Revisions Required"
+                className="tooltip-link button"
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                }}
+                onClick={() => setShowRevisionConfirmation(true)}
+              >
+                <RevalidateIcon />
+              </button>
+            </>
+          )}
+        {hasPermission(
+          allowedPermissions,
+          "view_order_payment_button"
+        ) && (
+            <Link
+              title="Payment"
+              className="tooltip-link"
+              onClick={OpenPaymentModal}
+            >
+              <PaymentIcon />
+            </Link>
+          )}
+        {hasPermission(
+          allowedPermissions,
+          "view_order_mail_button"
+        ) && (
+            <Link
+              title="Mail"
+              className="tooltip-link"
+              onClick={OpenMailModal}
+            >
+              <MailIcon />
+            </Link>
+          )}
+      </div>
+    );
+  }, [
+    isDeveloperAdmin,
+    isCompletingOrder,
+    ordersLoading,
+    handleCompleteOrder,
+    allowedPermissions,
+    isBankUser,
+    order?.current_status_id,
+    order?.category_name,
+    order?.valuer_name,
+    id,
+    isExemptAdmin,
+    showValuerNameError,
+    orderMediaDocumentsState,
+    hasCollageAndReport,
+    isSuperAdmin,
+    setShowCompleteConfirmation,
+    setShowAuthenticateConfirmation,
+    setShowRevisionConfirmation,
+    OpenPaymentModal,
+    OpenMailModal,
+  ]);
+
   // Handle mail form submission with enhanced validation
   const handleMailFormSubmit = async (e) => {
     e.preventDefault();
@@ -1470,22 +1928,23 @@ function OrderDetails() {
     const mailPayload = {
       to: Array.isArray(mailFormData.to)
         ? mailFormData.to
-            .map((email) => String(email).trim().toLowerCase())
-            .filter((email) => email && emailRegex.test(email))
+          .map((email) => String(email).trim().toLowerCase())
+          .filter((email) => email && emailRegex.test(email))
         : [],
       cc: Array.isArray(mailFormData.cc)
         ? mailFormData.cc
-            .map((email) => String(email).trim().toLowerCase())
-            .filter((email) => email && emailRegex.test(email))
+          .map((email) => String(email).trim().toLowerCase())
+          .filter((email) => email && emailRegex.test(email))
         : [],
       bcc: Array.isArray(mailFormData.bcc)
         ? mailFormData.bcc
-            .map((email) => String(email).trim().toLowerCase())
-            .filter((email) => email && emailRegex.test(email))
+          .map((email) => String(email).trim().toLowerCase())
+          .filter((email) => email && emailRegex.test(email))
         : [],
       subject: mailFormData.subject?.trim() || "",
       comments: comments,
       regards: mailFormData.regards?.trim() || "",
+      mail_attachment: mailFormData.mail_attachment || false, // Boolean: true if checkbox is checked, false otherwise
       document_ids: documentIds.map((doc) => doc.id), // Array of document IDs (collages and reports)
       // Add videos separately if there are any
       ...(videoIds.length > 0 && { video_ids: videoIds }), // Array of video IDs (only if videos exist)
@@ -1522,6 +1981,7 @@ function OrderDetails() {
           subject: "",
           comments: "",
           regards: "",
+          mail_attachment: false,
         });
       }
     } catch (error) {
@@ -1551,20 +2011,20 @@ function OrderDetails() {
               allowedPermissions,
               "view_order_details_order_status"
             ) && (
-              <div className="order-impo-info-card">
-                <p>Order Status</p>
-                <h6>{showValue(order?.current_status_name)}</h6>
-              </div>
-            )}
+                <div className="order-impo-info-card">
+                  <p>Order Status</p>
+                  <h6>{showValue(order?.current_status_name)}</h6>
+                </div>
+              )}
             {hasPermission(
               allowedPermissions,
               "view_order_details_payment_status"
             ) && (
-              <div className="order-impo-info-card">
-                <p>Payment Status</p>
-                <h6>{order?.payment_status ? order.payment_status : "-"}</h6>
-              </div>
-            )}
+                <div className="order-impo-info-card">
+                  <p>Payment Status</p>
+                  <h6>{order?.payment_status ? order.payment_status : "-"}</h6>
+                </div>
+              )}
           </div>
         </div>
         {/* Main content area for order details */}
@@ -1573,9 +2033,8 @@ function OrderDetails() {
             <div className="row h-100">
               {/* General information about the order */}
               <div
-                className={`${
-                  hasAnyOfficePermission ? "col-xl-4" : "col-xl-6"
-                } col-lg-6 col-md-6 col-sm-12 col-xs-12 border-right h-100 mb-lg-4`}
+                className={`${hasAnyOfficePermission ? "col-xl-4" : "col-xl-6"
+                  } col-lg-6 col-md-6 col-sm-12 col-xs-12 border-right h-100 mb-lg-4`}
               >
                 <div className="order-details-info-card">
                   <h6>General Information</h6>
@@ -1652,11 +2111,9 @@ function OrderDetails() {
               </div>
               {/* Client information section */}
               <div
-                className={`${
-                  hasAnyOfficePermission ? "col-xl-4" : "col-xl-6"
-                } col-lg-6 col-md-6 col-sm-12 col-xs-12 ${
-                  hasAnyOfficePermission ? "border-right" : ""
-                } h-100 mb-lg-4`}
+                className={`${hasAnyOfficePermission ? "col-xl-4" : "col-xl-6"
+                  } col-lg-6 col-md-6 col-sm-12 col-xs-12 ${hasAnyOfficePermission ? "border-right" : ""
+                  } h-100 mb-lg-4`}
               >
                 <div className="order-details-info-card client">
                   <h6>Client Information</h6>
@@ -1731,82 +2188,82 @@ function OrderDetails() {
                         allowedPermissions,
                         "view_order_details_bank_name"
                       ) && (
-                        <div className="order-details-info-set">
-                          <div className="order-details-info-set-heading">
-                            <p>
-                              <span>Bank</span>
-                              <span>:</span>
-                            </p>
+                          <div className="order-details-info-set">
+                            <div className="order-details-info-set-heading">
+                              <p>
+                                <span>Bank</span>
+                                <span>:</span>
+                              </p>
+                            </div>
+                            <div className="order-details-info-set-details">
+                              <p>{showValue(order?.bank_name)}</p>
+                            </div>
                           </div>
-                          <div className="order-details-info-set-details">
-                            <p>{showValue(order?.bank_name)}</p>
-                          </div>
-                        </div>
-                      )}
+                        )}
                       {hasPermission(
                         allowedPermissions,
                         "view_order_details_branch_name"
                       ) && (
-                        <div className="order-details-info-set">
-                          <div className="order-details-info-set-heading">
-                            <p>
-                              <span>Branch</span>
-                              <span>:</span>
-                            </p>
+                          <div className="order-details-info-set">
+                            <div className="order-details-info-set-heading">
+                              <p>
+                                <span>Branch</span>
+                                <span>:</span>
+                              </p>
+                            </div>
+                            <div className="order-details-info-set-details">
+                              <p>{showValue(order?.branch_name)}</p>
+                            </div>
                           </div>
-                          <div className="order-details-info-set-details">
-                            <p>{showValue(order?.branch_name)}</p>
-                          </div>
-                        </div>
-                      )}
+                        )}
                       {hasPermission(
                         allowedPermissions,
                         "view_order_details_officer_name"
                       ) && (
-                        <div className="order-details-info-set">
-                          <div className="order-details-info-set-heading">
-                            <p>
-                              <span>Officer</span>
-                              <span>:</span>
-                            </p>
+                          <div className="order-details-info-set">
+                            <div className="order-details-info-set-heading">
+                              <p>
+                                <span>Officer</span>
+                                <span>:</span>
+                              </p>
+                            </div>
+                            <div className="order-details-info-set-details">
+                              <p>{showValue(order?.officer_name)}</p>
+                            </div>
                           </div>
-                          <div className="order-details-info-set-details">
-                            <p>{showValue(order?.officer_name)}</p>
-                          </div>
-                        </div>
-                      )}
+                        )}
                       {hasPermission(
                         allowedPermissions,
                         "view_order_details_manager_name"
                       ) && (
-                        <div className="order-details-info-set">
-                          <div className="order-details-info-set-heading">
-                            <p>
-                              <span>Manager</span>
-                              <span>:</span>
-                            </p>
+                          <div className="order-details-info-set">
+                            <div className="order-details-info-set-heading">
+                              <p>
+                                <span>Manager</span>
+                                <span>:</span>
+                              </p>
+                            </div>
+                            <div className="order-details-info-set-details">
+                              <p>{showValue(order?.manager_name)}</p>
+                            </div>
                           </div>
-                          <div className="order-details-info-set-details">
-                            <p>{showValue(order?.manager_name)}</p>
-                          </div>
-                        </div>
-                      )}
+                        )}
                       {hasPermission(
                         allowedPermissions,
                         "view_order_details_field_verifier_name"
                       ) && (
-                        <div className="order-details-info-set">
-                          <div className="order-details-info-set-heading">
-                            <p>
-                              <span>Field Verifier</span>
-                              <span>:</span>
-                            </p>
+                          <div className="order-details-info-set">
+                            <div className="order-details-info-set-heading">
+                              <p>
+                                <span>Field Verifier</span>
+                                <span>:</span>
+                              </p>
+                            </div>
+                            <div className="order-details-info-set-details">
+                              <p>{showValue(order?.field_verifier_name)}</p>
+                            </div>
                           </div>
-                          <div className="order-details-info-set-details">
-                            <p>{showValue(order?.field_verifier_name)}</p>
-                          </div>
-                        </div>
-                      )}
+                        )}
                     </div>
                   </div>
                 </div>
@@ -1815,596 +2272,208 @@ function OrderDetails() {
           </div>
         </div>
         {/* Recent activity section */}
+        {(() => {
+          const hasRecentActivityPermission = hasPermission(
+            allowedPermissions,
+            "view_order_recent_activity"
+          );
+          const hasCommentsPermission = hasPermission(
+            allowedPermissions,
+            "view_order_comments"
+          );
 
-        <div className="col-xl-6 col-lg-6 col-md-12 col-sm-12 col-xs-12">
-          <div className="recent-activity-wrapper">
-            <div className="recent-activity-heading">
-              {hasPermission(
-                allowedPermissions,
-                "view_order_recent_activity"
-              ) && <h3>Recent Activity</h3>}
-              <div className="recent-activity-buttons">
-                {isDeveloperAdmin && (
-                  <button
-                    title="complete order"
-                    className={`tooltip-link${isCompletingOrder || ordersLoading ? " disabled" : ""}`}
-                    onClick={handleCompleteOrder}
-                    disabled={isCompletingOrder || ordersLoading}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      padding: 0,
-                      cursor: isCompletingOrder || ordersLoading ? "not-allowed" : "pointer",
-                      outline: "none",
-                      boxShadow: "none",
-                    }}
-                  >
-                    <SelectedIcon style={{ width: "40px", height: "40px" }} />
-                  </button>
-                )}
-                {/* Action buttons for uploading images and reports, validating, etc. */}
-                {/* For BANK AUTHORITY or BANK OFFICER, only show Documents button if status > 12 */}
-                {/* For other users, show normally (if they have permission) */}
-                {hasPermission(
-                  allowedPermissions,
-                  "view_order_media_documents"
-                ) && 
-                (!isBankUser || (order?.current_status_id > 12)) && (
-                  <Link
-                    to={`/orders/${id}/details/documents`}
-                    title="Documents"
-                    className="tooltip-link"
-                  >
-                    <FolderIcon />
-                    {/*  <DocumentsIcon /> */}
-                  </Link>
-                )}
-
-                {/* Conditional Report Buttons based on Category
-                    - "COMMERCIAL VEHICLE" -> CV Report
-                    - "CONSTRUCTION EQUIPMENTS" -> CE Report  
-                    - Categories containing "AVR" -> AVR Report
-                    - "MACHINERY" -> Machinery Report
-                */}
-                {hasPermission(allowedPermissions, "generate_order_report") && (
-                  <>
-                    {/* CV Report - Commercial Vehicle */}
-                    {order?.category_name === "COMMERCIAL VEHICLE" && (
-                      <>
-                        {order?.valuer_name &&
-                        order.valuer_name.trim() !== "" ? (
-                          order?.current_status_id === 10 && !isExemptAdmin ? (
-                            <span
-                              title="CV Report (Disabled)"
-                              className="tooltip-link disabled"
-                              style={{ cursor: "not-allowed" }}
-                            >
-                              <ReportIcon />
-                            </span>
-                          ) : (
-                            <Link
-                              to={`/orders/${id}/details/cv-report`}
-                              title="CV Report"
-                              className="tooltip-link"
-                            >
-                              <ReportIcon />
-                            </Link>
-                          )
-                        ) : (
-                          <button
-                            title="CV Report"
-                            className="tooltip-link"
-                            onClick={() => showValuerNameError("CV")}
-                            style={{
-                              background: "none",
-                              border: "none",
-                              padding: 0,
-                              cursor: "pointer",
-                              outline: "none",
-                              boxShadow: "none",
-                            }}
-                          >
-                            <ReportIcon />
-                          </button>
-                        )}
-                        {/* <Link
-                          to={`/orders/${id}/details/ce-report`}
-                          title="CE Report"
-                          className="tooltip-link"
-                        >
-                          <ReportIcon />
-                        </Link>
-                        <Link
-                          to={`/orders/${id}/details/avr-report`}
-                          title="AVR Report"
-                          className="tooltip-link"
-                        >
-                          <ReportIcon />
-                        </Link>
-                        <Link
-                          to={`/orders/${id}/details/machinery-report`}
-                          title="Machinery Report"
-                          className="tooltip-link"
-                        >
-                          <ReportIcon />
-                        </Link> */}
-                        {/* <Link
-                          to={`/orders/${id}/details/marine-report`}
-                          title="Marine Report"
-                          className="tooltip-link"
-                        >
-                          <ReportIcon />
-                        </Link> */}
-                      </>
-                    )}
-
-                    {/* CE Report - Construction Equipment */}
-                    {order?.category_name === "CONSTRUCTION EQUIPMENT" && (
-                      <>
-                        {order?.valuer_name &&
-                        order.valuer_name.trim() !== "" ? (
-                          order?.current_status_id === 10 && !isExemptAdmin ? (
-                            <span
-                              title="CE Report (Disabled)"
-                              className="tooltip-link disabled"
-                              style={{ cursor: "not-allowed" }}
-                            >
-                              <ReportIcon />
-                            </span>
-                          ) : (
-                            <Link
-                              to={`/orders/${id}/details/ce-report`}
-                              title="CE Report"
-                              className="tooltip-link"
-                            >
-                              <ReportIcon />
-                            </Link>
-                          )
-                        ) : (
-                          <button
-                            title="CE Report"
-                            className="tooltip-link"
-                            onClick={() => showValuerNameError("CE")}
-                            style={{
-                              background: "none",
-                              border: "none",
-                              padding: 0,
-                              cursor: "pointer",
-                              outline: "none",
-                              boxShadow: "none",
-                            }}
-                          >
-                            <ReportIcon />
-                          </button>
-                        )}
-                      </>
-                    )}
-
-                    {/* AVR Report - Categories containing AVR */}
-                    {order?.category_name &&
-                      order.category_name.toUpperCase().includes("AVR") && (
-                        <>
-                          {order?.valuer_name &&
-                          order.valuer_name.trim() !== "" ? (
-                            order?.current_status_id === 10 &&
-                            !isExemptAdmin ? (
-                              <span
-                                title="AVR Report (Disabled)"
-                                className="tooltip-link disabled"
-                                style={{ cursor: "not-allowed" }}
-                              >
-                                <ReportIcon />
-                              </span>
-                            ) : (
-                              <Link
-                                to={`/orders/${id}/details/avr-report`}
-                                title="AVR Report"
-                                className="tooltip-link"
-                              >
-                                <ReportIcon />
-                              </Link>
-                            )
-                          ) : (
-                            <button
-                              title="AVR Report"
-                              className="tooltip-link"
-                              onClick={() => showValuerNameError("AVR")}
-                              style={{
-                                background: "none",
-                                border: "none",
-                                padding: 0,
-                                cursor: "pointer",
-                                outline: "none",
-                                boxShadow: "none",
-                              }}
-                            >
-                              <ReportIcon />
-                            </button>
-                          )}
-                        </>
-                      )}
-
-                    {/* Machinery Report */}
-                    {order?.category_name === "MACHINERY" && (
-                      <>
-                        {order?.valuer_name &&
-                        order.valuer_name.trim() !== "" ? (
-                          order?.current_status_id === 10 && !isExemptAdmin ? (
-                            <span
-                              title="Machinery Report (Disabled)"
-                              className="tooltip-link disabled"
-                              style={{ cursor: "not-allowed" }}
-                            >
-                              <ReportIcon />
-                            </span>
-                          ) : (
-                            <Link
-                              to={`/orders/${id}/details/machinery-report`}
-                              title="Machinery Report"
-                              className="tooltip-link"
-                            >
-                              <ReportIcon />
-                            </Link>
-                          )
-                        ) : (
-                          <button
-                            title="Machinery Report"
-                            className="tooltip-link"
-                            onClick={() => showValuerNameError("Machinery")}
-                            style={{
-                              background: "none",
-                              border: "none",
-                              padding: 0,
-                              cursor: "pointer",
-                              outline: "none",
-                              boxShadow: "none",
-                            }}
-                          >
-                            <ReportIcon />
-                          </button>
-                        )}
-                      </>
-                    )}
-                    {order?.category_name === "MARINE" && (
-                      <>
-                        {order?.valuer_name &&
-                        order.valuer_name.trim() !== "" ? (
-                          order?.current_status_id === 10 && !isExemptAdmin ? (
-                            <span
-                              title="Marine Report (Disabled)"
-                              className="tooltip-link disabled"
-                              style={{ cursor: "not-allowed" }}
-                            >
-                              <ReportIcon />
-                            </span>
-                          ) : (
-                            <Link
-                              to={`/orders/${id}/details/marine-report`}
-                              title="Marine Report"
-                              className="tooltip-link"
-                            >
-                              <ReportIcon />
-                            </Link>
-                          )
-                        ) : (
-                          <button
-                            title="Marine Report"
-                            className="tooltip-link"
-                            onClick={() => showValuerNameError("Marine")}
-                            style={{
-                              background: "none",
-                              border: "none",
-                              padding: 0,
-                              cursor: "pointer",
-                              outline: "none",
-                              boxShadow: "none",
-                            }}
-                          >
-                            <ReportIcon />
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </>
-                )}
-                {/* <Link
-                  to={`/orders/${id}/details/custom-report`}
-                  title="Custom Report"
-                  className="tooltip-link"
-                >
-                  <ReportIcon />
-                </Link> */}
-                {hasPermission(
-                  allowedPermissions,
-                  "view_order_media_files"
-                ) && (
-                  <>
-                    {order?.valuer_name && order.valuer_name.trim() !== "" ? (
-                      order?.current_status_id === 10 && !isExemptAdmin ? (
-                        <span
-                          title="Images (Disabled)"
-                          className="tooltip-link disabled"
-                          style={{ cursor: "not-allowed" }}
-                        >
-                          <ImageCollageIcon />
-                        </span>
+          // If user has recent activity permission, show normal layout
+          if (hasRecentActivityPermission) {
+            return (
+              <div className="col-xl-6 col-lg-6 col-md-12 col-sm-12 col-xs-12">
+                <div className="recent-activity-wrapper">
+                  <div className="recent-activity-heading">
+                    <h3>Recent Activity</h3>
+                    {renderActionButtons()}
+                  </div>
+                  <div className="activities-wrapper">
+                    <div className="activities">
+                      {order?.status_history && order.status_history.length > 0 ? (
+                        order.status_history.map((status) => (
+                          <div className="activity" key={status.id}>
+                            <div className="activity-icon bg-primary text-white">
+                              {status.changed_by_name
+                                ?.split(" ")
+                                .map((n) => n[0])
+                                .join("")}
+                            </div>
+                            <div className="activity-detail">
+                              <p className="activity-time">
+                                {formatActivityTime(status.changed_at)}
+                              </p>
+                              <p className="activity-description">
+                                {status.status_name && status.activity_extra
+                                  ? `${showValue(
+                                    status.status_name
+                                  )} by ${showValue(
+                                    status.changed_by_name
+                                  )} [ ${showValue(status.activity_extra)} ]`
+                                  : status.status_name
+                                    ? `${showValue(
+                                      status.status_name
+                                    )} by ${showValue(status.changed_by_name)}`
+                                    : `${showValue(
+                                      status.activity_extra
+                                    )} by ${showValue(status.changed_by_name)}`}
+                              </p>
+                            </div>
+                          </div>
+                        ))
                       ) : (
-                        <Link
-                          to={`/orders/${id}/details/images`}
-                          title="Images"
-                          className="tooltip-link"
-                        >
-                          <ImageCollageIcon />
-                        </Link>
-                      )
-                    ) : (
-                      <button
-                        title="Images"
-                        className="tooltip-link"
-                        onClick={() => showValuerNameError("Images")}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          padding: 0,
-                          cursor: "pointer",
-                          outline: "none",
-                          boxShadow: "none",
-                        }}
-                      >
-                        <ImageCollageIcon />
-                      </button>
-                    )}
-                  </>
-                )}
-
-                {/* Complete button - only show if:
-                    1. Has permission to view complete button
-                    2. Order status is 8
-                    3. Has at least one approved report and one approved collage
-                */}
-                {(() => {
-                  // Debug each condition
-                  const hasCompletePermission = hasPermission(
-                    allowedPermissions,
-                    "view_order_complete_button"
-                  );
-                  const hasCorrectStatus = order?.current_status_id === 9;
-
-                  // Get all documents from the Redux state
-                  const allDocs =
-                    orderMediaDocumentsState?.documents?.documents ||
-                    orderMediaDocumentsState?.documents ||
-                    [];
-
-                  // Get all reports and collages first
-                  const allReports = allDocs.filter(
-                    (doc) => doc.document_type === "report"
-                  );
-                  const allCollages = allDocs.filter(
-                    (doc) => doc.document_type === "collage"
-                  );
-
-                  // Then filter for approved ones
-                  const approvedReports = allReports.filter(
-                    (doc) => doc.status === "approved"
-                  );
-                  const approvedCollages = allCollages.filter(
-                    (doc) => doc.status === "approved"
-                  );
-
-                  // Check if we have at least one of each
-                  const hasApprovedReport = approvedReports.length > 0;
-                  const hasApprovedCollage = approvedCollages.length > 0;
-
-                  return (
-                    hasCompletePermission &&
-                    hasCorrectStatus &&
-                    hasApprovedReport &&
-                    hasApprovedCollage && (
-                      <button
-                        title="Complete"
-                        className="tooltip-link button"
-                        style={{
-                          background: "none",
-                          border: "none",
-                          padding: 0,
-                          cursor: "pointer",
-                        }}
-                        onClick={() => setShowCompleteConfirmation(true)}
-                      >
-                        <ValidateIcon />
-                      </button>
-                    )
-                  );
-                })()}
-                {hasCollageAndReport &&
-                  hasPermission(
-                    allowedPermissions,
-                    "view_order_authenticate_button"
-                  ) &&
-                  isSuperAdmin &&
-                  order?.current_status_id === 10 && (
-                    <>
-                      <button
-                        title="Authenticate"
-                        className="tooltip-link button"
-                        style={{
-                          background: "none",
-                          border: "none",
-                          padding: 0,
-                          cursor: "pointer",
-                        }}
-                        onClick={() => setShowAuthenticateConfirmation(true)}
-                      >
-                        <ApprovedIcon />
-                      </button>
-                      <button
-                        title="Revisions Required"
-                        className="tooltip-link button"
-                        style={{
-                          background: "none",
-                          border: "none",
-                          padding: 0,
-                          cursor: "pointer",
-                        }}
-                        onClick={() => setShowRevisionConfirmation(true)}
-                      >
-                        <RevalidateIcon />
-                      </button>
-                    </>
-                  )}
-                {hasPermission(
-                  allowedPermissions,
-                  "view_order_payment_button"
-                ) && (
-                  <Link
-                    title="Payment"
-                    className="tooltip-link"
-                    onClick={OpenPaymentModal}
-                  >
-                    <PaymentIcon />
-                  </Link>
-                )}
-                {hasPermission(
-                  allowedPermissions,
-                  "view_order_mail_button"
-                ) && (
-                  <Link
-                    title="Mail"
-                    className="tooltip-link"
-                    onClick={OpenMailModal}
-                  >
-                    <MailIcon />
-                  </Link>
-                )}
-              </div>
-            </div>
-            {hasPermission(
-              allowedPermissions,
-              "view_order_recent_activity"
-            ) && (
-              <div className="activities-wrapper">
-                <div className="activities">
-                  {order?.status_history && order.status_history.length > 0 ? (
-                    order.status_history.map((status) => (
-                      <div className="activity" key={status.id}>
-                        <div className="activity-icon bg-primary text-white">
-                          {status.changed_by_name
-                            ?.split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </div>
-                        <div className="activity-detail">
-                          <p className="activity-time">
-                            {formatActivityTime(status.changed_at)}
-                          </p>
-                          <p className="activity-description">
-                            {status.status_name && status.activity_extra
-                              ? `${showValue(
-                                  status.status_name
-                                )} by ${showValue(
-                                  status.changed_by_name
-                                )} [ ${showValue(status.activity_extra)} ]`
-                              : status.status_name
-                              ? `${showValue(
-                                  status.status_name
-                                )} by ${showValue(status.changed_by_name)}`
-                              : `${showValue(
-                                  status.activity_extra
-                                )} by ${showValue(status.changed_by_name)}`}
-                          </p>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div>No recent activity</div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Comments section */}
-        {hasPermission(allowedPermissions, "view_order_comments") && (
-          <div className="col-xl-6 col-lg-6 col-md-12 col-sm-12 col-xs-12">
-            <div className="order-comments-wrapper">
-              <h3>Comments</h3>
-              <div className="order-comments-box">
-                <div
-                  className="order-comments-show-comments"
-                  ref={commentsBoxRef}
-                >
-                  <div className="order-comments-show-comments-inner">
-                    {comments && comments.length > 0 ? (
-                      comments.map((commentObj) => (
-                        <div
-                          className="order-comments-show-comments-card"
-                          key={commentObj.id}
-                        >
-                          <div className="order-comments-show-comments-card-icon">
-                            {commentObj.user_name
-                              ?.split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </div>
-                          <div className="order-comments-show-comments-card-content">
-                            <p className="order-comments-show-comments-card-content-text">
-                              <span className="name">
-                                {showValue(commentObj.user_name)}
-                              </span>
-                              &nbsp;added a comment&nbsp;
-                              <span>{timeAgo(commentObj.commented_at)}</span>
-                            </p>
-                            <p className="order-comments-show-comments-card-content-text-comment">
-                              {renderCommentWithTags(commentObj)}
-                            </p>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div>No comments</div>
-                    )}
-                    <div ref={commentsEndRef} />
+                        <div>No recent activity</div>
+                      )}
+                    </div>
                   </div>
                 </div>
-                {hasPermission(allowedPermissions, "add_order_comments") && (
-                  <form
-                    className="order-comments-add-comments"
-                    onSubmit={handleCommentSubmit}
-                  >
-                    <MentionsInput
-                      value={comment}
-                      onChange={handleMentionChange}
-                      className="mentions"
-                      placeholder="type your comment here..."
-                      allowSpaceInQuery
-                      style={mentionsStyle}
-                      singleLine
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          handleCommentSubmit(e);
-                        }
-                      }}
-                    >
-                      <Mention
-                        trigger="@"
-                        data={getFilteredUsers()}
-                        displayTransform={(id, display) => `@${display}`}
-                        appendSpaceOnAdd={true}
-                        markup="@[__display__](id:__id__)"
-                      />
-                    </MentionsInput>
-                    <button type="submit">
-                      <EditIcon className="icon" />
-                    </button>
-                  </form>
-                )}
               </div>
-            </div>
-          </div>
-        )}
+            );
+          }
+
+          // If no recent activity permission but has comments permission
+          // Return null here, buttons will be shown in Comments section
+          return null;
+        })()}
+
+        {/* Comments section */}
+        {(() => {
+          const hasRecentActivityPermission = hasPermission(
+            allowedPermissions,
+            "view_order_recent_activity"
+          );
+          const hasCommentsPermission = hasPermission(
+            allowedPermissions,
+            "view_order_comments"
+          );
+
+          // If user has comments permission
+          if (hasCommentsPermission) {
+            // Determine column width: full width if no recent activity permission, half width if has it
+            const columnClass = hasRecentActivityPermission
+              ? "col-xl-6 col-lg-6 col-md-12 col-sm-12 col-xs-12"
+              : "col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12";
+
+            return (
+              <div className={columnClass}>
+                <div className="order-comments-wrapper">
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: "1rem",
+                    }}
+                  >
+                    <h3>Comments</h3>
+                    {/* Show buttons next to heading if no recent activity permission */}
+                    {!hasRecentActivityPermission && (
+                      <div style={{ display: "flex", alignItems: "center" }}>
+                        {renderActionButtons()}
+                      </div>
+                    )}
+                  </div>
+                  <div className="order-comments-box">
+                    <div
+                      className="order-comments-show-comments"
+                      ref={commentsBoxRef}
+                    >
+                      <div className="order-comments-show-comments-inner">
+                        {comments && comments.length > 0 ? (
+                          comments.map((commentObj) => (
+                            <div
+                              className="order-comments-show-comments-card"
+                              key={commentObj.id}
+                            >
+                              <div className="order-comments-show-comments-card-icon">
+                                {commentObj.user_name
+                                  ?.split(" ")
+                                  .map((n) => n[0])
+                                  .join("")}
+                              </div>
+                              <div className="order-comments-show-comments-card-content">
+                                <p className="order-comments-show-comments-card-content-text">
+                                  <span className="name">
+                                    {showValue(commentObj.user_name)}
+                                  </span>
+                                  &nbsp;added a comment&nbsp;
+                                  <span>{timeAgo(commentObj.commented_at)}</span>
+                                </p>
+                                <p className="order-comments-show-comments-card-content-text-comment">
+                                  {renderCommentWithTags(commentObj)}
+                                </p>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div>No comments</div>
+                        )}
+                        <div ref={commentsEndRef} />
+                      </div>
+                    </div>
+                    {hasPermission(allowedPermissions, "add_order_comments") && (
+                      <form
+                        className="order-comments-add-comments"
+                        onSubmit={handleCommentSubmit}
+                      >
+                        <MentionsInput
+                          value={comment}
+                          onChange={handleMentionChange}
+                          className="mentions"
+                          placeholder="type your comment here..."
+                          allowSpaceInQuery
+                          style={mentionsStyle}
+                          singleLine
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              handleCommentSubmit(e);
+                            }
+                          }}
+                        >
+                          <Mention
+                            trigger="@"
+                            data={getFilteredUsers()}
+                            displayTransform={(id, display) => `@${display}`}
+                            appendSpaceOnAdd={true}
+                            markup="@[__display__](id:__id__)"
+                          />
+                        </MentionsInput>
+                        <button type="submit">
+                          <EditIcon className="icon" />
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          // If no comments permission but also no recent activity permission
+          // Show buttons in full width aligned to right
+          if (!hasRecentActivityPermission && !hasCommentsPermission) {
+            return (
+              <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12">
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    alignItems: "center",
+                    padding: "1rem 0",
+                  }}
+                >
+                  {renderActionButtons()}
+                </div>
+              </div>
+            );
+          }
+
+          return null;
+        })()}
       </div>
 
       {showPaymentModal && (
@@ -2426,9 +2495,8 @@ function OrderDetails() {
                 <ul className="nav nav-tabs" role="tablist">
                   <li className="nav-item" role="presentation">
                     <button
-                      className={`nav-link ${
-                        activeTab === "payment" ? "active" : ""
-                      }`}
+                      className={`nav-link ${activeTab === "payment" ? "active" : ""
+                        }`}
                       onClick={() => setActiveTab("payment")}
                       type="button"
                       role="tab"
@@ -2438,9 +2506,8 @@ function OrderDetails() {
                   </li>
                   <li className="nav-item" role="presentation">
                     <button
-                      className={`nav-link ${
-                        activeTab === "billing" ? "active" : ""
-                      }`}
+                      className={`nav-link ${activeTab === "billing" ? "active" : ""
+                        }`}
                       onClick={() => setActiveTab("billing")}
                       type="button"
                       role="tab"
@@ -2486,11 +2553,10 @@ function OrderDetails() {
                           <label htmlFor="paymentMode">Payment Mode</label>
                           <div className="radio-group">
                             <label
-                              className={`radio-label ${
-                                paymentFormData.paymentMode === "NEFT"
+                              className={`radio-label ${paymentFormData.paymentMode === "NEFT"
                                   ? "selected"
                                   : ""
-                              }`}
+                                }`}
                             >
                               <input
                                 type="radio"
@@ -2502,11 +2568,10 @@ function OrderDetails() {
                               NEFT
                             </label>
                             <label
-                              className={`radio-label ${
-                                paymentFormData.paymentMode === "UPI"
+                              className={`radio-label ${paymentFormData.paymentMode === "UPI"
                                   ? "selected"
                                   : ""
-                              }`}
+                                }`}
                             >
                               <input
                                 type="radio"
@@ -2523,11 +2588,10 @@ function OrderDetails() {
                           <label htmlFor="paymentStatus">Payment Status</label>
                           <div className="radio-group">
                             <label
-                              className={`radio-label ${
-                                paymentFormData.paymentStatus === "Pending"
+                              className={`radio-label ${paymentFormData.paymentStatus === "Pending"
                                   ? "selected"
                                   : ""
-                              }`}
+                                }`}
                             >
                               <input
                                 type="radio"
@@ -2541,11 +2605,10 @@ function OrderDetails() {
                               Pending
                             </label>
                             <label
-                              className={`radio-label ${
-                                paymentFormData.paymentStatus === "Received"
+                              className={`radio-label ${paymentFormData.paymentStatus === "Received"
                                   ? "selected"
                                   : ""
-                              }`}
+                                }`}
                             >
                               <input
                                 type="radio"
@@ -2752,6 +2815,27 @@ function OrderDetails() {
                   </div>
 
                   <div className="form-group">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={mailFormData.mail_attachment || false}
+                        onChange={(e) => {
+                          setMailFormData((prev) => ({
+                            ...prev,
+                            mail_attachment: e.target.checked,
+                          }));
+                        }}
+                        disabled={isSendingMail}
+                        style={{
+                          marginRight: "8px",
+                          cursor: isSendingMail ? "not-allowed" : "pointer",
+                        }}
+                      />
+                      Document as Attachment
+                    </label>
+                  </div>
+
+                  <div className="form-group">
                     <label>Selected Collage, Reports & Videos</label>
                     {renderApprovedDocuments()}
                   </div>
@@ -2807,7 +2891,7 @@ function OrderDetails() {
                         textAlign: "center",
                       }}
                     >
-                      <strong>Processing...</strong><br/> Mail sending process has
+                      <strong>Processing...</strong><br /> Mail sending process has
                       started. Please be patient, it might take some time due to
                       heavy files you are attaching.
                     </div>

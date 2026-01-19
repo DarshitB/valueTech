@@ -1302,7 +1302,7 @@ exports.updateOrderStatusDirect = async (req, res, next) => {
 /**
  * Send email with order documents and videos
  * POST /api/orders/:orderId/send-mail
- * Body: { to: [], cc: [], bcc: [], subject: string, comments: string, regards: string, document_ids: [], video_ids: [] }
+ * Body: { to: [], cc: [], bcc: [], subject: string, comments: string, regards: string, document_ids: [], video_ids: [], mail_attachment?: boolean }
  */
 exports.sendMail = async (req, res, next) => {
   try {
@@ -1316,6 +1316,7 @@ exports.sendMail = async (req, res, next) => {
       regards,
       document_ids,
       video_ids,
+      mail_attachment,
     } =
       req.body;
 
@@ -1365,12 +1366,29 @@ exports.sendMail = async (req, res, next) => {
       process.env.FRONTEND_URL ||
       `${req.protocol}://${req.get("host")}`;
 
+    // Normalize boolean-ish inputs
+    const normalizeBool = (val) => {
+      if (val === undefined || val === null) return null;
+      if (typeof val === "boolean") return val;
+      if (typeof val === "string") {
+        const v = val.trim().toLowerCase();
+        if (["true", "1", "yes", "y"].includes(v)) return true;
+        if (["false", "0", "no", "n"].includes(v)) return false;
+      }
+      throw new BadRequestError("mail_attachment must be boolean (true/false)");
+    };
+
     const video_as_attachment =
       (process.env.EMAIL_VIDEO_AS_ATTACHMENT || "false").toLowerCase() ===
       "true";
+
+    // Request-level override for document attachment behavior
+    const mailAttachmentOverride = normalizeBool(mail_attachment);
     const document_as_attachment =
-      (process.env.EMAIL_DOCUMENT_AS_ATTACHMENT || "true").toLowerCase() ===
-      "true";
+      mailAttachmentOverride !== null
+        ? mailAttachmentOverride
+        : (process.env.EMAIL_DOCUMENT_AS_ATTACHMENT || "true").toLowerCase() ===
+        "true";
 
     const titleCase = (value) =>
       (value || "")
@@ -1503,9 +1521,8 @@ exports.sendMail = async (req, res, next) => {
     }
 
     if (!emailBody) {
-      emailBody = `Please find attached files for order ${
-        order.order_number || orderId
-      }.`;
+      emailBody = `Please find attached files for order ${order.order_number || orderId
+        }.`;
     }
 
     // Append regards at the end (plain text), if provided
@@ -1523,9 +1540,8 @@ exports.sendMail = async (req, res, next) => {
               `<li><a href="${item.url}" target="_blank" rel="noopener noreferrer">${item.filename}</a></li>`
           )
           .join("");
-        htmlEmailBody += `${
-          htmlEmailBody ? "<br><br>" : ""
-        }<strong>${category}:</strong><ul>${linkHtml}</ul>`;
+        htmlEmailBody += `${htmlEmailBody ? "<br><br>" : ""
+          }<strong>${category}:</strong><ul>${linkHtml}</ul>`;
       }
     }
 
@@ -1536,23 +1552,20 @@ exports.sendMail = async (req, res, next) => {
             `<li><a href="${video.url}" target="_blank" rel="noopener noreferrer">${video.filename}</a></li>`
         )
         .join("");
-      htmlEmailBody += `${
-        htmlEmailBody ? "<br><br>" : ""
-      }<strong>Video links:</strong><ul>${videoListHtml}</ul>`;
+      htmlEmailBody += `${htmlEmailBody ? "<br><br>" : ""
+        }<strong>Video links:</strong><ul>${videoListHtml}</ul>`;
     }
 
     if (!htmlEmailBody) {
-      htmlEmailBody = `Please find attached files for order ${
-        order.order_number || orderId
-      }.`;
+      htmlEmailBody = `Please find attached files for order ${order.order_number || orderId
+        }.`;
     }
 
     // Append regards at the end (HTML), if provided
     if (regards && typeof regards === "string" && regards.trim() !== "") {
       const safeRegards = regards.trim();
-      htmlEmailBody += `${
-        htmlEmailBody ? "<br><br>" : ""
-      }<div style="margin-top:16px;"><span style="font-weight:bold;">Regards,</span><br>${safeRegards}</div>`;
+      htmlEmailBody += `${htmlEmailBody ? "<br><br>" : ""
+        }<div style="margin-top:16px;"><span style="font-weight:bold;">Regards,</span><br>${safeRegards}</div>`;
     }
 
     // Choose email credentials based on valuer_name

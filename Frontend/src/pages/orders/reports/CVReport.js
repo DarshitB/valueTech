@@ -1598,6 +1598,11 @@ function CVReport() {
           return;
         }
 
+        // Skip no_of_tyres - will be added separately with fresh computed value
+        if (key === "no_of_tyres") {
+          return;
+        }
+
         // Simple logic: if value exists, send it; if null/empty, send null
         // Note: Textarea values (with line breaks, spaces, formatting) are preserved as-is
         if (value !== null && value !== undefined && value !== "") {
@@ -1609,6 +1614,17 @@ function CVReport() {
 
       // Add invoice_no_date (combined from invoice_no and invoice_date) - always include with fresh computed value
       formData.append("invoice_no_date", combinedInvoiceData || "");
+
+      // Calculate and always add no_of_tyres (even if empty, always include in payload)
+      // Use set() instead of append() to replace any existing value (prevents array)
+      const frontTyre = parseInt(reportFormData.front_tyre_no) || 0;
+      const middleTyre = parseInt(reportFormData.middle_tyre_no) || 0;
+      const rearTyre = parseInt(reportFormData.rear_tyre_no) || 0;
+      const totalTyreCount = frontTyre + middleTyre + rearTyre;
+      const tyreWord = totalTyreCount > 0 ? numberToWords(totalTyreCount) : "";
+      const noOfTyresValue = totalTyreCount > 0 ? `${totalTyreCount} (${tyreWord})` : "";
+      // Always set no_of_tyres to payload with fresh calculated value (replaces any existing value)
+      formData.set("no_of_tyres", noOfTyresValue || "");
 
       // Add chassis impression file if selected
       if (chassisImpressionFile) {
@@ -1785,6 +1801,11 @@ function CVReport() {
         return;
       }
 
+      // Skip no_of_tyres - will be added separately with fresh computed value
+      if (key === "no_of_tyres") {
+        return;
+      }
+
       // Simple logic: if value exists, send it; if null/empty, send null
       // Note: Textarea values (with line breaks, spaces, formatting) are preserved as-is
       if (value !== null && value !== undefined && value !== "") {
@@ -1806,6 +1827,17 @@ function CVReport() {
       combinedInvoiceData = `Dated ${invoiceDate}`;
     }
     reportData.invoice_no_date = combinedInvoiceData || null;
+
+    // Calculate and always add no_of_tyres (even if empty, always include in payload)
+    // Always use fresh calculated value (replaces any existing value from saved report)
+    const frontTyre = parseInt(reportFormData.front_tyre_no) || 0;
+    const middleTyre = parseInt(reportFormData.middle_tyre_no) || 0;
+    const rearTyre = parseInt(reportFormData.rear_tyre_no) || 0;
+    const totalTyreCount = frontTyre + middleTyre + rearTyre;
+    const tyreWord = totalTyreCount > 0 ? numberToWords(totalTyreCount) : "";
+    const noOfTyresValue = totalTyreCount > 0 ? `${totalTyreCount} (${tyreWord})` : "";
+    // Always set no_of_tyres to fresh calculated value (replaces any old value)
+    reportData.no_of_tyres = noOfTyresValue || null;
 
     // Add flexible fields in the same format as report generation
     let formDataIndex = 0;
