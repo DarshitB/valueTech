@@ -516,12 +516,12 @@ exports.generateReport = async (req, res, next) => {
     // Add flexible fields back to formData for template rendering
     formData.flexible_fields = flexibleFields;
 
-    // Handle chassis impression image (for CV and CE reports)
+    // Handle chassis impression image (for CV, CE, and AVR reports)
     let chassisImageRelativePath = null;
     let chassisImageBase64 = null;
 
     if (
-      ["report_cv", "report_ce"].includes(requestedReportType.toLowerCase())
+      ["report_cv", "report_ce", "report_avr"].includes(requestedReportType.toLowerCase())
     ) {
       chassisImageRelativePath = resolveChassisRelativePath(
         formData.chassis_no_pencil_impression,
@@ -560,6 +560,7 @@ exports.generateReport = async (req, res, next) => {
         );
       }
 
+      // Store relative path for database (same for CV, CE, and AVR)
       if (chassisImageRelativePath) {
         formData.chassis_no_pencil_impression = chassisImageRelativePath;
       } else {
@@ -761,7 +762,7 @@ exports.generateReport = async (req, res, next) => {
     };
 
     if (
-      ["report_cv", "report_ce"].includes(requestedReportType.toLowerCase())
+      ["report_cv", "report_ce", "report_avr"].includes(requestedReportType.toLowerCase())
     ) {
       if (chassisImageRelativePath) {
         reportData.chassis_no_pencil_impression = chassisImageRelativePath;
@@ -2305,7 +2306,7 @@ exports.saveReportData = async (req, res, next) => {
     Object.assign(reportData, validFields);
 
     if (
-      ["report_cv", "report_ce"].includes(requestedReportType.toLowerCase())
+      ["report_cv", "report_ce", "report_avr"].includes(requestedReportType.toLowerCase())
     ) {
       if (chassisImageRelativePath) {
         reportData.chassis_no_pencil_impression = chassisImageRelativePath;
@@ -2675,7 +2676,12 @@ function filterValidReportFields(formData, reportType) {
       "date_of_disbursement",
       "date_of_invoice_delivery_no",
       "invoice_price",
+      "invoice_price_in_word",
+      "loan_amount",
+      "loan_amount_in_word",
       "lien_of_bank",
+      "hour_meter_reading",
+      "model_name",
       "chassis_no",
       "machine_serial_no",
       "engine_no",
@@ -2705,6 +2711,7 @@ function filterValidReportFields(formData, reportType) {
       "valuer_comments_remarks",
       "declaration",
       "disclaimer",
+      "chassis_no_pencil_impression",
     ],
     report_machinery: [
       "valueation_report_for_heading",

@@ -164,7 +164,7 @@ function generateAVRReportHTML(
             </tr>
             <tr>
                 <th style="width: 10%;">Date of Disbursement</th>
-                <td colspan="2">${formData.date_of_disbursement || ""}</td>
+                <td colspan="2">${formData.date_of_disbursement || "Not Available"}</td>
             </tr>
             <tr>
                 <th style="width: 10%;">Date of Invoice / Delivery No.</th>
@@ -179,8 +179,14 @@ function generateAVRReportHTML(
                 <th colspan="3">Invoice Details –</th>
             </tr>
             <tr>
-                <th style="width: 10%;">Invoice Price</th>
-                <td colspan="2">${formData.invoice_price || ""}</td>
+                <th style="width: 10%;">Invoice Price${formData.loan_amount ? " / Loan Amount" : ""}</th>
+                <td colspan="2">${
+                  formData.invoice_price && formData.loan_amount
+                    ? `${formData.invoice_price} (${formData.invoice_price_in_word}) / ${formData.loan_amount} (${formData.loan_amount_in_word})`
+                    : formData.invoice_price
+                    ? `${formData.invoice_price} (${formData.invoice_price_in_word})`
+                    : "NOT AVAILABLE"
+                }</td>
             </tr>
             <tr>
                 <th style="width: 10%;">Lien of ${
@@ -189,16 +195,19 @@ function generateAVRReportHTML(
                 <td colspan="2">${formData.lien_of_bank || ""}</td>
             </tr>
             <tr>
+                <th colspan="3">&nbsp;</th>
+            </tr>
+            <tr>
                 <th colspan="3">Asset details –</th>
             </tr>
             <tr>
                 <th style="width: 10%;">Asset # Chassis No. # Serial No. # Engine No.# Regn. No</th>
-                <td colspan="2"># MODEL NAME # CHASSIS NO. ${
+                <td colspan="2"># ${formData.model_name || "NOT AVAILABLE"} # CHASSIS NO. ${
                   formData.chassis_no || "NOT AVAILABLE"
                 } # MACHINE SERIAL NO.
                     ${
                       formData.machine_serial_no || "NOT AVAILABLE"
-                    } / ENGINE NO ${
+                    } / ENGINE NO. ${
     formData.engine_no || "NOT AVAILABLE"
   } / REG NO. ${formData.regn_no || "NOT AVAILABLE"}</td>
             </tr>
@@ -270,7 +279,11 @@ function generateAVRReportHTML(
             </tr>
             <tr>
                 <th style="width: 10%;">Material Usefulness</th>
-                <td colspan="2">${formData.material_usefulness || ""}</td>
+                <td colspan="2">${formData.material_usefulness || "NOT AVAILABLE"}</td>
+            </tr>
+            <tr>
+                <th style="width: 10%;">Hour Meter Reading</th>
+                <td colspan="2">${formData.hour_meter_reading || "NOT AVAILABLE"}</td>
             </tr>
             <tr>
                 <th style="width: 10%;">Colour</th>
@@ -326,23 +339,43 @@ function generateAVRReportHTML(
         </table>
         <table style="margin: 0%;width: 100%;">
             <tr>
-                <td colspan="2" style="border:none;">&nbsp;</td>
+                ${
+                formData.tyre_image_base64
+                      ? `
+                      <td colspan="2" rowspan="4" style="border:none; text-align:center; vertical-align:top;">
+                        <img src="${formData.tyre_image_base64}" alt="Chassis Print" style="height: 85px; max-width: 100%; object-fit: contain;">
+                      </td>
+                      `
+                      : `<td colspan="2" style="border:none;">&nbsp;</td>`
+                }
                 <th style="width: 10%;border:none;">Surveyor, Valuer & Loss Assessor</th>
             </tr>
             <tr>
-                <td colspan="2" style="border:none;">&nbsp;</td>
+                ${
+                formData.tyre_image_base64
+                      ? ``
+                      : `<td colspan="2" style="border:none;">&nbsp;</td>`
+                }
                 <th style="width: 10%;border:none;">${
                   formData.surveyor || ""
                 }</th>
             </tr>
             <tr>
-                <td colspan="2" style="border:none;">&nbsp;</td>
+              ${
+                formData.tyre_image_base64
+                      ? ``
+                      : `<td colspan="2" style="border:none;">&nbsp;</td>`
+                }
                 <th style="width: 10%;border:none;">${formData.valuer_name === "VALUETECH SOLUTIONS" ? "Licence No." : "License No."}:- ${
                   formData.license_no || ""
                 }</th>
             </tr>
             <tr>
-                <td colspan="2" style="border:none;">&nbsp;</td>
+              ${
+                formData.tyre_image_base64
+                      ? ``
+                      : `<td colspan="2" style="border:none;">&nbsp;</td>`
+                }
                 <th style="width: 10%;border:none;">${
                   formData.surveyor_location || ""
                 }</th>

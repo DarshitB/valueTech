@@ -31,16 +31,16 @@ const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "
     if (editorRef.current && !isUpdatingRef.current) {
       const currentContent = editorRef.current.innerHTML;
       const newContent = value || "";
-      
+
       // Only update if the value is different to avoid cursor jumping
       if (currentContent !== newContent) {
         const selection = window.getSelection();
         const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
         const wasFocused = document.activeElement === editorRef.current;
-        
+
         isUpdatingRef.current = true;
         editorRef.current.innerHTML = newContent;
-        
+
         // Restore cursor position if it was focused
         if (wasFocused && range) {
           try {
@@ -50,7 +50,7 @@ const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "
             // Ignore if range is invalid
           }
         }
-        
+
         setTimeout(() => {
           isUpdatingRef.current = false;
         }, 0);
@@ -74,7 +74,7 @@ const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "
     e.preventDefault();
     // Get plain text only - strip all formatting (bold, italic, etc.)
     let plainText = e.clipboardData.getData("text/plain");
-    
+
     // Remove extra spaces and normalize line breaks
     plainText = plainText
       .replace(/\r\n/g, '\n') // Normalize line breaks
@@ -83,10 +83,10 @@ const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "
       .map(line => line.trim()) // Remove leading/trailing spaces from each line
       .filter(line => line.length > 0) // Remove empty lines
       .join('\n');
-    
+
     // Convert to HTML with line breaks, but as plain text (no formatting)
     const htmlText = plainText.replace(/\n/g, '<br>');
-    
+
     // Insert as plain text with line breaks (no bold, italic, etc.)
     document.execCommand("insertHTML", false, htmlText || '');
   };
@@ -228,13 +228,18 @@ function AVRReport() {
       date_of_disbursement: "",
       date_of_invoice_delivery_no: "",
       invoice_price: "",
+      invoice_price_in_word: "",
+      loan_amount: "",
+      loan_amount_in_word: "",
       lien_of_bank: "",
+      model_name: "",
       chassis_no: "",
       machine_serial_no: "",
       engine_no: "",
       regn_no: "",
       installed_running: "",
       installed_asset_whether_functional_or_not: "",
+      hour_meter_reading: "",
       class_make_of_asset: "",
       year_of_mfg: "",
       invoice_purchase_order_no: "",
@@ -257,6 +262,9 @@ function AVRReport() {
 
     // Reset flexible fields
     setFlexibleFields([]);
+
+    // Reset chassis print file
+    setChasisPrintFile(null);
 
     // Clear the cleared fields tracking when form resets
     clearedFieldsRef.current.clear();
@@ -471,13 +479,18 @@ function AVRReport() {
     date_of_disbursement: "",
     date_of_invoice_delivery_no: "",
     invoice_price: "",
+    invoice_price_in_word: "",
+    loan_amount: "",
+    loan_amount_in_word: "",
     lien_of_bank: "",
+    model_name: "",
     chassis_no: "",
     machine_serial_no: "",
     engine_no: "",
     regn_no: "",
     installed_running: "",
     installed_asset_whether_functional_or_not: "",
+    hour_meter_reading: "",
     class_make_of_asset: "",
     year_of_mfg: "",
     invoice_purchase_order_no: "",
@@ -500,6 +513,10 @@ function AVRReport() {
 
   // State for flexible fields
   const [flexibleFields, setFlexibleFields] = useState([]);
+
+  // File state for chassis print
+  const [chasisPrintFile, setChasisPrintFile] = useState(null);
+  const [chasisPrintPreviewUrl, setChasisPrintPreviewUrl] = useState("");
 
   // Track fields that were explicitly cleared by the user (date and currency fields)
   const clearedFieldsRef = useRef(new Set());
@@ -618,13 +635,29 @@ function AVRReport() {
         updated.ref_no_month = `SFW-${months[currentMonth]}-`;
       }
 
+      // Auto-generate invoice_price_in_word if invoice_price exists but invoice_price_in_word doesn't
+      if (updated.invoice_price && (!updated.invoice_price_in_word || updated.invoice_price_in_word.trim() === "")) {
+        const amount = parseCurrency(updated.invoice_price);
+        if (amount > 0) {
+          updated.invoice_price_in_word = convertNumberToWordsIndian(amount);
+        }
+      }
+
+      // Auto-generate loan_amount_in_word if loan_amount exists but loan_amount_in_word doesn't
+      if (updated.loan_amount && (!updated.loan_amount_in_word || updated.loan_amount_in_word.trim() === "")) {
+        const amount = parseCurrency(updated.loan_amount);
+        if (amount > 0) {
+          updated.loan_amount_in_word = convertNumberToWordsIndian(amount);
+        }
+      }
+
       return updated;
     });
 
     if (Array.isArray(report.flexible_fields)) {
       setFlexibleFields(report.flexible_fields);
     }
-  }, [currentReport, id]);
+  }, [currentReport, id, parseCurrency, convertNumberToWordsIndian]);
 
   // Handle form input changes
   const handleFormChange = (e) => {
@@ -645,10 +678,39 @@ function AVRReport() {
         [name]: value,
       };
 
-      // Handle currency formatting for currency fields
-      /* if (name === "invoice_price") {
-        updated[name] = handleCurrencyFormatting(value);
-      } */
+      // Handle currency formatting and auto-convert to words for invoice_price
+      if (name === "invoice_price") {
+        // Format as currency (Indian number format)
+        const formattedValue = handleCurrencyFormatting(value);
+        updated[name] = formattedValue;
+
+        // Auto-convert to words
+        if (!formattedValue || formattedValue.trim() === "") {
+          updated.invoice_price_in_word = "";
+        } else {
+          const amount = parseCurrency(formattedValue);
+          updated.invoice_price_in_word = amount > 0
+            ? convertNumberToWordsIndian(amount)
+            : "";
+        }
+      }
+
+      // Handle currency formatting and auto-convert to words for loan_amount
+      if (name === "loan_amount") {
+        // Format as currency (Indian number format)
+        const formattedValue = handleCurrencyFormatting(value);
+        updated[name] = formattedValue;
+
+        // Auto-convert to words
+        if (!formattedValue || formattedValue.trim() === "") {
+          updated.loan_amount_in_word = "";
+        } else {
+          const amount = parseCurrency(formattedValue);
+          updated.loan_amount_in_word = amount > 0
+            ? convertNumberToWordsIndian(amount)
+            : "";
+        }
+      }
 
       return updated;
     });
@@ -680,10 +742,81 @@ function AVRReport() {
     });
   };
 
+  // Handle file change for chassis print
+  const handleFileChange = useCallback((e) => {
+    const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+    setChasisPrintFile(file);
+  }, []);
+
+  // Resolve chassis print image URL
+  const resolveChassisImageUrl = useCallback((value) => {
+    if (!value || typeof value !== "string") return "";
+
+    const baseUrl =
+      process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
+
+    // Attempt to parse JSON structure first
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === "object" && parsed.path) {
+        const cleanPath = parsed.path.startsWith("/")
+          ? parsed.path
+          : `/${parsed.path}`;
+        return `${baseUrl}${cleanPath}`;
+      }
+    } catch (err) {
+      // Ignore JSON parse errors, fall back to raw string
+    }
+
+    // Allow absolute URLs or data URIs as is
+    if (
+      value.startsWith("http://") ||
+      value.startsWith("https://") ||
+      value.startsWith("data:")
+    ) {
+      return value;
+    }
+
+    const cleanPath = value.startsWith("/") ? value : `/${value}`;
+    return `${baseUrl}${cleanPath}`;
+  }, []);
+
+  // Handle preview URL for chassis print
+  useEffect(() => {
+    let objectUrl = "";
+
+    if (chasisPrintFile instanceof File) {
+      objectUrl = URL.createObjectURL(chasisPrintFile);
+      setChasisPrintPreviewUrl(objectUrl);
+    } else {
+      const existingValue = reportFormData?.chassis_no_pencil_impression;
+      if (
+        existingValue &&
+        existingValue !== null &&
+        existingValue !== undefined
+      ) {
+        const resolved = resolveChassisImageUrl(existingValue);
+        setChasisPrintPreviewUrl(resolved);
+      } else {
+        setChasisPrintPreviewUrl("");
+      }
+    }
+
+    return () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [
+    chasisPrintFile,
+    reportFormData?.chassis_no_pencil_impression,
+    resolveChassisImageUrl,
+  ]);
+
   // Handle date input formatting (DD-MM-YYYY)
   const handleDateChange = (e) => {
     const { name, value } = e.target;
-    
+
     // Allow empty strings to clear the field
     if (!value || value.trim() === "") {
       // Track that this field was explicitly cleared
@@ -694,10 +827,10 @@ function AVRReport() {
       }));
       return;
     }
-    
+
     // If field gets a value, remove it from cleared fields tracking
     clearedFieldsRef.current.delete(name);
-    
+
     let numericValue = value.replace(/\D/g, ""); // Remove non-numeric characters
     if (numericValue.length > 8) numericValue = numericValue.substring(0, 8); // Limit to 8 digits (DDMMYYYY)
 
@@ -831,6 +964,11 @@ function AVRReport() {
       console.log(`${key}: ${value}`);
     } */
 
+    // Add chassis print file if selected
+    if (chasisPrintFile) {
+      formData.append("chassis_no_pencil_impression", chasisPrintFile);
+    }
+
     // Add flexible fields to FormData with proper sequential ordering
     let formDataIndex = 0;
     flexibleFields.forEach((field) => {
@@ -908,6 +1046,11 @@ function AVRReport() {
         reportData[key] = null; // Send null for empty values
       }
     });
+
+    // Add chassis print file if available (as base64 or file path)
+    if (chasisPrintFile) {
+      reportData["chassis_no_pencil_impression"] = chasisPrintFile;
+    }
 
     // Add flexible fields in the same format as report generation
     let formDataIndex = 0;
@@ -1134,7 +1277,7 @@ function AVRReport() {
                       name="report_date"
                       value={reportFormData.report_date}
                       onChange={handleDateChange}
-                      readOnly
+                      placeholder="DD-MM-YYYY"
                       required
                     />
                   </div>
@@ -1363,8 +1506,7 @@ function AVRReport() {
                 <div className="col-md-12">
                   <div className="form-group">
                     <label>
-                      Date of Disbursement{" "}
-                      <span className="text-danger">*</span>
+                      Date of Disbursement
                     </label>
                     <input
                       type="text"
@@ -1373,7 +1515,6 @@ function AVRReport() {
                       value={reportFormData.date_of_disbursement}
                       onChange={handleDateChange}
                       placeholder="DD-MM-YYYY"
-                      required
                     />
                   </div>
                 </div>
@@ -1400,7 +1541,7 @@ function AVRReport() {
                   <h5>Inspection Report</h5>
                   <hr />
                 </div>
-                <div className="col-md-12">
+                <div className="col-md-6">
                   <div className="form-group">
                     <label>
                       Invoice Price <span className="text-danger">*</span>
@@ -1413,6 +1554,51 @@ function AVRReport() {
                       onChange={handleFormChange}
                       rows={2}
                       required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Invoice Price In Words
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="invoice_price_in_word"
+                      value={reportFormData.invoice_price_in_word}
+                      onChange={handleFormChange}
+                      readOnly
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Loan amount
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="loan_amount"
+                      value={reportFormData.loan_amount}
+                      onChange={handleFormChange}
+                      rows={2}
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>
+                      Loan Amount In Words
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="loan_amount_in_word"
+                      value={reportFormData.loan_amount_in_word}
+                      onChange={handleFormChange}
+                      readOnly
                     />
                   </div>
                 </div>
@@ -1449,6 +1635,17 @@ function AVRReport() {
                     </label>
                     <div className="ref-no-input">
                       <div>
+                        <label>Model Name</label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          name="model_name"
+                          value={reportFormData.model_name}
+                          onChange={handleFormChange}
+                          style={{ textAlign: "left" }}
+                        />
+                      </div>
+                      <div>
                         <label>Chassis No.</label>
                         <input
                           type="text"
@@ -1458,7 +1655,6 @@ function AVRReport() {
                           onChange={handleFormChange}
                           placeholder="Enter Chassis No."
                           style={{ textAlign: "left" }}
-                          required
                         />
                       </div>
                       <div>
@@ -1471,7 +1667,6 @@ function AVRReport() {
                           onChange={handleFormChange}
                           placeholder="Enter Machine Serial No."
                           style={{ textAlign: "left" }}
-                          required
                         />
                       </div>
                       <div>
@@ -1484,7 +1679,6 @@ function AVRReport() {
                           onChange={handleFormChange}
                           placeholder="Enter Engine No."
                           style={{ textAlign: "left" }}
-                          required
                         />
                       </div>
                       <div>
@@ -1497,7 +1691,6 @@ function AVRReport() {
                           onChange={handleFormChange}
                           placeholder="Enter Regn. No."
                           style={{ textAlign: "left" }}
-                          required
                         />
                       </div>
                     </div>
@@ -1671,6 +1864,20 @@ function AVRReport() {
                         handleSelectChange("material_usefulness", value)
                       }
                       required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-12">
+                  <div className="form-group">
+                    <label>
+                      Hour Meter Reading
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="hour_meter_reading"
+                      value={reportFormData.hour_meter_reading}
+                      onChange={handleFormChange}
                     />
                   </div>
                 </div>
@@ -1871,6 +2078,46 @@ function AVRReport() {
                       required
                       readOnly
                     />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group">
+                    <label htmlFor="chassis_no_pencil_impression">
+                      Chassis Print (Image)
+                    </label>
+                    <input
+                      type="file"
+                      className="form-field"
+                      id="chassis_no_pencil_impression"
+                      name="chassis_no_pencil_impression"
+                      onChange={handleFileChange}
+                      accept="image/*"
+                    />
+                    {chasisPrintPreviewUrl && (
+                      <div
+                        style={{
+                          marginTop: "12px",
+                          maxWidth: "320px",
+                          border: "1px solid #e5e7eb",
+                          borderRadius: "6px",
+                          padding: "8px",
+                          backgroundColor: "#f9fafb",
+                        }}
+                      >
+                        <img
+                          src={chasisPrintPreviewUrl}
+                          alt="Chassis print preview"
+                          style={{
+                            width: "100%",
+                            height: "auto",
+                            display: "block",
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
