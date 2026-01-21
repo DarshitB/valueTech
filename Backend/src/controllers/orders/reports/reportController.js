@@ -845,6 +845,20 @@ exports.generateReport = async (req, res, next) => {
     // Set document ID for activity logger
     res.locals.documentId = documentId;
 
+    // Create status history entry for report generation
+    try {
+      const statusHistoryData = {
+        order_id: order.id,
+        changed_by: userId,
+        changed_at: new Date(),
+        activity_extra: `Report generated successfully (${requestedReportType})`,
+      };
+      await OrderStatusHistory.createStatusHistory(statusHistoryData);
+    } catch (statusHistoryError) {
+      console.error("Error creating status history:", statusHistoryError);
+      // Don't throw error - this is a non-critical operation
+    }
+
     // Check if both report and collage exist, update status to 9 if true
     await checkAndUpdateOrderStatus(order.id, userId);
 

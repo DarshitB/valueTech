@@ -4267,13 +4267,15 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName, getNextMa
     const tableRows = [];
     
     sectionFields.forEach((field) => {
-      const certName = renderFieldValue(field.field_1 || "");
-      const issued = renderFieldValue(field.field_2 || "");
-      const lastAnnual = renderFieldValue(field.field_3 || "");
-      const lastIntermediate = renderFieldValue(field.field_4 || "");
-      const expires = renderFieldValue(field.field_5 || "");
+      // Use "-" for null or empty values
+      const certName = renderFieldValue(field.field_1 || "") || "-";
+      const issued = renderFieldValue(field.field_2 || "") || "-";
+      const lastAnnual = renderFieldValue(field.field_3 || "") || "-";
+      const lastIntermediate = renderFieldValue(field.field_4 || "") || "-";
+      const expires = renderFieldValue(field.field_5 || "") || "-";
 
-      if (certName || issued || lastAnnual || lastIntermediate || expires) {
+      // Always add the row if at least one field has a value (not just "-")
+      if (field.field_1 || field.field_2 || field.field_3 || field.field_4 || field.field_5) {
         hasData = true;
         tableRows.push(`<tr>
             <td class="text-uppercase">${certName}</td>
