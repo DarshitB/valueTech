@@ -321,9 +321,8 @@ function saveChassisImage(
   ).toLowerCase();
 
   const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-  const fileName = `chassis_${uniqueSuffix}${
-    extension.startsWith(".") ? extension : `.${extension}`
-  }`;
+  const fileName = `chassis_${uniqueSuffix}${extension.startsWith(".") ? extension : `.${extension}`
+    }`;
 
   const chassisDir = path.join(
     process.cwd(),
@@ -1129,14 +1128,10 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
       preferCSSPageSize: true,
     };
 
-    // CV, CE, and Machinery Report specific handling: Single-page detection and footer management
-    if (
-      reportType.toLowerCase() === "report_cv" ||
-      reportType.toLowerCase() === "report_ce" ||
-      reportType.toLowerCase() === "report_machinery"
-    ) {
-      // console.log("🔵 Starting table split for:", reportType);
 
+    // SEPARATE HANDLING FOR AVR REPORTS (Signature Section Grouping)
+
+    if (reportType.toLowerCase() === "report_avr") {
       try {
         const splitResult = await page.evaluate((reportType) => {
           // Helper function to set page number on a table
@@ -1144,29 +1139,17 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
             if (!table) return;
             const footerRow = table.querySelector("tfoot .footer-row");
             if (footerRow) {
-              const pageNumberSpan =
-                footerRow.querySelector(".page-number-value");
+              const pageNumberSpan = footerRow.querySelector(".page-number-value");
               if (pageNumberSpan) {
                 pageNumberSpan.textContent = `Page ${pageNum}`;
-                pageNumberSpan.setAttribute(
-                  "data-page-number",
-                  pageNum.toString()
-                );
+                pageNumberSpan.setAttribute("data-page-number", pageNum.toString());
               }
             }
           };
 
-          // Check if report type needs footer with page numbers
-          const needsFooter = [
-            "report_ce",
-            "report_cv",
-            "report_machinery",
-          ].includes(reportType?.toLowerCase());
+          const needsFooter = true; // AVR always needs footer
 
-          // ============================================
-          // 🔥 STEP 1: Measure ACTUAL page dimensions
-          // ============================================
-
+          // Measure ACTUAL page dimensions
           const body = document.body;
           const wrapper = document.querySelector(".content-wrapper");
           const origTable = document.querySelector("table");
@@ -1177,286 +1160,126 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
           const tbody = origTable.querySelector("tbody");
           const tfoot = origTable.querySelector("tfoot");
 
-          if (!thead || !tbody)
-            return { success: false, error: "thead/tbody not found" };
+          if (!thead || !tbody) return { success: false, error: "thead/tbody not found" };
 
-          // Measure everything
           const wrapperStyle = wrapper ? getComputedStyle(wrapper) : null;
-          const wrapperPaddingTop = wrapperStyle
-            ? parseInt(wrapperStyle.paddingTop)
-            : 30;
-          const wrapperPaddingBottom = wrapperStyle
-            ? parseInt(wrapperStyle.paddingBottom)
-            : 0;
+          const wrapperPaddingTop = wrapperStyle ? parseInt(wrapperStyle.paddingTop) : 30;
+          const wrapperPaddingBottom = wrapperStyle ? parseInt(wrapperStyle.paddingBottom) : 0;
 
-          // ============================================
-          // 🔥 STEP 2: Calculate REAL available space
-          // ============================================
-
-          // Page height in pixels (Legal size = 14 inches at 96 DPI)
+          // Calculate REAL available space
           const PAGE_HEIGHT_PX = 14 * 96; // 1344px
 
-          // Get actual spacer height
           const spacerRow = thead.querySelector(".spacer-row");
           const actualSpacerHeight = spacerRow ? spacerRow.offsetHeight : 225;
 
-          // Get tfoot height (includes footer row + spacer row)
           const tfootHeight = tfoot ? tfoot.offsetHeight : 0;
-          const tfootSpacerRow = tfoot
-            ? tfoot.querySelector(".spacer-row")
-            : null;
-          const tfootFooterRow = tfoot
-            ? tfoot.querySelector(".footer-row")
-            : null;
-          
-          // Calculate actual bottom space
-          // Only count footer row (30px) - spacer is for visual spacing only, not needed in JS calculation
-          const tfootSpacerHeight = tfootSpacerRow ? tfootSpacerRow.offsetHeight : 80;
+          const tfootSpacerRow = tfoot ? tfoot.querySelector(".spacer-row") : null;
+          const tfootFooterRow = tfoot ? tfoot.querySelector(".footer-row") : null;
+
           const tfootFooterHeight = tfootFooterRow ? tfootFooterRow.offsetHeight : 30;
-          const actualBottomSpace = tfootFooterHeight; // Only footer row, spacer is visual only
-          
-          // console.log("   Tfoot total height:", tfootHeight, "px");
-          // console.log("   Tfoot spacer row (visual only):", tfootSpacerHeight, "px");
-          // console.log("   Tfoot footer row:", tfootFooterHeight, "px");
-          // console.log("   Bottom space (footer only):", actualBottomSpace, "px");
+          const actualBottomSpace = tfootFooterHeight;
 
-          // Calculate REAL available space per page
-          // Add safety margin to prevent text overflow and ensure rows don't break mid-way
-          const SAFETY_MARGIN = 30; // 30px safety buffer (reduced from 50px since footer row is now counted)
-          const realAvailable =
-            PAGE_HEIGHT_PX -
-            actualSpacerHeight -
-            wrapperPaddingTop -
-            wrapperPaddingBottom -
-            actualBottomSpace -
-            SAFETY_MARGIN;
+          const SAFETY_MARGIN = 30;
+          const realAvailable = PAGE_HEIGHT_PX - actualSpacerHeight - wrapperPaddingTop -
+            wrapperPaddingBottom - actualBottomSpace - SAFETY_MARGIN;
 
-          // console.log("📏 CALCULATED SPACE:");
-          // console.log("   Page height:", PAGE_HEIGHT_PX, "px");
-          // console.log("   Minus top spacer:", actualSpacerHeight, "px");
-          // console.log("   Minus top padding:", wrapperPaddingTop, "px");
-          // console.log("   Minus bottom padding:", wrapperPaddingBottom, "px");
-          // console.log("   Minus bottom space (footer only):", actualBottomSpace, "px");
-          // console.log("   Minus safety margin:", SAFETY_MARGIN, "px");
-          // console.log("   = Available per page:", realAvailable, "px");
-
-          // ============================================
-          // STEP 3: Calculate thead heights
-          // ============================================
-
+          // Calculate thead heights
           const theadRows = Array.from(thead.querySelectorAll("tr"));
           let baseTheadHeight = 0;
-          let generalDetailsRows = [];
 
           theadRows.forEach((row) => {
-            if (row.classList.contains("spacer-row")) {
-              return; // Don't count spacer
-            }
-
-            const fullText = row.textContent.toUpperCase().trim();
-
-            if (
-              row.classList.contains("general-details-row") ||
-              row.hasAttribute("data-first-page-only") ||
-              fullText.includes("GENERAL DETAILS")
-            ) {
-              generalDetailsRows.push(row);
-            } else {
+            if (!row.classList.contains("spacer-row")) {
               baseTheadHeight += row.offsetHeight;
             }
           });
 
-          // console.log(
-          //   "📏 Base thead height (without General Details):",
-          //   baseTheadHeight,
-          //   "px"
-          // );
-
-          // ============================================
-          // STEP 4: Find Proposed Owner rows
-          // ============================================
-
           const tbodyRows = Array.from(tbody.querySelectorAll("tr"));
-
-          let proposedOwnerNameRow = null;
-          let proposedOwnerAddressRow = null;
-          let proposedOwnerNameIndex = -1;
-          let proposedOwnerAddressIndex = -1;
-
-          for (let i = 0; i < tbodyRows.length; i++) {
-            const row = tbodyRows[i];
-            const cells = Array.from(row.querySelectorAll("td, th"));
-            const firstText = cells[0]
-              ? cells[0].textContent.toUpperCase().trim()
-              : "";
-
-            if (firstText.includes("PROPOSED OWNER NAME")) {
-              proposedOwnerNameRow = row;
-              proposedOwnerNameIndex = i;
-            } else if (
-              proposedOwnerNameRow &&
-              (row.hasAttribute("data-proposed-owner-address") ||
-                firstText === "ADDRESS:")
-            ) {
-              proposedOwnerAddressRow = row;
-              proposedOwnerAddressIndex = i;
-              break;
-            }
-          }
-
-          let proposedOwnerRowsHeight = 0;
-          if (proposedOwnerNameRow) {
-            proposedOwnerRowsHeight += proposedOwnerNameRow.offsetHeight;
-          }
-          if (proposedOwnerAddressRow) {
-            proposedOwnerRowsHeight += proposedOwnerAddressRow.offsetHeight;
-          }
-
-          // console.log(
-          //   "📏 Proposed Owner rows height:",
-          //   proposedOwnerRowsHeight,
-          //   "px"
-          // );
-
-          // ============================================
-          // STEP 5: Multi-page split calculation
-          // ============================================
-
-          // First page: has General Details, no Proposed Owner in thead
           const firstPageTheadHeight = baseTheadHeight;
           const firstPageAvailable = realAvailable - firstPageTheadHeight;
 
-          // Subsequent pages: no General Details, has Proposed Owner in thead
-          const subsequentTheadHeight =
-            baseTheadHeight + proposedOwnerRowsHeight;
+          // AVR: subsequent pages have same thead (no special rows to move)
+          const subsequentTheadHeight = baseTheadHeight;
           const subsequentAvailable = realAvailable - subsequentTheadHeight;
 
-          // console.log("📏 FIRST PAGE:");
-          // console.log("   Thead height:", firstPageTheadHeight, "px");
-          // console.log("   Available for tbody:", firstPageAvailable, "px");
-          // console.log("📏 SUBSEQUENT PAGES:");
-          // console.log("   Thead height:", subsequentTheadHeight, "px");
-          // console.log("   Available for tbody:", subsequentAvailable, "px");
+          // ============================================
+          // CRITICAL FIX: Better single-page detection
+          // ============================================
+
+          // First, calculate total tbody height
+          let totalTbodyHeight = 0;
+          tbodyRows.forEach((row) => {
+            totalTbodyHeight += row.offsetHeight;
+          });
+
+          // Check if ALL content fits on first page
+          const fitsOnFirstPage = totalTbodyHeight <= firstPageAvailable;
+
+          // ✅ FIXED: If content fits on first page, mark as single-page immediately
+          if (fitsOnFirstPage) {
+            /* console.log("✅ AVR: Content fits on first page!");
+            console.log(`   Total tbody: ${totalTbodyHeight}px, Available: ${firstPageAvailable}px`); */
+
+            document.body.classList.add("single-page");
+            origTable.classList.add("last-page");
+
+            // Hide heading separator row on single-page reports
+            const separatorRow = thead.querySelector(".heading-separator-row");
+            if (separatorRow) {
+              separatorRow.style.display = "none";
+            }
+
+            // Set page number to Page 1
+            setPageNumber(origTable, 1);
+
+            return {
+              success: true,
+              singlePage: true,
+              message: "Content fits on one page",
+              measurements: {
+                totalTbodyHeight,
+                firstPageAvailable,
+                fitsOnFirstPage: true
+              }
+            };
+          }
 
           // ============================================
-          // STEP 6: Calculate split points for all pages
+          // Multi-page split logic (only if doesn't fit)
           // ============================================
 
           const splitPoints = [];
           let currentRowIndex = 0;
           let pageNumber = 1;
 
-          // console.log("📋 Calculating split points:");
-
           while (currentRowIndex < tbodyRows.length) {
-            const availableSpace =
-              pageNumber === 1 ? firstPageAvailable : subsequentAvailable;
+            const availableSpace = pageNumber === 1 ? firstPageAvailable : subsequentAvailable;
             let accHeight = 0;
             let rowsInThisPage = 0;
-
-            // console.log(
-            //   `\n📄 Page ${pageNumber} (starting from row ${currentRowIndex}):`
-            // );
-            // console.log(`   Available space: ${availableSpace}px`);
-
-            // Calculate how many rows fit in this page
             let actualRowsProcessed = 0;
-            for (
-              let i = currentRowIndex;
-              i < tbodyRows.length;
-              i++
-            ) {
-              // Skip Proposed Owner rows if they're in tbody (they'll be in thead for page 2+)
-              if (
-                pageNumber > 1 &&
-                (i === proposedOwnerNameIndex || i === proposedOwnerAddressIndex)
-              ) {
-                actualRowsProcessed++;
-                continue;
-              }
 
+            for (let i = currentRowIndex; i < tbodyRows.length; i++) {
               const rowHeight = tbodyRows[i].offsetHeight;
-              const newHeight = accHeight + rowHeight;
-              
-              // Add extra buffer for rows with long text that might wrap
+
+              // Normal row processing
               const hasLongText = Array.from(tbodyRows[i].querySelectorAll('td')).some(td => {
-                return td.textContent.length > 100; // If any cell has > 100 chars
+                return td.textContent.length > 100;
               });
-              const rowBuffer = hasLongText ? 10 : 0; // Extra 10px buffer for long text rows
+              const rowBuffer = hasLongText ? 10 : 0;
+              const newHeight = accHeight + rowHeight;
 
               if (newHeight + rowBuffer <= availableSpace) {
                 accHeight = newHeight;
                 rowsInThisPage++;
                 actualRowsProcessed++;
               } else {
-                // Row doesn't fit - split here
-                // console.log(
-                //   `   ✂️ SPLIT at row ${i} (row height: ${rowHeight}px${hasLongText ? ' + 10px buffer (long text)' : ''}, would need: ${newHeight + rowBuffer}px)`
-                // );
                 break;
               }
             }
 
             if (rowsInThisPage === 0 && currentRowIndex < tbodyRows.length) {
-              // Edge case: Even one row doesn't fit - force include it
-              // console.log(
-              //   `   ⚠️ Warning: Row ${currentRowIndex} doesn't fit but forcing it`
-              // );
               rowsInThisPage = 1;
               actualRowsProcessed = 1;
               accHeight = tbodyRows[currentRowIndex].offsetHeight;
-            }
-            
-            // Check if this would create an empty or near-empty next page
-            const remainingRows = tbodyRows.length - (currentRowIndex + actualRowsProcessed);
-            const MIN_ROWS_FOR_NEW_PAGE = 5; // Minimum 5 rows to justify a new page (increased from 2)
-            
-            if (remainingRows > 0 && remainingRows <= MIN_ROWS_FOR_NEW_PAGE) {
-              // Too few rows left - try to fit them on current page
-              // console.log(
-              //   `   ⚠️ Only ${remainingRows} rows left - trying to fit on current page to avoid near-empty page`
-              // );
-              
-              // Try to fit remaining rows
-              let canFitRemaining = true;
-              let testHeight = accHeight;
-              let testRowsToAdd = 0;
-              
-              let skippedRows = 0;
-              for (let i = currentRowIndex + actualRowsProcessed; i < tbodyRows.length; i++) {
-                // Skip Proposed Owner rows if they're in tbody (they'll be in thead for page 2+)
-                if (
-                  pageNumber > 1 &&
-                  (i === proposedOwnerNameIndex || i === proposedOwnerAddressIndex)
-                ) {
-                  skippedRows++;
-                  continue;
-                }
-                
-                const rowHeight = tbodyRows[i].offsetHeight;
-                const newTestHeight = testHeight + rowHeight;
-                
-                // Use a very conservative threshold (allow up to 101% of available space)
-                // Reduced from 103% to prevent text overflow issues
-                const aggressiveThreshold = availableSpace * 1.01;
-                
-                if (newTestHeight <= aggressiveThreshold) {
-                  testHeight = newTestHeight;
-                  testRowsToAdd++;
-                } else {
-                  canFitRemaining = false;
-                  break;
-                }
-              }
-              
-              if (canFitRemaining && testRowsToAdd > 0) {
-                // Fit all remaining rows on this page
-                const totalRowsToAdd = testRowsToAdd + skippedRows;
-                // console.log(`   ✅ Fitting all ${testRowsToAdd} remaining content rows (${totalRowsToAdd} total with skipped) on current page (using ${testHeight}px vs ${availableSpace}px available)`);
-                rowsInThisPage += testRowsToAdd;
-                actualRowsProcessed += totalRowsToAdd;
-                accHeight = testHeight;
-              }
             }
 
             splitPoints.push({
@@ -1465,67 +1288,41 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
               rowCount: actualRowsProcessed,
               spaceUsed: accHeight,
               spaceAvailable: availableSpace,
-              unusedSpace: availableSpace - accHeight,
             });
-
-            // console.log(
-            //   `   ✅ Page ${pageNumber}: rows ${currentRowIndex} to ${
-            //     currentRowIndex + actualRowsProcessed - 1
-            //   } (${rowsInThisPage} content rows, ${actualRowsProcessed} total processed, ${accHeight}px used, ${
-            //     availableSpace - accHeight
-            //   }px unused)`
-            // );
 
             currentRowIndex += actualRowsProcessed;
             pageNumber++;
 
-            // Safety check to prevent infinite loop
-            if (pageNumber > 100) {
-              // console.error("❌ Too many pages, breaking loop");
-              break;
-            }
+            if (pageNumber > 100) break;
           }
 
-          // ============================================
-          // STEP 7: Check if single page
-          // ============================================
-
-          // console.log(`\n📊 Total split points: ${splitPoints.length}`);
-          // console.log(`   Split points:`, splitPoints.map(sp => `Page ${sp.pageNumber}: ${sp.rowCount} rows`).join(', '));
-
+          // Double-check: If only one split point, mark as single page
           if (splitPoints.length === 1) {
-            // Check if all rows are processed
             const totalRowsProcessed = splitPoints[0].rowCount;
             const totalRows = tbodyRows.length;
-            const spaceUsed = splitPoints[0].spaceUsed;
-            const spaceAvailable = splitPoints[0].spaceAvailable;
-            
-            // console.log(`   Total rows: ${totalRows}, Processed: ${totalRowsProcessed}`);
-            // console.log(`   Space used: ${spaceUsed}px / ${spaceAvailable}px (${((spaceUsed/spaceAvailable)*100).toFixed(1)}%)`);
-            
-            // Only mark as single-page if ALL rows fit AND space usage is reasonable (< 95%)
-            const allRowsProcessed = totalRowsProcessed >= totalRows - 2; // Allow margin for Proposed Owner rows
-            const spaceUsageReasonable = (spaceUsed / spaceAvailable) < 0.95; // Less than 95% usage
-            
-            if (allRowsProcessed && spaceUsageReasonable) {
-              // console.log("✅ All content fits comfortably on first page! No split needed.");
+
+            if (totalRowsProcessed >= totalRows) {
+              /* console.log("✅ AVR: All rows processed in one split - single page!"); */
               document.body.classList.add("single-page");
               origTable.classList.add("last-page");
+
+              const separatorRow = thead.querySelector(".heading-separator-row");
+              if (separatorRow) {
+                separatorRow.style.display = "none";
+              }
+
+              setPageNumber(origTable, 1);
+
               return {
-                success: false,
-                error: "All content fits on one page",
+                success: true,
                 singlePage: true,
+                message: "All rows in one split point",
+                splitPoints: splitPoints
               };
-            } else if (allRowsProcessed && !spaceUsageReasonable) {
-              // console.log("⚠️ All rows processed but space usage is tight (>95%). Forcing split to avoid overflow.");
-              // Don't return - continue with split logic
             }
           }
 
-          // ============================================
-          // STEP 8: Build multiple tables
-          // ============================================
-
+          // Build multiple tables
           const tables = [];
           const finalWrapper = origTable.parentElement;
 
@@ -1535,199 +1332,596 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
             const isLastPage = p === splitPoints.length - 1;
 
             const table = document.createElement("table");
-            table.style.cssText =
-              "width:100%; border-collapse:collapse; margin-top:-30px; margin-bottom:0;";
+            table.style.cssText = "width:100%; border-collapse:collapse; margin-top:-30px; margin-bottom:0;";
+            if (!isLastPage) table.style.pageBreakAfter = "always";
 
-            if (!isLastPage) {
-              table.style.pageBreakAfter = "always";
-            }
-
-            // Build thead
             const newThead = document.createElement("thead");
-
-            // Add spacer row
             theadRows.forEach((row) => {
-              if (row.classList.contains("spacer-row")) {
-                newThead.appendChild(row.cloneNode(true));
-              }
-            });
-
-            // Add regular thead rows
-            theadRows.forEach((row) => {
-              if (row.classList.contains("spacer-row")) {
-                return;
-              }
-
-              const fullText = row.textContent.toUpperCase().trim();
-              const isGeneralDetails =
-                row.classList.contains("general-details-row") ||
-                row.hasAttribute("data-first-page-only") ||
-                fullText.includes("GENERAL DETAILS");
-
-              // General Details only on first page
-              if (isGeneralDetails && !isFirstPage) {
-                return;
-              }
-
               newThead.appendChild(row.cloneNode(true));
             });
 
-            // Add Proposed Owner rows to thead for subsequent pages
-            if (!isFirstPage) {
-              if (proposedOwnerNameRow) {
-                newThead.appendChild(proposedOwnerNameRow.cloneNode(true));
+            // Hide heading separator row on first page only
+            if (isFirstPage) {
+              const separatorRow = newThead.querySelector(".heading-separator-row");
+              if (separatorRow) {
+                separatorRow.style.display = "none";
               }
-              if (proposedOwnerAddressRow) {
-                newThead.appendChild(proposedOwnerAddressRow.cloneNode(true));
-              }
-              
-              // Add empty spacing row after Proposed Owner on subsequent pages
-              const spacingRow = document.createElement("tr");
-              spacingRow.style.height = "20px"; // Adjust height as needed
-              const spacingCell = document.createElement("td");
-              spacingCell.setAttribute("colspan", "6");
-              spacingCell.style.cssText = "border: none; height: 20px; padding: 0;";
-              spacingRow.appendChild(spacingCell);
-              newThead.appendChild(spacingRow);
             }
 
             table.appendChild(newThead);
 
-            // Build tbody
             const newTbody = document.createElement("tbody");
             const endRow = split.startRow + split.rowCount;
             let tbodyRowsAdded = 0;
 
             for (let i = split.startRow; i < endRow && i < tbodyRows.length; i++) {
-              // Skip Proposed Owner rows on subsequent pages (they're in thead)
-              if (
-                !isFirstPage &&
-                (i === proposedOwnerNameIndex || i === proposedOwnerAddressIndex)
-              ) {
-                continue;
-              }
-
               newTbody.appendChild(tbodyRows[i].cloneNode(true));
               tbodyRowsAdded++;
             }
 
-            // Only add tbody if it has rows
             if (tbodyRowsAdded > 0) {
               table.appendChild(newTbody);
             } else {
-              // Skip this table if no content rows
-              // console.log(`   ⚠️ Skipping page ${split.pageNumber} - no content rows`);
               continue;
             }
 
-            // Add tfoot
-            if (tfoot) {
-              table.appendChild(tfoot.cloneNode(true));
-            }
-
-            // Mark last page
-            if (isLastPage) {
-              table.classList.add("last-page");
-            }
-
-            // Set page number
-            if (needsFooter) {
-              setPageNumber(table, split.pageNumber);
-            }
+            if (tfoot) table.appendChild(tfoot.cloneNode(true));
+            if (isLastPage) table.classList.add("last-page");
+            if (needsFooter) setPageNumber(table, split.pageNumber);
 
             tables.push(table);
           }
 
-          // Replace original table with all new tables
           finalWrapper.innerHTML = "";
-          tables.forEach((table) => {
-            finalWrapper.appendChild(table);
-          });
+          tables.forEach((table) => finalWrapper.appendChild(table));
 
-          // If only 1 page after split, mark as single-page
+          // Final single-page check after building tables
           if (tables.length === 1) {
-            // console.log("✅ Only 1 page after split - marking as single-page");
+            /* console.log("✅ AVR: Only 1 table built - single page!"); */
             document.body.classList.add("single-page");
             tables[0].classList.add("last-page");
-          }
 
-          // console.log(`\n✅ Split completed into ${tables.length} pages!`);
+            const separatorRow = tables[0].querySelector("thead .heading-separator-row");
+            if (separatorRow) {
+              separatorRow.style.display = "none";
+            }
+
+            return {
+              success: true,
+              totalPages: 1,
+              singlePage: true,
+              splitPoints: splitPoints,
+            };
+          }
 
           return {
             success: true,
             totalPages: tables.length,
             splitPoints: splitPoints,
-            singlePage: tables.length === 1, // Add singlePage flag
-            measurements: {
-              pageHeight: PAGE_HEIGHT_PX,
-              spacerHeight: actualSpacerHeight,
-              bottomSpace: actualBottomSpace,
-              firstPageAvailable: firstPageAvailable,
-              subsequentAvailable: subsequentAvailable,
-            },
+            singlePage: false,
           };
         }, reportType);
 
-        // console.log(
-        //   "📊 DETAILED SPLIT RESULT:",
-        //   JSON.stringify(splitResult, null, 2)
-        // );
+        // Log result
+       /*  if (splitResult.singlePage) {
+          console.log("✅ AVR Report: Single page detected");
+        } else if (splitResult.success) {
+          console.log(`✅ AVR Report: ${splitResult.totalPages} pages created`);
+        } */
+
+        await new Promise((r) => setTimeout(r, 300));
+      } catch (error) {
+        console.error("❌ Error in AVR report splitting:", error);
+      }
+    }
+
+    /**
+ * Enhanced page.evaluate for CV, CE, and Machinery reports
+ * Ensures tyre-image-row and signature-row always stay together
+ */
+    async function splitReportWithGroupedRows(page, reportType) {
+      const splitResult = await page.evaluate((reportType) => {
+        // Helper function to set page number on a table
+        const setPageNumber = (table, pageNum) => {
+          if (!table) return;
+          const footerRow = table.querySelector("tfoot .footer-row");
+          if (footerRow) {
+            const pageNumberSpan = footerRow.querySelector(".page-number-value");
+            if (pageNumberSpan) {
+              pageNumberSpan.textContent = `Page ${pageNum}`;
+              pageNumberSpan.setAttribute("data-page-number", pageNum.toString());
+            }
+          }
+        };
+
+        const needsFooter = [
+          "report_ce",
+          "report_cv",
+          "report_machinery",
+          "report_avr",
+        ].includes(reportType?.toLowerCase());
+
+        // Measure ACTUAL page dimensions
+        const body = document.body;
+        const wrapper = document.querySelector(".content-wrapper");
+        const origTable = document.querySelector("table");
+
+        if (!origTable) return { success: false, error: "Table not found" };
+
+        const thead = origTable.querySelector("thead");
+        const tbody = origTable.querySelector("tbody");
+        const tfoot = origTable.querySelector("tfoot");
+
+        if (!thead || !tbody)
+          return { success: false, error: "thead/tbody not found" };
+
+        const wrapperStyle = wrapper ? getComputedStyle(wrapper) : null;
+        const wrapperPaddingTop = wrapperStyle
+          ? parseInt(wrapperStyle.paddingTop)
+          : 30;
+        const wrapperPaddingBottom = wrapperStyle
+          ? parseInt(wrapperStyle.paddingBottom)
+          : 0;
+
+        // Calculate REAL available space
+        const PAGE_HEIGHT_PX = 14 * 96; // 1344px
+
+        const spacerRow = thead.querySelector(".spacer-row");
+        const actualSpacerHeight = spacerRow ? spacerRow.offsetHeight : 225;
+
+        const tfootHeight = tfoot ? tfoot.offsetHeight : 0;
+        const tfootSpacerRow = tfoot ? tfoot.querySelector(".spacer-row") : null;
+        const tfootFooterRow = tfoot ? tfoot.querySelector(".footer-row") : null;
+
+        const tfootFooterHeight = tfootFooterRow ? tfootFooterRow.offsetHeight : 30;
+        const actualBottomSpace = tfootFooterHeight;
+
+        const SAFETY_MARGIN = 30;
+        const realAvailable =
+          PAGE_HEIGHT_PX -
+          actualSpacerHeight -
+          wrapperPaddingTop -
+          wrapperPaddingBottom -
+          actualBottomSpace -
+          SAFETY_MARGIN;
+
+        // Calculate thead heights
+        const theadRows = Array.from(thead.querySelectorAll("tr"));
+        let baseTheadHeight = 0;
+        let generalDetailsRows = [];
+
+        theadRows.forEach((row) => {
+          if (row.classList.contains("spacer-row")) {
+            return;
+          }
+
+          const fullText = row.textContent.toUpperCase().trim();
+
+          if (
+            row.classList.contains("general-details-row") ||
+            row.hasAttribute("data-first-page-only") ||
+            fullText.includes("GENERAL DETAILS")
+          ) {
+            generalDetailsRows.push(row);
+          } else {
+            baseTheadHeight += row.offsetHeight;
+          }
+        });
+
+        // Find Proposed Owner rows
+        const tbodyRows = Array.from(tbody.querySelectorAll("tr"));
+
+        let proposedOwnerNameRow = null;
+        let proposedOwnerAddressRow = null;
+        let proposedOwnerNameIndex = -1;
+        let proposedOwnerAddressIndex = -1;
+
+        for (let i = 0; i < tbodyRows.length; i++) {
+          const row = tbodyRows[i];
+          const cells = Array.from(row.querySelectorAll("td, th"));
+          const firstText = cells[0]
+            ? cells[0].textContent.toUpperCase().trim()
+            : "";
+
+          if (firstText.includes("PROPOSED OWNER NAME")) {
+            proposedOwnerNameRow = row;
+            proposedOwnerNameIndex = i;
+          } else if (
+            proposedOwnerNameRow &&
+            (row.hasAttribute("data-proposed-owner-address") ||
+              firstText === "ADDRESS:")
+          ) {
+            proposedOwnerAddressRow = row;
+            proposedOwnerAddressIndex = i;
+            break;
+          }
+        }
+
+        let proposedOwnerRowsHeight = 0;
+        if (proposedOwnerNameRow) {
+          proposedOwnerRowsHeight += proposedOwnerNameRow.offsetHeight;
+        }
+        if (proposedOwnerAddressRow) {
+          proposedOwnerRowsHeight += proposedOwnerAddressRow.offsetHeight;
+        }
+
+        // ⭐ NEW: Find tyre-image-row and signature-row
+        let tyreImageRow = null;
+        let signatureRow = null;
+        let tyreImageIndex = -1;
+        let signatureIndex = -1;
+        let groupedRowsHeight = 0;
+
+        for (let i = 0; i < tbodyRows.length; i++) {
+          const row = tbodyRows[i];
+          if (row.classList.contains("tyre-image-row")) {
+            tyreImageRow = row;
+            tyreImageIndex = i;
+            groupedRowsHeight += row.offsetHeight;
+          } else if (row.classList.contains("signature-row")) {
+            signatureRow = row;
+            signatureIndex = i;
+            groupedRowsHeight += row.offsetHeight;
+            break; // Both found
+          }
+        }
+
+        // Multi-page split calculation
+        const firstPageTheadHeight = baseTheadHeight;
+        const firstPageAvailable = realAvailable - firstPageTheadHeight;
+
+        const subsequentTheadHeight = baseTheadHeight + proposedOwnerRowsHeight;
+        const subsequentAvailable = realAvailable - subsequentTheadHeight;
+
+        // Calculate split points for all pages
+        const splitPoints = [];
+        let currentRowIndex = 0;
+        let pageNumber = 1;
+
+        while (currentRowIndex < tbodyRows.length) {
+          const availableSpace =
+            pageNumber === 1 ? firstPageAvailable : subsequentAvailable;
+          let accHeight = 0;
+          let rowsInThisPage = 0;
+          let actualRowsProcessed = 0;
+
+          for (let i = currentRowIndex; i < tbodyRows.length; i++) {
+            // Skip Proposed Owner rows if they're in tbody (they'll be in thead for page 2+)
+            if (
+              pageNumber > 1 &&
+              (i === proposedOwnerNameIndex || i === proposedOwnerAddressIndex)
+            ) {
+              actualRowsProcessed++;
+              continue;
+            }
+
+            const rowHeight = tbodyRows[i].offsetHeight;
+
+            // ⭐ NEW: Check if this is the tyre-image-row
+            const isTyreImageRow = i === tyreImageIndex;
+            const isSignatureRow = i === signatureIndex;
+
+            // If we're at tyre-image-row, check if BOTH rows can fit
+            if (isTyreImageRow && signatureRow) {
+              const combinedHeight = groupedRowsHeight;
+              const newHeight = accHeight + combinedHeight;
+
+              if (newHeight <= availableSpace) {
+                // Both rows fit - add them together
+                accHeight = newHeight;
+                rowsInThisPage += 2;
+                actualRowsProcessed += 2;
+                i++; // Skip signature-row in next iteration (already counted)
+                continue;
+              } else {
+                // Both rows don't fit - break here (they'll go to next page together)
+                break;
+              }
+            }
+
+            // Skip signature-row if we already processed it with tyre-image-row
+            if (isSignatureRow && tyreImageRow && i === signatureIndex) {
+              // Already handled above
+              continue;
+            }
+
+            // Normal row processing
+            const hasLongText = Array.from(tbodyRows[i].querySelectorAll("td")).some(
+              (td) => {
+                return td.textContent.length > 100;
+              }
+            );
+            const rowBuffer = hasLongText ? 10 : 0;
+            const newHeight = accHeight + rowHeight;
+
+            if (newHeight + rowBuffer <= availableSpace) {
+              accHeight = newHeight;
+              rowsInThisPage++;
+              actualRowsProcessed++;
+            } else {
+              break;
+            }
+          }
+
+          if (rowsInThisPage === 0 && currentRowIndex < tbodyRows.length) {
+            rowsInThisPage = 1;
+            actualRowsProcessed = 1;
+            accHeight = tbodyRows[currentRowIndex].offsetHeight;
+          }
+
+          // Check if this would create an empty or near-empty next page
+          const remainingRows =
+            tbodyRows.length - (currentRowIndex + actualRowsProcessed);
+          const MIN_ROWS_FOR_NEW_PAGE = 5;
+
+          if (remainingRows > 0 && remainingRows <= MIN_ROWS_FOR_NEW_PAGE) {
+            let canFitRemaining = true;
+            let testHeight = accHeight;
+            let testRowsToAdd = 0;
+
+            let skippedRows = 0;
+            for (
+              let i = currentRowIndex + actualRowsProcessed;
+              i < tbodyRows.length;
+              i++
+            ) {
+              if (
+                pageNumber > 1 &&
+                (i === proposedOwnerNameIndex || i === proposedOwnerAddressIndex)
+              ) {
+                skippedRows++;
+                continue;
+              }
+
+              const rowHeight = tbodyRows[i].offsetHeight;
+              const newTestHeight = testHeight + rowHeight;
+              const aggressiveThreshold = availableSpace * 1.01;
+
+              if (newTestHeight <= aggressiveThreshold) {
+                testHeight = newTestHeight;
+                testRowsToAdd++;
+              } else {
+                canFitRemaining = false;
+                break;
+              }
+            }
+
+            if (canFitRemaining && testRowsToAdd > 0) {
+              const totalRowsToAdd = testRowsToAdd + skippedRows;
+              rowsInThisPage += testRowsToAdd;
+              actualRowsProcessed += totalRowsToAdd;
+              accHeight = testHeight;
+            }
+          }
+
+          splitPoints.push({
+            pageNumber: pageNumber,
+            startRow: currentRowIndex,
+            rowCount: actualRowsProcessed,
+            spaceUsed: accHeight,
+            spaceAvailable: availableSpace,
+            unusedSpace: availableSpace - accHeight,
+          });
+
+          currentRowIndex += actualRowsProcessed;
+          pageNumber++;
+
+          if (pageNumber > 100) break;
+        }
+
+        // Check if single page
+        if (splitPoints.length === 1) {
+          const totalRowsProcessed = splitPoints[0].rowCount;
+          const totalRows = tbodyRows.length;
+          const spaceUsed = splitPoints[0].spaceUsed;
+          const spaceAvailable = splitPoints[0].spaceAvailable;
+
+          const allRowsProcessed = totalRowsProcessed >= totalRows - 2;
+          const spaceUsageReasonable = spaceUsed / spaceAvailable < 0.95;
+
+          if (allRowsProcessed && spaceUsageReasonable) {
+            document.body.classList.add("single-page");
+            origTable.classList.add("last-page");
+            return {
+              success: false,
+              error: "All content fits on one page",
+              singlePage: true,
+            };
+          }
+        }
+
+        // Build multiple tables
+        const tables = [];
+        const finalWrapper = origTable.parentElement;
+
+        for (let p = 0; p < splitPoints.length; p++) {
+          const split = splitPoints[p];
+          const isFirstPage = split.pageNumber === 1;
+          const isLastPage = p === splitPoints.length - 1;
+
+          const table = document.createElement("table");
+          table.style.cssText =
+            "width:100%; border-collapse:collapse; margin-top:-30px; margin-bottom:0;";
+
+          if (!isLastPage) {
+            table.style.pageBreakAfter = "always";
+          }
+
+          // Build thead
+          const newThead = document.createElement("thead");
+
+          theadRows.forEach((row) => {
+            if (row.classList.contains("spacer-row")) {
+              newThead.appendChild(row.cloneNode(true));
+            }
+          });
+
+          theadRows.forEach((row) => {
+            if (row.classList.contains("spacer-row")) {
+              return;
+            }
+
+            const fullText = row.textContent.toUpperCase().trim();
+            const isGeneralDetails =
+              row.classList.contains("general-details-row") ||
+              row.hasAttribute("data-first-page-only") ||
+              fullText.includes("GENERAL DETAILS");
+
+            if (isGeneralDetails && !isFirstPage) {
+              return;
+            }
+
+            newThead.appendChild(row.cloneNode(true));
+          });
+
+          if (!isFirstPage) {
+            if (proposedOwnerNameRow) {
+              newThead.appendChild(proposedOwnerNameRow.cloneNode(true));
+            }
+            if (proposedOwnerAddressRow) {
+              newThead.appendChild(proposedOwnerAddressRow.cloneNode(true));
+            }
+
+            const spacingRow = document.createElement("tr");
+            spacingRow.style.height = "20px";
+            const spacingCell = document.createElement("td");
+            spacingCell.setAttribute("colspan", "6");
+            spacingCell.style.cssText =
+              "border: none; height: 20px; padding: 0;";
+            spacingRow.appendChild(spacingCell);
+            newThead.appendChild(spacingRow);
+          }
+
+          table.appendChild(newThead);
+
+          // Build tbody
+          const newTbody = document.createElement("tbody");
+          const endRow = split.startRow + split.rowCount;
+          let tbodyRowsAdded = 0;
+
+          for (let i = split.startRow; i < endRow && i < tbodyRows.length; i++) {
+            if (
+              !isFirstPage &&
+              (i === proposedOwnerNameIndex || i === proposedOwnerAddressIndex)
+            ) {
+              continue;
+            }
+
+            newTbody.appendChild(tbodyRows[i].cloneNode(true));
+            tbodyRowsAdded++;
+          }
+
+          if (tbodyRowsAdded > 0) {
+            table.appendChild(newTbody);
+          } else {
+            continue;
+          }
+
+          if (tfoot) {
+            table.appendChild(tfoot.cloneNode(true));
+          }
+
+          if (isLastPage) {
+            table.classList.add("last-page");
+          }
+
+          if (needsFooter) {
+            setPageNumber(table, split.pageNumber);
+          }
+
+          tables.push(table);
+        }
+
+        finalWrapper.innerHTML = "";
+        tables.forEach((table) => {
+          finalWrapper.appendChild(table);
+        });
+
+        if (tables.length === 1) {
+          document.body.classList.add("single-page");
+          tables[0].classList.add("last-page");
+        }
+
+        return {
+          success: true,
+          totalPages: tables.length,
+          splitPoints: splitPoints,
+          singlePage: tables.length === 1,
+          groupedRows: {
+            tyreImageIndex,
+            signatureIndex,
+            groupedRowsHeight,
+          },
+          measurements: {
+            pageHeight: PAGE_HEIGHT_PX,
+            spacerHeight: actualSpacerHeight,
+            bottomSpace: actualBottomSpace,
+            firstPageAvailable: firstPageAvailable,
+            subsequentAvailable: subsequentAvailable,
+          },
+        };
+      }, reportType);
+
+      return splitResult;
+    }
+
+    // Now update the existing generateReportPDF function
+    // Find this section in your code (around line 800-900) and replace it:
+
+    // INSIDE generateReportPDF function, replace the CV/CE/Machinery handling section:
+
+    if (
+      reportType.toLowerCase() === "report_cv" ||
+      reportType.toLowerCase() === "report_ce" ||
+      reportType.toLowerCase() === "report_machinery"
+    ) {
+      try {
+        // ⭐ Use the new enhanced function
+        const splitResult = await splitReportWithGroupedRows(page, reportType);
 
         if (splitResult.success) {
-          // console.log("");
-          // console.log(`✅ Split completed into ${splitResult.totalPages} pages!`);
-          
-          // if (splitResult.splitPoints && splitResult.splitPoints.length > 0) {
-          //   splitResult.splitPoints.forEach((split) => {
-          //     console.log(
-          //       `📄 Page ${split.pageNumber}: ${split.rowCount} rows, ${split.spaceUsed}/${split.spaceAvailable}px (${split.unusedSpace}px unused)`
-          //     );
-          //   });
-          // }
-        } else {
-          // console.log("ℹ️", splitResult.error);
+          /* console.log(`✅ Split completed into ${splitResult.totalPages} pages!`);
+          if (splitResult.groupedRows) {
+            console.log(
+              `✅ Tyre-image and signature rows grouped together (height: ${splitResult.groupedRows.groupedRowsHeight}px)`
+            );
+          } */
+        } else if (splitResult.singlePage) {
+          /* console.log("✅ Single page report - no split needed"); */
 
-          // ✅ Verify કરો કે class add થઈ છે કે નહીં
-          if (splitResult.singlePage) {
-            const hasClass = await page.evaluate(() => {
-              return document.body.classList.contains("single-page");
-            });
-            // console.log("✅ Single-page class present:", hasClass);
+          const hasClass = await page.evaluate(() => {
+            return document.body.classList.contains("single-page");
+          });
+          /* console.log("✅ Single-page class present:", hasClass); */
 
-            // ✅ વધારે debugging માટે
-            const bodyClasses = await page.evaluate(() => {
-              return document.body.className;
-            });
-            // console.log("📝 Body classes:", bodyClasses);
+          const needsFooter = [
+            "report_ce",
+            "report_cv",
+            "report_machinery",
+            "report_avr",
+          ].includes(reportType?.toLowerCase());
 
-            // Set page number to Page 1 for single-page reports that need footer
-            const needsFooter = [
-              "report_ce",
-              "report_cv",
-              "report_machinery",
-            ].includes(reportType?.toLowerCase());
-            if (needsFooter) {
-              await page.evaluate(() => {
-                const table = document.querySelector("table");
-                if (table) {
-                  const footerRow = table.querySelector("tfoot .footer-row");
-                  if (footerRow) {
-                    const pageNumberSpan =
-                      footerRow.querySelector(".page-number-value");
-                    if (pageNumberSpan) {
-                      pageNumberSpan.textContent = "Page 1";
-                      pageNumberSpan.setAttribute("data-page-number", "1");
-                    }
+          if (needsFooter) {
+            await page.evaluate(() => {
+              const table = document.querySelector("table");
+              if (table) {
+                const footerRow = table.querySelector("tfoot .footer-row");
+                if (footerRow) {
+                  const pageNumberSpan =
+                    footerRow.querySelector(".page-number-value");
+                  if (pageNumberSpan) {
+                    pageNumberSpan.textContent = "Page 1";
+                    pageNumberSpan.setAttribute("data-page-number", "1");
                   }
                 }
-              });
-            }
+              }
+            });
           }
         }
 
         await new Promise((r) => setTimeout(r, 300));
       } catch (error) {
-        // console.error("❌ Error:", error);
+        console.error("❌ Error in report splitting:", error);
       }
     } else {
       // Other reports: No footer by default
@@ -2517,8 +2711,8 @@ function normalizeFlexibleField(field) {
         field.field_value !== undefined
           ? field.field_value
           : field.fieldValue !== undefined
-          ? field.fieldValue
-          : null,
+            ? field.fieldValue
+            : null,
       field_order: parseNumeric(field.field_order || field.fieldOrder),
     };
   }

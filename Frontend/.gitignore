@@ -12,3 +12,6 @@ service-account.json
 
 # Ignore build
 /build
+
+# Ignore package-lock.json
+package-lock.json
