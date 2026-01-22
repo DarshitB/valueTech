@@ -1517,6 +1517,78 @@ function CEReport() {
         return updated;
       });
 
+      // Handle flexible fields from child category report
+      // Only process COMMENTS_ON_EQUIPMENT_AT_THE_TIME_OF_INSPECTION section
+      // Prefill labels only, keep values blank
+      if (Array.isArray(report.flexible_fields) && report.flexible_fields.length > 0) {
+        // Get existing flexible fields to preserve other sections
+        setFlexibleFields((prevFields) => {
+          // Filter out existing COMMENTS section fields (if any)
+          const otherFields = prevFields.filter(
+            (field) => field.section_name !== "COMMENTS_ON_EQUIPMENT_AT_THE_TIME_OF_INSPECTION"
+          );
+
+          // Process only COMMENTS_ON_EQUIPMENT_AT_THE_TIME_OF_INSPECTION section from child category report
+          const apiFields = report.flexible_fields;
+          const commentsFields = apiFields.filter(
+            (f) => f.section_name === "COMMENTS_ON_EQUIPMENT_AT_THE_TIME_OF_INSPECTION"
+          );
+
+          if (commentsFields.length === 0) {
+            // No COMMENTS fields in child category report, return existing fields
+            return prevFields;
+          }
+
+          // Group by section and process
+          const sectionToFields = commentsFields.reduce((acc, f) => {
+            const key = f.section_name || "__UNKNOWN__";
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(f);
+            return acc;
+          }, {});
+
+          const combined = [];
+          Object.keys(sectionToFields).forEach((section) => {
+            const list = sectionToFields[section]
+              .slice()
+              .sort((a, b) => (a.field_order || 0) - (b.field_order || 0));
+            
+            for (let i = 0; i < list.length; i++) {
+              const first = list[i];
+              
+              if (first.col_span === 2) {
+                const second =
+                  list[i + 1] && list[i + 1].col_span === 2 ? list[i + 1] : null;
+                
+                combined.push({
+                  id: `${section}_${first.id || first.field_order || i}_combined`,
+                  section_name: section,
+                  col_span: 2,
+                  field_label: first.field_label || "", // Prefill label
+                  field_value: "", // Keep value blank
+                  field_label_2: second?.field_label || "", // Prefill label
+                  field_value_2: "", // Keep value blank
+                  field_order: first.field_order || i + 1,
+                });
+                if (second) i++;
+              } else {
+                combined.push({
+                  id: `${section}_${first.id || first.field_order || i}`,
+                  section_name: section,
+                  col_span: 1,
+                  field_label: first.field_label || "", // Prefill label
+                  field_value: "", // Keep value blank
+                  field_order: first.field_order || i + 1,
+                });
+              }
+            }
+          });
+
+          // Combine: other existing fields + new COMMENTS fields
+          return [...otherFields, ...combined];
+        });
+      }
+
       // Check if RC API will be called - if not, remove loading now
       // RC API will only be called if registration number exists
       if (
@@ -2237,22 +2309,49 @@ function CEReport() {
   }, []);
 
   // Validate flexible fields
-  const validateFlexibleFields = useCallback(() => {
+  // isForGenerate: true for Generate API (strict validation), false for Save API (allow blank values for COMMENTS section)
+  const validateFlexibleFields = useCallback((isForGenerate = true) => {
     const errors = [];
 
     flexibleFields.forEach((field, index) => {
-      if (!field.field_label.trim() || !field.field_value.trim()) {
+      const isCommentsSection = field.section_name === "COMMENTS_ON_EQUIPMENT_AT_THE_TIME_OF_INSPECTION";
+      
+      // Label is always required
+      if (!field.field_label.trim()) {
         errors.push(
-          `Flexible field ${index + 1}: Label and Value are required`
+          `Flexible field ${index + 1}: Label is required`
         );
+      }
+
+      // Value validation:
+      // - For Generate API: Always required (including COMMENTS section)
+      // - For Save API: Required for all sections EXCEPT COMMENTS section
+      if (isForGenerate || !isCommentsSection) {
+        if (!field.field_value.trim()) {
+          errors.push(
+            `Flexible field ${index + 1}: Value is required`
+          );
+        }
       }
 
       // For Add Two fields, validate second set
       if (field.col_span === 2) {
-        if (!field.field_label_2?.trim() || !field.field_value_2?.trim()) {
+        // Second label is always required
+        if (!field.field_label_2?.trim()) {
           errors.push(
-            `Flexible field ${index + 1}: Second Label and Value are required`
+            `Flexible field ${index + 1}: Second Label is required`
           );
+        }
+
+        // Second value validation:
+        // - For Generate API: Always required (including COMMENTS section)
+        // - For Save API: Required for all sections EXCEPT COMMENTS section
+        if (isForGenerate || !isCommentsSection) {
+          if (!field.field_value_2?.trim()) {
+            errors.push(
+              `Flexible field ${index + 1}: Second Value is required`
+            );
+          }
         }
       }
     });
@@ -2305,8 +2404,8 @@ function CEReport() {
         return;
       }
 
-      // Validate flexible fields
-      const validationErrors = validateFlexibleFields();
+      // Validate flexible fields (strict validation for Generate API)
+      const validationErrors = validateFlexibleFields(true);
       if (validationErrors.length > 0) {
         validationErrors.forEach((error) => toast.error(error));
         // Close the preOpenedTab if validation fails
@@ -2567,8 +2666,8 @@ function CEReport() {
       return;
     }
 
-    // Validate flexible fields
-    const validationErrors = validateFlexibleFields();
+    // Validate flexible fields (allow blank values for COMMENTS section in Save API)
+    const validationErrors = validateFlexibleFields(false);
     if (validationErrors.length > 0) {
       toast.error("Please fix validation errors before saving");
       return;
@@ -5219,7 +5318,7 @@ function CEReport() {
                     </label>
                     <SingleSearchSelect
                       options={[
-                        { value: "COPY", label: "COPY" },
+                        { value: "COPY VERIFIED", label: "COPY VERIFIED" },
                         {
                           value: "COPY NOT AVAILABLE",
                           label: "COPY NOT AVAILABLE",
@@ -5241,7 +5340,7 @@ function CEReport() {
                     </label>
                     <SingleSearchSelect
                       options={[
-                        { value: "COPY", label: "COPY" },
+                        { value: "COPY VERIFIED", label: "COPY VERIFIED" },
                         {
                           value: "COPY NOT AVAILABLE",
                           label: "COPY NOT AVAILABLE",
@@ -5384,7 +5483,7 @@ function CEReport() {
                     </label>
                     <SingleSearchSelect
                       options={[
-                        { value: "COPY", label: "COPY" },
+                        { value: "COPY VERIFIED", label: "COPY VERIFIED" },
                         {
                           value: "COPY NOT AVAILABLE",
                           label: "COPY NOT AVAILABLE",

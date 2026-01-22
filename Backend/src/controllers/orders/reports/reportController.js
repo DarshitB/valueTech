@@ -2958,6 +2958,7 @@ function filterValidReportFields(formData, reportType) {
       "laf_id",
       "application_usage",
       "invoice_no_date",
+      "invoice_no_heading",
       "hyp_with",
       "machine_type",
       "asset_classification",

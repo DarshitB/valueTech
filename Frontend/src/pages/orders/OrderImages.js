@@ -320,12 +320,12 @@ function OrderImages() {
       if (prevSeq.includes(imageId)) {
         // Remove from sequence
         const newSeq = prevSeq.filter((id) => id !== imageId);
-        console.log("Removed from sequence:", imageId, "New sequence:", newSeq);
+        /* console.log("Removed from sequence:", imageId, "New sequence:", newSeq); */
         return newSeq;
       } else {
         // Add to sequence (maintain order)
         const newSeq = [...prevSeq, imageId];
-        console.log("Added to sequence:", imageId, "New sequence:", newSeq);
+        /* console.log("Added to sequence:", imageId, "New sequence:", newSeq); */
         return newSeq;
       }
     });
@@ -444,7 +444,7 @@ function OrderImages() {
       image_ids: selectedImageSequence.map((id) => id.toString()), // Use sequence order
       valuer_name: order?.valuer_name || "",
     };
-    console.log("image collage payload", payload);
+    /* console.log("image collage payload", payload); */
     dispatch(generateCollage(payload)).then((result) => {
       if (result.meta.requestStatus === "fulfilled") {
         // Open PDF in new tab

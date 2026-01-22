@@ -3968,7 +3968,7 @@ function CVReport() {
                     </label>
                     <SingleSearchSelect
                       options={[
-                        { value: "COPY", label: "COPY" },
+                        { value: "COPY VERIFIED", label: "COPY VERIFIED" },
                         {
                           value: "COPY NOT AVAILABLE",
                           label: "COPY NOT AVAILABLE",
@@ -3989,7 +3989,7 @@ function CVReport() {
                     </label>
                     <SingleSearchSelect
                       options={[
-                        { value: "COPY", label: "COPY" },
+                        { value: "COPY VERIFIED", label: "COPY VERIFIED" },
                         {
                           value: "COPY NOT AVAILABLE",
                           label: "COPY NOT AVAILABLE",
@@ -4132,7 +4132,7 @@ function CVReport() {
                     </label>
                     <SingleSearchSelect
                       options={[
-                        { value: "COPY", label: "COPY" },
+                        { value: "COPY VERIFIED", label: "COPY VERIFIED" },
                         {
                           value: "COPY NOT AVAILABLE",
                           label: "COPY NOT AVAILABLE",
