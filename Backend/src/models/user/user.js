@@ -49,6 +49,10 @@ const user = {
         "cities.name as city_name",
         "users.otp",
         "users.otp_expiry",
+        "users.otp_attempts",
+        "users.otp_locked_until",
+        "users.active_token",
+        "users.deleted_at",
         "users.created_at",
         "created_user.name as created_by",
         "users.updated_at",
@@ -98,6 +102,7 @@ const user = {
 
   findByEmailOrMobile: (input) =>
     db("users")
+      .select("*")
       .where(function () {
         this.where("email", input).orWhere("mobile", input);
       })

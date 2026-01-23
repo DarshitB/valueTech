@@ -1085,7 +1085,8 @@ function generateMarineReportHTML(
               formData.flexible_fields || [],
               "CERTIFICATIONS_OF_THE_VESSEL",
               getNextMainCounter,
-              null
+              null,
+              formData
             )}
 
             ${(() => {
@@ -3801,6 +3802,13 @@ function generateMarineReportHTML(
                                 if (rows.length > 0) {
                                     const tableClassName = el.className;
                                     const tableWidth = el.getAttribute('width') || el.style.width;
+                                    
+                                    // Store the first row to use as width reference for continuation tables
+                                    // This preserves the exact column structure without modification
+                                    let firstRowReference = null;
+                                    if (rows.length > 0) {
+                                        firstRowReference = rows[0].cloneNode(true);
+                                    }
 
                                     rows.forEach((row, index) => {
                                         row._isTableRow = true;
@@ -3808,6 +3816,10 @@ function generateMarineReportHTML(
                                         row._rowIndex = index;
                                         row._tableClassName = tableClassName;
                                         row._tableWidth = tableWidth;
+                                        // Store first row reference for continuation tables
+                                        if (firstRowReference) {
+                                            row._tableFirstRowReference = firstRowReference.cloneNode(true);
+                                        }
                                         allContentElements.push(row);
                                     });
                                 } else {
@@ -3952,6 +3964,23 @@ function generateMarineReportHTML(
                             currentTable.className = element._tableClassName;
                         }
                         const tbody = document.createElement('tbody');
+                        
+                        // Add invisible first row to preserve column widths naturally
+                        if (element._tableFirstRowReference && element._rowIndex !== 0) {
+                            const hiddenRow = element._tableFirstRowReference.cloneNode(true);
+                            hiddenRow.style.visibility = 'collapse'; // collapse instead of hidden to preserve widths
+                            hiddenRow.style.lineHeight = '0';
+                            hiddenRow.style.height = '0';
+                            // Empty the cell contents but keep the structure
+                            const cells = hiddenRow.querySelectorAll('td, th');
+                            cells.forEach(cell => {
+                                cell.innerHTML = '&nbsp;';
+                                cell.style.padding = '0';
+                                cell.style.border = 'none';
+                            });
+                            tbody.appendChild(hiddenRow);
+                        }
+                        
                         currentTable.appendChild(tbody);
                         currentPageContent.appendChild(currentTable);
                     }
@@ -3983,6 +4012,23 @@ function generateMarineReportHTML(
                             currentTable.className = element._tableClassName;
                         }
                         const tbody = document.createElement('tbody');
+                        
+                        // Add invisible first row to preserve column widths in continuation table
+                        if (element._tableFirstRowReference) {
+                            const hiddenRow = element._tableFirstRowReference.cloneNode(true);
+                            hiddenRow.style.visibility = 'collapse'; // collapse to preserve widths
+                            hiddenRow.style.lineHeight = '0';
+                            hiddenRow.style.height = '0';
+                            // Empty the cell contents but keep the structure
+                            const cells = hiddenRow.querySelectorAll('td, th');
+                            cells.forEach(cell => {
+                                cell.innerHTML = '&nbsp;';
+                                cell.style.padding = '0';
+                                cell.style.border = 'none';
+                            });
+                            tbody.appendChild(hiddenRow);
+                        }
+                        
                         currentTable.appendChild(tbody);
                         currentPageContent.appendChild(currentTable);
                         currentTable.querySelector('tbody').appendChild(element);
@@ -4151,7 +4197,7 @@ function generateMarineReportHTML(
  * @param {Function} getNextSubCounter - Optional function to get next sub-counter value
  * @returns {string} HTML for flexible fields in the specified section
  */
-function generateFlexibleFieldsForSection(flexibleFields, sectionName, getNextMainCounter = null, getNextSubCounter = null) {
+function generateFlexibleFieldsForSection(flexibleFields, sectionName, getNextMainCounter = null, getNextSubCounter = null, formData = null) {
   if (!flexibleFields || flexibleFields.length === 0) {
     return "";
   }
@@ -4294,6 +4340,13 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName, getNextMa
     
     const counterValue = getNextMainCounter ? getNextMainCounter() : "2.0";
     html += `<h2><span class="main-counter">${counterValue}</span>. CERTIFICATIONS OF THE VESSEL:</h2>`;
+    
+    // Add certifications vessel note if it exists in formData
+    if (formData && formData.certifications_vessel_note) {
+      const certNote = renderFieldValue(formData.certifications_vessel_note);
+      html += `<p>Note: ${certNote}</p>`;
+    }
+    
     html += `<table class="border-table">`;
     html += `<tr>
                 <th width="40%">CERTIFICATES</th>

@@ -3236,6 +3236,8 @@ function filterValidReportFields(formData, reportType) {
       "technical_operator",
       "commercial_operator",
       "disponent_owner",
+      // CERTIFICATIONS OF THE VESSEL
+      "certifications_vessel_note",
       // PROTECTION & INDEMNITY POLICY
       "institution_name_insurance_policy",
       "certificate_no_insurance_policy",

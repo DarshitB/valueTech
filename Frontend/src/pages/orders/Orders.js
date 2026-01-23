@@ -1534,11 +1534,11 @@ function Orders() {
                     flexWrap: "wrap",
                   }}
                 >
-                  {hasPermission(allowedPermissions, "add_order") && (
+                  {/* {hasPermission(allowedPermissions, "add_order") && (
                     <button className="btn" onClick={openAddModal}>
                       Add Order
                     </button>
-                  )}
+                  )} */}
                 </div>
               ),
               header: (

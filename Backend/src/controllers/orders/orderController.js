@@ -1520,10 +1520,10 @@ exports.sendMail = async (req, res, next) => {
       emailBody += `${emailBody ? "\n\n" : ""}Video links:\n${videoListText}`;
     }
 
-    if (!emailBody) {
+    /* if (!emailBody) {
       emailBody = `Please find attached files for order ${order.order_number || orderId
         }.`;
-    }
+    } */
 
     // Append regards at the end (plain text), if provided
     if (regards && typeof regards === "string" && regards.trim() !== "") {
@@ -1556,10 +1556,10 @@ exports.sendMail = async (req, res, next) => {
         }<strong>Video links:</strong><ul>${videoListHtml}</ul>`;
     }
 
-    if (!htmlEmailBody) {
+    /* if (!htmlEmailBody) {
       htmlEmailBody = `Please find attached files for order ${order.order_number || orderId
         }.`;
-    }
+    } */
 
     // Append regards at the end (HTML), if provided
     if (regards && typeof regards === "string" && regards.trim() !== "") {

@@ -4,6 +4,7 @@ import { Route, Routes } from "react-router-dom";
 import ProtectedRoute from "./ProtectedRoute";
 
 import Login from "../pages/auth/Login";
+import OTPPage from "../pages/auth/OTPPage";
 import Dashboard from "../pages/dashboard/dashboard";
 import Layout from "../layout/Layout";
 import Orders from "../pages/orders/Orders";
@@ -37,6 +38,7 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/otp-verify" element={<OTPPage />} />
       {/* Public route for order images (no authentication required) */}
       <Route
         path="/public/orders/:id/images"
@@ -52,7 +54,7 @@ const AppRoutes = () => {
           }
         />
         <Route
-          path="orders"
+          path="orders-history"
           element={
             <ProtectedRoute permission="view_order">
               <Orders />

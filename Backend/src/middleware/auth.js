@@ -13,6 +13,13 @@ module.exports = async function (req, res, next) {
     if (!user || user.deleted_at)
       return res.status(401).json({ message: "Invalid user" }); // Check if user exists and is not deleted
 
+    // ✅ Check if token matches the active token in database (single session login)
+    if (user.active_token && user.active_token !== token) {
+      return res.status(401).json({ 
+        message: "Session expired. You have been logged in from another device" 
+      });
+    }
+
     req.user = {
       id: user.id,
       role_id: user.role_id,

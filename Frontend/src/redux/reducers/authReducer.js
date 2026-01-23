@@ -37,8 +37,37 @@ export const login = createAsyncThunk(
       // 4. Save user to localStorage for persistence
       localStorage.setItem("user", JSON.stringify(user));
 
+      // 5. Check if user needs OTP verification
+      // Exempt developer_admin role from OTP requirement
+      const userRole = user?.role?.name || "";
+      const needsOtp =
+        user?.permissions?.includes("need_otp_access") &&
+        userRole.toLowerCase() !== "developer_admin";
+
+      // 6. If user needs OTP, generate it before redirecting
+      // Store password temporarily in Redux (in-memory only, not localStorage) for resend OTP
+      let tempPassword = null;
+      if (needsOtp) {
+        try {
+          await axios.post("/api/auth/generate-otp", {
+            username: payload.username,
+            password: payload.password,
+          });
+          // Store password temporarily in Redux state (in-memory only) for resend OTP
+          tempPassword = payload.password;
+          // Clear any previous OTP verification status
+          localStorage.removeItem("otpVerified");
+        } catch (otpErr) {
+          // If OTP generation fails, still allow login but user will need to request OTP again
+          console.error("OTP generation failed:", otpErr);
+        }
+      } else {
+        // If user doesn't need OTP, mark as verified
+        localStorage.setItem("otpVerified", "true");
+      }
+
       toast.success("Login successful");
-      return { token, user };
+      return { token, user, needsOtp, tempPassword };
     } catch (err) {
       toast.error(err.response?.data?.message || "Login failed");
       return thunkAPI.rejectWithValue(
@@ -77,11 +106,49 @@ export const fetchCurrentUser = createAsyncThunk(
   }
 );
 
+// Generate OTP
+export const generateOtp = createAsyncThunk(
+  "auth/generateOtp",
+  async (payload, thunkAPI) => {
+    try {
+      const res = await axios.post("/api/auth/generate-otp", payload);
+      toast.success(res.data.message || "OTP generated successfully");
+      return res.data;
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to generate OTP");
+      return thunkAPI.rejectWithValue(
+        err.response?.data?.message || "Failed to generate OTP"
+      );
+    }
+  }
+);
+
+// Verify OTP
+export const verifyOtp = createAsyncThunk(
+  "auth/verifyOtp",
+  async (payload, thunkAPI) => {
+    try {
+      const res = await axios.post("/api/auth/verify-otp", payload);
+      toast.success(res.data.message || "OTP verified successfully");
+      return res.data;
+    } catch (err) {
+      toast.error(err.response?.data?.message || "OTP verification failed");
+      return thunkAPI.rejectWithValue(
+        err.response?.data?.message || "OTP verification failed"
+      );
+    }
+  }
+);
+
 const initialState = {
   user: JSON.parse(localStorage.getItem("user") || "null"),
   token: localStorage.getItem("token"),
   loading: false,
   error: null,
+  otpLoading: false,
+  otpError: null,
+  otpVerified: localStorage.getItem("otpVerified") === "true",
+  tempPassword: null, // Temporary password for resend OTP (in-memory only, never in localStorage)
 };
 
 const authSlice = createSlice({
@@ -91,6 +158,14 @@ const authSlice = createSlice({
     setUser: (state, action) => {
       state.user = action.payload;
       localStorage.setItem("user", JSON.stringify(action.payload));
+    },
+    setOtpVerified: (state, action) => {
+      state.otpVerified = action.payload;
+      if (action.payload) {
+        localStorage.setItem("otpVerified", "true");
+      } else {
+        localStorage.removeItem("otpVerified");
+      }
     },
   },
   extraReducers: (builder) => {
@@ -104,6 +179,12 @@ const authSlice = createSlice({
         state.loading = false;
         state.token = action.payload.token;
         state.user = action.payload.user;
+        // Store temp password only if user needs OTP (in-memory only)
+        if (action.payload.needsOtp && action.payload.tempPassword) {
+          state.tempPassword = action.payload.tempPassword;
+        }
+        // Reset OTP verification status on new login
+        state.otpVerified = false;
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
@@ -114,8 +195,11 @@ const authSlice = createSlice({
       .addCase(logout.fulfilled, (state) => {
         state.token = null;
         state.user = null;
+        state.otpVerified = false;
+        state.tempPassword = null; // Clear temp password on logout
         localStorage.removeItem("token");
         localStorage.removeItem("user");
+        localStorage.removeItem("otpVerified");
       })
 
       // fetchCurrentUser
@@ -128,9 +212,47 @@ const authSlice = createSlice({
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         toast.error("Session expired. Please login again.");
+      })
+
+      // generateOtp
+      .addCase(generateOtp.pending, (state) => {
+        state.otpLoading = true;
+        state.otpError = null;
+      })
+      .addCase(generateOtp.fulfilled, (state, action) => {
+        state.otpLoading = false;
+        state.otpError = null;
+        // If password was provided in payload, store it temporarily for future resend
+        if (action.meta.arg?.password) {
+          state.tempPassword = action.meta.arg.password;
+        }
+      })
+      .addCase(generateOtp.rejected, (state, action) => {
+        state.otpLoading = false;
+        state.otpError = action.payload;
+      })
+
+      // verifyOtp
+      .addCase(verifyOtp.pending, (state) => {
+        state.otpLoading = true;
+        state.otpError = null;
+        state.otpVerified = false;
+      })
+      .addCase(verifyOtp.fulfilled, (state) => {
+        state.otpLoading = false;
+        state.otpError = null;
+        state.otpVerified = true;
+        // Clear temp password after successful verification (security)
+        state.tempPassword = null;
+        localStorage.setItem("otpVerified", "true");
+      })
+      .addCase(verifyOtp.rejected, (state, action) => {
+        state.otpLoading = false;
+        state.otpError = action.payload;
+        state.otpVerified = false;
       });
   },
 });
 
-export const { setUser } = authSlice.actions;
+export const { setUser, setOtpVerified } = authSlice.actions;
 export default authSlice.reducer;

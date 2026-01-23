@@ -279,6 +279,9 @@ function Users() {
                 <th style={{ width: "200px" }}>Email</th>
                 <th style={{ width: "150px" }}>Contact</th>
                 <th style={{ width: "150px" }}>Role</th>
+                {hasPermission(allowedPermissions, "otp_tab_in_user_table") && (
+                  <th style={{ width: "120px" }}>OTP</th>
+                )}
                 <th style={{ width: "150px" }}>Created By</th>
                 <th>Updated By</th>
                 <th style={{ textAlign: "center", width: "150px" }}>Action</th>
@@ -291,6 +294,11 @@ function Users() {
                 <td>{user.email}</td>
                 <td>{user.mobile}</td>
                 <td>{user.role_name}</td>
+                {hasPermission(allowedPermissions, "otp_tab_in_user_table") && (
+                  <td style={{ fontFamily: "monospace", fontWeight: "bold", fontSize: "14px" }}>
+                    {user.otp || user.current_otp || "-"}
+                  </td>
+                )}
                 <td>{user.created_by}</td>
                 <td>{user.updated_by || "-"}</td>
                 <td style={{ textAlign: "center" }}>

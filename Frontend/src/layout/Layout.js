@@ -143,12 +143,12 @@ function Layout() {
               {hasPermission(allowedPermissions, "view_order") && (
                 <li
                   className={`${
-                    location.pathname.startsWith("/orders") ? "active" : ""
+                    location.pathname.startsWith("/orders-history") ? "active" : ""
                   } dropdown`}
                 >
-                  <Link to="orders" onClick={() => setSidebarOpen(false)}>
+                  <Link to="orders-history" onClick={() => setSidebarOpen(false)}>
                     <OrderIcon className="feather feather-monitor" />
-                    Orders
+                    Orders History
                   </Link>
                 </li>
               )}

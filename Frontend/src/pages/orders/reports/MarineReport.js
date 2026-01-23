@@ -347,6 +347,7 @@ function MarineReport() {
     vessel_photo: "",
     vessel_photo_preview: "",
     vessel_photo_id: null,
+    certifications_vessel_note: "",
     disclaimer: "",
   });
 
@@ -3835,6 +3836,22 @@ function MarineReport() {
                 <div className="col-md-12">
                   <h4>2.0. CERTIFICATIONS OF THE VESSEL :</h4>
                   <hr />
+                </div>
+                <div className="col-md-12">
+                  <div className="form-group">
+                    <label htmlFor="certifications_vessel_note">
+                      Certifications Vessel Note
+                    </label>
+                    <WysiwygTextarea
+                      className="form-field"
+                      id="certifications_vessel_note"
+                      name="certifications_vessel_note"
+                      value={reportFormData.certifications_vessel_note}
+                      onChange={handleFormChange}
+                      placeholder="Enter certifications vessel note"
+                      rows={4}
+                    />
+                  </div>
                 </div>
                 <div className="col-md-12">
                   <div className="row">

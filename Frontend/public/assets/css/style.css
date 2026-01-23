@@ -4355,12 +4355,12 @@ h6 .badge {
     padding-left: 10px
 }
 
-.btn:not(.btn-social):not(.btn-social-icon):active,
+/* .btn:not(.btn-social):not(.btn-social-icon):active,
 .btn:not(.btn-social):not(.btn-social-icon):focus,
 .btn:not(.btn-social):not(.btn-social-icon):hover {
     border-color: transparent !important;
     background-color: #fff
-}
+} */
 
 .btn>i {
     margin-left: 0 !important
@@ -8982,7 +8982,8 @@ body:not(.sidebar-mini) .sidebar-style-2 .sidebar-menu li.active ul.dropdown-men
 .theme-purple .btn-primary {
     background-color: #5864bd;
     border-color: transparent !important;
-    color: #fff
+    color: #fff;
+    border: 1px solid #5864bd;
 }
 
 .theme-purple .btn-primary:focus {
@@ -8998,8 +8999,9 @@ body:not(.sidebar-mini) .sidebar-style-2 .sidebar-menu li.active ul.dropdown-men
 }
 
 .theme-purple .btn-primary:hover {
-    background-color: #5864bd !important;
-    color: #fff
+    background-color: #fff !important;
+    color: #5864bd;
+    border-color: #5864bd !important;
 }
 
 .theme-purple .btn-primary.disabled {

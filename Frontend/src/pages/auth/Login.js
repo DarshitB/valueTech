@@ -9,7 +9,7 @@ import { PasswordIcon, UserIcon } from "../../components/icons";
 export default function Login() {
   /* ==== hooks ==== */
   const dispatch = useDispatch(); // Dispatch function to trigger actions
-  const { loading, token } = useSelector((state) => state.auth); // Access auth state from Redux store
+  const { loading, token, user } = useSelector((state) => state.auth); // Access auth state from Redux store
 
   /* ==== useSTates ==== */
   const [form, setForm] = useState({ username: "", password: "" }); // Initial form state
@@ -25,7 +25,18 @@ export default function Login() {
     dispatch(login(form));
   }; // Handle form submission
 
-  if (token) return <Navigate to="/" />;
+  // Handle redirect after login - check immediately to prevent dashboard flash
+  if (token && user) {
+    const userRole = user?.role?.name || "";
+    const needsOtp =
+      user?.permissions?.includes("need_otp_access") &&
+      userRole.toLowerCase() !== "developer_admin";
+
+    if (needsOtp) {
+      return <Navigate to="/otp-verify" replace />;
+    }
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <>
@@ -95,13 +106,13 @@ export default function Login() {
                         please fill in your password
                       </div>
                     </div>
-                    <div className="forgot-password">
+                    {/* <div className="forgot-password">
                       <div className="float-right">
                         <Link to="/auth/forgot-password" className="text-small">
                           Forgot Password?
                         </Link>
                       </div>
-                    </div>
+                    </div> */}
                     <div className="form-group">
                       <button
                         type="submit"
