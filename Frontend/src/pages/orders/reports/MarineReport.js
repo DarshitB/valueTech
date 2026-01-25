@@ -1801,6 +1801,9 @@ function MarineReport() {
 
   // Set page title using custom hook
   const { setTitle } = usePageTitle();
+  
+  // State for report type selection (Rough/Production)
+  const [reportTypeSelection, setReportTypeSelection] = useState("Rough");
 
   // Clear report data when component mounts or order changes
   useEffect(() => {
@@ -1873,6 +1876,9 @@ function MarineReport() {
 
     // Create FormData for multipart/form-data submission
     const formData = new FormData();
+    
+    // Add report type selection (Rough/Production)
+    formData.append("report_type_selection", reportTypeSelection);
 
     // Add ALL form fields to FormData - ensure every field is included to prevent data loss
     Object.keys(reportFormData).forEach((key) => {
@@ -11041,10 +11047,20 @@ function MarineReport() {
                   />
                 </div>
               </div>
-              {/* Generate Report Button */}
+              {/* Generate Report Button with Report Type Selection */}
               <div className="row">
                 <div className="col-md-12">
-                  <div className="form-buttons">
+                  <div className="form-buttons" style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: "12px" }}>
+                    <div style={{ minWidth: "200px" }}>
+                      <SingleSearchSelect
+                        options={[
+                          { value: "Rough", label: "Rough" },
+                          { value: "Production", label: "Production" },
+                        ]}
+                        value={reportTypeSelection}
+                        onChange={(value) => setReportTypeSelection(value)}
+                      />
+                    </div>
                     <button
                       type="submit"
                       className="submit-button"

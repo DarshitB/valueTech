@@ -166,6 +166,9 @@ function CVReport() {
   const [otherAssetMake, setOtherAssetMake] = useState("");
   // Set page title using custom hook
   const { setTitle } = usePageTitle();
+  
+  // State for report type selection (Rough/Production)
+  const [reportTypeSelection, setReportTypeSelection] = useState("Rough");
 
   // State to track if initial report fetch has completed (using state instead of ref to trigger re-renders)
   const [reportFetchCompleted, setReportFetchCompleted] = useState(false);
@@ -1565,6 +1568,9 @@ function CVReport() {
 
       // Create FormData for multipart/form-data submission
       const formData = new FormData();
+      
+      // Add report type selection (Rough/Production)
+      formData.append("report_type_selection", reportTypeSelection);
 
       // Ensure amount_in_words is present in payload when FMV exists
       if (fmvRaw) {
@@ -1756,6 +1762,7 @@ function CVReport() {
       parseCurrency,
       convertNumberToWordsIndian,
       numberToWords,
+      reportTypeSelection,
     ]
   );
 
@@ -4449,10 +4456,20 @@ function CVReport() {
                 </div>
               </div>
 
-              {/* Generate Report Button */}
+              {/* Generate Report Button with Report Type Selection */}
               <div className="row">
-                <div className="col-12 text-center">
-                  <div className="form-buttons">
+                <div className="col-12">
+                  <div className="form-buttons" style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: "12px" }}>
+                    <div style={{ minWidth: "200px" }}>
+                      <SingleSearchSelect
+                        options={[
+                          { value: "Rough", label: "Rough" },
+                          { value: "Production", label: "Production" },
+                        ]}
+                        value={reportTypeSelection}
+                        onChange={(value) => setReportTypeSelection(value)}
+                      />
+                    </div>
                     <button
                       type="submit"
                       className="submit-button"

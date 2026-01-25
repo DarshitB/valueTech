@@ -280,7 +280,7 @@ function Users() {
                 <th style={{ width: "150px" }}>Contact</th>
                 <th style={{ width: "150px" }}>Role</th>
                 {hasPermission(allowedPermissions, "otp_tab_in_user_table") && (
-                  <th style={{ width: "120px" }}>OTP</th>
+                  <th style={{ width: "120px" }}>Login Code</th>
                 )}
                 <th style={{ width: "150px" }}>Created By</th>
                 <th>Updated By</th>

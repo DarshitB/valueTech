@@ -28,7 +28,8 @@ function generateMachineryReportHTML(
   formData,
   extraData,
   bgImageBase64,
-  stampImageBase64
+  stampImageBase64,
+  reportTypeSelection
 ) {
   return `
 <!DOCTYPE html>
@@ -320,9 +321,40 @@ body.single-page{
             width: 16.66%;
             word-wrap: break-word;
         }
+        
+        ${reportTypeSelection === "Rough" ? `
+        /* Watermark for Rough reports - appears on every page */
+        .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 120px;
+            font-weight: bold;
+            color: rgba(0, 0, 0, 0.15);
+            z-index: 9999;
+            pointer-events: none;
+            user-select: none;
+            white-space: nowrap;
+            font-family: Arial, sans-serif;
+        }
+        
+        @media print {
+            .watermark {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%) rotate(-45deg);
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                color-adjust: exact;
+            }
+        }
+        ` : ''}
     </style>
 </head>
 <body>
+    ${reportTypeSelection === "Rough" ? '<div class="watermark">Rough</div>' : ''}
     <div class="content-wrapper">
         <table class="main-table" style="min-height: calc(100% - 225px);">
         <thead>

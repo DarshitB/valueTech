@@ -1,6 +1,7 @@
 const nodemailer = require("nodemailer");
 const path = require("path");
 const fs = require("fs").promises; // Use promises for async file operations
+const { cleanupTempAttachments } = require("./imageCompressor");
 
 // Cache transporters keyed by SMTP user to reuse connections per account
 const transporterCache = {};
@@ -89,7 +90,10 @@ const sendEmail = async (options) => {
       // Validate all files exist in parallel (async, non-blocking)
       await Promise.all(
         options.attachments.map(async (attachment) => {
-          const filePath = path.join(process.cwd(), attachment.path);
+          // Handle both absolute and relative paths
+          const filePath = path.isAbsolute(attachment.path) 
+            ? attachment.path 
+            : path.join(process.cwd(), attachment.path);
           
           // Check if file exists (async, non-blocking)
           try {
@@ -102,7 +106,10 @@ const sendEmail = async (options) => {
 
       // Map attachments after validation
       mailOptions.attachments = options.attachments.map((attachment) => {
-        const filePath = path.join(process.cwd(), attachment.path);
+        // Handle both absolute and relative paths
+        const filePath = path.isAbsolute(attachment.path)
+          ? attachment.path
+          : path.join(process.cwd(), attachment.path);
         return {
           filename: attachment.filename || path.basename(attachment.path),
           path: filePath,
@@ -111,12 +118,20 @@ const sendEmail = async (options) => {
     }
 
     const info = await transporter.sendMail(mailOptions);
+    
+    // Clean up temporary compressed files after successful send
+    await cleanupTempAttachments(options.attachments);
+    
     return {
       success: true,
       messageId: info.messageId,
       response: info.response,
     };
   } catch (error) {
+    // Clean up temporary files even on error
+    if (options.attachments) {
+      await cleanupTempAttachments(options.attachments);
+    }
     throw new Error(`Failed to send email: ${error.message}`);
   }
 };

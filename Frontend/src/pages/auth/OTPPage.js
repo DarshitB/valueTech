@@ -78,7 +78,7 @@ export default function OTPPage() {
     // Ensure username is included in payload (auto-filled from logged-in user)
     const username = form.username || user?.email || user?.username || "";
     if (!username) {
-      alert("Unable to verify OTP. Please login again.");
+      alert("Unable to verify Login Code. Please login again.");
       return;
     }
     // Submit with username in payload (even though it's not shown in UI)
@@ -178,7 +178,7 @@ export default function OTPPage() {
               <h2 className="login-brand">Valuetech Solutions</h2>
               <div className="card card-primary">
                 <div className="card-header">
-                  <h4>Verify OTP</h4>
+                  <h4>Verify Login Code</h4>
                 </div>
                 <div className="card-body">
                   <form
@@ -241,7 +241,7 @@ export default function OTPPage() {
                         tabIndex="7"
                         disabled={otpLoading}
                       >
-                        {otpLoading ? "Verifying..." : "Verify OTP"}
+                        {otpLoading ? "Verifying..." : "Verify Login Code"}
                       </button>
                     </div>
                   </form>

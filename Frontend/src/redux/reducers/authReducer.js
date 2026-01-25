@@ -59,7 +59,7 @@ export const login = createAsyncThunk(
           localStorage.removeItem("otpVerified");
         } catch (otpErr) {
           // If OTP generation fails, still allow login but user will need to request OTP again
-          console.error("OTP generation failed:", otpErr);
+          console.error("Login Code generation failed:", otpErr);
         }
       } else {
         // If user doesn't need OTP, mark as verified
@@ -112,12 +112,12 @@ export const generateOtp = createAsyncThunk(
   async (payload, thunkAPI) => {
     try {
       const res = await axios.post("/api/auth/generate-otp", payload);
-      toast.success(res.data.message || "OTP generated successfully");
+      toast.success(res.data.message || "Login Code generated successfully");
       return res.data;
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to generate OTP");
+      toast.error(err.response?.data?.message || "Failed to generate Login Code");
       return thunkAPI.rejectWithValue(
-        err.response?.data?.message || "Failed to generate OTP"
+        err.response?.data?.message || "Failed to generate Login Code"
       );
     }
   }
@@ -129,12 +129,12 @@ export const verifyOtp = createAsyncThunk(
   async (payload, thunkAPI) => {
     try {
       const res = await axios.post("/api/auth/verify-otp", payload);
-      toast.success(res.data.message || "OTP verified successfully");
+      toast.success(res.data.message || "Login Code verified successfully");
       return res.data;
     } catch (err) {
-      toast.error(err.response?.data?.message || "OTP verification failed");
+      toast.error(err.response?.data?.message || "Login Code verification failed");
       return thunkAPI.rejectWithValue(
-        err.response?.data?.message || "OTP verification failed"
+        err.response?.data?.message || "Login Code verification failed"
       );
     }
   }

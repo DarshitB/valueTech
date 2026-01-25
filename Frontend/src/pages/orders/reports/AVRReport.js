@@ -159,6 +159,9 @@ function AVRReport() {
   );
   // Set page title using custom hook
   const { setTitle } = usePageTitle();
+  
+  // State for report type selection (Rough/Production)
+  const [reportTypeSelection, setReportTypeSelection] = useState("Rough");
   // Clear report data when component mounts or order changes
   useEffect(() => {
     // Clear any existing report data first
@@ -940,6 +943,9 @@ function AVRReport() {
 
     // Create FormData for multipart/form-data submission
     const formData = new FormData();
+    
+    // Add report type selection (Rough/Production)
+    formData.append("report_type_selection", reportTypeSelection);
 
     // Add all form fields to FormData - simple logic: if value exists send it, if null/empty send null
     Object.keys(reportFormData).forEach((key) => {
@@ -2122,10 +2128,20 @@ function AVRReport() {
                 </div>
               </div>
 
-              {/* Generate Report Button */}
+              {/* Generate Report Button with Report Type Selection */}
               <div className="row">
                 <div className="col-md-12">
-                  <div className="form-buttons">
+                  <div className="form-buttons" style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: "12px" }}>
+                    <div style={{ minWidth: "200px" }}>
+                      <SingleSearchSelect
+                        options={[
+                          { value: "Rough", label: "Rough" },
+                          { value: "Production", label: "Production" },
+                        ]}
+                        value={reportTypeSelection}
+                        onChange={(value) => setReportTypeSelection(value)}
+                      />
+                    </div>
                     <button
                       type="submit"
                       className="submit-button"

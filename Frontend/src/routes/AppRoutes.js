@@ -28,8 +28,8 @@ import PublicOrderImages from "../pages/orders/PublicOrderImages";
 import OrderDocuments from "../pages/orders/OrderDocuments";
 import CVReport from "../pages/orders/reports/CVReport";
 import AVRReport from "../pages/orders/reports/AVRReport";
-import CustomReport from "../pages/orders/reports/CustomReport";
-import WordLikeEditor from "../pages/orders/reports/WordLikeEditor";
+/* import CustomReport from "../pages/orders/reports/CustomReport";
+import WordLikeEditor from "../pages/orders/reports/WordLikeEditor"; */
 import MachineryReport from "../pages/orders/reports/MachineryReport";
 import CEReport from "../pages/orders/reports/CEReport";
 import MarineReport from "../pages/orders/reports/MarineReport";
@@ -125,14 +125,14 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
-        <Route
+        {/* <Route
           path="orders/:id/details/custom-report"
           element={
             <ProtectedRoute permission="view_order_details">
               <WordLikeEditor />
             </ProtectedRoute>
           }
-        />
+        /> */}
         <Route
           path="order-history"
           element={

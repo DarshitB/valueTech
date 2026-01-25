@@ -1042,7 +1042,8 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
     formData,
     extraData,
     bgImageBase64,
-    stampImageBase64
+    stampImageBase64,
+    formData.report_type_selection
   );
 
   // Launch Puppeteer with optimized settings
@@ -1958,6 +1959,7 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
  * @param {Object} extraData - Extra data
  * @param {string} bgImageBase64 - Background image as base64
  * @param {string|null} stampImageBase64 - Optional stamp image as base64
+ * @param {string|null} reportTypeSelection - Report type selection ("Rough" or "Production")
  * @returns {string} HTML content
  */
 function generateReportHTML(
@@ -1965,7 +1967,8 @@ function generateReportHTML(
   formData,
   extraData,
   bgImageBase64,
-  stampImageBase64
+  stampImageBase64,
+  reportTypeSelection
 ) {
   // Route to appropriate template based on report type
   switch (reportType.toLowerCase()) {
@@ -1974,7 +1977,8 @@ function generateReportHTML(
         formData,
         extraData,
         bgImageBase64,
-        stampImageBase64
+        stampImageBase64,
+        reportTypeSelection
       );
 
     case "report_avr":
@@ -1982,7 +1986,8 @@ function generateReportHTML(
         formData,
         extraData,
         bgImageBase64,
-        stampImageBase64
+        stampImageBase64,
+        reportTypeSelection
       );
 
     case "report_machinery":
@@ -1990,7 +1995,8 @@ function generateReportHTML(
         formData,
         extraData,
         bgImageBase64,
-        stampImageBase64
+        stampImageBase64,
+        reportTypeSelection
       );
 
     case "report_ce":
@@ -1998,7 +2004,8 @@ function generateReportHTML(
         formData,
         extraData,
         bgImageBase64,
-        stampImageBase64
+        stampImageBase64,
+        reportTypeSelection
       );
 
     case "report_marine":
@@ -2006,7 +2013,8 @@ function generateReportHTML(
         formData,
         extraData,
         bgImageBase64,
-        stampImageBase64
+        stampImageBase64,
+        reportTypeSelection
       );
 
     // Future report types can be added here

@@ -14,7 +14,7 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchPublicOrderMedia } from "../../redux/reducers/orderReducer";
-import { ZoomIn } from "lucide-react";
+import { ZoomIn, FileText, Image as ImageIcon, Eye } from "lucide-react";
 import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
 import "./PublicOrderImages.scss";
@@ -78,6 +78,31 @@ function PublicOrderImages() {
     }
   };
 
+  // Get filename from media URL
+  const getFilenameFromMediaUrl = (media_url) => {
+    if (!media_url || typeof media_url !== "string") return "Document";
+    try {
+      const parsed = JSON.parse(media_url);
+      if (parsed && typeof parsed === "object") {
+        const filename = parsed.path || parsed.filename || parsed.name;
+        if (filename) {
+          const extractedName =
+            typeof filename === "string"
+              ? filename.split("/").pop() || filename
+              : "Document";
+          return extractedName;
+        }
+      }
+      return "Document";
+    } catch {
+      if (typeof media_url === "string") {
+        const filename = media_url.split("/").pop() || media_url;
+        return filename;
+      }
+      return "Document";
+    }
+  };
+
   // Backend already returns only approved media, so no filtering needed
   // Separate images and videos
   const approvedMedia = React.useMemo(() => {
@@ -94,6 +119,19 @@ function PublicOrderImages() {
   const approvedVideos = React.useMemo(() => {
     return approvedMedia.filter((item) => isVideo(item.media_url));
   }, [approvedMedia]);
+
+  // Filter reports and collages from media response using media_type
+  const approvedReports = React.useMemo(() => {
+    if (!media?.media) return [];
+    // Filter items with media_type === "report"
+    return media.media.filter((item) => item.media_type === "report");
+  }, [media]);
+
+  const approvedCollages = React.useMemo(() => {
+    if (!media?.media) return [];
+    // Filter items with media_type === "collage"
+    return media.media.filter((item) => item.media_type === "collage");
+  }, [media]);
 
   // Prepare lightbox slides array (approved images and videos)
   const lightboxSlides = React.useMemo(() => {
@@ -223,7 +261,7 @@ function PublicOrderImages() {
               <div className="col-12">
                 <div className="public-order-images-container">
                   <div className="public-order-images-content">
-                    {approvedMedia.length > 0 ? (
+                    {approvedMedia.length > 0 || approvedReports.length > 0 || approvedCollages.length > 0 ? (
                       <>
                         {/* Images Section */}
                         {approvedImages.length > 0 && (
@@ -258,7 +296,7 @@ function PublicOrderImages() {
                                             handleLightboxOpen(item);
                                           }}
                                         >
-                                          <ZoomIn size={20} />
+                                          <Eye size={20} />
                                         </button>
                                       </div>
                                     </div>
@@ -271,7 +309,7 @@ function PublicOrderImages() {
 
                         {/* Videos Section */}
                         {approvedVideos.length > 0 && (
-                          <div>
+                          <div style={{ marginBottom: "40px" }}>
                             <h2 className="section-heading" style={{ marginBottom: "20px", fontSize: "24px", fontWeight: "600" }}>
                               Videos ({approvedVideos.length})
                             </h2>
@@ -305,7 +343,7 @@ function PublicOrderImages() {
                                             handleLightboxOpen(item);
                                           }}
                                         >
-                                          <ZoomIn size={20} />
+                                          <Eye size={20} />
                                         </button>
                                         <span
                                           style={{
@@ -321,6 +359,134 @@ function PublicOrderImages() {
                                         >
                                           Video
                                         </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Reports Section - Only show if there are reports */}
+                        {approvedReports.length > 0 && (
+                          <div style={{ marginBottom: "40px" }}>
+                            <h2 className="section-heading" style={{ marginBottom: "20px", fontSize: "24px", fontWeight: "600" }}>
+                              Reports ({approvedReports.length})
+                            </h2>
+                            <div className="public-order-images-grid">
+                              {approvedReports.map((item) => {
+                                const documentUrl = getImageUrl(item.media_url);
+                                const fileName = item.file_name || item.name || getFilenameFromMediaUrl(item.media_url) || `Report ${item.id}`;
+
+                                return (
+                                  <div key={item.id} className="public-order-image-card">
+                                    <div
+                                      className="public-order-image-box"
+                                      onClick={() => window.open(documentUrl, "_blank", "noopener,noreferrer")}
+                                      style={{
+                                        backgroundColor: "#f8f9fa",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        padding: "20px",
+                                      }}
+                                    >
+                                      <FileText size={48} color="#007bff" style={{ marginBottom: "12px" }} />
+                                      <span
+                                        style={{
+                                          fontSize: "12px",
+                                          color: "#333",
+                                          fontWeight: "500",
+                                          textAlign: "center",
+                                          wordBreak: "break-word",
+                                          maxWidth: "100%",
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          display: "-webkit-box",
+                                          WebkitLineClamp: 2,
+                                          WebkitBoxOrient: "vertical",
+                                        }}
+                                        title={fileName}
+                                      >
+                                        {fileName}
+                                      </span>
+                                      <div className="public-order-image-overlay">
+                                        <button
+                                          className="lightbox-btn"
+                                          title="Open report in new tab"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            window.open(documentUrl, "_blank", "noopener,noreferrer");
+                                          }}
+                                        >
+                                          <Eye size={20} />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Collages Section */}
+                        {approvedCollages.length > 0 && (
+                          <div style={{ marginBottom: "40px" }}>
+                            <h2 className="section-heading" style={{ marginBottom: "20px", fontSize: "24px", fontWeight: "600" }}>
+                              Collages ({approvedCollages.length})
+                            </h2>
+                            <div className="public-order-images-grid">
+                              {approvedCollages.map((item) => {
+                                const mediaUrl = getImageUrl(item.media_url);
+                                const fileName = item.file_name || item.name || getFilenameFromMediaUrl(item.media_url) || `Collage ${item.id}`;
+
+                                return (
+                                  <div key={item.id} className="public-order-image-card">
+                                    <div
+                                      className="public-order-image-box"
+                                      onClick={() => window.open(mediaUrl, "_blank", "noopener,noreferrer")}
+                                      style={{
+                                        backgroundColor: "#f8f9fa",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        padding: "20px",
+                                      }}
+                                    >
+                                      <FileText size={48} color="#007bff" style={{ marginBottom: "12px" }} />
+                                      <span
+                                        style={{
+                                          fontSize: "12px",
+                                          color: "#333",
+                                          fontWeight: "500",
+                                          textAlign: "center",
+                                          wordBreak: "break-word",
+                                          maxWidth: "100%",
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          display: "-webkit-box",
+                                          WebkitLineClamp: 2,
+                                          WebkitBoxOrient: "vertical",
+                                        }}
+                                        title={fileName}
+                                      >
+                                        {fileName}
+                                      </span>
+                                      <div className="public-order-image-overlay">
+                                        <button
+                                          className="lightbox-btn"
+                                          title="Open collage in new tab"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            window.open(mediaUrl, "_blank", "noopener,noreferrer");
+                                          }}
+                                        >
+                                          <Eye size={20} />
+                                        </button>
                                       </div>
                                     </div>
                                   </div>

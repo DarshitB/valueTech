@@ -1360,6 +1360,10 @@ exports.sendMail = async (req, res, next) => {
     const orderMediaDocument = require("../../models/orders/orderMediaDocument");
     const orderMediaPortal = require("../../models/orders/orderMediaPortal");
     const path = require("path");
+    const { 
+      isPdfFile,
+      compressPdfForEmail 
+    } = require("../../utils/imageCompressor");
 
     const baseUrl =
       process.env.APP_BASE_URL ||
@@ -1478,10 +1482,41 @@ exports.sendMail = async (req, res, next) => {
         const filename = path.basename(document.media_url);
 
         if (document_as_attachment) {
-          documentAttachments.push({
-            path: mediaPath,
-            filename,
-          });
+          // Get the full file path for checking
+          const fullPath = path.join(process.cwd(), mediaPath);
+          
+          // Check if document is a collage PDF that should be compressed
+          const isCollagePdf = 
+            isPdfFile(fullPath) && 
+            document.document_type === 'collage';
+          
+          if (isCollagePdf) {
+            // Compress collage PDF to ~1MB for email (only if > 1MB)
+            // Works directly on PDF without needing source JPG
+            try {
+              const result = await compressPdfForEmail(fullPath, 1);
+              documentAttachments.push({
+                path: result.path,
+                filename,
+                isTemporary: result.path !== fullPath, // Mark as temp if compressed
+              });
+            } catch (compressionError) {
+              console.error(`Failed to compress ${filename}:`, compressionError.message);
+              // Fall back to original if compression fails
+              documentAttachments.push({
+                path: mediaPath,
+                filename,
+                isTemporary: false,
+              });
+            }
+          } else {
+            // Reports and other documents: send as-is
+            documentAttachments.push({
+              path: mediaPath,
+              filename,
+              isTemporary: false,
+            });
+          }
           documentAttachmentCount++;
         } else {
           const relativeUrl = document.media_url.startsWith("/")

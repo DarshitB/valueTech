@@ -1,4 +1,5 @@
 const orderMediaPortal = require("../../models/orders/orderMediaPortal");
+const orderMediaDocument = require("../../models/orders/orderMediaDocument");
 const Order = require("../../models/orders/order");
 const OrderStatusHistory = require("../../models/orders/orderStatusHistory");
 const fs = require("fs");
@@ -511,6 +512,7 @@ async function uploadZip(req, res, next) {
 /**
  * GET /api/portal/order-media/public/:orderId
  * Public API to get only approved media records for a specific order (no authentication required)
+ * Includes: images, videos, reports, and collages (all approved)
  */
 async function getApprovedOrderMediaPublic(req, res, next) {
   try {
@@ -532,8 +534,36 @@ async function getApprovedOrderMediaPublic(req, res, next) {
       throw new NotFoundError("Order not found");
     }
 
-    // Get only approved media for the order (status = 1)
+    // Get approved images and videos (status = 1)
     const approvedMediaRecords = await orderMediaPortal.getApprovedMediaByOrderId(orderIdNum);
+
+    // Get approved reports and collages (status = "approved")
+    const approvedDocuments = await orderMediaDocument.findApprovedByOrderId(orderIdNum);
+    
+    // Filter only reports and collages
+    const reportsAndCollages = approvedDocuments.filter(
+      doc => doc.document_type === 'report' || doc.document_type === 'collage'
+    );
+
+    // Format documents to match media structure for consistency
+    const formattedDocuments = reportsAndCollages.map(doc => ({
+      id: doc.id,
+      order_id: doc.order_id,
+      uploader_type: doc.created_type || 'system',
+      uploader_id: doc.created_by,
+      media_url: doc.media_url,
+      media_type: doc.document_type, // 'report' or 'collage'
+      status: doc.status,
+      created_at: doc.created_at,
+      updated_at: doc.updated_at,
+      updated_by: doc.updated_by,
+    }));
+
+    // Combine all approved media (images, videos, reports, collages)
+    const allApprovedMedia = [...approvedMediaRecords, ...formattedDocuments];
+
+    // Sort by created_at (newest first)
+    allApprovedMedia.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     res.json({
       success: true,
@@ -542,8 +572,14 @@ async function getApprovedOrderMediaPublic(req, res, next) {
           id: order.id,
           order_number: order.order_number,
         },
-        media: approvedMediaRecords,
-        total_count: approvedMediaRecords.length,
+        media: allApprovedMedia,
+        total_count: allApprovedMedia.length,
+        summary: {
+          images: approvedMediaRecords.filter(m => m.media_type === 'image').length,
+          videos: approvedMediaRecords.filter(m => m.media_type === 'video').length,
+          reports: formattedDocuments.filter(d => d.media_type === 'report').length,
+          collages: formattedDocuments.filter(d => d.media_type === 'collage').length,
+        },
       },
     });
   } catch (error) {
