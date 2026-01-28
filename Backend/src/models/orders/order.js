@@ -212,10 +212,61 @@ const order = {
       }, {});
     }
 
-    // Add assigned_users to each order
+    // Get ref_no_id from reports for each order
+    let refNoIdMap = {};
+    
+    if (orderIds.length > 0) {
+      // Query all report tables to get ref_no_id
+      const [cvReports, avrReports, machineryReports, ceReports, marineReports, customReports] = await Promise.all([
+        db("report_cv")
+          .select("order_id", "ref_no_id")
+          .whereIn("order_id", orderIds)
+          .whereNotNull("ref_no_id"),
+        db("report_avr")
+          .select("order_id", "ref_no_id")
+          .whereIn("order_id", orderIds)
+          .whereNotNull("ref_no_id"),
+        db("report_machinery")
+          .select("order_id", "ref_no_id")
+          .whereIn("order_id", orderIds)
+          .whereNotNull("ref_no_id"),
+        db("report_ce")
+          .select("order_id", "ref_no_id")
+          .whereIn("order_id", orderIds)
+          .whereNotNull("ref_no_id"),
+        db("report_marine")
+          .select("order_id", "ref_no_id")
+          .whereIn("order_id", orderIds)
+          .whereNotNull("ref_no_id"),
+        db("report_custom")
+          .select("order_id", "content")
+          .whereIn("order_id", orderIds)
+          .whereNotNull("content")
+      ]);
+
+      // Process standard reports (cv, avr, machinery, ce, marine)
+      [...cvReports, ...avrReports, ...machineryReports, ...ceReports, ...marineReports].forEach((report) => {
+        if (report.ref_no_id) {
+          refNoIdMap[report.order_id] = report.ref_no_id;
+        }
+      });
+
+      // Process custom reports (ref_no_id might be in content JSONB)
+      customReports.forEach((report) => {
+        if (report.content && typeof report.content === 'object') {
+          // Check if ref_no_id exists in the content object
+          if (report.content.ref_no_id) {
+            refNoIdMap[report.order_id] = report.content.ref_no_id;
+          }
+        }
+      });
+    }
+
+    // Add assigned_users and ref_no_id to each order
     const ordersWithAssignedUsers = orders.map((order) => ({
       ...order,
       assigned_users: assignedUsersMap[order.id] || [],
+      ref_no_id: refNoIdMap[order.id] || null,
     }));
 
     return ordersWithAssignedUsers;
@@ -416,10 +467,61 @@ const order = {
       }, {});
     }
 
-    // Add assigned_users to each order
+    // Get ref_no_id from reports for each order
+    let refNoIdMap = {};
+    
+    if (orderIds.length > 0) {
+      // Query all report tables to get ref_no_id
+      const [cvReports, avrReports, machineryReports, ceReports, marineReports, customReports] = await Promise.all([
+        db("report_cv")
+          .select("order_id", "ref_no_id")
+          .whereIn("order_id", orderIds)
+          .whereNotNull("ref_no_id"),
+        db("report_avr")
+          .select("order_id", "ref_no_id")
+          .whereIn("order_id", orderIds)
+          .whereNotNull("ref_no_id"),
+        db("report_machinery")
+          .select("order_id", "ref_no_id")
+          .whereIn("order_id", orderIds)
+          .whereNotNull("ref_no_id"),
+        db("report_ce")
+          .select("order_id", "ref_no_id")
+          .whereIn("order_id", orderIds)
+          .whereNotNull("ref_no_id"),
+        db("report_marine")
+          .select("order_id", "ref_no_id")
+          .whereIn("order_id", orderIds)
+          .whereNotNull("ref_no_id"),
+        db("report_custom")
+          .select("order_id", "content")
+          .whereIn("order_id", orderIds)
+          .whereNotNull("content")
+      ]);
+
+      // Process standard reports (cv, avr, machinery, ce, marine)
+      [...cvReports, ...avrReports, ...machineryReports, ...ceReports, ...marineReports].forEach((report) => {
+        if (report.ref_no_id) {
+          refNoIdMap[report.order_id] = report.ref_no_id;
+        }
+      });
+
+      // Process custom reports (ref_no_id might be in content JSONB)
+      customReports.forEach((report) => {
+        if (report.content && typeof report.content === 'object') {
+          // Check if ref_no_id exists in the content object
+          if (report.content.ref_no_id) {
+            refNoIdMap[report.order_id] = report.content.ref_no_id;
+          }
+        }
+      });
+    }
+
+    // Add assigned_users and ref_no_id to each order
     const ordersWithAssignedUsers = orders.map((order) => ({
       ...order,
       assigned_users: assignedUsersMap[order.id] || [],
+      ref_no_id: refNoIdMap[order.id] || null,
     }));
 
     return ordersWithAssignedUsers;

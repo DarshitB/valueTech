@@ -1549,6 +1549,10 @@ function Orders() {
                   ) && <th style={{ width: "150px" }}>Order Number</th>}
                   {hasPermission(
                     allowedPermissions,
+                    "view_order_table_ref_id"
+                  ) && <th style={{ width: "150px" }}>Ref ID</th>}
+                  {hasPermission(
+                    allowedPermissions,
                     "view_order_table_category"
                   ) && <th style={{ width: "150px" }}>Category</th>}
                   {hasPermission(
@@ -1659,6 +1663,10 @@ function Orders() {
                       {order.order_number}
                     </td>
                   )}
+                  {hasPermission(
+                    allowedPermissions,
+                    "view_order_table_ref_id"
+                  ) && <td>{order.ref_no_id || "-"}</td>}
                   {hasPermission(
                     allowedPermissions,
                     "view_order_table_category"

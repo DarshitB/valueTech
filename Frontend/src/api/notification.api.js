@@ -29,8 +29,8 @@ export const getNotifications = (params = {}) => {
   
   return axios.get(url).then((response) => {
     // Debug: Log the raw response
-    console.log("Raw notification API response:", response);
-    console.log("Response data:", response.data);
+   /*  console.log("Raw notification API response:", response);
+    console.log("Response data:", response.data); */
     return response;
   }).catch((error) => {
     console.error("Notification API error:", error);

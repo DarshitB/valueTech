@@ -25,6 +25,7 @@ import Officers from "../pages/banks/Officers";
 import OrderDetails from "../pages/orders/OrderDetails";
 import OrderImages from "../pages/orders/OrderImages";
 import PublicOrderImages from "../pages/orders/PublicOrderImages";
+import PublicOrderDetails from "../pages/orders/PublicOrderDetails";
 import OrderDocuments from "../pages/orders/OrderDocuments";
 import CVReport from "../pages/orders/reports/CVReport";
 import AVRReport from "../pages/orders/reports/AVRReport";
@@ -39,10 +40,14 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/otp-verify" element={<OTPPage />} />
-      {/* Public route for order images (no authentication required) */}
+      {/* Public routes (no authentication required) */}
       <Route
         path="/public/orders/:id/images"
         element={<PublicOrderImages />}
+      />
+      <Route
+        path="/public/orders/:id/documents"
+        element={<PublicOrderDetails />}
       />
       <Route path="/" element={<Layout />}>
         <Route

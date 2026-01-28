@@ -1317,6 +1317,7 @@ exports.sendMail = async (req, res, next) => {
       document_ids,
       video_ids,
       mail_attachment,
+      public_url,
     } =
       req.body;
 
@@ -1353,6 +1354,10 @@ exports.sendMail = async (req, res, next) => {
 
     if (video_ids !== undefined && !Array.isArray(video_ids)) {
       throw new BadRequestError("'video_ids' must be an array");
+    }
+
+    if (public_url !== undefined && (typeof public_url !== "string" || public_url.trim() === "")) {
+      throw new BadRequestError("'public_url' must be a non-empty string if provided");
     }
 
     // Import email service and models
@@ -1539,20 +1544,29 @@ exports.sendMail = async (req, res, next) => {
 
     let emailBody = comments ? `${comments.trim()}` : "";
 
-    if (!document_as_attachment && documentLinkGroups.size > 0) {
-      for (const [category, links] of documentLinkGroups.entries()) {
-        const list = links
-          .map((item) => `- ${item.filename}: ${item.url}`)
-          .join("\n");
-        emailBody += `${emailBody ? "\n\n" : ""}${category}:\n${list}`;
-      }
-    }
+    // Check if public_url is provided and not null
+    const hasPublicUrl = public_url && typeof public_url === "string" && public_url.trim() !== "";
 
-    if (videoLinks.length > 0) {
-      const videoListText = videoLinks
-        .map((video) => `- ${video.filename}: ${video.url}`)
-        .join("\n");
-      emailBody += `${emailBody ? "\n\n" : ""}Video links:\n${videoListText}`;
+    if (hasPublicUrl) {
+      // If public_url exists, add only public_url to email body
+      emailBody += `${emailBody ? "\n\n" : ""}${public_url.trim()}`;
+    } else {
+      // If no public_url, use existing behavior (document links and video links)
+      if (!document_as_attachment && documentLinkGroups.size > 0) {
+        for (const [category, links] of documentLinkGroups.entries()) {
+          const list = links
+            .map((item) => `- ${item.filename}: ${item.url}`)
+            .join("\n");
+          emailBody += `${emailBody ? "\n\n" : ""}${category}:\n${list}`;
+        }
+      }
+
+      if (videoLinks.length > 0) {
+        const videoListText = videoLinks
+          .map((video) => `- ${video.filename}: ${video.url}`)
+          .join("\n");
+        emailBody += `${emailBody ? "\n\n" : ""}Video links:\n${videoListText}`;
+      }
     }
 
     /* if (!emailBody) {
@@ -1567,28 +1581,36 @@ exports.sendMail = async (req, res, next) => {
 
     let htmlEmailBody = comments ? comments.replace(/\n/g, "<br>") : "";
 
-    if (!document_as_attachment && documentLinkGroups.size > 0) {
-      for (const [category, links] of documentLinkGroups.entries()) {
-        const linkHtml = links
+    if (hasPublicUrl) {
+      // If public_url exists, add only public_url to HTML email body
+      const safePublicUrl = public_url.trim();
+      htmlEmailBody += `${htmlEmailBody ? "<br><br>" : ""
+        }Documents: <a href="${safePublicUrl}" target="_blank" rel="noopener noreferrer">Click here to view</a>`;
+    } else {
+      // If no public_url, use existing behavior (document links and video links)
+      if (!document_as_attachment && documentLinkGroups.size > 0) {
+        for (const [category, links] of documentLinkGroups.entries()) {
+          const linkHtml = links
+            .map(
+              (item) =>
+                `<li><a href="${item.url}" target="_blank" rel="noopener noreferrer">${item.filename}</a></li>`
+            )
+            .join("");
+          htmlEmailBody += `${htmlEmailBody ? "<br><br>" : ""
+            }<strong>${category}:</strong><ul>${linkHtml}</ul>`;
+        }
+      }
+
+      if (videoLinks.length > 0) {
+        const videoListHtml = videoLinks
           .map(
-            (item) =>
-              `<li><a href="${item.url}" target="_blank" rel="noopener noreferrer">${item.filename}</a></li>`
+            (video) =>
+              `<li><a href="${video.url}" target="_blank" rel="noopener noreferrer">${video.filename}</a></li>`
           )
           .join("");
         htmlEmailBody += `${htmlEmailBody ? "<br><br>" : ""
-          }<strong>${category}:</strong><ul>${linkHtml}</ul>`;
+          }<strong>Video links:</strong><ul>${videoListHtml}</ul>`;
       }
-    }
-
-    if (videoLinks.length > 0) {
-      const videoListHtml = videoLinks
-        .map(
-          (video) =>
-            `<li><a href="${video.url}" target="_blank" rel="noopener noreferrer">${video.filename}</a></li>`
-        )
-        .join("");
-      htmlEmailBody += `${htmlEmailBody ? "<br><br>" : ""
-        }<strong>Video links:</strong><ul>${videoListHtml}</ul>`;
     }
 
     /* if (!htmlEmailBody) {
@@ -1657,6 +1679,7 @@ exports.sendMail = async (req, res, next) => {
         cc: cc || [],
         bcc: bcc || [],
         subject: subject,
+        public_url: hasPublicUrl ? public_url : null,
         videosCount: videoLinks.length,
         documentsCount: document_as_attachment
           ? documentAttachmentCount

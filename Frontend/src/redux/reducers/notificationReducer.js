@@ -77,12 +77,12 @@ const notificationSlice = createSlice({
         const response = action.payload;
         
         // Debug: Log the response to help identify the issue
-        console.log("Notification API Response:", response);
+        /* console.log("Notification API Response:", response);
         console.log("Response.data:", response?.data);
         console.log("Response.data.notifications:", response?.data?.notifications);
         console.log("Response.data.unread_count:", response?.data?.unread_count);
         console.log("Is notifications array?", Array.isArray(response?.data?.notifications));
-        console.log("Notifications length:", response?.data?.notifications?.length);
+        console.log("Notifications length:", response?.data?.notifications?.length); */
         
         // Handle different response structures
         if (response?.data?.notifications) {
@@ -98,25 +98,25 @@ const notificationSlice = createSlice({
           if (response.data.last_check_timestamp) {
             state.lastCheck = response.data.last_check_timestamp;
           }
-          console.log("Parsed notifications (standard structure):", state.list.length, "notifications");
+        /*   console.log("Parsed notifications (standard structure):", state.list.length, "notifications");
           console.log("Backend unread_count:", response.data.unread_count);
           console.log("Actual unread count (from notifications array):", actualUnreadCount);
-          console.log("Unread count set to:", state.unreadCount);
+          console.log("Unread count set to:", state.unreadCount); */
         } else if (response?.notifications) {
           // Alternative structure: { notifications: [...], unread_count: X }
           state.list = Array.isArray(response.notifications) ? response.notifications : [];
           state.unreadCount = response.unread_count || 0;
-          console.log("Parsed notifications (alternative structure):", state.list.length, "notifications");
+         /*  console.log("Parsed notifications (alternative structure):", state.list.length, "notifications"); */
         } else if (Array.isArray(response)) {
           // Direct array response
           state.list = response;
           state.unreadCount = response.length;
-          console.log("Parsed notifications (array structure):", state.list.length, "notifications");
+          /* console.log("Parsed notifications (array structure):", state.list.length, "notifications"); */
         } else if (response?.data && Array.isArray(response.data)) {
           // { data: [...] }
           state.list = response.data;
           state.unreadCount = response.data.length;
-          console.log("Parsed notifications (data array):", state.list.length, "notifications");
+          /* console.log("Parsed notifications (data array):", state.list.length, "notifications"); */
         } else {
           // Empty or unknown structure
           state.list = [];

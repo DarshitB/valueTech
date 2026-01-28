@@ -54,6 +54,8 @@ function Dashboard() {
   const { lastRecord: lastAttendance, loading: attendanceLoading } =
     useSelector((state) => state.attendance);
 
+  console.log("orders", orders);
+
   // Fetch everything on mount - always fetch orders when Dashboard component mounts
   // This ensures we get the correct data even if Orders' finalized orders are in the store
   useEffect(() => {
@@ -1278,14 +1280,13 @@ function Dashboard() {
           <div className="row">
             {hasStatisticsPermission && (
               <div
-                className={`${
-                  hasPermission(
-                    allowedPermissions,
-                    "view_dashboard_checkin_checkout"
-                  )
+                className={`${hasPermission(
+                  allowedPermissions,
+                  "view_dashboard_checkin_checkout"
+                )
                     ? "col-xl-12"
                     : "col-xl-12"
-                } col-lg-12 col-md-12 col-sm-12 col-xs-12`}
+                  } col-lg-12 col-md-12 col-sm-12 col-xs-12`}
               >
                 <div className="left-part-of-sneak-peek">
                   <div className="row">
@@ -1408,7 +1409,7 @@ function Dashboard() {
                                           orders.filter(
                                             (order) =>
                                               order.has_rejected_media ===
-                                                true ||
+                                              true ||
                                               order.has_rejected_images === true
                                           ).length
                                         )}
@@ -1569,7 +1570,7 @@ function Dashboard() {
                                           orders.filter(
                                             (order) =>
                                               order.has_rejected_media ===
-                                                true ||
+                                              true ||
                                               order.has_rejected_images === true
                                           ).length
                                         )}
@@ -1656,204 +1657,204 @@ function Dashboard() {
                         allowedPermissions,
                         "view_order_type_filter"
                       ) && (
-                        <SingleSearchSelect
-                          className="search-selector"
-                          options={[
-                            { value: "", label: "All Types" },
-                            { value: "VKA1", label: "VKA1" },
-                            { value: "VKA2", label: "VKA2" },
-                            { value: "VKA3", label: "VKA3" },
-                          ]}
-                          value={selectedOrderType || null}
-                          onChange={(value) => {
-                            const val = value || "";
-                            setSelectedOrderType(val);
-                            localStorage.setItem("filter_orderType", val);
-                          }}
-                          placeholder="All Types"
-                        />
-                      )}
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Types" },
+                              { value: "VKA1", label: "VKA1" },
+                              { value: "VKA2", label: "VKA2" },
+                              { value: "VKA3", label: "VKA3" },
+                            ]}
+                            value={selectedOrderType || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedOrderType(val);
+                              localStorage.setItem("filter_orderType", val);
+                            }}
+                            placeholder="All Types"
+                          />
+                        )}
                       {hasPermission(
                         allowedPermissions,
                         "view_order_priority_filter"
                       ) && (
-                        <SingleSearchSelect
-                          className="search-selector"
-                          options={[
-                            { value: "", label: "All Priorities" },
-                            { value: "High", label: "High" },
-                            { value: "Low", label: "Low" },
-                          ]}
-                          value={selectedPriority || null}
-                          onChange={(value) => {
-                            const val = value || "";
-                            setSelectedPriority(val);
-                            localStorage.setItem("filter_priority", val);
-                          }}
-                          placeholder="All Priorities"
-                        />
-                      )}
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Priorities" },
+                              { value: "High", label: "High" },
+                              { value: "Low", label: "Low" },
+                            ]}
+                            value={selectedPriority || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedPriority(val);
+                              localStorage.setItem("filter_priority", val);
+                            }}
+                            placeholder="All Priorities"
+                          />
+                        )}
                       {hasPermission(
                         allowedPermissions,
                         "view_status_filter"
                       ) && (
-                        <SingleSearchSelect
-                          className="search-selector"
-                          options={[
-                            { value: "", label: "All Status" },
-                            ...distinctOrderStatuses.map((status) => ({
-                              value: status,
-                              label: status,
-                            })),
-                          ]}
-                          value={selectedOrderStatus || null}
-                          onChange={(value) => {
-                            const val = value || "";
-                            setSelectedOrderStatus(val);
-                            localStorage.setItem("filter_orderStatus", val);
-                          }}
-                          placeholder="All Status"
-                        />
-                      )}
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Status" },
+                              ...distinctOrderStatuses.map((status) => ({
+                                value: status,
+                                label: status,
+                              })),
+                            ]}
+                            value={selectedOrderStatus || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedOrderStatus(val);
+                              localStorage.setItem("filter_orderStatus", val);
+                            }}
+                            placeholder="All Status"
+                          />
+                        )}
                       {hasPermission(
                         allowedPermissions,
                         "view_date_filter"
                       ) && (
-                        <>
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "Date Preset" },
-                              { value: "today", label: "Today" },
-                              { value: "thisWeek", label: "This Week" },
-                              { value: "thisMonth", label: "This Month" },
-                              { value: "fromTo", label: "From-To Date" },
-                            ]}
-                            value={selectedDatePreset || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              const previousValue = selectedDatePreset;
-                              setSelectedDatePreset(val);
-                              localStorage.setItem("filter_datePreset", val);
-                              // Clear date range when changing from "fromTo" to another preset or empty
-                              if (
-                                previousValue === "fromTo" &&
-                                val !== "fromTo"
-                              ) {
-                                setSelectedDateRange({
-                                  start: null,
-                                  end: null,
-                                });
-                                localStorage.removeItem(
-                                  "filter_dateRangeStart"
-                                );
-                                localStorage.removeItem("filter_dateRangeEnd");
-                              }
-                              // Clear date range when preset is selected (except for fromTo)
-                              if (val && val !== "fromTo") {
-                                setSelectedDateRange({
-                                  start: null,
-                                  end: null,
-                                });
-                                localStorage.removeItem(
-                                  "filter_dateRangeStart"
-                                );
-                                localStorage.removeItem("filter_dateRangeEnd");
-                              }
-                            }}
-                            placeholder="Date Preset"
-                          />
-                          {selectedDatePreset === "fromTo" && (
-                            <>
-                              <div className="date-picker-wrapper">
-                                <DatePicker
-                                  selected={selectedDateRange.start}
-                                  onChange={(date) => {
-                                    setSelectedDateRange((prev) => ({
-                                      ...prev,
-                                      start: date,
-                                    }));
-                                    if (date) {
-                                      localStorage.setItem(
-                                        "filter_dateRangeStart",
-                                        date.toISOString()
-                                      );
-                                    } else {
-                                      localStorage.removeItem(
-                                        "filter_dateRangeStart"
-                                      );
-                                    }
-                                    // Set preset to fromTo if dates are manually selected
-                                    if (
-                                      !selectedDatePreset &&
-                                      (date || selectedDateRange.end)
-                                    ) {
-                                      setSelectedDatePreset("fromTo");
-                                      localStorage.setItem(
-                                        "filter_datePreset",
-                                        "fromTo"
-                                      );
-                                    }
-                                  }}
-                                  selectsStart
-                                  startDate={selectedDateRange.start}
-                                  endDate={selectedDateRange.end}
-                                  placeholderText="Start Date"
-                                  className="form-field search-selector"
-                                  dateFormat="d MMM yyyy"
-                                  renderCustomHeader={renderDatePickerHeader}
-                                  showMonthDropdown
-                                  showYearDropdown
-                                  dropdownMode="select"
-                                />
-                              </div>
-                              <div className="date-picker-wrapper">
-                                <DatePicker
-                                  selected={selectedDateRange.end}
-                                  onChange={(date) => {
-                                    setSelectedDateRange((prev) => ({
-                                      ...prev,
-                                      end: date,
-                                    }));
-                                    if (date) {
-                                      localStorage.setItem(
-                                        "filter_dateRangeEnd",
-                                        date.toISOString()
-                                      );
-                                    } else {
-                                      localStorage.removeItem(
-                                        "filter_dateRangeEnd"
-                                      );
-                                    }
-                                    // Set preset to fromTo if dates are manually selected
-                                    if (
-                                      !selectedDatePreset &&
-                                      (selectedDateRange.start || date)
-                                    ) {
-                                      setSelectedDatePreset("fromTo");
-                                      localStorage.setItem(
-                                        "filter_datePreset",
-                                        "fromTo"
-                                      );
-                                    }
-                                  }}
-                                  selectsEnd
-                                  startDate={selectedDateRange.start}
-                                  endDate={selectedDateRange.end}
-                                  minDate={selectedDateRange.start}
-                                  placeholderText="End Date"
-                                  className="form-field search-selector"
-                                  dateFormat="d MMM yyyy"
-                                  renderCustomHeader={renderDatePickerHeader}
-                                  showMonthDropdown
-                                  showYearDropdown
-                                  dropdownMode="select"
-                                />
-                              </div>
-                            </>
-                          )}
-                        </>
-                      )}
+                          <>
+                            <SingleSearchSelect
+                              className="search-selector"
+                              options={[
+                                { value: "", label: "Date Preset" },
+                                { value: "today", label: "Today" },
+                                { value: "thisWeek", label: "This Week" },
+                                { value: "thisMonth", label: "This Month" },
+                                { value: "fromTo", label: "From-To Date" },
+                              ]}
+                              value={selectedDatePreset || null}
+                              onChange={(value) => {
+                                const val = value || "";
+                                const previousValue = selectedDatePreset;
+                                setSelectedDatePreset(val);
+                                localStorage.setItem("filter_datePreset", val);
+                                // Clear date range when changing from "fromTo" to another preset or empty
+                                if (
+                                  previousValue === "fromTo" &&
+                                  val !== "fromTo"
+                                ) {
+                                  setSelectedDateRange({
+                                    start: null,
+                                    end: null,
+                                  });
+                                  localStorage.removeItem(
+                                    "filter_dateRangeStart"
+                                  );
+                                  localStorage.removeItem("filter_dateRangeEnd");
+                                }
+                                // Clear date range when preset is selected (except for fromTo)
+                                if (val && val !== "fromTo") {
+                                  setSelectedDateRange({
+                                    start: null,
+                                    end: null,
+                                  });
+                                  localStorage.removeItem(
+                                    "filter_dateRangeStart"
+                                  );
+                                  localStorage.removeItem("filter_dateRangeEnd");
+                                }
+                              }}
+                              placeholder="Date Preset"
+                            />
+                            {selectedDatePreset === "fromTo" && (
+                              <>
+                                <div className="date-picker-wrapper">
+                                  <DatePicker
+                                    selected={selectedDateRange.start}
+                                    onChange={(date) => {
+                                      setSelectedDateRange((prev) => ({
+                                        ...prev,
+                                        start: date,
+                                      }));
+                                      if (date) {
+                                        localStorage.setItem(
+                                          "filter_dateRangeStart",
+                                          date.toISOString()
+                                        );
+                                      } else {
+                                        localStorage.removeItem(
+                                          "filter_dateRangeStart"
+                                        );
+                                      }
+                                      // Set preset to fromTo if dates are manually selected
+                                      if (
+                                        !selectedDatePreset &&
+                                        (date || selectedDateRange.end)
+                                      ) {
+                                        setSelectedDatePreset("fromTo");
+                                        localStorage.setItem(
+                                          "filter_datePreset",
+                                          "fromTo"
+                                        );
+                                      }
+                                    }}
+                                    selectsStart
+                                    startDate={selectedDateRange.start}
+                                    endDate={selectedDateRange.end}
+                                    placeholderText="Start Date"
+                                    className="form-field search-selector"
+                                    dateFormat="d MMM yyyy"
+                                    renderCustomHeader={renderDatePickerHeader}
+                                    showMonthDropdown
+                                    showYearDropdown
+                                    dropdownMode="select"
+                                  />
+                                </div>
+                                <div className="date-picker-wrapper">
+                                  <DatePicker
+                                    selected={selectedDateRange.end}
+                                    onChange={(date) => {
+                                      setSelectedDateRange((prev) => ({
+                                        ...prev,
+                                        end: date,
+                                      }));
+                                      if (date) {
+                                        localStorage.setItem(
+                                          "filter_dateRangeEnd",
+                                          date.toISOString()
+                                        );
+                                      } else {
+                                        localStorage.removeItem(
+                                          "filter_dateRangeEnd"
+                                        );
+                                      }
+                                      // Set preset to fromTo if dates are manually selected
+                                      if (
+                                        !selectedDatePreset &&
+                                        (selectedDateRange.start || date)
+                                      ) {
+                                        setSelectedDatePreset("fromTo");
+                                        localStorage.setItem(
+                                          "filter_datePreset",
+                                          "fromTo"
+                                        );
+                                      }
+                                    }}
+                                    selectsEnd
+                                    startDate={selectedDateRange.start}
+                                    endDate={selectedDateRange.end}
+                                    minDate={selectedDateRange.start}
+                                    placeholderText="End Date"
+                                    className="form-field search-selector"
+                                    dateFormat="d MMM yyyy"
+                                    renderCustomHeader={renderDatePickerHeader}
+                                    showMonthDropdown
+                                    showYearDropdown
+                                    dropdownMode="select"
+                                  />
+                                </div>
+                              </>
+                            )}
+                          </>
+                        )}
                       {hasActiveFilters && (
                         <button
                           className="btn clear-filters-btn"
@@ -1869,9 +1870,8 @@ function Dashboard() {
 
                     {/* Advanced Filters Section */}
                     <div
-                      className={`advanced-filters-section ${
-                        isAdvancedFiltersOpen ? "open" : ""
-                      }`}
+                      className={`advanced-filters-section ${isAdvancedFiltersOpen ? "open" : ""
+                        }`}
                     >
                       <div
                         className="advanced-filters-header"
@@ -1881,9 +1881,8 @@ function Dashboard() {
                         style={{ cursor: "pointer" }}
                       >
                         <span
-                          className={`advanced-filters-title ${
-                            isAdvancedFiltersOpen ? "open" : ""
-                          }`}
+                          className={`advanced-filters-title ${isAdvancedFiltersOpen ? "open" : ""
+                            }`}
                         >
                           Advanced Filters
                         </span>
@@ -1893,229 +1892,229 @@ function Dashboard() {
                           allowedPermissions,
                           "view_category_filter"
                         ) && (
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "All Categories" },
-                              ...distinctCategories.map((category) => ({
-                                value: category,
-                                label: category,
-                              })),
-                            ]}
-                            value={selectedCategory || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              setSelectedCategory(val);
-                              localStorage.setItem("filter_category", val);
-                            }}
-                            placeholder="All Categories"
-                          />
-                        )}
+                            <SingleSearchSelect
+                              className="search-selector"
+                              options={[
+                                { value: "", label: "All Categories" },
+                                ...distinctCategories.map((category) => ({
+                                  value: category,
+                                  label: category,
+                                })),
+                              ]}
+                              value={selectedCategory || null}
+                              onChange={(value) => {
+                                const val = value || "";
+                                setSelectedCategory(val);
+                                localStorage.setItem("filter_category", val);
+                              }}
+                              placeholder="All Categories"
+                            />
+                          )}
                         {hasPermission(
                           allowedPermissions,
                           "view_asset_category_filter"
                         ) && (
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "All Asset Categories" },
-                              ...distinctAssetCategories.map(
-                                (assetCategory) => ({
-                                  value: assetCategory,
-                                  label: assetCategory,
-                                })
-                              ),
-                            ]}
-                            value={selectedAssetCategory || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              setSelectedAssetCategory(val);
-                              localStorage.setItem("filter_assetCategory", val);
-                            }}
-                            placeholder="All Asset Categories"
-                          />
-                        )}
+                            <SingleSearchSelect
+                              className="search-selector"
+                              options={[
+                                { value: "", label: "All Asset Categories" },
+                                ...distinctAssetCategories.map(
+                                  (assetCategory) => ({
+                                    value: assetCategory,
+                                    label: assetCategory,
+                                  })
+                                ),
+                              ]}
+                              value={selectedAssetCategory || null}
+                              onChange={(value) => {
+                                const val = value || "";
+                                setSelectedAssetCategory(val);
+                                localStorage.setItem("filter_assetCategory", val);
+                              }}
+                              placeholder="All Asset Categories"
+                            />
+                          )}
                         {hasPermission(
                           allowedPermissions,
                           "view_sub_category_filter"
                         ) && (
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "All Sub Categories" },
-                              ...distinctSubCategories.map((subCategory) => ({
-                                value: subCategory,
-                                label: subCategory,
-                              })),
-                            ]}
-                            value={selectedSubCategory || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              setSelectedSubCategory(val);
-                              localStorage.setItem("filter_subCategory", val);
-                            }}
-                            placeholder="All Sub Categories"
-                          />
-                        )}
+                            <SingleSearchSelect
+                              className="search-selector"
+                              options={[
+                                { value: "", label: "All Sub Categories" },
+                                ...distinctSubCategories.map((subCategory) => ({
+                                  value: subCategory,
+                                  label: subCategory,
+                                })),
+                              ]}
+                              value={selectedSubCategory || null}
+                              onChange={(value) => {
+                                const val = value || "";
+                                setSelectedSubCategory(val);
+                                localStorage.setItem("filter_subCategory", val);
+                              }}
+                              placeholder="All Sub Categories"
+                            />
+                          )}
                         {hasPermission(
                           allowedPermissions,
                           "view_valuer_name_filter"
                         ) && (
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "All Valuers" },
-                              ...distinctValuerNames.map((valuer) => ({
-                                value: valuer,
-                                label: valuer,
-                              })),
-                            ]}
-                            value={selectedValuerName || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              setSelectedValuerName(val);
-                              localStorage.setItem("filter_valuerName", val);
-                            }}
-                            placeholder="All Valuers"
-                          />
-                        )}
+                            <SingleSearchSelect
+                              className="search-selector"
+                              options={[
+                                { value: "", label: "All Valuers" },
+                                ...distinctValuerNames.map((valuer) => ({
+                                  value: valuer,
+                                  label: valuer,
+                                })),
+                              ]}
+                              value={selectedValuerName || null}
+                              onChange={(value) => {
+                                const val = value || "";
+                                setSelectedValuerName(val);
+                                localStorage.setItem("filter_valuerName", val);
+                              }}
+                              placeholder="All Valuers"
+                            />
+                          )}
                         {hasPermission(
                           allowedPermissions,
                           "view_manager_filter"
                         ) && (
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "All Managers" },
-                              ...distinctManagers.map((manager) => ({
-                                value: manager,
-                                label: manager,
-                              })),
-                            ]}
-                            value={selectedManager || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              setSelectedManager(val);
-                              localStorage.setItem("filter_manager", val);
-                            }}
-                            placeholder="All Managers"
-                          />
-                        )}
+                            <SingleSearchSelect
+                              className="search-selector"
+                              options={[
+                                { value: "", label: "All Managers" },
+                                ...distinctManagers.map((manager) => ({
+                                  value: manager,
+                                  label: manager,
+                                })),
+                              ]}
+                              value={selectedManager || null}
+                              onChange={(value) => {
+                                const val = value || "";
+                                setSelectedManager(val);
+                                localStorage.setItem("filter_manager", val);
+                              }}
+                              placeholder="All Managers"
+                            />
+                          )}
                         {hasPermission(
                           allowedPermissions,
                           "view_bank_filter"
                         ) && (
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "All Banks" },
-                              ...distinctBanks.map((bank) => ({
-                                value: bank,
-                                label: bank,
-                              })),
-                            ]}
-                            value={selectedBank || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              setSelectedBank(val);
-                              localStorage.setItem("filter_bank", val);
-                            }}
-                            placeholder="All Banks"
-                          />
-                        )}
+                            <SingleSearchSelect
+                              className="search-selector"
+                              options={[
+                                { value: "", label: "All Banks" },
+                                ...distinctBanks.map((bank) => ({
+                                  value: bank,
+                                  label: bank,
+                                })),
+                              ]}
+                              value={selectedBank || null}
+                              onChange={(value) => {
+                                const val = value || "";
+                                setSelectedBank(val);
+                                localStorage.setItem("filter_bank", val);
+                              }}
+                              placeholder="All Banks"
+                            />
+                          )}
                         {hasPermission(
                           allowedPermissions,
                           "view_bank_branch_filter"
                         ) && (
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "All Branches" },
-                              ...distinctBranches.map((branch) => ({
-                                value: branch,
-                                label: branch,
-                              })),
-                            ]}
-                            value={selectedBranch || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              setSelectedBranch(val);
-                              localStorage.setItem("filter_branch", val);
-                            }}
-                            placeholder="All Branches"
-                          />
-                        )}
+                            <SingleSearchSelect
+                              className="search-selector"
+                              options={[
+                                { value: "", label: "All Branches" },
+                                ...distinctBranches.map((branch) => ({
+                                  value: branch,
+                                  label: branch,
+                                })),
+                              ]}
+                              value={selectedBranch || null}
+                              onChange={(value) => {
+                                const val = value || "";
+                                setSelectedBranch(val);
+                                localStorage.setItem("filter_branch", val);
+                              }}
+                              placeholder="All Branches"
+                            />
+                          )}
                         {hasPermission(
                           allowedPermissions,
                           "view_branch_officer_filter"
                         ) && (
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "All Officers" },
-                              ...distinctOfficers.map((officer) => ({
-                                value: officer,
-                                label: officer,
-                              })),
-                            ]}
-                            value={selectedOfficer || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              setSelectedOfficer(val);
-                              localStorage.setItem("filter_officer", val);
-                            }}
-                            placeholder="All Officers"
-                          />
-                        )}
+                            <SingleSearchSelect
+                              className="search-selector"
+                              options={[
+                                { value: "", label: "All Officers" },
+                                ...distinctOfficers.map((officer) => ({
+                                  value: officer,
+                                  label: officer,
+                                })),
+                              ]}
+                              value={selectedOfficer || null}
+                              onChange={(value) => {
+                                const val = value || "";
+                                setSelectedOfficer(val);
+                                localStorage.setItem("filter_officer", val);
+                              }}
+                              placeholder="All Officers"
+                            />
+                          )}
                         {hasPermission(
                           allowedPermissions,
                           "view_field_verifier_filter"
                         ) && (
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "All Field Verifiers" },
-                              ...distinctFieldVerifiers.map(
-                                (fieldVerifier) => ({
-                                  value: fieldVerifier,
-                                  label: fieldVerifier,
-                                })
-                              ),
-                            ]}
-                            value={selectedFieldVerifier || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              setSelectedFieldVerifier(val);
-                              localStorage.setItem("filter_fieldVerifier", val);
-                            }}
-                            placeholder="All Field Verifiers"
-                          />
-                        )}
+                            <SingleSearchSelect
+                              className="search-selector"
+                              options={[
+                                { value: "", label: "All Field Verifiers" },
+                                ...distinctFieldVerifiers.map(
+                                  (fieldVerifier) => ({
+                                    value: fieldVerifier,
+                                    label: fieldVerifier,
+                                  })
+                                ),
+                              ]}
+                              value={selectedFieldVerifier || null}
+                              onChange={(value) => {
+                                const val = value || "";
+                                setSelectedFieldVerifier(val);
+                                localStorage.setItem("filter_fieldVerifier", val);
+                              }}
+                              placeholder="All Field Verifiers"
+                            />
+                          )}
 
                         {hasPermission(
                           allowedPermissions,
                           "view_payment_status_filter"
                         ) && (
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "All Payment Statuses" },
-                              ...distinctPaymentStatuses.map(
-                                (paymentStatus) => ({
-                                  value: paymentStatus,
-                                  label: paymentStatus,
-                                })
-                              ),
-                            ]}
-                            value={selectedPaymentStatus || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              setSelectedPaymentStatus(val);
-                              localStorage.setItem("filter_paymentStatus", val);
-                            }}
-                            placeholder="All Payment Statuses"
-                          />
-                        )}
+                            <SingleSearchSelect
+                              className="search-selector"
+                              options={[
+                                { value: "", label: "All Payment Statuses" },
+                                ...distinctPaymentStatuses.map(
+                                  (paymentStatus) => ({
+                                    value: paymentStatus,
+                                    label: paymentStatus,
+                                  })
+                                ),
+                              ]}
+                              value={selectedPaymentStatus || null}
+                              onChange={(value) => {
+                                const val = value || "";
+                                setSelectedPaymentStatus(val);
+                                localStorage.setItem("filter_paymentStatus", val);
+                              }}
+                              placeholder="All Payment Statuses"
+                            />
+                          )}
                       </div>
                     </div>
                   </div>
@@ -2145,10 +2144,10 @@ function Dashboard() {
                               allowedPermissions,
                               "add_order_db"
                             ) && (
-                              <button className="btn" onClick={openAddModal}>
-                                Add Order
-                              </button>
-                            )}
+                                <button className="btn" onClick={openAddModal}>
+                                  Add Order
+                                </button>
+                              )}
                             {/* {hasPermission(
                               allowedPermissions,
                               "view_order"
@@ -2165,8 +2164,14 @@ function Dashboard() {
                               allowedPermissions,
                               "view_order_table_order_number_db"
                             ) && (
-                              <th style={{ width: "150px" }}>Order Number</th>
-                            )}
+                                <th style={{ width: "150px" }}>Order Number</th>
+                              )}
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_table_ref_id_db"
+                            ) && (
+                                <th style={{ width: "150px" }}>Ref ID</th>
+                              )}
                             {hasPermission(
                               allowedPermissions,
                               "view_order_table_category_db"
@@ -2175,14 +2180,14 @@ function Dashboard() {
                               allowedPermissions,
                               "view_order_table_asset_category_db"
                             ) && (
-                              <th style={{ width: "150px" }}>Asset Category</th>
-                            )}
+                                <th style={{ width: "150px" }}>Asset Category</th>
+                              )}
                             {hasPermission(
                               allowedPermissions,
                               "view_order_table_sub_category_db"
                             ) && (
-                              <th style={{ width: "150px" }}>Subcategory</th>
-                            )}
+                                <th style={{ width: "150px" }}>Subcategory</th>
+                              )}
                             {hasPermission(
                               allowedPermissions,
                               "view_order_table_manager_db"
@@ -2191,8 +2196,8 @@ function Dashboard() {
                               allowedPermissions,
                               "view_order_table_field_verifier_db"
                             ) && (
-                              <th style={{ width: "150px" }}>Field Verifier</th>
-                            )}
+                                <th style={{ width: "150px" }}>Field Verifier</th>
+                              )}
                             {hasPermission(
                               allowedPermissions,
                               "view_order_table_Bank_db"
@@ -2209,22 +2214,22 @@ function Dashboard() {
                               allowedPermissions,
                               "view_order_table_registration_number_db"
                             ) && (
-                              <th style={{ width: "200px" }}>
-                                Registration Number
-                              </th>
-                            )}
+                                <th style={{ width: "200px" }}>
+                                  Registration Number
+                                </th>
+                              )}
                             {hasPermission(
                               allowedPermissions,
                               "view_order_table_payment_status_db"
                             ) && (
-                              <th style={{ width: "200px" }}>Payment Status</th>
-                            )}
+                                <th style={{ width: "200px" }}>Payment Status</th>
+                              )}
                             {hasPermission(
                               allowedPermissions,
                               "view_order_table_payment_amount_db"
                             ) && (
-                              <th style={{ width: "200px" }}>Payment Amount</th>
-                            )}
+                                <th style={{ width: "200px" }}>Payment Amount</th>
+                              )}
                             {hasPermission(
                               allowedPermissions,
                               "view_order_table_created_at_db"
@@ -2249,8 +2254,8 @@ function Dashboard() {
                               allowedPermissions,
                               "view_order_table_valuer_name_db"
                             ) && (
-                              <th style={{ width: "120px" }}>Valuer Name</th>
-                            )}
+                                <th style={{ width: "120px" }}>Valuer Name</th>
+                              )}
                             {hasPermission(
                               allowedPermissions,
                               "view_order_table_status_db"
@@ -2259,12 +2264,12 @@ function Dashboard() {
                               allowedPermissions,
                               "view_order_table_action_db"
                             ) && (
-                              <th
-                                style={{ textAlign: "center", width: "200px" }}
-                              >
-                                Action
-                              </th>
-                            )}
+                                <th
+                                  style={{ textAlign: "center", width: "200px" }}
+                                >
+                                  Action
+                                </th>
+                              )}
                           </tr>
                         ),
                         rows: [...orders]
@@ -2303,7 +2308,7 @@ function Dashboard() {
                             const fieldVerifierMatch =
                               !selectedFieldVerifier ||
                               order.field_verifier_name ===
-                                selectedFieldVerifier;
+                              selectedFieldVerifier;
 
                             // Filter by valuer name if selected
                             const valuerMatch =
@@ -2390,19 +2395,27 @@ function Dashboard() {
                                 allowedPermissions,
                                 "view_order_table_order_number_db"
                               ) && (
-                                <td
-                                  className={
-                                    hasPermission(
-                                      allowedPermissions,
-                                      "view_order_details"
-                                    )
-                                      ? "get-me-inside"
-                                      : ""
-                                  }
-                                >
-                                  {order.order_number}
-                                </td>
-                              )}
+                                  <td
+                                    className={
+                                      hasPermission(
+                                        allowedPermissions,
+                                        "view_order_details"
+                                      )
+                                        ? "get-me-inside"
+                                        : ""
+                                    }
+                                  >
+                                    {order.order_number}
+                                  </td>
+                                )}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_ref_id_db"
+                              ) && (
+                                  <td>
+                                    {order.ref_no_id || "-"}
+                                  </td>
+                                )}
                               {hasPermission(
                                 allowedPermissions,
                                 "view_order_table_category_db"
@@ -2463,17 +2476,16 @@ function Dashboard() {
                                 allowedPermissions,
                                 "view_order_table_priority_db"
                               ) && (
-                                <td>
-                                  <span
-                                    className={`priority-badge priority-${
-                                      order.order_priority?.toLowerCase() ||
-                                      "none"
-                                    }`}
-                                  >
-                                    {order.order_priority || "-"}
-                                  </span>
-                                </td>
-                              )}
+                                  <td>
+                                    <span
+                                      className={`priority-badge priority-${order.order_priority?.toLowerCase() ||
+                                        "none"
+                                        }`}
+                                    >
+                                      {order.order_priority || "-"}
+                                    </span>
+                                  </td>
+                                )}
                               {hasPermission(
                                 allowedPermissions,
                                 "view_order_table_type_db"
@@ -2486,72 +2498,72 @@ function Dashboard() {
                                 allowedPermissions,
                                 "view_order_table_status_db"
                               ) && (
-                                <td>
-                                  <p className="status-state order-state">
-                                    {order.current_status_name}
-                                  </p>
-                                </td>
-                              )}
+                                  <td>
+                                    <p className="status-state order-state">
+                                      {order.current_status_name}
+                                    </p>
+                                  </td>
+                                )}
                               {hasPermission(
                                 allowedPermissions,
                                 "view_order_table_action_db"
                               ) && (
-                                <td style={{ textAlign: "center" }}>
-                                  {hasPermission(
-                                    allowedPermissions,
-                                    "edit_order_db"
-                                  ) && (
-                                    <button
-                                      className="action-icons"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        openEditModal(order);
-                                      }}
-                                    >
-                                      <EditIcon />
-                                    </button>
-                                  )}
-                                  {hasPermission(
-                                    allowedPermissions,
-                                    "delete_order_db"
-                                  ) && (
-                                    <button
-                                      className="action-icons"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        confirmDelete(
-                                          order.id,
-                                          order.customer_name
-                                        );
-                                      }}
-                                    >
-                                      <DeleteIcon />
-                                    </button>
-                                  )}
-                                  {(hasPermission(
-                                    allowedPermissions,
-                                    "edit_order_priority_db"
-                                  ) ||
-                                    hasPermission(
+                                  <td style={{ textAlign: "center" }}>
+                                    {hasPermission(
                                       allowedPermissions,
-                                      "edit_order_type_db"
+                                      "edit_order_db"
+                                    ) && (
+                                        <button
+                                          className="action-icons"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            openEditModal(order);
+                                          }}
+                                        >
+                                          <EditIcon />
+                                        </button>
+                                      )}
+                                    {hasPermission(
+                                      allowedPermissions,
+                                      "delete_order_db"
+                                    ) && (
+                                        <button
+                                          className="action-icons"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            confirmDelete(
+                                              order.id,
+                                              order.customer_name
+                                            );
+                                          }}
+                                        >
+                                          <DeleteIcon />
+                                        </button>
+                                      )}
+                                    {(hasPermission(
+                                      allowedPermissions,
+                                      "edit_order_priority_db"
                                     ) ||
-                                    hasPermission(
-                                      allowedPermissions,
-                                      "edit_valuer_name_to_order_db"
-                                    )) && (
-                                    <button
-                                      className="action-icons"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        openAttributesModal(order);
-                                      }}
-                                    >
-                                      <MoreIcon />
-                                    </button>
-                                  )}
-                                </td>
-                              )}
+                                      hasPermission(
+                                        allowedPermissions,
+                                        "edit_order_type_db"
+                                      ) ||
+                                      hasPermission(
+                                        allowedPermissions,
+                                        "edit_valuer_name_to_order_db"
+                                      )) && (
+                                        <button
+                                          className="action-icons"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            openAttributesModal(order);
+                                          }}
+                                        >
+                                          <MoreIcon />
+                                        </button>
+                                      )}
+                                  </td>
+                                )}
                             </tr>
                           )),
                       }}
@@ -2579,13 +2591,12 @@ function Dashboard() {
               orders.map((order) => (
                 <div
                   key={order.id}
-                  className={`telecoller-dashboard-order-card clickable-card ${
-                    order.current_status_id === 5
+                  className={`telecoller-dashboard-order-card clickable-card ${order.current_status_id === 5
                       ? "reassign-order"
                       : order.current_status_id >= 7
-                      ? "complete-order"
-                      : ""
-                  }`}
+                        ? "complete-order"
+                        : ""
+                    }`}
                   onClick={() => openEditModal(order)}
                   style={{ cursor: "pointer" }}
                 >
@@ -2665,10 +2676,9 @@ function Dashboard() {
         <FormModel>
           {{
             title: isEdit
-              ? `Edit Order - ${
-                  orders.find((order) => order.id === editOrderId)
-                    ?.order_number || "N/A"
-                }`
+              ? `Edit Order - ${orders.find((order) => order.id === editOrderId)
+                ?.order_number || "N/A"
+              }`
               : "Add Order",
             body: (
               <form
@@ -2844,32 +2854,32 @@ function Dashboard() {
                     allowedPermissions,
                     "view_order_add_edit_subcategory_filed"
                   ) && (
-                    <div className="form-group">
-                      <label htmlFor="Subcategory">Subcategory</label>
-                      <SingleSearchSelect
-                        id="Subcategory"
-                        className="search-selector"
-                        options={filteredChildCategories.map(
-                          (childCategory) => ({
-                            value: childCategory.id,
-                            label: `${childCategory.name}`,
-                          })
-                        )}
-                        value={formData.child_category_id}
-                        onChange={(val) => {
-                          // Only allow TELECALLER to change this field if they have permission
-                          if (!isTelecaller) {
-                            setFormData({
-                              ...formData,
-                              child_category_id: val,
-                            });
-                          }
-                        }}
-                        placeholder="Select Subcategory"
-                        disabled={isTelecaller}
-                      />
-                    </div>
-                  )}
+                      <div className="form-group">
+                        <label htmlFor="Subcategory">Subcategory</label>
+                        <SingleSearchSelect
+                          id="Subcategory"
+                          className="search-selector"
+                          options={filteredChildCategories.map(
+                            (childCategory) => ({
+                              value: childCategory.id,
+                              label: `${childCategory.name}`,
+                            })
+                          )}
+                          value={formData.child_category_id}
+                          onChange={(val) => {
+                            // Only allow TELECALLER to change this field if they have permission
+                            if (!isTelecaller) {
+                              setFormData({
+                                ...formData,
+                                child_category_id: val,
+                              });
+                            }
+                          }}
+                          placeholder="Select Subcategory"
+                          disabled={isTelecaller}
+                        />
+                      </div>
+                    )}
                   {/* Officer field - Show based on permission but hidden for Bank Officers */}
                   {hasPermission(
                     allowedPermissions,
@@ -3027,38 +3037,37 @@ function Dashboard() {
                     allowedPermissions,
                     "edit_order_priority_db"
                   ) && (
-                    <div className="form-group order-priority-radio-group">
-                      <label>Order Priority</label>
-                      <div className="radio-group two-items">
-                        {["Low", "High"].map((priority) => (
-                          <label
-                            key={priority}
-                            className={`radio-label ${priority.toLowerCase()} ${
-                              attributesFormData.order_priority === priority
-                                ? "selected"
-                                : ""
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="order_priority"
-                              value={priority}
-                              checked={
-                                attributesFormData.order_priority === priority
-                              }
-                              onChange={(e) =>
-                                setAttributesFormData({
-                                  ...attributesFormData,
-                                  order_priority: e.target.value,
-                                })
-                              }
-                            />
-                            {priority}
-                          </label>
-                        ))}
+                      <div className="form-group order-priority-radio-group">
+                        <label>Order Priority</label>
+                        <div className="radio-group two-items">
+                          {["Low", "High"].map((priority) => (
+                            <label
+                              key={priority}
+                              className={`radio-label ${priority.toLowerCase()} ${attributesFormData.order_priority === priority
+                                  ? "selected"
+                                  : ""
+                                }`}
+                            >
+                              <input
+                                type="radio"
+                                name="order_priority"
+                                value={priority}
+                                checked={
+                                  attributesFormData.order_priority === priority
+                                }
+                                onChange={(e) =>
+                                  setAttributesFormData({
+                                    ...attributesFormData,
+                                    order_priority: e.target.value,
+                                  })
+                                }
+                              />
+                              {priority}
+                            </label>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
                   {hasPermission(allowedPermissions, "edit_order_type_db") && (
                     <div className="form-group">
@@ -3067,11 +3076,10 @@ function Dashboard() {
                         {["VKA1", "VKA2", "VKA3"].map((type) => (
                           <label
                             key={type}
-                            className={`radio-label ${
-                              attributesFormData.order_type === type
+                            className={`radio-label ${attributesFormData.order_type === type
                                 ? "selected"
                                 : ""
-                            }`}
+                              }`}
                           >
                             <input
                               type="radio"
@@ -3096,57 +3104,57 @@ function Dashboard() {
                     allowedPermissions,
                     "edit_valuer_name_to_order_db"
                   ) && (
-                    <div className="form-group">
-                      <label>Valuer Name</label>
-                      <SingleSearchSelect
-                        className="search-selector"
-                        options={[
-                          {
-                            value: "V.K. ASSOCIATES",
-                            label: "V.K. ASSOCIATES",
-                          },
-                          {
-                            value: "VALUETECH SOLUTIONS",
-                            label: "VALUETECH SOLUTIONS",
-                          },
-                          {
-                            value: "VISHAL D. KOTHARI",
-                            label: "VISHAL D. KOTHARI",
-                          },
-                        ]}
-                        value={attributesFormData.valuer_name}
-                        onChange={(value) =>
-                          setAttributesFormData({
-                            ...attributesFormData,
-                            valuer_name: value,
-                          })
-                        }
-                        placeholder="Select valuer name"
-                      />
-                    </div>
-                  )}
+                      <div className="form-group">
+                        <label>Valuer Name</label>
+                        <SingleSearchSelect
+                          className="search-selector"
+                          options={[
+                            {
+                              value: "V.K. ASSOCIATES",
+                              label: "V.K. ASSOCIATES",
+                            },
+                            {
+                              value: "VALUETECH SOLUTIONS",
+                              label: "VALUETECH SOLUTIONS",
+                            },
+                            {
+                              value: "VISHAL D. KOTHARI",
+                              label: "VISHAL D. KOTHARI",
+                            },
+                          ]}
+                          value={attributesFormData.valuer_name}
+                          onChange={(value) =>
+                            setAttributesFormData({
+                              ...attributesFormData,
+                              valuer_name: value,
+                            })
+                          }
+                          placeholder="Select valuer name"
+                        />
+                      </div>
+                    )}
 
                   {hasPermission(
                     allowedPermissions,
                     "assign_user_to_order_db"
                   ) && (
-                    <div className="form-group">
-                      <label>Users assigned</label>
-                      <SingleSearchSelect
-                        className="search-selector"
-                        options={adminUsersOptions}
-                        value={attributesFormData.admin_user_ids}
-                        onChange={(values) =>
-                          setAttributesFormData({
-                            ...attributesFormData,
-                            admin_user_ids: values || [],
-                          })
-                        }
-                        placeholder="Select users..."
-                        isMulti={true}
-                      />
-                    </div>
-                  )}
+                      <div className="form-group">
+                        <label>Users assigned</label>
+                        <SingleSearchSelect
+                          className="search-selector"
+                          options={adminUsersOptions}
+                          value={attributesFormData.admin_user_ids}
+                          onChange={(values) =>
+                            setAttributesFormData({
+                              ...attributesFormData,
+                              admin_user_ids: values || [],
+                            })
+                          }
+                          placeholder="Select users..."
+                          isMulti={true}
+                        />
+                      </div>
+                    )}
                   <div className="form-buttons">
                     <button className="submit-button" type="submit">
                       Update Attributes

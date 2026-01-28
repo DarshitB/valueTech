@@ -26,7 +26,7 @@ router.use(auth);
  */
 router.post(
   "/upload",
-  checkPermission("add_order_reports"), // Check permission to add order reports
+  checkPermission("add_order_reports_collages"), // Check permission to add order reports
   activityLogger(
     "order_media_documents",
     (req, res) => res.locals.documentId,
@@ -54,7 +54,7 @@ router.post(
  */
 router.post(
   "/upload-multiple",
-  checkPermission("add_order_reports"), // Check permission to add order reports
+  checkPermission("add_order_reports_collages"), // Check permission to add order reports
   activityLogger(
     "order_media_documents",
     (req, res) => res.locals.documentId,

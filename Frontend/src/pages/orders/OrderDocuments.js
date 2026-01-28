@@ -148,7 +148,7 @@ function OrderDocuments() {
   // Refs for file inputs
   const reportFileInputRef = useRef(null);
   const collageFileInputRef = useRef(null);
-  
+
   // State to track which type is being uploaded
   const [uploadingType, setUploadingType] = useState(null);
 
@@ -167,12 +167,12 @@ function OrderDocuments() {
     // BANK OFFICER and BANK AUTHORITY can only see approved/verified collages and reports
     const filterDocuments = (docArray, docType) => {
       const filtered = docArray.filter((doc) => doc?.document_type === docType);
-      
+
       // If user is BANK OFFICER or BANK AUTHORITY, only show approved documents for collages and reports
       if (isBankUser && (docType === "collage" || docType === "report")) {
         return filtered.filter((doc) => doc?.status === "approved");
       }
-      
+
       return filtered;
     };
 
@@ -484,9 +484,8 @@ function OrderDocuments() {
         const url = URL.createObjectURL(zipBlob);
 
         link.href = url;
-        link.download = `${order?.order_number || "order"}_${documentType}_${
-          new Date().toISOString().split("T")[0]
-        }.zip`;
+        link.download = `${order?.order_number || "order"}_${documentType}_${new Date().toISOString().split("T")[0]
+          }.zip`;
         link.style.display = "none";
 
         document.body.appendChild(link);
@@ -782,7 +781,7 @@ function OrderDocuments() {
     if (!order?.category_name) return null;
 
     const categoryName = order.category_name.toUpperCase();
-    
+
     if (categoryName === "COMMERCIAL VEHICLE") {
       return `/orders/${id}/details/cv-report`;
     } else if (categoryName === "CONSTRUCTION EQUIPMENT") {
@@ -794,7 +793,7 @@ function OrderDocuments() {
     } else if (categoryName === "MARINE") {
       return `/orders/${id}/details/marine-report`;
     }
-    
+
     return null;
   }, [order, id]);
 
@@ -803,13 +802,13 @@ function OrderDocuments() {
     if (!order?.category_name) return "Report";
 
     const categoryName = order.category_name.toUpperCase();
-    
+
     if (categoryName === "COMMERCIAL VEHICLE") return "CV";
     if (categoryName === "CONSTRUCTION EQUIPMENT") return "CE";
     if (categoryName.includes("AVR")) return "AVR";
     if (categoryName === "MACHINERY") return "Machinery";
     if (categoryName === "MARINE") return "Marine";
-    
+
     return "Report";
   }, [order]);
 
@@ -973,36 +972,36 @@ function OrderDocuments() {
                     allowedPermissions,
                     "download_order_media_documents"
                   ) && (
-                    <button
-                      onClick={() => handleDownloadDocument(doc)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                      }}
-                      aria-label="Download document"
-                      title="Download document"
-                    >
-                      <DownloadDocumentIcon />
-                    </button>
-                  )}
+                      <button
+                        onClick={() => handleDownloadDocument(doc)}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                        }}
+                        aria-label="Download document"
+                        title="Download document"
+                      >
+                        <DownloadDocumentIcon />
+                      </button>
+                    )}
                   {hasPermission(
                     allowedPermissions,
                     "delete_order_media_documents"
                   ) && (
-                    <button
-                      onClick={() => handleDeleteDocument(doc)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                      }}
-                      aria-label="Delete document"
-                      title="Delete document"
-                    >
-                      <DeleteIcon />
-                    </button>
-                  )}
+                      <button
+                        onClick={() => handleDeleteDocument(doc)}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                        }}
+                        aria-label="Delete document"
+                        title="Delete document"
+                      >
+                        <DeleteIcon />
+                      </button>
+                    )}
                 </td>
               </tr>
             ))}
@@ -1108,36 +1107,36 @@ function OrderDocuments() {
                     allowedPermissions,
                     "download_order_media_documents"
                   ) && (
-                    <button
-                      onClick={() => handleDownloadDocument(doc)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                      }}
-                      aria-label="Download document"
-                      title="Download document"
-                    >
-                      <DownloadDocumentIcon />
-                    </button>
-                  )}
+                      <button
+                        onClick={() => handleDownloadDocument(doc)}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                        }}
+                        aria-label="Download document"
+                        title="Download document"
+                      >
+                        <DownloadDocumentIcon />
+                      </button>
+                    )}
                   {hasPermission(
                     allowedPermissions,
                     "delete_order_media_documents"
                   ) && (
-                    <button
-                      onClick={() => handleDeleteDocument(doc)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                      }}
-                      aria-label="Delete document"
-                      title="Delete document"
-                    >
-                      <DeleteIcon />
-                    </button>
-                  )}
+                      <button
+                        onClick={() => handleDeleteDocument(doc)}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                        }}
+                        aria-label="Delete document"
+                        title="Delete document"
+                      >
+                        <DeleteIcon />
+                      </button>
+                    )}
                 </td>
               </tr>
             ))}
@@ -1270,16 +1269,16 @@ function OrderDocuments() {
                         )}
                       {hasPermission(
                         allowedPermissions,
-                        "view_order_media_files"
+                        "add_order_reports_collages"
                       ) && (
-                        <button
-                          className="btn primary"
-                          onClick={() => handleUploadReportCollageClick("collage")}
-                          disabled={reportCollageUploadLoading || loading}
-                        >
-                          {reportCollageUploadLoading && uploadingType === "collage" ? "Uploading..." : "Upload Collage"}
-                        </button>
-                      )}
+                          <button
+                            className="btn primary"
+                            onClick={() => handleUploadReportCollageClick("collage")}
+                            disabled={reportCollageUploadLoading || loading}
+                          >
+                            {reportCollageUploadLoading && uploadingType === "collage" ? "Uploading..." : "Upload Collage"}
+                          </button>
+                        )}
                     </div>
                   </div>
                   {/* Hidden file input for collage upload */}
@@ -1316,21 +1315,21 @@ function OrderDocuments() {
                           allowedPermissions,
                           "approve_order_collage"
                         ) && (
-                          <button
-                            className="btn approve-report"
-                            onClick={() =>
-                              handleVerifySelected(
-                                documentState.selectedCollages,
-                                "collage"
-                              )
-                            }
-                            disabled={approveLoading || loading}
-                          >
-                            {approveLoading
-                              ? "Verifying..."
-                              : "Verify selected collages"}
-                          </button>
-                        )}
+                            <button
+                              className="btn approve-report"
+                              onClick={() =>
+                                handleVerifySelected(
+                                  documentState.selectedCollages,
+                                  "collage"
+                                )
+                              }
+                              disabled={approveLoading || loading}
+                            >
+                              {approveLoading
+                                ? "Verifying..."
+                                : "Verify selected collages"}
+                            </button>
+                          )}
                         {hasPermission(
                           allowedPermissions,
                           "remove_approve_order_collage"
@@ -1401,16 +1400,16 @@ function OrderDocuments() {
                       )}
                       {hasPermission(
                         allowedPermissions,
-                        "view_order_media_files"
+                        "add_order_reports_collages"
                       ) && (
-                        <button
-                          className="btn primary"
-                          onClick={() => handleUploadReportCollageClick("report")}
-                          disabled={reportCollageUploadLoading || loading}
-                        >
-                          {reportCollageUploadLoading && uploadingType === "report" ? "Uploading..." : "Upload Report"}
-                        </button>
-                      )}
+                          <button
+                            className="btn primary"
+                            onClick={() => handleUploadReportCollageClick("report")}
+                            disabled={reportCollageUploadLoading || loading}
+                          >
+                            {reportCollageUploadLoading && uploadingType === "report" ? "Uploading..." : "Upload Report"}
+                          </button>
+                        )}
                     </div>
                   </div>
                   {/* Hidden file input for report upload */}
@@ -1452,21 +1451,21 @@ function OrderDocuments() {
                           allowedPermissions,
                           "approve_order_report"
                         ) && (
-                          <button
-                            className="btn approve-report"
-                            onClick={() =>
-                              handleVerifySelected(
-                                documentState.selectedReports,
-                                "report"
-                              )
-                            }
-                            disabled={approveLoading || loading}
-                          >
-                            {approveLoading
-                              ? "Verifying..."
-                              : "Verify selected reports"}
-                          </button>
-                        )}
+                            <button
+                              className="btn approve-report"
+                              onClick={() =>
+                                handleVerifySelected(
+                                  documentState.selectedReports,
+                                  "report"
+                                )
+                              }
+                              disabled={approveLoading || loading}
+                            >
+                              {approveLoading
+                                ? "Verifying..."
+                                : "Verify selected reports"}
+                            </button>
+                          )}
                         {hasPermission(
                           allowedPermissions,
                           "remove_approve_order_report"
@@ -1509,54 +1508,54 @@ function OrderDocuments() {
                   allowedPermissions,
                   "add_order_media_documents"
                 ) && (
-                  <div className="order-upload-documents">
-                    <input
-                      type="file"
-                      id="fileInput"
-                      multiple
-                      hidden
-                      onChange={handleFileInputChange}
-                      accept={[...ALLOWED_FILE_TYPES, ".zip"].join(",")}
-                    />
-                    <label
-                      htmlFor="fileInput"
-                      className="upload-box"
-                      onDragOver={handleDragOver}
-                      onDragEnter={handleDragEnter}
-                      onDragLeave={handleDragLeave}
-                      onDrop={handleDrop}
-                    >
-                      <div className="upload-icon">
-                        <PlusIcon />
-                      </div>
-                      <p>
-                        Drop documents here or <span>click to browse</span>
-                      </p>
-                      <small>
-                        Max file size: {MAX_FILE_SIZE / (1024 * 1024)}MB, Max
-                        files: {MAX_FILES_COUNT}
-                      </small>
-                    </label>
-                    {documentState.isUploading && (
-                      <div className="upload-progress-container">
-                        <div className="progress">
-                          <div
-                            className="progress-bar"
-                            role="progressbar"
-                            style={{
-                              width: `${documentState.uploadProgress}%`,
-                            }}
-                            aria-valuenow={documentState.uploadProgress}
-                            aria-valuemin="0"
-                            aria-valuemax="100"
-                          >
-                            Uploading... {documentState.uploadProgress}%
+                    <div className="order-upload-documents">
+                      <input
+                        type="file"
+                        id="fileInput"
+                        multiple
+                        hidden
+                        onChange={handleFileInputChange}
+                        accept={[...ALLOWED_FILE_TYPES, ".zip"].join(",")}
+                      />
+                      <label
+                        htmlFor="fileInput"
+                        className="upload-box"
+                        onDragOver={handleDragOver}
+                        onDragEnter={handleDragEnter}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                      >
+                        <div className="upload-icon">
+                          <PlusIcon />
+                        </div>
+                        <p>
+                          Drop documents here or <span>click to browse</span>
+                        </p>
+                        <small>
+                          Max file size: {MAX_FILE_SIZE / (1024 * 1024)}MB, Max
+                          files: {MAX_FILES_COUNT}
+                        </small>
+                      </label>
+                      {documentState.isUploading && (
+                        <div className="upload-progress-container">
+                          <div className="progress">
+                            <div
+                              className="progress-bar"
+                              role="progressbar"
+                              style={{
+                                width: `${documentState.uploadProgress}%`,
+                              }}
+                              aria-valuenow={documentState.uploadProgress}
+                              aria-valuemin="0"
+                              aria-valuemax="100"
+                            >
+                              Uploading... {documentState.uploadProgress}%
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                      )}
+                    </div>
+                  )}
               </div>
               <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12">
                 <div className="order-document-table">

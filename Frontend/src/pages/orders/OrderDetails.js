@@ -247,6 +247,7 @@ function OrderDetails() {
     comments: "",
     regards: "",
     mail_attachment: false,
+    public_link_with_image: false,
   });
 
   // Track removed documents (by ID) - documents user removes from mail attachments
@@ -1945,6 +1946,10 @@ function OrderDetails() {
       comments: comments,
       regards: mailFormData.regards?.trim() || "",
       mail_attachment: mailFormData.mail_attachment || false, // Boolean: true if checkbox is checked, false otherwise
+      public_link_with_image: mailFormData.public_link_with_image || false, // Boolean: true if checkbox is checked, false otherwise
+      public_url: mailFormData.public_link_with_image
+        ? `${window.location.origin}/public/orders/${id}/documents` // URL without images (reports/collages/videos only)
+        : `${window.location.origin}/public/orders/${id}/images`, // URL with images
       document_ids: documentIds.map((doc) => doc.id), // Array of document IDs (collages and reports)
       // Add videos separately if there are any
       ...(videoIds.length > 0 && { video_ids: videoIds }), // Array of video IDs (only if videos exist)
@@ -1982,6 +1987,7 @@ function OrderDetails() {
           comments: "",
           regards: "",
           mail_attachment: false,
+          public_link_with_image: false,
         });
       }
     } catch (error) {
@@ -2554,8 +2560,8 @@ function OrderDetails() {
                           <div className="radio-group">
                             <label
                               className={`radio-label ${paymentFormData.paymentMode === "NEFT"
-                                  ? "selected"
-                                  : ""
+                                ? "selected"
+                                : ""
                                 }`}
                             >
                               <input
@@ -2569,8 +2575,8 @@ function OrderDetails() {
                             </label>
                             <label
                               className={`radio-label ${paymentFormData.paymentMode === "UPI"
-                                  ? "selected"
-                                  : ""
+                                ? "selected"
+                                : ""
                                 }`}
                             >
                               <input
@@ -2589,8 +2595,8 @@ function OrderDetails() {
                           <div className="radio-group">
                             <label
                               className={`radio-label ${paymentFormData.paymentStatus === "Pending"
-                                  ? "selected"
-                                  : ""
+                                ? "selected"
+                                : ""
                                 }`}
                             >
                               <input
@@ -2606,8 +2612,8 @@ function OrderDetails() {
                             </label>
                             <label
                               className={`radio-label ${paymentFormData.paymentStatus === "Received"
-                                  ? "selected"
-                                  : ""
+                                ? "selected"
+                                : ""
                                 }`}
                             >
                               <input
@@ -2832,6 +2838,43 @@ function OrderDetails() {
                         }}
                       />
                       Document as Attachment
+                    </label>
+                  </div>
+
+
+
+                  <div className="form-group">
+                    <label>
+
+                      <input
+                        type="checkbox"
+                        checked={mailFormData.public_link_with_image || false}
+                        onChange={(e) => {
+                          setMailFormData((prev) => ({
+                            ...prev,
+                            public_link_with_image: e.target.checked,
+                          }));
+                        }}
+                        disabled={isSendingMail}
+                        style={{
+                          marginRight: "8px",
+                          cursor: isSendingMail ? "not-allowed" : "pointer",
+                        }}
+                      />
+                      <input
+                        className="form-field"
+                        id="publicUrl"
+                        type="hidden"
+                        value={
+                          mailFormData.public_link_with_image
+                            ? `${window.location.origin}/public/orders/${id}/documents`
+                            : `${window.location.origin}/public/orders/${id}/images`
+                        }
+                        readOnly
+                        name="publicUrl"
+                        disabled={isSendingMail}
+                      />
+                      Public link With image
                     </label>
                   </div>
 
