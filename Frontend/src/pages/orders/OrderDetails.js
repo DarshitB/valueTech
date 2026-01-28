@@ -2842,41 +2842,42 @@ function OrderDetails() {
                   </div>
 
 
+                  {hasPermission(allowedPermissions, "public_link_with_image_checkbox_mail_send") && (
+                    <div className="form-group">
+                      <label>
 
-                  <div className="form-group">
-                    <label>
-
-                      <input
-                        type="checkbox"
-                        checked={mailFormData.public_link_with_image || false}
-                        onChange={(e) => {
-                          setMailFormData((prev) => ({
-                            ...prev,
-                            public_link_with_image: e.target.checked,
-                          }));
-                        }}
-                        disabled={isSendingMail}
-                        style={{
-                          marginRight: "8px",
-                          cursor: isSendingMail ? "not-allowed" : "pointer",
-                        }}
-                      />
-                      <input
-                        className="form-field"
-                        id="publicUrl"
-                        type="hidden"
-                        value={
-                          mailFormData.public_link_with_image
-                            ? `${window.location.origin}/public/orders/${id}/images`
-                            : `${window.location.origin}/public/orders/${id}/documents`
-                        }
-                        readOnly
-                        name="publicUrl"
-                        disabled={isSendingMail}
-                      />
-                      Public link With image
-                    </label>
-                  </div>
+                        <input
+                          type="checkbox"
+                          checked={mailFormData.public_link_with_image || false}
+                          onChange={(e) => {
+                            setMailFormData((prev) => ({
+                              ...prev,
+                              public_link_with_image: e.target.checked,
+                            }));
+                          }}
+                          disabled={isSendingMail}
+                          style={{
+                            marginRight: "8px",
+                            cursor: isSendingMail ? "not-allowed" : "pointer",
+                          }}
+                        />
+                        <input
+                          className="form-field"
+                          id="publicUrl"
+                          type="hidden"
+                          value={
+                            mailFormData.public_link_with_image
+                              ? `${window.location.origin}/public/orders/${id}/images`
+                              : `${window.location.origin}/public/orders/${id}/documents`
+                          }
+                          readOnly
+                          name="publicUrl"
+                          disabled={isSendingMail}
+                        />
+                        Public link With image
+                      </label>
+                    </div>
+                  )}
 
                   <div className="form-group">
                     <label>Selected Collage, Reports & Videos</label>
