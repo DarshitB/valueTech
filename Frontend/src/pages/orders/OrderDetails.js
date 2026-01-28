@@ -1948,8 +1948,8 @@ function OrderDetails() {
       mail_attachment: mailFormData.mail_attachment || false, // Boolean: true if checkbox is checked, false otherwise
       public_link_with_image: mailFormData.public_link_with_image || false, // Boolean: true if checkbox is checked, false otherwise
       public_url: mailFormData.public_link_with_image
-        ? `${window.location.origin}/public/orders/${id}/documents` // URL without images (reports/collages/videos only)
-        : `${window.location.origin}/public/orders/${id}/images`, // URL with images
+        ? `${window.location.origin}/public/orders/${id}/images` // URL with images (reports/collages/videos + images)
+        : `${window.location.origin}/public/orders/${id}/documents`, // URL without images (reports/collages/videos only)
       document_ids: documentIds.map((doc) => doc.id), // Array of document IDs (collages and reports)
       // Add videos separately if there are any
       ...(videoIds.length > 0 && { video_ids: videoIds }), // Array of video IDs (only if videos exist)
@@ -2867,8 +2867,8 @@ function OrderDetails() {
                         type="hidden"
                         value={
                           mailFormData.public_link_with_image
-                            ? `${window.location.origin}/public/orders/${id}/documents`
-                            : `${window.location.origin}/public/orders/${id}/images`
+                            ? `${window.location.origin}/public/orders/${id}/images`
+                            : `${window.location.origin}/public/orders/${id}/documents`
                         }
                         readOnly
                         name="publicUrl"

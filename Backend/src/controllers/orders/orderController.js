@@ -1320,6 +1320,7 @@ exports.sendMail = async (req, res, next) => {
       public_url,
     } =
       req.body;
+      console.log("public_url", req.body.public_url);
 
     // Validate order exists
     const order = await Order.findById(orderId, req.user);

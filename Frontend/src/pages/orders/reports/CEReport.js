@@ -5835,26 +5835,31 @@ function CEReport() {
                 </div>
               </div>
 
-              {/* Generate Report Button with Report Type Selection */}
+              {/* Generate Report Buttons - Rough and Production */}
               <div className="row">
                 <div className="col-12">
                   <div className="form-buttons" style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: "12px" }}>
-                    <div style={{ minWidth: "200px" }}>
-                      <SingleSearchSelect
-                        options={[
-                          { value: "Rough", label: "Rough" },
-                          { value: "Production", label: "Production" },
-                        ]}
-                        value={reportTypeSelection}
-                        onChange={(value) => setReportTypeSelection(value)}
-                      />
-                    </div>
                     <button
                       type="submit"
                       className="submit-button"
                       disabled={generating}
+                      onClick={() => setReportTypeSelection("Rough")}
+                      style={{
+                        backgroundColor: generating ? "#9ca3af" : "#f59e0b",
+                        borderColor: generating ? "#9ca3af" : "#f59e0b",
+                      }}
                     >
-                      {generating
+                      {generating && reportTypeSelection === "Rough"
+                        ? "Generating Rough..."
+                        : "Rough"}
+                    </button>
+                    <button
+                      type="submit"
+                      className="submit-button"
+                      disabled={generating}
+                      onClick={() => setReportTypeSelection("Production")}
+                    >
+                      {generating && reportTypeSelection === "Production"
                         ? "Generating Report..."
                         : "Generate CE Report"}
                     </button>
