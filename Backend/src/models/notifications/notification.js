@@ -140,8 +140,7 @@ const notification = {
         .leftJoin("order_status_history", "notifications.activity_id", "order_status_history.id")
         .leftJoin("order_comments", "notifications.comment_id", "order_comments.id")
         .leftJoin("officers", "orders.officer_id", "officers.id")
-        .whereNull("orders.deleted_at")
-        .whereNot("orders.current_status_id", 13); // Exclude status 13
+        .whereNull("orders.deleted_at");
 
       // Apply order permission filters
       if (!hasPrivilegedRole) {
@@ -244,10 +243,13 @@ const notification = {
           "order_status_history.changed_by",
           "order_status_history.user_type",
           db.raw(`
-            CASE 
-              WHEN order_status_history.user_type = 'field_verifier' THEN field_verifiers.name 
-              ELSE changed_by_user.name 
-            END as changed_by_name
+            COALESCE(
+              CASE 
+                WHEN order_status_history.user_type = 'field_verifier' THEN field_verifiers.name 
+                ELSE changed_by_user.name 
+              END,
+              'System'
+            ) as changed_by_name
           `),
           "order_status_history.changed_at",
           "order_comments.comment as comment_text",
@@ -294,8 +296,7 @@ const notification = {
       .leftJoin("order_comments", "notifications.comment_id", "order_comments.id")
       .leftJoin("officers", "orders.officer_id", "officers.id")
       .where("notifications.is_read", false)
-      .whereNull("orders.deleted_at")
-      .whereNot("orders.current_status_id", 13);
+      .whereNull("orders.deleted_at");
 
     // Apply order permission filters (same as getAllNotificationsWithFilter)
     if (!hasPrivilegedRole) {
@@ -421,8 +422,7 @@ const notification = {
         .leftJoin("order_comments", "notifications.comment_id", "order_comments.id")
         .leftJoin("officers", "orders.officer_id", "officers.id")
         .where("notifications.is_read", false)
-        .whereNull("orders.deleted_at")
-        .whereNot("orders.current_status_id", 13);
+        .whereNull("orders.deleted_at");
 
       // Apply order permission filters
       if (!hasPrivilegedRole) {
@@ -508,10 +508,13 @@ const notification = {
           "order_status_history.changed_by",
           "order_status_history.user_type",
           db.raw(`
-            CASE 
-              WHEN order_status_history.user_type = 'field_verifier' THEN field_verifiers.name 
-              ELSE changed_by_user.name 
-            END as changed_by_name
+            COALESCE(
+              CASE 
+                WHEN order_status_history.user_type = 'field_verifier' THEN field_verifiers.name 
+                ELSE changed_by_user.name 
+              END,
+              'System'
+            ) as changed_by_name
           `),
           "order_status_history.changed_at",
           "order_comments.comment as comment_text",
@@ -587,8 +590,7 @@ const notification = {
       .leftJoin("order_status_history", "notifications.activity_id", "order_status_history.id")
       .leftJoin("order_comments", "notifications.comment_id", "order_comments.id")
       .leftJoin("officers", "orders.officer_id", "officers.id")
-      .whereNull("orders.deleted_at")
-      .whereNot("orders.current_status_id", 13);
+      .whereNull("orders.deleted_at");
 
     // Apply order permission filters
     if (!hasPrivilegedRole) {
@@ -674,10 +676,13 @@ const notification = {
           "order_status_history.changed_by",
           "order_status_history.user_type",
           db.raw(`
-            CASE 
-              WHEN order_status_history.user_type = 'field_verifier' THEN field_verifiers.name 
-              ELSE changed_by_user.name 
-            END as changed_by_name
+            COALESCE(
+              CASE 
+                WHEN order_status_history.user_type = 'field_verifier' THEN field_verifiers.name 
+                ELSE changed_by_user.name 
+              END,
+              'System'
+            ) as changed_by_name
           `),
           "order_status_history.changed_at",
           "order_comments.comment as comment_text",
@@ -805,8 +810,7 @@ const notification = {
       .leftJoin("order_comments", "notifications.comment_id", "order_comments.id")
       .leftJoin("officers", "orders.officer_id", "officers.id")
       .where("notifications.is_read", false)
-      .whereNull("orders.deleted_at")
-      .whereNot("orders.current_status_id", 13);
+      .whereNull("orders.deleted_at");
 
     // Apply order permission filters (same as getAllNotificationsWithFilter)
     if (!hasPrivilegedRole) {

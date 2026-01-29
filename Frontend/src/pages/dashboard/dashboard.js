@@ -125,6 +125,8 @@ function Dashboard() {
       "view_payment_status_filter",
       "view_category_filter",
       "view_date_filter",
+      "view_created_by_filter",
+      "view_user_assigned_filter",
     ];
     return filterPermissions.some((permission) =>
       hasPermission(allowedPermissions, permission)
@@ -225,6 +227,16 @@ function Dashboard() {
     return saved || "";
   });
 
+  const [selectedCreatedBy, setSelectedCreatedBy] = useState(() => {
+    const saved = localStorage.getItem("filter_createdBy");
+    return saved || "";
+  });
+
+  const [selectedUserAssigned, setSelectedUserAssigned] = useState(() => {
+    const saved = localStorage.getItem("filter_userAssigned");
+    return saved || "";
+  });
+
   // State for date filter
   const [selectedDatePreset, setSelectedDatePreset] = useState(() => {
     const saved = localStorage.getItem("filter_datePreset");
@@ -318,6 +330,21 @@ function Dashboard() {
     return [...new Set(subCategories)].sort();
   }, [orders]);
 
+  const distinctCreatedBy = useMemo(() => {
+    const createdByValues = orders
+      .map((order) => order.created_by)
+      .filter((name) => name && name.trim() !== "");
+    return [...new Set(createdByValues)].sort();
+  }, [orders]);
+
+  const distinctUserAssigned = useMemo(() => {
+    const assignedUserNames = orders
+      .flatMap((order) => order.assigned_users || [])
+      .map((user) => user.name)
+      .filter((name) => name && name.trim() !== "");
+    return [...new Set(assignedUserNames)].sort();
+  }, [orders]);
+
   // Fetch filtered child categories for Bank Officers based on their departments
   useEffect(() => {
     if (isBankOfficer && officers.length > 0) {
@@ -371,6 +398,7 @@ function Dashboard() {
     officer_id: null,
     manager_id: null,
     field_verifier_id: null,
+    created_at: null,
   });
 
   const [isEdit, setIsEdit] = useState(false);
@@ -723,6 +751,7 @@ function Dashboard() {
       officer_id: null,
       manager_id: null,
       field_verifier_id: null,
+      created_at: null,
     });
     setShowFormModal(true);
   };
@@ -744,6 +773,7 @@ function Dashboard() {
       officer_id: order.officer_id || null,
       manager_id: order.manager_id || null,
       field_verifier_id: order.field_verifier_id || null,
+      created_at: order.created_at ? new Date(order.created_at) : null,
     });
     setShowFormModal(true);
   };
@@ -922,6 +952,8 @@ function Dashboard() {
     setSelectedCategory("");
     setSelectedAssetCategory("");
     setSelectedSubCategory("");
+    setSelectedCreatedBy("");
+    setSelectedUserAssigned("");
     setSelectedDatePreset("");
     setSelectedDateRange({ start: null, end: null });
 
@@ -939,6 +971,8 @@ function Dashboard() {
     localStorage.removeItem("filter_category");
     localStorage.removeItem("filter_assetCategory");
     localStorage.removeItem("filter_subCategory");
+    localStorage.removeItem("filter_createdBy");
+    localStorage.removeItem("filter_userAssigned");
     localStorage.removeItem("filter_datePreset");
     localStorage.removeItem("filter_dateRangeStart");
     localStorage.removeItem("filter_dateRangeEnd");
@@ -960,6 +994,8 @@ function Dashboard() {
       selectedCategory !== "" ||
       selectedAssetCategory !== "" ||
       selectedSubCategory !== "" ||
+      selectedCreatedBy !== "" ||
+      selectedUserAssigned !== "" ||
       selectedDatePreset !== "" ||
       selectedDateRange.start !== null ||
       selectedDateRange.end !== null
@@ -978,6 +1014,8 @@ function Dashboard() {
     selectedCategory,
     selectedAssetCategory,
     selectedSubCategory,
+    selectedCreatedBy,
+    selectedUserAssigned,
     selectedDatePreset,
     selectedDateRange,
   ]);
@@ -1045,6 +1083,17 @@ function Dashboard() {
         payload.place_of_inspection =
           formData.place_of_inspection.trim() || null;
       }
+
+      // Add created_at only if user has permission and value is set and changed
+      if (hasPermission(allowedPermissions, "edit_order_created_at") && formData.created_at) {
+        const currentCreatedAt = currentOrder.created_at ? new Date(currentOrder.created_at) : null;
+        const newCreatedAt = formData.created_at;
+        
+        // Only add if changed
+        if (!currentCreatedAt || currentCreatedAt.getTime() !== newCreatedAt.getTime()) {
+          payload.created_at = newCreatedAt.toISOString();
+        }
+      }
     } else {
       // For add mode, include all fields
       payload = {
@@ -1057,6 +1106,11 @@ function Dashboard() {
         registration_number: formData.registration_number.trim() || null,
         place_of_inspection: formData.place_of_inspection.trim() || null,
       };
+
+      // Add created_at only if user has permission and value is set
+      if (hasPermission(allowedPermissions, "add_order_created_at") && formData.created_at) {
+        payload.created_at = formData.created_at.toISOString();
+      }
     }
 
     // Handle officer_id, manager_id, and field_verifier_id based on permissions and user role
@@ -2115,6 +2169,44 @@ function Dashboard() {
                               placeholder="All Payment Statuses"
                             />
                           )}
+                        {hasPermission(allowedPermissions, "view_created_by_filter") && (
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Created By" },
+                              ...distinctCreatedBy.map((createdBy) => ({
+                                value: createdBy,
+                                label: createdBy,
+                              })),
+                            ]}
+                            value={selectedCreatedBy || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedCreatedBy(val);
+                              localStorage.setItem("filter_createdBy", val);
+                            }}
+                            placeholder="All Created By"
+                          />
+                        )}
+                        {hasPermission(allowedPermissions, "view_user_assigned_filter") && (
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Users Assigned" },
+                              ...distinctUserAssigned.map((userName) => ({
+                                value: userName,
+                                label: userName,
+                              })),
+                            ]}
+                            value={selectedUserAssigned || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedUserAssigned(val);
+                              localStorage.setItem("filter_userAssigned", val);
+                            }}
+                            placeholder="All Users Assigned"
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2340,6 +2432,16 @@ function Dashboard() {
                               !selectedSubCategory ||
                               order.child_category_name === selectedSubCategory;
 
+                            // Filter by created by if selected
+                            const createdByMatch =
+                              !selectedCreatedBy || order.created_by === selectedCreatedBy;
+
+                            // Filter by user assigned if selected
+                            const userAssignedMatch =
+                              !selectedUserAssigned ||
+                              (order.assigned_users &&
+                                order.assigned_users.some((user) => user.name === selectedUserAssigned));
+
                             // Filter by date if selected
                             const dateMatch = matchesDateFilter(order);
 
@@ -2350,6 +2452,8 @@ function Dashboard() {
                               categoryMatch &&
                               assetCategoryMatch &&
                               subCategoryMatch &&
+                              createdByMatch &&
+                              userAssignedMatch &&
                               bankMatch &&
                               branchMatch &&
                               officerMatch &&
@@ -2849,6 +2953,27 @@ function Dashboard() {
                     />
                   </div>
 
+                  {/* Created At field - Show based on permission */}
+                  {((isEdit && hasPermission(allowedPermissions, "edit_order_created_at")) ||
+                    (!isEdit && hasPermission(allowedPermissions, "add_order_created_at"))) && (
+                    <div className="form-group">
+                      <label htmlFor="createdAt">Created At</label>
+                      <DatePicker
+                        id="createdAt"
+                        selected={formData.created_at}
+                        onChange={(date) => setFormData({ ...formData, created_at: date })}
+                        showTimeSelect
+                        timeFormat="HH:mm"
+                        timeIntervals={15}
+                        dateFormat="d MMM yyyy h:mm aa"
+                        placeholderText="Select date and time (optional)"
+                        className="form-field"
+                        renderCustomHeader={renderDatePickerHeader}
+                        isClearable
+                      />
+                    </div>
+                  )}
+
                   {/* Subcategory field - Show based on permission */}
                   {hasPermission(
                     allowedPermissions,
@@ -3003,6 +3128,7 @@ function Dashboard() {
                 officer_id: null,
                 manager_id: null,
                 field_verifier_id: null,
+                created_at: null,
               });
             },
           }}

@@ -2139,7 +2139,8 @@ function AVRReport() {
                       onClick={() => setReportTypeSelection("Rough")}
                       style={{
                         backgroundColor: generating ? "#9ca3af" : "#f59e0b",
-                        borderColor: generating ? "#9ca3af" : "#f59e0b",
+                        borderColor: generating ? "#9ca3af" : "#f59e0b",  
+                        width: "200px",
                       }}
                     >
                       {generating && reportTypeSelection === "Rough"
@@ -2151,6 +2152,9 @@ function AVRReport() {
                       className="submit-button"
                       disabled={generating}
                       onClick={() => setReportTypeSelection("Production")}
+                      style={{
+                        width: "calc(100% - 212px)",
+                      }}
                     >
                       {generating && reportTypeSelection === "Production"
                         ? "Generating AVR Report..."

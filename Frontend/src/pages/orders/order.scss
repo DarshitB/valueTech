@@ -7,6 +7,12 @@
   min-width: 150px;
 }
 
+.modal-content {
+  .react-datepicker-wrapper {
+    width: 100%;
+  }
+}
+
 .react-datepicker-wrapper {
   display: block;
   width: 150px;
@@ -64,6 +70,10 @@
     border-radius: 8px 8px 0 0;
     padding: 10px;
 
+    &.react-datepicker__header--time {
+      line-height: 36px;
+    }
+
     .react-datepicker__current-month {
       color: #2c2c34;
       font-weight: 600;
@@ -79,6 +89,13 @@
         width: 2.2rem;
         line-height: 2.2rem;
       }
+    }
+  }
+
+  .react-datepicker__time-list-item {
+    height: auto !important;
+    &.react-datepicker__time-list-item--selected{
+      background-color: #5864bd !important;
     }
   }
 
@@ -207,7 +224,7 @@
   }
 
   // CustomDataTable wrapper should take remaining space
-  > div:last-child {
+  >div:last-child {
     flex: 1;
     min-height: 0;
     display: flex;
@@ -215,7 +232,7 @@
     overflow: hidden;
 
     // Ensure CustomDataTable fills the wrapper
-    > div {
+    >div {
       flex: 1;
       min-height: 0;
       display: flex;
@@ -240,15 +257,19 @@
     flex-wrap: wrap;
     margin-bottom: 15px;
     align-items: center;
+
     .css-b62m3t-container {
       min-width: 200px;
     }
+
     &:last-child {
       margin-bottom: 0;
     }
+
     .clear-filters-btn {
       margin-left: auto;
     }
+
     &.advanced-filters-content {
       display: flex;
       flex-wrap: wrap;
@@ -328,6 +349,7 @@
         margin-bottom 0.4s ease-in-out;
       margin-bottom: 0;
       visibility: hidden;
+
       .css-b62m3t-container {
         width: calc((100% - 40px) / 5);
         min-width: 200px;
@@ -373,30 +395,36 @@
   width: fit-content;
   text-align: center;
   line-height: 20px;
+
   &.order-states {
     white-space: nowrap;
   }
 }
+
 .priority-badge {
   padding: 4px 15px;
   border-radius: 50rem;
   font-weight: 600;
+
   &.priority-high {
     border: 1px solid $color-danger;
     background-color: $color-danger;
     color: white;
   }
+
   &.priority-average {
     border: 1px solid $color-average;
     background-color: $color-average;
     color: white;
   }
+
   &.priority-low {
     border: 1px solid $color-success;
     background-color: $color-success;
     color: white;
   }
 }
+
 .type-priority-selector {
   padding: 2px 10px;
   border: 1px solid #ddd;
@@ -420,13 +448,16 @@
     text-align: left;
   } */
 }
+
 /*///////////////// order details  ////////////////////*/
 
 .mention-highlight {
   color: $primary-color;
   font-weight: bold;
 }
+
 .order-details-wrapper {
+
   /* padding-bottom: 50px; */
   .order-important-info {
     .order-impo-info-card {
@@ -441,15 +472,18 @@
       justify-content: center;
       flex-direction: column;
       box-shadow: 0 0 20px $box-shadow-color;
+
       &:last-child {
         margin-bottom: 0;
       }
+
       p {
         font-size: 14px;
         font-weight: 400;
         margin-bottom: 0;
         line-height: 20px;
       }
+
       h6 {
         font-size: 20px;
         font-weight: 600;
@@ -457,12 +491,14 @@
       }
     }
   }
+
   .order-details-info {
     min-height: 100%;
     /* height: 100%; */
     box-shadow: 0 0 20px $box-shadow-color;
     border-radius: 10px;
     padding: 20px;
+
     .order-details-info-card {
       h6 {
         font-size: 16px;
@@ -470,13 +506,16 @@
         margin-bottom: 20px;
         color: $base-font-color;
       }
+
       .order-details-info-sets {
         .order-details-info-set {
           display: flex;
           gap: 10px;
           margin-bottom: 15px;
+
           .order-details-info-set-heading {
             width: 130px;
+
             p {
               font-size: 14px;
               font-weight: 400;
@@ -488,6 +527,7 @@
               line-height: 20px;
             }
           }
+
           .order-details-info-set-details {
             p {
               font-size: 14px;
@@ -499,6 +539,7 @@
           }
         }
       }
+
       &.client {
         .order-details-info-sets {
           .order-details-info-set {
@@ -508,6 +549,7 @@
           }
         }
       }
+
       &.office {
         .order-details-info-sets {
           .order-details-info-set {
@@ -519,35 +561,43 @@
       }
     }
   }
+
   .recent-activity-wrapper {
     .recent-activity-heading {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 20px;
+
       h3 {
         color: $base-font-color;
       }
+
       .recent-activity-buttons {
         display: flex;
         gap: 5px;
       }
     }
+
     .activities-wrapper {
+
       /* max-height: 300px;
       overflow-y: auto; */
       .activities {
         padding-right: 10px;
+
         .activity {
           .activity-detail {
             width: 100%;
             padding: 20px;
             box-shadow: 0 0 20px $box-shadow-color;
+
             .activity-time {
               margin-bottom: 0px;
               line-height: 20px;
               color: $base-font-color;
             }
+
             .activity-description {
               margin-bottom: 0px;
               font-size: 15px;
@@ -560,28 +610,34 @@
       }
     }
   }
+
   .order-comments-wrapper {
     h3 {
       height: 41.59px;
       color: $base-font-color;
     }
+
     .order-comments-box {
       background-color: $base-color;
       box-shadow: 0 0 20px $box-shadow-color;
       border-radius: 10px;
       padding: 20px;
+
       .order-comments-show-comments {
         margin-bottom: 20px;
         max-height: 250px;
         overflow-y: auto;
+
         .order-comments-show-comments-inner {
           display: flex;
           flex-direction: column;
           justify-content: flex-end;
+
           .order-comments-show-comments-card {
             display: flex;
             align-items: center;
             gap: 20px;
+
             .order-comments-show-comments-card-icon {
               width: 40px;
               height: 40px;
@@ -593,21 +649,25 @@
               justify-content: center;
               font-weight: 600;
             }
+
             .order-comments-show-comments-card-content {
               display: flex;
               flex-direction: column;
               justify-content: center;
               padding: 10px 0;
+
               .order-comments-show-comments-card-content-text {
                 color: $base-font-color-light;
                 margin-bottom: 0;
                 font-size: 14px;
                 font-weight: 400;
                 line-height: 16px;
+
                 .name {
                   font-weight: 500;
                 }
               }
+
               .order-comments-show-comments-card-content-text-comment {
                 color: $base-font-color;
                 margin-bottom: 0;
@@ -618,6 +678,7 @@
           }
         }
       }
+
       .order-comments-add-comments {
         display: flex;
         align-items: center;
@@ -625,9 +686,11 @@
         border: 1px solid $border-color;
         border-radius: 50rem;
         position: relative;
+
         /* overflow: hidden; */
         .mentions {
           width: 100%;
+
           .mentions__suggestions {
             top: auto !important;
             left: 0 !important;
@@ -639,6 +702,7 @@
             width: calc(100% + 56px);
           }
         }
+
         input,
         textarea {
           width: 100%;
@@ -647,6 +711,7 @@
           padding: 10px 15px !important;
           outline: none;
         }
+
         button {
           background-color: transparent;
           padding: 0;
@@ -654,6 +719,7 @@
           border: 0;
           color: $primary-color;
           outline: none;
+
           .icon {
             height: 41px;
             width: 46px;
@@ -662,6 +728,7 @@
       }
     }
   }
+
   /* Payment Modal Styles */
   .payment-modal-content {
     .nav-tabs {
@@ -671,6 +738,7 @@
       .nav-item {
         margin-bottom: -1px;
         width: 50%;
+
         .nav-link {
           border: 1px solid transparent;
           width: 100%;
@@ -689,6 +757,7 @@
           &.active {
             font-weight: 500;
             position: relative;
+
             &::after {
               content: "";
               position: absolute;
@@ -711,25 +780,31 @@
         &.active {
           display: block;
         }
+
         .body-form-box {
           .form-field {
             line-height: 21px;
           }
+
           .form-buttons {
             &.two {
               display: flex;
               gap: 10px;
+
               .submit-button {
                 width: 50%;
+
                 &.open-tally {
                   background-color: $primary-color;
                 }
               }
             }
           }
+
           label {
             line-height: 21px;
           }
+
           .radio-group {
             .radio-label {
               width: 50%;
@@ -748,6 +823,7 @@
     align-items: center;
     justify-content: center;
   }
+
   .save-report {
     width: 150px;
     height: 50px;
@@ -757,37 +833,46 @@
     background-color: white;
     border: 1px solid $color-success;
     color: $color-success !important;
+
     &:hover {
       background-color: $color-success !important;
       color: $base-color !important;
     }
   }
 }
+
 .order-priority-radio-group {
   .radio-group {
     display: flex !important;
     gap: 20px;
+
     .radio-label {
       border-radius: 50rem;
+
       &.low {
         border: 1px solid $color-success;
         color: $color-success;
+
         &.selected {
           background-color: $color-success;
           color: $base-color;
         }
       }
+
       &.average {
         border: 1px solid $color-average;
         color: $color-average;
+
         &.selected {
           background-color: $color-average;
           color: $base-color;
         }
       }
+
       &.high {
         border: 1px solid $color-danger;
         color: $color-danger;
+
         &.selected {
           background-color: $color-danger;
           color: $base-color;
@@ -796,11 +881,13 @@
     }
   }
 }
+
 .selected-documents-container {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   padding: 8px 0;
+
   .approved-document-tag {
     display: inline-flex;
     align-items: center;
@@ -814,6 +901,7 @@
     color: $base-font-color-light;
     position: relative;
     width: 100%;
+
     .remove-document-tag {
       background: none;
       border: none;
@@ -825,6 +913,7 @@
     }
   }
 }
+
 @media (max-width: 567px) {
   .order-details-wrapper {
     .recent-activity-wrapper {
@@ -840,46 +929,56 @@
 /*///////////////// order images  ////////////////////*/
 .order-images-wrapper {
   height: 100%;
+
   .order-images-container {
     padding: 30px 50px;
     box-shadow: 0 0 20px $box-shadow-color;
     background-color: $base-color;
     border-radius: 10px;
     height: 100%;
+
     .order-images-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 10px;
       margin-bottom: 20px;
+
       .order-images-header-title-with-buttons {
         display: flex;
         align-items: center;
         gap: 20px;
+
         h2 {
           font-size: 20px;
           color: $base-font-color;
           margin-bottom: 0;
+
           span {
             font-size: 12px;
           }
         }
+
         .tooltip-link {
           border: 1px solid $primary-color !important;
+
           &:hover {
             background-color: transparent !important;
             color: $primary-color !important;
           }
+
           &:focus {
             background-color: transparent !important;
             color: $primary-color !important;
           }
         }
       }
+
       .order-images-buttons {
         display: flex;
         gap: 10px;
         align-items: center;
+
         button {
           background-color: transparent;
           padding: 0;
@@ -887,11 +986,13 @@
           border: 0;
           outline: none;
           cursor: pointer;
+
           &:disabled {
             opacity: 0.6;
             cursor: not-allowed;
           }
         }
+
         .btn {
           display: flex;
           align-items: center;
@@ -942,9 +1043,11 @@
         }
       }
     }
+
     .order-images-content {
       overflow-y: auto;
       height: calc(100% - 78px);
+
       .form-control {
         height: auto !important;
         margin-bottom: 20px;
@@ -969,6 +1072,7 @@
         display: flex;
         flex-wrap: wrap;
         gap: 25px;
+
         .order-image-card {
           width: fit-content;
           height: fit-content;
@@ -1077,6 +1181,7 @@
                   box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
                 }
               }
+
               .icon-if-selected {
                 position: absolute;
                 bottom: -10px;
@@ -1084,6 +1189,7 @@
                 /* display: none; */
                 visibility: hidden;
               }
+
               &:has(.form-check-input:checked) {
                 .icon-if-selected {
                   visibility: visible;
@@ -1117,6 +1223,7 @@
                   color: $primary-color;
                 }
               }
+
               .copy-video-url-btn {
                 position: absolute;
                 top: 5px;
@@ -1144,6 +1251,7 @@
                   color: $primary-color;
                 }
               }
+
               .selection-order {
                 position: absolute;
                 top: 5px;
@@ -1220,6 +1328,7 @@
               .form-check-input {
                 opacity: 1;
               }
+
               .lightbox-btn {
                 display: flex;
               }
@@ -1235,6 +1344,7 @@
     }
   }
 }
+
 .tooltip-link {
   &.button {
     &:focus {
@@ -1244,14 +1354,17 @@
     }
   }
 }
+
 /* Lightbox customizations */
 .yarl__container {
   z-index: 9998 !important;
   background-color: rgba(0, 0, 0, 0.8) !important;
 }
+
 .yarl__portal {
   z-index: 9998 !important;
 }
+
 .yarl__thumbnails_thumbnail {
   border-radius: 8px;
   overflow: hidden;
@@ -1262,6 +1375,7 @@
   font-size: 16px;
   font-weight: 500;
 }
+
 .approval-component-lightbox {
   position: absolute;
   bottom: 20px;
@@ -1271,21 +1385,25 @@
   padding: 15px 50px;
   border-radius: 8px;
   z-index: 1000;
+
   .approval-component-lightbox-status-note {
     margin-bottom: 10px;
     color: $primary-font-color;
     opacity: 0.7;
   }
+
   .approval-component-lightbox-status {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 10px;
+
     label {
       margin: 0;
     }
   }
 }
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .order-images-wrapper {
@@ -1307,6 +1425,7 @@
           }
         }
       }
+
       .order-images {
         gap: 15px;
 
@@ -1344,6 +1463,7 @@
 .order-documents-wrapper {
   .order-collage-report-container {
     .order-collage-container {
+
       /* margin-bottom: 30px; */
       .order-collage-header {
         display: flex;
@@ -1351,17 +1471,21 @@
         align-items: center;
         gap: 10px;
         margin-bottom: 10px;
+
         h3 {
           color: $base-font-color;
         }
+
         .btn.primary {
           color: $primary-font-color;
+
           &:hover {
             color: $primary-color;
           }
         }
       }
     }
+
     .order-report-container {
       .order-report-header {
         display: flex;
@@ -1369,11 +1493,14 @@
         align-items: center;
         gap: 10px;
         margin-bottom: 10px;
+
         h3 {
           color: $base-font-color;
         }
+
         .btn.primary {
           color: $primary-font-color;
+
           &:hover {
             color: $primary-color;
           }
@@ -1381,13 +1508,16 @@
       }
     }
   }
+
   .order-upload-documents-container {
     .order-upload-documents-header {
       padding-bottom: 10px;
+
       h3 {
         color: $base-font-color;
       }
     }
+
     .order-upload-documents {
       width: 100%;
       display: flex;
@@ -1399,6 +1529,7 @@
       box-shadow: 0 0 20px $box-shadow-color;
       position: relative;
       overflow: hidden;
+
       .upload-box {
         padding: 30px 20px;
         width: 100%;
@@ -1412,6 +1543,7 @@
         cursor: pointer;
         transition: border-color 0.3s ease, background-color 0.3s ease;
         margin-bottom: 0;
+
         .upload-icon {
           color: #6777ef;
           background: #dee0f2;
@@ -1422,11 +1554,13 @@
           justify-content: center;
           align-items: center;
           margin-bottom: 8px;
+
           svg {
             width: 35px;
             height: 35px;
           }
         }
+
         p {
           font-size: 14px;
           color: #555;
@@ -1437,11 +1571,13 @@
             text-decoration: underline;
           }
         }
+
         &:hover {
           border-color: $primary-color;
           background-color: #f9f9f9;
         }
       }
+
       .upload-progress-container {
         position: absolute;
         bottom: 0;
@@ -1450,6 +1586,7 @@
         height: 10px;
         background-color: #f9f9f9;
         border-radius: 5px;
+
         .progress {
           height: 100%;
           background-color: $primary-color;
@@ -1458,6 +1595,7 @@
       }
     }
   }
+
   .order-document-table {
     min-height: 200px;
     box-shadow: 0 0 20px $box-shadow-color;
@@ -1465,6 +1603,7 @@
     padding: 10px 10px;
     background-color: $base-color;
     margin-bottom: 30px;
+
     .no-documents {
       display: flex;
       align-items: center;
@@ -1472,24 +1611,29 @@
       width: 100%;
       min-height: 180px;
     }
+
     table {
       margin-bottom: 20px;
       width: 100%;
+
       th,
       td {
         color: #000;
         padding: 5px 10px;
       }
+
       th {
         padding: 18px 10px;
         font-weight: 700;
       }
+
       .selection-check {
         width: 100%;
         height: 100%;
         display: flex;
         align-items: center;
         justify-content: center;
+
         .selection-check-input {
           width: 20px;
           height: 20px;
@@ -1497,14 +1641,17 @@
           margin: auto; // reset bootstrap’s margin
         }
       }
+
       button {
         padding: 0;
         outline: none;
         box-shadow: none;
       }
     }
+
     .btn {
       margin-top: 10px;
+
       &.download-all {
         width: 50%;
         height: 50px;
@@ -1514,10 +1661,12 @@
         padding: 10px 10px;
         background-color: #54ca68;
         border-color: #54ca68;
+
         &:hover {
           color: #54ca68 !important;
         }
       }
+
       &.approve-report {
         width: 50%;
         height: 50px;
@@ -1527,11 +1676,13 @@
         background-color: transparent;
         border: 1px solid $color-success;
         color: $color-success !important;
+
         &:hover {
           background-color: $color-success !important;
           color: $base-color !important;
         }
       }
+
       &.remove-approve-report {
         width: 50%;
         height: 50px;
@@ -1542,6 +1693,7 @@
         border: 1px solid $color-danger;
         background-color: $color-danger !important;
         color: $base-color !important;
+
         &:hover {
           background-color: transparent !important;
           color: $color-danger !important;
@@ -1559,29 +1711,34 @@
     padding: 30px 50px;
     box-shadow: 0 0 20px $box-shadow-color;
     border-radius: 10px;
+
     h2 {
       font-size: 20px;
       color: $base-font-color;
       margin-bottom: 20px;
     }
+
     h4 {
       font-size: 18px;
       color: $base-font-color;
       margin-bottom: 0;
       margin-top: 30px;
     }
+
     h5 {
       font-size: 16px;
       color: $base-font-color;
       margin-bottom: 0;
       margin-top: 30px;
     }
+
     .row {
       box-sizing: border-box;
       width: 100%;
       margin-right: 0;
       margin-left: 0;
     }
+
     .col,
     .col-1,
     .col-10,
@@ -1655,17 +1812,20 @@
       padding-left: 5px;
       padding-right: 5px;
     }
+
     .form-group {
       .form-field {
         min-height: 38px;
         width: 100%;
       }
+
       label {
         font-weight: 600;
         color: #34395e;
         font-size: 12px;
         letter-spacing: 0.5px;
       }
+
       // Registration option buttons styling (match input field style)
       .registration-option-btn {
         background-color: #fdfdff;
@@ -1676,42 +1836,50 @@
         min-height: 38px;
         transition: all 0.2s ease;
         width: fit-content;
+
         &:hover {
           background-color: #f1f1f1;
           border-color: #95a0f4;
         }
+
         &.active {
           background-color: #878787;
           color: #fff;
         }
       }
     }
+
     .ref-no-input {
       display: flex;
       flex-wrap: wrap;
       flex-direction: row;
       gap: 6px;
+
       .form-field {
         min-width: 60px;
         flex: 1 1 60px;
         text-align: center;
       }
+
       .ref-no-slash {
         height: 38px;
         display: flex;
         align-items: center;
       }
     }
+
     .flexible-buttons-container {
       display: flex;
       gap: 10px;
       align-items: center;
       justify-content: flex-end;
       margin-bottom: 30px;
+
       .btn {
         padding: 5px 16px;
       }
     }
+
     .flexible-field-remove-button {
       position: absolute;
       top: -10px;
@@ -1722,6 +1890,7 @@
       z-index: 2;
       padding: 0;
     }
+
     input:read-only,
     textarea:read-only {
       background-color: #e3e3e3;
@@ -1773,10 +1942,12 @@
   0% {
     transform: rotate(0deg);
   }
+
   100% {
     transform: rotate(360deg);
   }
 }
+
 .gap-2 {
   gap: 5px;
 }

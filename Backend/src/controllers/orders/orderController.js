@@ -297,6 +297,7 @@ exports.create = async (req, res, next) => {
       registration_number,
       place_of_inspection,
       date_of_inspection,
+      created_at,
     } = req.body;
 
     // Validation - only customer_name and contact are mandatory
@@ -395,7 +396,7 @@ exports.create = async (req, res, next) => {
       order_type: "VKA1",
       order_priority: "Low",
       created_by: req.user?.id,
-      created_at: new Date(),
+      created_at: created_at ? new Date(created_at) : new Date(),
     };
 
     /* console.log("About to create order with data:", orderData); */
@@ -477,6 +478,7 @@ exports.update = async (req, res, next) => {
       registration_number,
       place_of_inspection,
       date_of_inspection,
+      created_at,
     } = req.body;
     /* console.log("req.body", req.body); */
     /* console.log(req.body); */
@@ -630,6 +632,11 @@ exports.update = async (req, res, next) => {
       updated_by: req.user?.id,
       updated_at: new Date(),
     };
+
+    // Add created_at to update data if provided (allows manual timestamp override)
+    if (created_at) {
+      updateData.created_at = new Date(created_at);
+    }
 
     const updatedOrder = await Order.updateOrder(
       orderId,
@@ -969,10 +976,10 @@ exports.updateOrderAttributes = async (req, res, next) => {
     const { user_ids, ...otherUpdateData } = updateData;
 
     // Remove any system fields that shouldn't be updated directly
+    // Note: created_at is allowed if user has permission (handled separately in payload)
     const restrictedFields = [
       "id",
       "order_number",
-      "created_at",
       "created_by",
       "updated_by",
       "updated_at",

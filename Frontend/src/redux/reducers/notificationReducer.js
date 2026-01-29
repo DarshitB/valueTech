@@ -98,10 +98,11 @@ const notificationSlice = createSlice({
           if (response.data.last_check_timestamp) {
             state.lastCheck = response.data.last_check_timestamp;
           }
-        /*   console.log("Parsed notifications (standard structure):", state.list.length, "notifications");
+          /* console.log("Parsed notifications (standard structure):", state.list.length, "notifications");
           console.log("Backend unread_count:", response.data.unread_count);
           console.log("Actual unread count (from notifications array):", actualUnreadCount);
-          console.log("Unread count set to:", state.unreadCount); */
+          console.log("Unread count set to:", state.unreadCount);
+          console.log("Sample notification:", state.list[0]); */
         } else if (response?.notifications) {
           // Alternative structure: { notifications: [...], unread_count: X }
           state.list = Array.isArray(response.notifications) ? response.notifications : [];

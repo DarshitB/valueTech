@@ -56,6 +56,17 @@ exports.getNotifications = async (req, res, next) => {
 
     // Format notifications for response - match exact frontend format
     const formattedNotifications = (notifications || []).map((notif) => {
+      // Debug log to check what data we're getting from database
+      /* if (process.env.NODE_ENV === 'development') {
+        console.log('Raw notification from DB:', {
+          id: notif.id,
+          user_name: notif.user_name,
+          changed_by_name: notif.changed_by_name,
+          status_name: notif.status_name,
+          activity_extra: notif.activity_extra
+        });
+      } */
+      
       // Ensure all required fields are present
       const formatted = {
         id: notif.id ? notif.id.toString() : null,
@@ -71,7 +82,7 @@ exports.getNotifications = async (req, res, next) => {
         status_name: notif.status_name || null,
         activity_extra: notif.activity_extra || null,
         changed_by_id: notif.changed_by || null,
-        changed_by_name: notif.changed_by_name || null,
+        changed_by_name: notif.changed_by_name || 'System',
         changed_at: notif.changed_at || notif.created_at,
         created_at: notif.created_at || new Date().toISOString(),
         is_read: notif.is_read !== undefined ? notif.is_read : false
@@ -213,7 +224,7 @@ exports.getAllNotifications = async (req, res, next) => {
         status_name: notif.status_name || null,
         activity_extra: notif.activity_extra || null,
         changed_by_id: notif.changed_by || null,
-        changed_by_name: notif.changed_by_name || null,
+        changed_by_name: notif.changed_by_name || 'System',
         changed_at: notif.changed_at,
         created_at: notif.created_at,
         is_read: notif.is_read || false

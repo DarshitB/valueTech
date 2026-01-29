@@ -287,23 +287,41 @@ function NotificationDropdown() {
 
   // Format notification description (exactly like OrderDetails component)
   const formatNotificationDescription = useCallback((notification) => {
-    // Use description if provided by backend
-    if (notification.description) {
-      return notification.description;
-    }
+    // Debug: Log notification data to check what's coming from backend
+    /* console.log("Notification data:", {
+      id: notification.id,
+      user_name: notification.user_name,
+      changed_by_name: notification.changed_by_name,
+      status_name: notification.status_name,
+      activity_extra: notification.activity_extra,
+      description: notification.description
+    }); */
     
     // Format exactly like OrderDetails component (lines 2258-2270)
     const showValue = (val) => val || "";
     
-    // Get user name - prefer user_name from API, fallback to changed_by_name
-    const userName = notification.user_name || notification.changed_by_name || "";
+    // Get user name - prefer user_name from API, fallback to changed_by_name, then "Unknown User"
+    const userName = notification.user_name || notification.changed_by_name || "Unknown User";
     
+    /* console.log("Formatted userName:", userName); */
+    
+    // If description is provided and already contains " by ", use it as-is
+    if (notification.description && notification.description.includes(" by ")) {
+      return notification.description;
+    }
+    
+    // If description is provided but doesn't have " by ", append the user name
+    if (notification.description) {
+      return `${notification.description} by ${userName}`;
+    }
+    
+    // Format based on available fields
     if (notification.status_name && notification.activity_extra) {
-      return `${showValue(notification.status_name)} by ${showValue(userName)} [ ${showValue(notification.activity_extra)} ]`;
+      return `${showValue(notification.status_name)} by ${userName} [ ${showValue(notification.activity_extra)} ]`;
     } else if (notification.status_name) {
-      return `${showValue(notification.status_name)} by ${showValue(userName)}`;
+      return `${showValue(notification.status_name)} by ${userName}`;
     } else if (notification.activity_extra) {
-      return `${showValue(notification.activity_extra)} by ${showValue(userName)}`;
+      return `${showValue(notification.activity_extra)} by ${userName}`;
     }
     
     return "New activity";

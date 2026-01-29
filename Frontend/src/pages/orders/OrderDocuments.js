@@ -51,8 +51,8 @@ const ALLOWED_FILE_TYPES = [
   "application/x-zip-compressed",
 ];
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-const MAX_FILES_COUNT = 20;
+const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+const MAX_FILES_COUNT = 50;
 const DOCUMENT_TYPES = ["collage", "report", "documents"];
 
 // Security utilities
