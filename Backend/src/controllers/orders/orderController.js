@@ -686,6 +686,7 @@ exports.update = async (req, res, next) => {
       "registration_number",
       "place_of_inspection",
       "date_of_inspection",
+      "created_at",
     ];
 
     for (const field of fieldsToCheck) {
@@ -701,7 +702,19 @@ exports.update = async (req, res, next) => {
       if (newValue !== undefined) {
         const oldValue = existingOrder[field];
 
-        if (oldValue !== newValue) {
+        // Compare values: for date fields, DB may give a Date object and the payload a string.
+        // Converting both to timestamps (milliseconds) lets us compare "same moment" as equal
+        // so we only log a change when the actual date/time changed.
+        let valuesDiffer = false;
+        if (field === "created_at" || field === "date_of_inspection") {
+          const oldTime = oldValue != null ? new Date(oldValue).getTime() : null;
+          const newTime = newValue != null ? new Date(newValue).getTime() : null;
+          valuesDiffer = oldTime !== newTime;
+        } else {
+          valuesDiffer = oldValue !== newValue;
+        }
+
+        if (valuesDiffer) {
           // Format field names for better readability
           const formatFieldName = (fieldName) => {
             const fieldMap = {
@@ -716,6 +729,7 @@ exports.update = async (req, res, next) => {
               registration_number: "REGISTRATION NUMBER",
               place_of_inspection: "PLACE OF INSPECTION",
               date_of_inspection: "DATE OF INSPECTION",
+              created_at: "CREATED AT",
             };
             return (
               fieldMap[fieldName] || fieldName.replace(/_/g, " ").toUpperCase()
@@ -746,6 +760,21 @@ exports.update = async (req, res, next) => {
             displayNewValue = newValue
               ? (await getCategoryName(newValue)) || `Category ${newValue}`
               : "null";
+          } else if (field === "created_at" || field === "date_of_inspection") {
+            const formatDateForDisplay = (v) => {
+              if (v == null) return "null";
+              const d = new Date(v);
+              if (isNaN(d.getTime())) return String(v);
+              return d.toLocaleString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              });
+            };
+            displayOldValue = formatDateForDisplay(oldValue);
+            displayNewValue = formatDateForDisplay(newValue);
           } else {
             displayOldValue =
               oldValue === null ? "null" : oldValue === "" ? "empty" : oldValue;
