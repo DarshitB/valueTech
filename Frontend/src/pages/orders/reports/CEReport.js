@@ -5758,8 +5758,12 @@ function CEReport() {
                       Declaration <span class="text-danger">*</span>
                     </label>
                     <p className="mb-0">
-                      The aforesaid COMMERCIAL VEHICLE / TATA LPT 3518 inspected
-                      by us & found in{" "}
+                      The aforesaid{" "}
+                      {order?.category_name || ""}
+                      {order?.sub_category_name
+                        ? ` / ${order.sub_category_name}`
+                        : ""}{" "}
+                      inspected by us & found in{" "}
                     </p>
                     <SingleSearchSelect
                       options={[
@@ -5787,9 +5791,10 @@ function CEReport() {
                       required
                     />
                     <p className="mb-0">
-                      on the date of my inspection.This Report issued for
-                      [valuation_purpose] of HINDUJA LEYLAND FINANCE LTD, PUNE,
-                      GUJARAT Only.
+                      on the date of my inspection. This Report issued for{" "}
+                      {reportFormData.valuation_purpose || ""} of{" "}
+                      {order?.bank_name || ""}, {order?.branch_name || ""},{" "}
+                      {reportFormData.state_name || ""} Only.
                     </p>
                   </div>
                 </div>

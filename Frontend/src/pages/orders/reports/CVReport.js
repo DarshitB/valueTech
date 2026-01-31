@@ -19,6 +19,8 @@ import { fetchAssetMakesForReports } from "../../../redux/reducers/assetMakesRed
 import { usePageTitle } from "../../../context/PageTitleContext";
 import SingleSearchSelect from "../../../components/SingleSearchSelect";
 import { toast } from "react-toastify";
+import { selectPermissions } from "../../../redux/selectors/authSelectors";
+import { hasPermission } from "../../../utils/permissionUtils";
 import "../order.scss";
 import { DeleteIcon } from "../../../components/icons";
 import axios from "axios";
@@ -162,6 +164,7 @@ function CVReport() {
   const { list: assetMakes, loading: assetMakesLoading } = useSelector(
     (state) => state.assetMakes
   );
+  const allowedPermissions = useSelector(selectPermissions);
   const [showOtherAssetMake, setShowOtherAssetMake] = useState(false);
   const [otherAssetMake, setOtherAssetMake] = useState("");
   // Set page title using custom hook
@@ -2157,12 +2160,14 @@ function CVReport() {
 
     // Check if report loading is complete, report is blank, and we haven't called the API yet
     // IMPORTANT: Wait for initial report fetch to complete before calling external API
+    // RC API is only called if user has "rc_fill_allow" permission (silent skip if not)
     if (
       reportFetchCompleted && // Initial report fetch has completed (critical to prevent calling API before checking for existing data)
       !currentReport?.report && // No existing report (blank report)
       !externalApiCalledRef.current && // API hasn't been called yet
       order?.registration_number && // Registration number exists
-      order.registration_number.trim() !== "" // Registration number is not empty
+      order.registration_number.trim() !== "" && // Registration number is not empty
+      hasPermission(allowedPermissions, "rc_fill_allow") // User must have permission to call RC API
     ) {
       /* console.log("🔍 CVReport External API - Conditions met. Report is blank, calling external API..."); */
       externalApiCalledRef.current = true; // Mark as called to prevent multiple calls
@@ -2187,6 +2192,37 @@ function CVReport() {
     order?.registration_number,
     fetchRCDetailsFromExternalAPI,
     reportFetchCompleted,
+    allowedPermissions,
+  ]);
+
+  // Manual RC Fill: call RC API, prefill form, then save (same lifecycle as auto-call on new report)
+  // RC API is only called if user has "rc_fill_allow" (silent skip, no error if not)
+  const handleRCFillClick = useCallback(() => {
+    if (!hasPermission(allowedPermissions, "rc_fill_api_call_on_button")) {
+      toast.error("You do not have permission to use RC Fill.");
+      return;
+    }
+    if (!hasPermission(allowedPermissions, "rc_fill_allow")) {
+      return; // Silent: do not call API and do not show error
+    }
+    const registrationNumber =
+      reportFormData.registration_no?.trim() ||
+      order?.registration_number?.trim() ||
+      "";
+    if (!registrationNumber) {
+      toast.error("Please enter Registration No. in the form or ensure the order has a registration number.");
+      return;
+    }
+    if (!process.env.REACT_APP_ATTESTR_API_TOKEN) {
+      toast.error("RC API is not configured.");
+      return;
+    }
+    fetchRCDetailsFromExternalAPI(registrationNumber);
+  }, [
+    allowedPermissions,
+    reportFormData.registration_no,
+    order?.registration_number,
+    fetchRCDetailsFromExternalAPI,
   ]);
 
   // Auto-save after external API prefills data
@@ -2650,7 +2686,20 @@ function CVReport() {
           <div className="order-report-container">
             <div className="d-flex justify-content-between align-items-center">
               <h2>CV Report</h2>
-              <Link to={`/orders/${id}/details/images`} className="btn btn-primary">View Images</Link>
+              <div className="d-flex align-items-center gap-2">
+                {hasPermission(allowedPermissions, "rc_fill_allow") &&
+                hasPermission(allowedPermissions, "rc_fill_api_call_on_button") && (
+                  <button
+                    type="button"
+                    className="btn btn-outline-primary"
+                    onClick={handleRCFillClick}
+                    disabled={externalApiLoading}
+                  >
+                    {externalApiLoading ? "Fetching RC..." : "RC Fill"}
+                  </button>
+                )}
+                <Link to={`/orders/${id}/details/images`} className="btn btn-primary">View Images</Link>
+              </div>
             </div>
             <form onSubmit={handleReportSubmit} className="body-form-box">
               <div className="row">

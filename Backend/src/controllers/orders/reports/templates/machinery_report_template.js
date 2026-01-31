@@ -636,11 +636,11 @@ body.single-page{
             <th colspan="6">${formData.insurance_details_heading}</th>
         </tr>
         <tr>
-            <td>RC BOOK VERIFIED:</td>
-            <td>${formData.rc_book_verified}</td>
-            <td>TAX INVOICE COPY:</td>
-            <td>${formData.tax_invoice_copy}</td>
-            <td>${
+            <td>INVOICE COPY:</td>
+            <td colspan="2">${formData.tax_invoice_copy ? formData.tax_invoice_copy : "NOT AVAILABLE"}</td>
+            <td>BILL OF ENTRY:</td>
+            <td colspan="2">${formData.bill_of_entry ? formData.bill_of_entry : "NOT AVAILABLE"}</td>
+            <!-- <td>${
               formData.tax_upto_title
                 ? formData.tax_upto_title
                 : "NOT AVAILABLE"
@@ -653,10 +653,10 @@ body.single-page{
                       : formData.tax_upto
                     : "NOT AVAILABLE"
                 }
-            </td>
+            </td> -->
         </tr>
-        <tr>
-            <td>PERMIT UPTO:</td>
+        <!-- <tr>
+           <td>PERMIT UPTO:</td>
             <td>
                 ${
                   formData.permit_upto
@@ -681,17 +681,19 @@ body.single-page{
                     ? formData.fitness_upto
                     : "NOT AVAILABLE"
                 }
-            </td>
-        </tr>
+            </td> 
+        </tr> -->
         <tr>
-            <td>INSURANCE CO.Name:</td>
+            <!-- <td>INSURANCE CO.Name:</td>
             <td colspan="2">
                 ${
                   formData.insurance_co_name
                     ? formData.insurance_co_name
                     : "NOT AVAILABLE"
                 }
-            </td>
+            </td> -->
+            <td>INSURANCE COPY:</td>
+            <td colspan="2">${formData.rc_book_verified ? formData.rc_book_verified : "NOT AVAILABLE"}</td>
             <td>POLICY NO:</td>
             <td colspan="2">
                 ${formData.policy_no ? formData.policy_no : "NOT AVAILABLE"}
@@ -708,9 +710,9 @@ body.single-page{
             </td>
             <td>INSURED VALUE:</td>
             <td colspan="2">
-                RS. ${
+                 ${
                   formData.insured_value
-                    ? formData.insured_value
+                    ? "RS." . formData.insured_value
                     : "NOT AVAILABLE"
                 }
             </td>

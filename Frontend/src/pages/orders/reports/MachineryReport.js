@@ -183,7 +183,7 @@ function MachineryReport() {
   const reportLoadingStartedRef = useRef(false);
   // Set page title using custom hook
   const { setTitle } = usePageTitle();
-  
+
   // State for report type selection (Rough/Production)
   const [reportTypeSelection, setReportTypeSelection] = useState("Rough");
 
@@ -327,6 +327,7 @@ function MachineryReport() {
 
       fix_but_flex_heading_8: "",
       fix_but_flex_value_8: "",
+      bill_of_entry: "",
     });
 
     // Reset flexible fields
@@ -662,6 +663,7 @@ function MachineryReport() {
     insurance_valid_date: "",
     insured_value: "",
     insurance_verified: "",
+    bill_of_entry: "",
 
     // OVER ALL FEED BACK OF THE INSPECTED
     tax_invoice_cost: "",
@@ -1622,7 +1624,7 @@ function MachineryReport() {
 
       // Create FormData for multipart/form-data submission
       const formData = new FormData();
-      
+
       // Add report type selection (Rough/Production)
       formData.append("report_type_selection", reportTypeSelection);
 
@@ -2740,11 +2742,10 @@ function MachineryReport() {
                       />
                       <button
                         type="button"
-                        className={`form-field registration-option-btn ${
-                          registrationNoOption === "NOT_AVAILABLE"
-                            ? "active"
-                            : ""
-                        }`}
+                        className={`form-field registration-option-btn ${registrationNoOption === "NOT_AVAILABLE"
+                          ? "active"
+                          : ""
+                          }`}
                         onClick={() =>
                           handleRegistrationOption(
                             "registration_no",
@@ -2762,11 +2763,10 @@ function MachineryReport() {
                       </button>
                       <button
                         type="button"
-                        className={`form-field registration-option-btn ${
-                          registrationNoOption === "NOT_APPLICABLE"
-                            ? "active"
-                            : ""
-                        }`}
+                        className={`form-field registration-option-btn ${registrationNoOption === "NOT_APPLICABLE"
+                          ? "active"
+                          : ""
+                          }`}
                         onClick={() =>
                           handleRegistrationOption(
                             "registration_no",
@@ -2802,11 +2802,10 @@ function MachineryReport() {
                       />
                       <button
                         type="button"
-                        className={`form-field registration-option-btn ${
-                          registrationDateOption === "NOT_AVAILABLE"
-                            ? "active"
-                            : ""
-                        }`}
+                        className={`form-field registration-option-btn ${registrationDateOption === "NOT_AVAILABLE"
+                          ? "active"
+                          : ""
+                          }`}
                         onClick={() =>
                           handleRegistrationOption(
                             "registration_date",
@@ -2824,11 +2823,10 @@ function MachineryReport() {
                       </button>
                       <button
                         type="button"
-                        className={`form-field registration-option-btn ${
-                          registrationDateOption === "NOT_APPLICABLE"
-                            ? "active"
-                            : ""
-                        }`}
+                        className={`form-field registration-option-btn ${registrationDateOption === "NOT_APPLICABLE"
+                          ? "active"
+                          : ""
+                          }`}
                         onClick={() =>
                           handleRegistrationOption(
                             "registration_date",
@@ -2865,11 +2863,10 @@ function MachineryReport() {
                       <div className="d-flex flex-column gap-2">
                         <button
                           type="button"
-                          className={`form-field registration-option-btn ${
-                            locationOfMachineryOption === "NOT_AVAILABLE"
-                              ? "active"
-                              : ""
-                          }`}
+                          className={`form-field registration-option-btn ${locationOfMachineryOption === "NOT_AVAILABLE"
+                            ? "active"
+                            : ""
+                            }`}
                           onClick={() =>
                             handleRegistrationOption(
                               "location_of_machinery",
@@ -2887,11 +2884,10 @@ function MachineryReport() {
                         </button>
                         <button
                           type="button"
-                          className={`form-field registration-option-btn ${
-                            locationOfMachineryOption === "NOT_APPLICABLE"
-                              ? "active"
-                              : ""
-                          }`}
+                          className={`form-field registration-option-btn ${locationOfMachineryOption === "NOT_APPLICABLE"
+                            ? "active"
+                            : ""
+                            }`}
                           onClick={() =>
                             handleRegistrationOption(
                               "location_of_machinery",
@@ -3786,10 +3782,31 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="tax_invoice_copy">
+                      Tax Invoice Copy <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "COPY VERIFIED", label: "COPY VERIFIED" },
+                        {
+                          value: "COPY NOT AVAILABLE",
+                          label: "COPY NOT AVAILABLE",
+                        },
+                      ]}
+                      value={reportFormData.tax_invoice_copy}
+                      onChange={(value) =>
+                        handleSelectChange("tax_invoice_copy", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="rc_book_verified">
-                      RC Book Verified <span class="text-danger">*</span>
+                      Insurance Copy
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -3803,27 +3820,27 @@ function MachineryReport() {
                       onChange={(value) =>
                         handleSelectChange("rc_book_verified", value)
                       }
-                      required
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
-                    <label htmlFor="tax_invoice_copy">
-                      Tax Invoice Copy <span class="text-danger">*</span>
+                    <label htmlFor="bill_of_entry">
+                      Bill of Entry
                     </label>
                     <input
                       type="text"
                       className="form-field"
-                      id="tax_invoice_copy"
-                      name="tax_invoice_copy"
-                      value={reportFormData.tax_invoice_copy}
-                      readOnly
+                      id="bill_of_entry"
+                      name="bill_of_entry"
+                      value={reportFormData.bill_of_entry}
                       onChange={handleFormChange}
+                      placeholder="Bill of Entry"
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+
+                {/* <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="tax_upto_title">Title</label>
                     <input
@@ -3851,11 +3868,11 @@ function MachineryReport() {
                       maxLength="10"
                     />
                   </div>
-                </div>
+                </div> */}
               </div>
 
               <div className="row">
-                <div className="col-md-3">
+                {/* <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="permit_upto">Permit Upto</label>
                     <input
@@ -3926,8 +3943,11 @@ function MachineryReport() {
                       placeholder="New India Assurance"
                     />
                   </div>
-                </div>
-                <div className="col-md-6">
+                </div> */}
+              </div>
+
+              <div className="row">
+                <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="policy_no">Policy No</label>
                     <input
@@ -3941,10 +3961,7 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-              </div>
-
-              <div className="row">
-                <div className="col-md-4">
+                <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="insurance_valid_date">
                       Insurance Val. Date
@@ -3961,7 +3978,7 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-4">
+                <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="insured_value">Insured Value</label>
                     <input
@@ -3975,18 +3992,23 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-4">
+                <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="insurance_verified">
                       Insurance Verified
                     </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="insurance_verified"
-                      name="insurance_verified"
+                    <SingleSearchSelect
+                      options={[
+                        { value: "COPY VERIFIED", label: "COPY VERIFIED" },
+                        {
+                          value: "COPY NOT AVAILABLE",
+                          label: "COPY NOT AVAILABLE",
+                        },
+                      ]}
                       value={reportFormData.insurance_verified}
-                      onChange={handleFormChange}
+                      onChange={(value) =>
+                        handleSelectChange("insurance_verified", value)
+                      }
                     />
                   </div>
                 </div>
