@@ -375,7 +375,7 @@ body.single-page{
             <td colspan="2">${formData.ref_no_year}/${formData.ref_no_bank}/${
     formData.state_name
   }/${formData.ref_no_code}/${formData.ref_no_month}${formData.ref_no_id}</td>
-            <td>REPORT DATE:</td>
+            <td style="text-transform: uppercase;">${formData.report_date_heading}:</td>
             <td colspan="2">${formData.report_date}</td>
         </tr>
         </thead>

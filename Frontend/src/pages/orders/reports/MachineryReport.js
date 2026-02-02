@@ -254,6 +254,7 @@ function MachineryReport() {
       ref_no_month: `SFW-${getCurrentMonthAbbreviationLocal()}-`, // Default: SFW-(CURRENT_MONTH)
       ref_no_id: "",
       report_date: getCurrentDateLocal(), // Default to today's date
+      report_date_heading: "Report Date",
 
       valuer_name: "VALUETECH SOLUTIONS", // Default to first option
       license_no: "CAT-VII-A-6019",
@@ -560,6 +561,7 @@ function MachineryReport() {
     ref_no_month: `SFW-${getCurrentMonthAbbreviation()}-`, // Default: SFW-(CURRENT_MONTH)
     ref_no_id: "",
     report_date: getCurrentDate(), // Default to today's date
+    report_date_heading: "Report Date",
 
     valuer_name: "VALUETECH SOLUTIONS", // Default to first option
     license_no: "CAT-VII-A-6019",
@@ -1699,6 +1701,9 @@ function MachineryReport() {
         }
       });
 
+      // Always include report_date_heading in payload (even if user did not change it - use preselected default)
+      formData.set("report_date_heading", reportFormData.report_date_heading || "Report Date");
+
       // Add invoice_no_date (combined from invoice_no and invoice_date) - always include with fresh computed value
       formData.append("invoice_no_date", combinedInvoiceData || "");
 
@@ -1927,6 +1932,9 @@ function MachineryReport() {
         reportData[key] = null; // Send null for empty values
       }
     });
+
+    // Always include report_date_heading in payload (even if user did not change it - use preselected default)
+    reportData.report_date_heading = reportFormData.report_date_heading || "Report Date";
 
     // Add invoice_no_date (combined from invoice_no and invoice_date) - always include with fresh computed value
     const invoiceNo = reportFormData.invoice_no || "";
@@ -2498,22 +2506,57 @@ function MachineryReport() {
                     </div>
                   </div>
                 </div>
-                <div className="col-md-6">
+                <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="report_date">
-                      Report Date <span class="text-danger">*</span>
+                      Report Date <span className="text-danger">*</span>
                     </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="report_date"
-                      name="report_date"
-                      value={reportFormData.report_date}
-                      onChange={handleDateChange}
-                      placeholder="DD-MM-YYYY"
-                      maxLength="10"
-                      required
-                    />
+                    <div className="d-flex gap-2 align-items-center mb-2 drop-down-w-100">
+                      <div style={{ width: "80px", flexShrink: 0 }}>
+                        Heading:
+                      </div>
+                      <SingleSearchSelect
+                        options={[
+                          { value: "Report Date", label: "Report Date" },
+                          {
+                            value: "Rev-Report Date",
+                            label: "Rev-Report Date",
+                          },
+                        ]}
+                        value={
+                          reportFormData.report_date_heading ||
+                          "Report Date"
+                        }
+                        onChange={(value) =>
+                          handleSelectChange("report_date_heading", value)
+                        }
+                      />
+                    </div>
+                    
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="report_date">
+                      &nbsp;
+                    </label>
+                    <div className="d-flex gap-2 align-items-center">
+                      <div style={{ width: "80px", flexShrink: 0 }}>
+                        Value:
+                      </div>
+                      <input
+                        type="text"
+                        className="form-field flex-grow-1"
+                        id="report_date"
+                        name="report_date"
+                        value={reportFormData.report_date}
+                        onChange={handleDateChange}
+                        placeholder="DD-MM-YYYY"
+                        maxLength="10"
+                        required
+                        style={{ marginBottom: 0, minWidth: 0 }}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

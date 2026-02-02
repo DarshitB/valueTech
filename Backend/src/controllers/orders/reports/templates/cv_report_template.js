@@ -380,7 +380,7 @@ body.single-page{
   }/${formData.state_name}/${formData.ref_no_code}/${formData.ref_no_month}${
     formData.ref_no_id
   }</td>
-                <td>REPORT DATE:</td>
+                <td style="text-transform: uppercase;">${formData.report_date_heading}:</td>
                 <td colspan="2">${formData.report_date}</td>
             </tr>
             </thead>

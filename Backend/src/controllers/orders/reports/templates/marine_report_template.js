@@ -955,7 +955,7 @@ function generateMarineReportHTML(
                 <span>REF. NO.${getValue(formData.ref_no_year)}/${getValue(
     formData.ref_no_bank
   )}/${getValue(formData.state_initial)}/${getValue(formData.ref_no_code)}/${getValue(formData.ref_no_month)}${getValue(formData.ref_no_id)}</span>
-                <span>DATE: ${getValue(formData.report_date)}</span>
+                <span><span style="text-transform: uppercase;">${getValue(formData.report_date_heading)}:</span> ${getValue(formData.report_date)}</span>
             </p>
 
             <h4

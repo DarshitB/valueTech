@@ -270,6 +270,7 @@ function CEReport() {
       ref_no_month: `SFW-${getCurrentMonthAbbreviationLocal()}-`, // Default: SFW-(CURRENT_MONTH)
       ref_no_id: "",
       rev_report_date: getCurrentDateLocal(), // Default to today's date
+      report_date_heading: "Rev-Report Date",
 
       valuer_name: "V.K. ASSOCIATES", // Default to first option
       license_no: "SLA-60827",
@@ -623,6 +624,7 @@ function CEReport() {
     ref_no_month: `SFW-${getCurrentMonthAbbreviation()}-`, // Default: SFW-(CURRENT_MONTH)
     ref_no_id: "",
     rev_report_date: getCurrentDate(), // Default to today's date
+    report_date_heading: "Rev-Report Date",
 
     valuer_name: "V.K. ASSOCIATES", // Default to first option
     license_no: "SLA-60827",
@@ -1379,6 +1381,7 @@ function CEReport() {
         // List of fields to populate from child category report
         // NOTE: registration_no, registration_date, registered_location are handled separately below
         const fieldsToPopulate = [
+          "report_date_heading",
           "engine_no_heading",
           "chassis_no_heading",
           "no_of_cylinder",
@@ -2508,6 +2511,9 @@ function CEReport() {
         }
       });
 
+      // Always include report_date_heading in payload (even if user did not change it - use preselected default)
+      formData.set("report_date_heading", reportFormData.report_date_heading || "Rev-Report Date");
+
       // Add invoice_no_date (combined from invoice_no and invoice_date) - always include with fresh computed value
       formData.append("invoice_no_date", combinedInvoiceData || "");
 
@@ -2746,6 +2752,9 @@ function CEReport() {
         reportData[key] = null; // Send null for empty values
       }
     });
+
+    // Always include report_date_heading in payload (even if user did not change it - use preselected default)
+    reportData.report_date_heading = reportFormData.report_date_heading || "Rev-Report Date";
 
     // Add invoice_no_date (combined from invoice_no and invoice_date) - always include with fresh computed value
     const invoiceNo = reportFormData.invoice_no || "";
@@ -3431,22 +3440,54 @@ function CEReport() {
                     </div>
                   </div>
                 </div>
-                <div className="col-md-6">
+                <div className="col-md-3">
                   <div className="form-group">
-                    <label htmlFor="rev_report_date">
-                      Rev-Report Date <span class="text-danger">*</span>
+                    <label htmlFor="report_date_heading">
+                      Rev-Report Date <span className="text-danger">*</span>
                     </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="rev_report_date"
-                      name="rev_report_date"
-                      value={reportFormData.rev_report_date}
-                      onChange={handleDateChange}
-                      placeholder="DD-MM-YYYY"
-                      maxLength="10"
-                      required
-                    />
+                    <div className="d-flex gap-2 align-items-center mb-2 drop-down-w-100">
+                      <div style={{ width: "80px", flexShrink: 0 }}>
+                        Heading:
+                      </div>
+                      <SingleSearchSelect
+                        options={[
+                          { value: "Report Date", label: "Report Date" },
+                          {
+                            value: "Rev-Report Date",
+                            label: "Rev-Report Date",
+                          },
+                        ]}
+                        value={
+                          reportFormData.report_date_heading ||
+                          "Rev-Report Date"
+                        }
+                        onChange={(value) =>
+                          handleSelectChange("report_date_heading", value)
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
+                    <label htmlFor="rev_report_date">&nbsp;</label>
+                    <div className="d-flex gap-2 align-items-center">
+                      <div style={{ width: "80px", flexShrink: 0 }}>
+                        Value:
+                      </div>
+                      <input
+                        type="text"
+                        className="form-field flex-grow-1"
+                        id="rev_report_date"
+                        name="rev_report_date"
+                        value={reportFormData.rev_report_date}
+                        onChange={handleDateChange}
+                        placeholder="DD-MM-YYYY"
+                        maxLength="10"
+                        required
+                        style={{ marginBottom: 0, minWidth: 0 }}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
