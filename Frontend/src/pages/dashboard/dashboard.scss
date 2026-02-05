@@ -397,6 +397,14 @@
         background: linear-gradient(to right, #cc3e15, #f05f35);
         color: $primary-font-color;
       }
+      &.total-orders {
+        background: linear-gradient(to right, #555870, #6e7396);
+        color: $primary-font-color;
+      }
+      &.today-orders-card {
+        background: linear-gradient(to right, #4751a0, #6b76c9);
+        color: $primary-font-color;
+      }
     }
     &.center-vertical {
       display: flex;

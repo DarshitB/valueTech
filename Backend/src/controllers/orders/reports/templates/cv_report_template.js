@@ -4,14 +4,14 @@
  * This is used by CV report template and its helper functions
  */
 const renderFieldValue = (value) => {
-  if (!value) return "";
-  // Convert string to string if it's not already
-  const strValue = String(value);
-  // Replace \r\n and \n with <br> tags for proper line breaks
-  return strValue
-    .replace(/\r\n/g, "<br>")
-    .replace(/\n/g, "<br>")
-    .replace(/\r/g, "<br>");
+    if (!value) return "";
+    // Convert string to string if it's not already
+    const strValue = String(value);
+    // Replace \r\n and \n with <br> tags for proper line breaks
+    return strValue
+        .replace(/\r\n/g, "<br>")
+        .replace(/\n/g, "<br>")
+        .replace(/\r/g, "<br>");
 };
 
 /**
@@ -25,14 +25,14 @@ const renderFieldValue = (value) => {
  * @returns {string} HTML content
  */
 function generateCVReportHTML(
-  formData,
-  extraData,
-  bgImageBase64,
-  stampImageBase64,
-  reportTypeSelection
+    formData,
+    extraData,
+    bgImageBase64,
+    stampImageBase64,
+    reportTypeSelection
 ) {
 
-  return `
+    return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -375,11 +375,9 @@ body.single-page{
             </tr>
             <tr>
                 <td style="width: 20%;">REF NO.</td>
-                <td colspan="2">${formData.ref_no_year}/${
-    formData.ref_no_bank
-  }/${formData.state_name}/${formData.ref_no_code}/${formData.ref_no_month}${
-    formData.ref_no_id
-  }</td>
+                <td colspan="2">${formData.ref_no_year}/${formData.ref_no_bank
+        }/${formData.state_name}/${formData.ref_no_code}/${formData.ref_no_month}${formData.ref_no_id
+        }</td>
                 <td style="text-transform: uppercase;">${formData.report_date_heading}:</td>
                 <td colspan="2">${formData.report_date}</td>
             </tr>
@@ -388,11 +386,10 @@ body.single-page{
             <tr>
             <td>VALUER NAME:</td>
             <td colspan="2">${formData.valuer_name}</td>
-            <td>${
-              formData.valuer_name === "VALUETECH SOLUTIONS"
-                ? "Licence No."
-                : "SLA NO:"
-            }</td>
+            <td>${formData.valuer_name === "VALUETECH SOLUTIONS"
+            ? "Licence No."
+            : "SLA NO:"
+        }</td>
             <td colspan="2">${formData.license_no}</td>
         </tr>
         <tr>
@@ -434,11 +431,10 @@ body.single-page{
             <td>REGISTRATION NO:</td>
             <td colspan="2">${formData.registration_no}</td>
             <td>REGISTRATION DATE:</td>
-            <td colspan="2">${
-              formData.registration_date === "00-00-0000"
-                ? "NA"
-                : formData.registration_date
-            }</td>
+            <td colspan="2">${formData.registration_date === "00-00-0000"
+            ? "NA"
+            : formData.registration_date
+        }</td>
         </tr>
         <tr>
             <td>REGISTERED LOCATION:</td>
@@ -475,11 +471,10 @@ body.single-page{
             <td colspan="2">${formData.kilometer_reading}</td>
             <td>INVOICE NO. & DATE:</td>
             <td colspan="2">
-                ${
-                  formData.invoice_no_date
-                    ? formData.invoice_no_date
-                    : "NOT AVAILABLE"
-                }
+                ${formData.invoice_no_date
+            ? formData.invoice_no_date
+            : "NOT AVAILABLE"
+        }
             </td>
         </tr>
         <tr>
@@ -487,17 +482,16 @@ body.single-page{
             <td colspan="2">${renderFieldValue(formData.hyp_with)}</td>
             <td>HYP FROM DATE:</td>
             <td colspan="2">
-                ${
-                  formData.hyp_from_date
-                    ? formData.hyp_from_date
-                    : "NOT AVAILABLE"
-                }
+                ${formData.hyp_from_date
+            ? formData.hyp_from_date
+            : "NOT AVAILABLE"
+        }
             </td>
         </tr>
         ${generateAdditionalRows(formData, "inspected")}
         ${generateFlexibleFieldsForSection(
-          formData.flexible_fields || [],
-          "INSPECTED_EQUIPMENT_DETAILS"
+            formData.flexible_fields || [],
+            "INSPECTED_EQUIPMENT_DETAILS"
         )}
         <tr>
             <th colspan="6">${formData.comments_on_equipment_heading}</th>
@@ -542,9 +536,8 @@ body.single-page{
                     <div style="flex: 1; border-right: 1px solid #000; padding: 1.5px; text-align: center; font-size: 9.3px; text-transform: uppercase;">
                         ${formData.front_tyre_condition}%
                     </div>
-                    ${
-                      formData.middle_tyre_no
-                        ? `
+                    ${formData.middle_tyre_no
+            ? `
                     <div style="flex: 1; border-right: 1px solid #000; padding: 1.5px; text-align: center; font-size: 9.3px; text-transform: uppercase;">
                         MIDDLE ${formData.middle_tyre_no} TYRE
                     </div>
@@ -552,8 +545,8 @@ body.single-page{
                         ${formData.middle_tyre_condition}%
                     </div>
                     `
-                        : ""
-                    }
+            : ""
+        }
                     <div style="flex: 1; border-right: 1px solid #000; padding: 1.5px; text-align: center; font-size: 9.3px; text-transform: uppercase;">
                         REAR ${formData.rear_tyre_no} TYRE
                     </div>
@@ -593,23 +586,21 @@ body.single-page{
         </tr>
         ${generateAdditionalRows(formData, "comments")}
         ${generateFlexibleFieldsForSection(
-          formData.flexible_fields || [],
-          "COMMENTS_ON_EQUIPMENT_AT_THE_TIME_OF_INSPECTION"
+            formData.flexible_fields || [],
+            "COMMENTS_ON_EQUIPMENT_AT_THE_TIME_OF_INSPECTION"
         )}
         <tr>
             <th>DAMAGES IF ANY:</th>
             <td colspan="5">
-                ${
-                  formData.damages_if_any
-                    ? formData.damages_if_any
-                    : "NOT VISIBLE"
-                }
+                ${formData.damages_if_any
+            ? formData.damages_if_any
+            : "NOT VISIBLE"
+        }
             </td>
         </tr>
         <tr>
-            <th colspan="6">${
-              formData.rc_permit_tax_fitness_insurance_heading
-            }</th>
+            <th colspan="6">${formData.rc_permit_tax_fitness_insurance_heading
+        }</th>
         </tr>
         <tr>
             <td>RC BOOK VERIFIED:</td>
@@ -618,25 +609,23 @@ body.single-page{
             <td>${formData.invoice_verified}</td>
             <td>TAX UPTO:</td>
             <td>
-                ${
-                  formData.tax_upto
-                    ? formData.tax_upto === "00-00-0000"
-                      ? "LTT"
-                      : formData.tax_upto
-                    : "NOT AVAILABLE"
-                }
+                ${formData.tax_upto
+            ? formData.tax_upto === "00-00-0000"
+                ? "LTT"
+                : formData.tax_upto
+            : "NOT AVAILABLE"
+        }
             </td>
         </tr>
         <tr>
             <td>PERMIT UPTO:</td>
             <td>
-                ${
-                  formData.permit_upto
-                    ? formData.permit_upto === "00-00-0000"
-                      ? "LTT"
-                      : formData.permit_upto
-                    : "NOT AVAILABLE"
-                }
+                ${formData.permit_upto
+            ? formData.permit_upto === "00-00-0000"
+                ? "LTT"
+                : formData.permit_upto
+            : "NOT AVAILABLE"
+        }
             </td>
             <td>PERMIT TYPE:</td>
             <td>
@@ -644,21 +633,19 @@ body.single-page{
             </td>
             <td>FITNESS UPTO:</td>
             <td>
-                ${
-                  formData.fitness_upto
-                    ? formData.fitness_upto
-                    : "NOT AVAILABLE"
-                }
+                ${formData.fitness_upto
+            ? formData.fitness_upto
+            : "NOT AVAILABLE"
+        }
             </td>
         </tr>
         <tr>
             <td>INSURANCE CO.Name:</td>
             <td colspan="2">
-                ${
-                  formData.insurance_co_name
-                    ? formData.insurance_co_name
-                    : "NOT AVAILABLE"
-                }
+                ${formData.insurance_co_name
+            ? formData.insurance_co_name
+            : "NOT AVAILABLE"
+        }
             </td>
             <td>POLICY NO:</td>
             <td colspan="2">
@@ -668,19 +655,17 @@ body.single-page{
         <tr>
             <td rowspan="2">PERIOD OF INSURANCE:</td>
             <td rowspan="2" colspan="2">
-                ${
-                  formData.period_of_insurance
-                    ? formData.period_of_insurance
-                    : "NOT AVAILABLE"
-                }
+                ${formData.period_of_insurance
+            ? formData.period_of_insurance
+            : "NOT AVAILABLE"
+        }
             </td>
             <td>INSURED VALUE:</td>
             <td colspan="2">
-                 ${
-                   formData.insured_value
-                     ? "RS." + formData.insured_value
-                     : "NOT AVAILABLE"
-                 }
+                 ${formData.insured_value
+            ? "RS." + formData.insured_value
+            : "NOT AVAILABLE"
+        }
             </td>
         </tr>
         <tr>
@@ -706,9 +691,8 @@ body.single-page{
         <tr>
             <td>NO OF PHOTOGRAPH:</td>
             <td colspan="3">${formData.no_of_photograph} PHOTOS</td>
-            <th rowspan="2" colspan="2">AMOUNT IN WORDS :- ${
-              formData.amount_in_words
-            }</th>
+            <th rowspan="2" colspan="2">AMOUNT IN WORDS :- ${formData.amount_in_words
+        }</th>
         </tr>
         <tr>
             <td>NO OF COLLAGE:</td>
@@ -719,28 +703,23 @@ body.single-page{
             <td colspan="5">${renderFieldValue(formData.valuer_comments_remarks)}</td>
         </tr>
         ${generateFlexibleFieldsForSection(
-          formData.flexible_fields || [],
-          "OVER_ALL_FEED_BACK_OF_THE_INSPECTED"
+            formData.flexible_fields || [],
+            "OVER_ALL_FEED_BACK_OF_THE_INSPECTED"
         )}
         <tr>
             <td>DECLARATION:</td>
             <td colspan="5" style="text-transform: none;">
-                The aforesaid ${extraData.cat} / ${extraData.subCat} ${
-    extraData.childCat
-  } inspected by us & found in ${
-    formData.declaration_condition
-  } on the date of my inspection.This Report issued for ${
-    formData.valuation_purpose
-  } of ${extraData.bank_name}, ${extraData.branch_name}, ${
-    extraData.state_name
-  } Only.
+                The aforesaid ${extraData.cat} / ${extraData.subCat} ${extraData.childCat
+        } inspected by us & found in ${formData.declaration_condition
+        } on the date of my inspection.This Report issued for ${formData.valuation_purpose
+        } ${formData.is_repo == "true" ? "(REPO)" : ""} of ${extraData.bank_name}, ${extraData.branch_name}, ${extraData.state_name
+        } Only.
             </td>
         </tr>
         <tr>
             <td>DISCLAIMER:</td>
-            <td colspan="5" style="text-transform: none;">${
-              formData.valuer_name
-            } will not be held liable for any direct, indirect consequential or exemplary
+            <td colspan="5" style="text-transform: none;">${formData.valuer_name
+        } will not be held liable for any direct, indirect consequential or exemplary
 damages for any loss resulting from use of this report. The above valuation given based on submitted R.C. Book. We are not responsible for
 the genuineness of the vehicle documents. To give loan to the applicant is the responsiiblity of the finance company/bank. We are not
 responsible or concerned for the same.</td>
@@ -748,20 +727,18 @@ responsible or concerned for the same.</td>
         <tr class="tyre-image-row">
             <td colspan="6" style="height: 58px; position: relative;">
                
-                ${
-                  formData.tyre_image_base64
-                    ? `<img src="${formData.tyre_image_base64}" style="height: 70px; position: relative; z-index:1;" alt="">`
-                    : ""
-                }
+                ${formData.tyre_image_base64
+            ? `<img src="${formData.tyre_image_base64}" style="height: 70px; position: relative; z-index:1;" alt="">`
+            : ""
+        }
             </td>
         </tr>
         <tr class="signature-row">
             <td colspan="6" style="height: 48px;position: relative;">
-              ${
-                stampImageBase64
-                  ? `<img src="${stampImageBase64}" alt="stamp" style="position:absolute; left:50%; bottom: -5px; transform:translateX(calc(-50% - 250px)); height: 125px;  z-index:2; pointer-events:none;" />`
-                  : ""
-              }
+              ${stampImageBase64
+            ? `<img src="${stampImageBase64}" alt="stamp" style="position:absolute; left:50%; bottom: -5px; transform:translateX(calc(-50% - 250px)); height: 125px;  z-index:2; pointer-events:none;" />`
+            : ""
+        }
               SIGNATURE WITH SEAL & STAMP
             </td>
         </tr>
@@ -793,30 +770,30 @@ responsible or concerned for the same.</td>
  * @returns {string} HTML for additional rows
  */
 function generateAdditionalRows(formData, type) {
-  let html = "";
-  const prefix =
-    type === "inspected"
-      ? "additional_rows_inspected"
-      : "additional_rows_comments";
+    let html = "";
+    const prefix =
+        type === "inspected"
+            ? "additional_rows_inspected"
+            : "additional_rows_comments";
 
-  // First additional row
-  if (formData[`${prefix}_headding_1`] || formData[`${prefix}_value_1`]) {
-    html += `
+    // First additional row
+    if (formData[`${prefix}_headding_1`] || formData[`${prefix}_value_1`]) {
+        html += `
     <tr>
         <td>${formData[`${prefix}_headding_1`] || ""}</td>
         <td colspan="5">${formData[`${prefix}_value_1`] || ""}</td>
     </tr>
     `;
-  }
+    }
 
-  // Second and third additional rows (combined)
-  if (
-    formData[`${prefix}_headding_2`] ||
-    formData[`${prefix}_value_2`] ||
-    formData[`${prefix}_headding_3`] ||
-    formData[`${prefix}_value_3`]
-  ) {
-    html += `
+    // Second and third additional rows (combined)
+    if (
+        formData[`${prefix}_headding_2`] ||
+        formData[`${prefix}_value_2`] ||
+        formData[`${prefix}_headding_3`] ||
+        formData[`${prefix}_value_3`]
+    ) {
+        html += `
     <tr>
         <td>${formData[`${prefix}_headding_2`] || ""}</td>
         <td colspan="2">${formData[`${prefix}_value_2`] || ""}</td>
@@ -824,9 +801,9 @@ function generateAdditionalRows(formData, type) {
         <td colspan="2">${formData[`${prefix}_value_3`] || ""}</td>
     </tr>
     `;
-  }
+    }
 
-  return html;
+    return html;
 }
 
 /**
@@ -836,72 +813,72 @@ function generateAdditionalRows(formData, type) {
  * @returns {string} HTML for flexible fields in the specified section
  */
 function generateFlexibleFieldsForSection(flexibleFields, sectionName) {
-  if (!flexibleFields || flexibleFields.length === 0) {
-    return "";
-  }
+    if (!flexibleFields || flexibleFields.length === 0) {
+        return "";
+    }
 
-  // Filter fields for the specific section
-  const sectionFields = flexibleFields.filter(
-    (field) => field.section_name === sectionName
-  );
+    // Filter fields for the specific section
+    const sectionFields = flexibleFields.filter(
+        (field) => field.section_name === sectionName
+    );
 
-  if (sectionFields.length === 0) {
-    return "";
-  }
+    if (sectionFields.length === 0) {
+        return "";
+    }
 
-  let html = "";
+    let html = "";
 
-  // Process fields row by row, ensuring total columns don't exceed 6
-  let i = 0;
-  while (i < sectionFields.length) {
-    html += "<tr>";
-    let currentRowColumns = 0;
+    // Process fields row by row, ensuring total columns don't exceed 6
+    let i = 0;
+    while (i < sectionFields.length) {
+        html += "<tr>";
+        let currentRowColumns = 0;
 
-    // Add fields to current row until we reach 6 columns or run out of fields
-    while (i < sectionFields.length && currentRowColumns < 6) {
-      const field = sectionFields[i];
-      const colSpan = field.col_span ? parseInt(field.col_span) : 2;
+        // Add fields to current row until we reach 6 columns or run out of fields
+        while (i < sectionFields.length && currentRowColumns < 6) {
+            const field = sectionFields[i];
+            const colSpan = field.col_span ? parseInt(field.col_span) : 2;
 
-      // Calculate how many columns this field will take
-      let fieldColumns;
-      let valueColSpan;
+            // Calculate how many columns this field will take
+            let fieldColumns;
+            let valueColSpan;
 
-      if (colSpan === 1) {
-        // col_span 1: label (1 col) + value (5 cols) = 6 total columns
-        fieldColumns = 6;
-        valueColSpan = 5;
-      } else {
-        // col_span 2: label (1 col) + value (2 cols) = 3 total columns
-        fieldColumns = 3;
-        valueColSpan = 2;
-      }
+            if (colSpan === 1) {
+                // col_span 1: label (1 col) + value (5 cols) = 6 total columns
+                fieldColumns = 6;
+                valueColSpan = 5;
+            } else {
+                // col_span 2: label (1 col) + value (2 cols) = 3 total columns
+                fieldColumns = 3;
+                valueColSpan = 2;
+            }
 
-      // Check if this field fits in the current row
-      if (currentRowColumns + fieldColumns <= 6) {
-        html += `
+            // Check if this field fits in the current row
+            if (currentRowColumns + fieldColumns <= 6) {
+                html += `
           <td style="font-weight: bold;">${field.field_label || ""}</td>
           <td colspan="${valueColSpan}">${renderFieldValue(field.field_value || "")}</td>
         `;
-        currentRowColumns += fieldColumns;
-        i++;
-      } else {
-        // Field doesn't fit, break to next row
-        break;
-      }
+                currentRowColumns += fieldColumns;
+                i++;
+            } else {
+                // Field doesn't fit, break to next row
+                break;
+            }
+        }
+
+        // Fill remaining columns in the row if needed
+        if (currentRowColumns < 6) {
+            const remainingColumns = 6 - currentRowColumns;
+            html += `<td colspan="${remainingColumns}"></td>`;
+        }
+
+        html += "</tr>";
     }
 
-    // Fill remaining columns in the row if needed
-    if (currentRowColumns < 6) {
-      const remainingColumns = 6 - currentRowColumns;
-      html += `<td colspan="${remainingColumns}"></td>`;
-    }
-
-    html += "</tr>";
-  }
-
-  return html;
+    return html;
 }
 
 module.exports = {
-  generateCVReportHTML,
+    generateCVReportHTML,
 };

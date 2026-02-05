@@ -298,11 +298,37 @@ exports.create = async (req, res, next) => {
       place_of_inspection,
       date_of_inspection,
       created_at,
+      number_of_order_duplication,
     } = req.body;
-
     // Validation - only customer_name and contact are mandatory
     if (!customer_name || !contact) {
       throw new BadRequestError("Customer name and contact are required.");
+    }
+
+    // Validate number_of_order_duplication: positive integer only, no decimals
+    const duplicationCount =
+      number_of_order_duplication != null && number_of_order_duplication !== ""
+        ? parseInt(number_of_order_duplication, 10)
+        : 1;
+    if (
+      number_of_order_duplication != null &&
+      number_of_order_duplication !== ""
+    ) {
+      if (
+        !Number.isInteger(duplicationCount) ||
+        duplicationCount < 1 ||
+        Number(number_of_order_duplication) !== duplicationCount
+      ) {
+        throw new BadRequestError(
+          "number_of_order_duplication must be a positive whole number (no decimals)."
+        );
+      }
+      const MAX_DUPLICATION = 100;
+      if (duplicationCount > MAX_DUPLICATION) {
+        throw new BadRequestError(
+          `number_of_order_duplication cannot exceed ${MAX_DUPLICATION}.`
+        );
+      }
     }
 
     // Validate officer if provided
@@ -375,84 +401,86 @@ exports.create = async (req, res, next) => {
       );
     };
 
-    const uniqueOrderNumber = await generateOrderNumber();
+    const createdOrderIds = [];
 
-    // Create order with determined status
-    const orderData = {
-      order_number: uniqueOrderNumber,
-      customer_name,
-      contact,
-      alternative_contact: alternative_contact || null,
-      supervisor_number: supervisor_number || null,
-      driver_number: driver_number || null,
-      child_category_id: child_category_id || null,
-      officer_id: officer_id || null,
-      manager_id: finalManagerId || null,
-      field_verifier_id: field_verifier_id || null,
-      registration_number: registration_number || null,
-      place_of_inspection: place_of_inspection || null,
-      date_of_inspection: date_of_inspection || null,
-      current_status_id: orderStatusId,
-      order_type: "VKA1",
-      order_priority: "Low",
-      created_by: req.user?.id,
-      created_at: created_at ? new Date(created_at) : new Date(),
-    };
+    for (let i = 0; i < duplicationCount; i++) {
+      const uniqueOrderNumber = await generateOrderNumber();
 
-    /* console.log("About to create order with data:", orderData); */
-    const order = await Order.createOrder(orderData);
-    /* console.log("Order created successfully:", order); */
+      // Create order with determined status (same details for each duplicate)
+      const orderData = {
+        order_number: uniqueOrderNumber,
+        customer_name,
+        contact,
+        alternative_contact: alternative_contact || null,
+        supervisor_number: supervisor_number || null,
+        driver_number: driver_number || null,
+        child_category_id: child_category_id || null,
+        officer_id: officer_id || null,
+        manager_id: finalManagerId || null,
+        field_verifier_id: field_verifier_id || null,
+        registration_number: registration_number || null,
+        place_of_inspection: place_of_inspection || null,
+        date_of_inspection: date_of_inspection || null,
+        current_status_id: orderStatusId,
+        order_type: "VKA1",
+        order_priority: "Low",
+        created_by: req.user?.id,
+        created_at: created_at ? new Date(created_at) : new Date(),
+      };
 
-    // Create status history entries based on assignments
-    // Always create Order Initiated status first
-    const pendingStatusHistory = {
-      order_id: order.id,
-      status_id: 1, // Order Initiated
-      changed_by: req.user?.id,
-      changed_at: new Date(),
-    };
-    await OrderStatusHistory.createStatusHistory(pendingStatusHistory);
+      const order = await Order.createOrder(orderData);
+      createdOrderIds.push(order.id);
 
-    // Create status history entries based on what was assigned
-    // If field_verifier is assigned, create both manager (4) and field verifier (6) records
-    if (field_verifier_id) {
-      // First create Manager Assigned status (if manager is assigned)
-      if (finalManagerId) {
-        const managerStatusHistory = {
+      // Create status history entries for this order
+      const pendingStatusHistory = {
+        order_id: order.id,
+        status_id: 1, // Order Initiated
+        changed_by: req.user?.id,
+        changed_at: new Date(),
+      };
+      await OrderStatusHistory.createStatusHistory(pendingStatusHistory);
+
+      if (field_verifier_id) {
+        if (finalManagerId) {
+          const managerStatusHistory = {
+            order_id: order.id,
+            status_id: 4,
+            changed_by: req.user?.id,
+            changed_at: new Date(),
+          };
+          await OrderStatusHistory.createStatusHistory(managerStatusHistory);
+        }
+        const fieldVerifierStatusHistory = {
           order_id: order.id,
-          status_id: 4, // Manager Assigned
+          status_id: 6,
           changed_by: req.user?.id,
           changed_at: new Date(),
         };
-        await OrderStatusHistory.createStatusHistory(managerStatusHistory);
+        await OrderStatusHistory.createStatusHistory(fieldVerifierStatusHistory);
+      } else {
+        const finalStatusHistory = {
+          order_id: order.id,
+          status_id: orderStatusId,
+          changed_by: req.user?.id,
+          changed_at: new Date(),
+        };
+        await OrderStatusHistory.createStatusHistory(finalStatusHistory);
       }
-
-      // Then create Field Verifier Assigned status
-      const fieldVerifierStatusHistory = {
-        order_id: order.id,
-        status_id: 6, // Field Verifier Assigned
-        changed_by: req.user?.id,
-        changed_at: new Date(),
-      };
-      await OrderStatusHistory.createStatusHistory(fieldVerifierStatusHistory);
-    } else {
-      // Create single status history based on calculated status
-      const finalStatusHistory = {
-        order_id: order.id,
-        status_id: orderStatusId,
-        changed_by: req.user?.id,
-        changed_at: new Date(),
-      };
-      await OrderStatusHistory.createStatusHistory(finalStatusHistory);
     }
 
-    res.locals.newRecordId = order.id;
+    res.locals.newRecordId =
+      createdOrderIds.length > 0 ? createdOrderIds[createdOrderIds.length - 1] : null;
 
-    /* console.log("order if",order.id); */
-    // Get enriched order data for response
-    const enrichedOrder = await Order.findById(order.id, req.user);
-    /* console.log(enrichedOrder); */
-    res.status(201).json(enrichedOrder);
+    // Return single order (backward compatible) or array of enriched orders
+    if (duplicationCount === 1) {
+      const enrichedOrder = await Order.findById(createdOrderIds[0], req.user);
+      res.status(201).json(enrichedOrder);
+    } else {
+      const enrichedOrders = await Promise.all(
+        createdOrderIds.map((id) => Order.findById(id, req.user))
+      );
+      res.status(201).json(enrichedOrders);
+    }
   } catch (err) {
     if (err.code === "23505") {
       return next(new ConflictError("Order number already exists"));

@@ -36,4 +36,5 @@ export {
   MoneyIcon,
   MailInputIcon,
   ShareIcon,
+  SendIcon,
 } from "./Icons";

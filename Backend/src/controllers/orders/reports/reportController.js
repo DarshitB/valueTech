@@ -2779,6 +2779,7 @@ function filterValidReportFields(formData, reportType) {
     report_cv: [
       "valueation_report_for_heading",
       "general_details_heading",
+      "is_repo",
       "inspected_equipment_heading",
       "comments_on_equipment_heading",
       "rc_permit_tax_fitness_insurance_heading",
@@ -2934,6 +2935,7 @@ function filterValidReportFields(formData, reportType) {
     report_machinery: [
       "valueation_report_for_heading",
       "general_details_heading",
+      "is_repo",
       "inspected_equipment_heading",
       "comments_on_equipment_heading",
       "insurance_details_heading",
@@ -3035,6 +3037,7 @@ function filterValidReportFields(formData, reportType) {
     report_ce: [
       "valueation_report_for_heading",
       "general_details_heading",
+      "is_repo",
       "inspected_equipment_heading",
       "comments_on_equipment_heading",
       "rc_permit_tax_fitness_insurance_heading",

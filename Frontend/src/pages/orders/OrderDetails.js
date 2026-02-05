@@ -37,6 +37,7 @@ import {
   MoneyIcon,
   DocumentsIcon,
   EditIcon,
+  SendIcon,
   FolderIcon,
   ImageCollageIcon,
   MailIcon,
@@ -202,7 +203,9 @@ function OrderDetails() {
     useState(false);
   const [showRevisionConfirmation, setShowRevisionConfirmation] =
     useState(false);
+  const [showOnHoldConfirmation, setShowOnHoldConfirmation] = useState(false);
   const [isCompletingOrder, setIsCompletingOrder] = useState(false);
+  const [isPuttingOnHold, setIsPuttingOnHold] = useState(false);
 
   // Complete order (status 13) via direct status update
   const handleCompleteOrder = async () => {
@@ -222,6 +225,29 @@ function OrderDetails() {
       // errors are toasted in reducer
     } finally {
       setIsCompletingOrder(false);
+    }
+  };
+
+  // Order on Hold (status 14) via direct status update
+  const handleOrderOnHold = async () => {
+    if (!id) return;
+    setIsPuttingOnHold(true);
+    const userName = currentUser?.name || "admin";
+    try {
+      await dispatch(
+        updateOrderStatusDirect({
+          id,
+          data: {
+            status_id: 14,
+          },
+        })
+      ).unwrap();
+      setShowOnHoldConfirmation(false);
+      dispatch(fetchOrderById(id));
+    } catch (err) {
+      // errors are toasted in reducer
+    } finally {
+      setIsPuttingOnHold(false);
     }
   };
 
@@ -1359,6 +1385,24 @@ function OrderDetails() {
             <SelectedIcon style={{ width: "40px", height: "40px" }} />
           </button>
         )}
+        {hasPermission(allowedPermissions, "view_order_on_hold_button") && (
+          <button
+            title="Order on Hold"
+            className={`tooltip-link${isPuttingOnHold || ordersLoading ? " disabled" : ""}`}
+            onClick={() => setShowOnHoldConfirmation(true)}
+            disabled={isPuttingOnHold || ordersLoading}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              cursor: isPuttingOnHold || ordersLoading ? "not-allowed" : "pointer",
+              outline: "none",
+              boxShadow: "none",
+            }}
+          >
+            <RevalidateIcon style={{ width: "40px", height: "40px" }} />
+          </button>
+        )}
         {/* Action buttons for uploading images and reports, validating, etc. */}
         {/* For BANK AUTHORITY or BANK OFFICER, only show Documents button if status > 12 */}
         {/* For other users, show normally (if they have permission) */}
@@ -1762,8 +1806,10 @@ function OrderDetails() {
   }, [
     isDeveloperAdmin,
     isCompletingOrder,
+    isPuttingOnHold,
     ordersLoading,
     handleCompleteOrder,
+    setShowOnHoldConfirmation,
     allowedPermissions,
     isBankUser,
     order?.current_status_id,
@@ -2448,8 +2494,8 @@ function OrderDetails() {
                             markup="@[__display__](id:__id__)"
                           />
                         </MentionsInput>
-                        <button type="submit">
-                          <EditIcon className="icon" />
+                        <button type="submit" title="Send comment">
+                          <SendIcon className="icon" />
                         </button>
                       </form>
                     )}
@@ -3018,6 +3064,16 @@ function OrderDetails() {
             });
           }}
           onCancel={() => setShowRevisionConfirmation(false)}
+        />
+      )}
+
+      {/* Order on Hold Confirmation Modal */}
+      {showOnHoldConfirmation && (
+        <ConfirmationModal
+          title="Confirm Order on Hold"
+          message={`Are you sure you want to put this order <span class="danger">${order?.order_number}</span> on hold?`}
+          onConfirm={handleOrderOnHold}
+          onCancel={() => setShowOnHoldConfirmation(false)}
         />
       )}
     </section>

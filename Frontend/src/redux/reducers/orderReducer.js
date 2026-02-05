@@ -258,11 +258,15 @@ const orderSlice = createSlice({
         toast.error(`Failed to fetch order: ${action.payload}`);
       })
 
-      // Add new order
+      // Add new order (API may return single order object or array of orders when number_of_order_duplication > 1)
       .addCase(addOrder.fulfilled, (state, action) => {
-        state.list.push(action.payload);
-        /* console.log("action.payload", action.payload); */
-        toast.success(`Order added successfully: Order ID ${action.payload.order_number}`);
+        const orders = Array.isArray(action.payload) ? action.payload : [action.payload];
+        state.list.push(...orders);
+        if (orders.length > 1) {
+          toast.success(`${orders.length} orders added successfully`);
+        } else {
+          toast.success(`Order added successfully: Order ID ${orders[0].order_number}`);
+        }
       })
       .addCase(addOrder.rejected, (state, action) => {
         toast.error(`Failed to add order: ${action.payload}`);

@@ -395,6 +395,7 @@ function Dashboard() {
     child_category_id: "",
     registration_number: "",
     place_of_inspection: "",
+    number_of_order_duplication: "",
     officer_id: null,
     manager_id: null,
     field_verifier_id: null,
@@ -748,6 +749,7 @@ function Dashboard() {
       child_category_id: "",
       registration_number: "",
       place_of_inspection: "",
+      number_of_order_duplication: "",
       officer_id: null,
       manager_id: null,
       field_verifier_id: null,
@@ -770,6 +772,7 @@ function Dashboard() {
       child_category_id: order.child_category_id || "",
       registration_number: order.registration_number || "",
       place_of_inspection: order.place_of_inspection || "",
+      number_of_order_duplication: "",
       officer_id: order.officer_id || null,
       manager_id: order.manager_id || null,
       field_verifier_id: order.field_verifier_id || null,
@@ -1020,6 +1023,49 @@ function Dashboard() {
     selectedDateRange,
   ]);
 
+  // Count of orders shown in the table (same filters as table rows)
+  const filteredTableOrdersCount = useMemo(() => {
+    if (!orders || !Array.isArray(orders)) return 0;
+    return orders.filter((order) => {
+      const typeMatch = !selectedOrderType || order.order_type === selectedOrderType;
+      const priorityMatch = !selectedPriority || order.order_priority === selectedPriority;
+      const bankMatch = !selectedBank || order.bank_name === selectedBank;
+      const branchMatch = !selectedBranch || order.branch_name === selectedBranch;
+      const officerMatch = !selectedOfficer || order.officer_name === selectedOfficer;
+      const managerMatch = !selectedManager || order.manager_name === selectedManager;
+      const fieldVerifierMatch = !selectedFieldVerifier || order.field_verifier_name === selectedFieldVerifier;
+      const valuerMatch = !selectedValuerName || order.valuer_name === selectedValuerName;
+      const statusMatch = !selectedOrderStatus || order.current_status_name === selectedOrderStatus;
+      const paymentStatusMatch = !selectedPaymentStatus || order.payment_status === selectedPaymentStatus;
+      const categoryMatch = !selectedCategory || order.category_name === selectedCategory;
+      const assetCategoryMatch = !selectedAssetCategory || order.sub_category_name === selectedAssetCategory;
+      const subCategoryMatch = !selectedSubCategory || order.child_category_name === selectedSubCategory;
+      const createdByMatch = !selectedCreatedBy || order.created_by === selectedCreatedBy;
+      const userAssignedMatch = !selectedUserAssigned || (order.assigned_users && order.assigned_users.some((user) => user.name === selectedUserAssigned));
+      const dateMatch = matchesDateFilter(order);
+      return typeMatch && priorityMatch && categoryMatch && assetCategoryMatch && subCategoryMatch && createdByMatch && userAssignedMatch && bankMatch && branchMatch && officerMatch && managerMatch && fieldVerifierMatch && valuerMatch && statusMatch && paymentStatusMatch && dateMatch;
+    }).length;
+  }, [
+    orders,
+    selectedOrderType,
+    selectedPriority,
+    selectedBank,
+    selectedBranch,
+    selectedOfficer,
+    selectedManager,
+    selectedFieldVerifier,
+    selectedValuerName,
+    selectedOrderStatus,
+    selectedPaymentStatus,
+    selectedCategory,
+    selectedAssetCategory,
+    selectedSubCategory,
+    selectedCreatedBy,
+    selectedUserAssigned,
+    selectedDatePreset,
+    selectedDateRange,
+  ]);
+
   const handleSubmit = () => {
     // Collect all validation errors
     if (!formData.customer_name.trim()) {
@@ -1106,6 +1152,17 @@ function Dashboard() {
         registration_number: formData.registration_number.trim() || null,
         place_of_inspection: formData.place_of_inspection.trim() || null,
       };
+
+      // Add number_of_order_duplication only if user has permission and has entered a value (add order only)
+      if (hasPermission(allowedPermissions, "view_order_add_number_of_order_duplication")) {
+        const dupVal = (formData.number_of_order_duplication || "").toString().trim();
+        if (dupVal !== "") {
+          const parsed = parseInt(dupVal, 10);
+          if (!Number.isNaN(parsed)) {
+            payload.number_of_order_duplication = parsed;
+          }
+        }
+      }
 
       // Add created_at only if user has permission and value is set
       if (hasPermission(allowedPermissions, "add_order_created_at") && formData.created_at) {
@@ -1348,14 +1405,21 @@ function Dashboard() {
                       <>
                         <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 col-xs-12">
                           <div className="padding-top-bottom">
-                            <div className="sneak-peek-card today-orders">
-                              <DashboardIcon className="sneak-peek-card-icon" />
+                            <div className="sneak-peek-card order-status total-orders">
+                              <h3>Total Orders</h3>
+                              <p>{formatTwoDigits(filteredTableOrdersCount)}</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 col-xs-12">
+                          <div className="padding-top-bottom">
+                            <div className="sneak-peek-card order-status today-orders-card">
                               <h3>Today's Orders</h3>
                               <p>{formatTwoDigits(todaysOrdersCount)}</p>
                             </div>
                           </div>
                         </div>
-                        <div className="col-xl-5 col-lg-6 col-md-8 col-sm-12 col-xs-12">
+                        <div className="col-xl-4 col-lg-6 col-md-8 col-sm-12 col-xs-12">
                           <div className="row">
                             {/* For Bank Authority and Bank Officer users - custom layout */}
                             {isBankAuthority || isBankOfficer ? (
@@ -1507,10 +1571,17 @@ function Dashboard() {
                       </>
                     ) : (
                       <>
-                        <div className="col-xl-4 col-lg-4 col-md-4 col-sm-12 col-xs-12">
+                        <div className="col-xl-2 col-lg-4 col-md-4 col-sm-12 col-xs-12">
                           <div className="padding-top-bottom">
-                            <div className="sneak-peek-card today-orders">
-                              <DashboardIcon className="sneak-peek-card-icon" />
+                            <div className="sneak-peek-card order-status total-orders">
+                              <h3>Total Orders</h3>
+                              <p>{formatTwoDigits(filteredTableOrdersCount)}</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="col-xl-2 col-lg-4 col-md-4 col-sm-12 col-xs-12">
+                          <div className="padding-top-bottom">
+                            <div className="sneak-peek-card order-status today-orders-card">
                               <h3>Today's Orders</h3>
                               <p>{formatTwoDigits(todaysOrdersCount)}</p>
                             </div>
@@ -2953,6 +3024,32 @@ function Dashboard() {
                     />
                   </div>
 
+                  {!isEdit && hasPermission(allowedPermissions, "view_order_add_number_of_order_duplication") && (
+                    <div className="form-group">
+                      <label htmlFor="numberOfOrderDuplication">
+                        Number of order duplication
+                      </label>
+                      <input
+                        className="form-field"
+                        id="numberOfOrderDuplication"
+                        name="numberOfOrderDuplication"
+                        type="text"
+                        inputMode="numeric"
+                        value={formData.number_of_order_duplication}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (/^\d*$/.test(value)) {
+                            setFormData({
+                              ...formData,
+                              number_of_order_duplication: value,
+                            });
+                          }
+                        }}
+                        placeholder="Enter number (integer only)"
+                      />
+                    </div>
+                  )}
+
                   {/* Created At field - Show based on permission */}
                   {((isEdit && hasPermission(allowedPermissions, "edit_order_created_at")) ||
                     (!isEdit && hasPermission(allowedPermissions, "add_order_created_at"))) && (
@@ -3125,6 +3222,7 @@ function Dashboard() {
                 child_category_id: "",
                 registration_number: "",
                 place_of_inspection: "",
+                number_of_order_duplication: "",
                 officer_id: null,
                 manager_id: null,
                 field_verifier_id: null,
