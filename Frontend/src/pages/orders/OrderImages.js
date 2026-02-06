@@ -26,7 +26,7 @@ import {
   updateOrderMediaStatus,
   uploadZipFile,
 } from "../../redux/reducers/orderReducer";
-import { generateCollage } from "../../redux/reducers/collageReducer";
+import { generateCollage, generateTextImageCollage } from "../../redux/reducers/collageReducer";
 import {
   ApprovedIcon,
   FolderIcon,
@@ -63,6 +63,7 @@ function OrderImages() {
   const mediaLoading = useSelector((state) => state.orders.mediaLoading);
   const mediaError = useSelector((state) => state.orders.mediaError);
   const collageGenerating = useSelector((state) => state.collage.generating);
+  const collageGeneratingTextImage = useSelector((state) => state.collage.generatingTextImage);
 
   // Local state
   const [selectedImageSequence, setSelectedImageSequence] = useState([]); // Track selection and order
@@ -186,20 +187,21 @@ function OrderImages() {
           const url = getImageUrl(item.media_url);
           const isImageFile = isImage(item.media_url);
           const isVideoFile = isVideo(item.media_url);
+          const slidePayload = { mediaId: item.id, status: item.status };
 
           if (isImageFile) {
             return {
               src: url,
               alt: `Image ${item.id}`,
               type: "image",
-              mediaId: item.id,
+              ...slidePayload,
             };
           } else if (isVideoFile) {
             return {
               src: url,
               alt: `Video ${item.id}`,
               type: "video",
-              mediaId: item.id,
+              ...slidePayload,
             };
           }
           return null;
@@ -224,7 +226,6 @@ function OrderImages() {
   const isAllSelected = React.useMemo(() => {
     if (!displayedMediaIds.length) return false;
     if (selectedImageSequence.length !== displayedMediaIds.length) return false;
-    // Compare as sets to ensure equality
     const sel = new Set(selectedImageSequence);
     for (const id of displayedMediaIds) {
       if (!sel.has(id)) return false;
@@ -256,19 +257,19 @@ function OrderImages() {
           break;
 
         case "Enter":
-          // Mark current media as rejected
-          const currentSlide = lightboxSlides[lightboxIndex];
-          if (currentSlide) {
-            handleApprovalChange(currentSlide.mediaId, 2); // 2 = rejected
+          // Mark current media as rejected (skip status 4 Text Image)
+          const currentSlideReject = lightboxSlides[lightboxIndex];
+          if (currentSlideReject && currentSlideReject.status !== 4) {
+            handleApprovalChange(currentSlideReject.mediaId, 2); // 2 = rejected
           }
           break;
 
         case " ":
-          // Mark current media as approved
+          // Mark current media as approved (skip status 4 Text Image)
           event.preventDefault(); // Prevent page scroll
-          const slide = lightboxSlides[lightboxIndex];
-          if (slide) {
-            handleApprovalChange(slide.mediaId, 1); // 1 = approved
+          const slideApprove = lightboxSlides[lightboxIndex];
+          if (slideApprove && slideApprove.status !== 4) {
+            handleApprovalChange(slideApprove.mediaId, 1); // 1 = approved
           }
           break;
       }
@@ -314,19 +315,14 @@ function OrderImages() {
     );
   }, [id, order, setTitle]);
 
-  // Handle image selection with sequence tracking
+  // Handle image selection with sequence tracking (status 4 can be selected for collage only)
   const handleImageSelect = (imageId) => {
     setSelectedImageSequence((prevSeq) => {
       if (prevSeq.includes(imageId)) {
-        // Remove from sequence
         const newSeq = prevSeq.filter((id) => id !== imageId);
-        /* console.log("Removed from sequence:", imageId, "New sequence:", newSeq); */
         return newSeq;
       } else {
-        // Add to sequence (maintain order)
-        const newSeq = [...prevSeq, imageId];
-        /* console.log("Added to sequence:", imageId, "New sequence:", newSeq); */
-        return newSeq;
+        return [...prevSeq, imageId];
       }
     });
   };
@@ -363,12 +359,12 @@ function OrderImages() {
       return false;
     }
 
-    // Check if all selected images are approved
+    // Check if all selected images are approved (status 4 Text Image is allowed without approval)
     const selectedMediaItems =
       media?.media?.filter((item) => selectedImageSequence.includes(item.id)) ||
       [];
     const unapprovedImages = selectedMediaItems.filter(
-      (item) => item.status !== 1
+      (item) => item.status !== 1 && item.status !== 4
     );
 
     if (unapprovedImages.length > 0) {
@@ -461,9 +457,25 @@ function OrderImages() {
     });
   };
 
-  // Custom approval component for lightbox
-  // Approval component for lightbox - displays radio buttons for status selection
+  // Handle generate text image (text-only image from remarks, saved to order media)
+  const handleGenerateTextImage = () => {
+    const trimmed = remarks.trim();
+    if (!trimmed) return;
+    const payload = {
+      order_id: id.toString(),
+      text: trimmed,
+    };
+    dispatch(generateTextImageCollage(payload)).then((result) => {
+      if (result.meta.requestStatus === "fulfilled") {
+        setRemarks("");
+        dispatch(fetchOrderMedia(id));
+      }
+    });
+  };
+
+  // Custom approval component for lightbox (not shown for status 4 Text Image)
   const ApprovalComponent = ({ slide }) => {
+    if (slide.status === 4) return null; // Text Image: no approve/reject in lightbox
     const currentApproval = lightboxApprovals[slide.mediaId] || 0;
 
     // Handle local approval change and delegate to global handler
@@ -666,17 +678,25 @@ function OrderImages() {
     });
   };
 
-  // Handle approve selected images (for bulk operations)
+  // Handle approve selected images (for bulk operations; exclude status 4 Text Image)
   const handleApprove = () => {
     if (selectedImageSequence.length === 0) {
       toast.warning("Please select images to approve");
       return;
     }
 
-    const updates = selectedImageSequence.map((imageId) => ({
-      id: imageId,
-      status: 1, // 1 = approved
-    }));
+    const updates = selectedImageSequence
+      .map((imageId) => {
+        const mediaItem = media?.media?.find((m) => m.id === imageId);
+        if (mediaItem?.status === 4) return null; // Text Image not in approve/reject
+        return { id: imageId, status: 1 }; // 1 = approved
+      })
+      .filter(Boolean);
+
+    if (updates.length === 0) {
+      toast.warning("Selected items are Text Images; approve/reject does not apply.");
+      return;
+    }
 
     dispatch(updateOrderMediaStatus({ updates })).then((result) => {
       if (result.meta.requestStatus === "fulfilled") {
@@ -687,17 +707,25 @@ function OrderImages() {
     });
   };
 
-  // Handle reject selected images (for bulk operations)
+  // Handle reject selected images (for bulk operations; exclude status 4 Text Image)
   const handleReject = () => {
     if (selectedImageSequence.length === 0) {
       toast.warning("Please select images to reject");
       return;
     }
 
-    const updates = selectedImageSequence.map((imageId) => ({
-      id: imageId,
-      status: 2, // 2 = rejected
-    }));
+    const updates = selectedImageSequence
+      .map((imageId) => {
+        const mediaItem = media?.media?.find((m) => m.id === imageId);
+        if (mediaItem?.status === 4) return null; // Text Image not in approve/reject
+        return { id: imageId, status: 2 }; // 2 = rejected
+      })
+      .filter(Boolean);
+
+    if (updates.length === 0) {
+      toast.warning("Selected items are Text Images; approve/reject does not apply.");
+      return;
+    }
 
     dispatch(updateOrderMediaStatus({ updates })).then((result) => {
       if (result.meta.requestStatus === "fulfilled") {
@@ -719,6 +747,8 @@ function OrderImages() {
         return { text: "Rejected", color: "text-danger" };
       case 3:
         return { text: "Terminated", color: "text-info" }; // light blue sky color
+      case 4:
+        return { text: "Text Image", color: "text-secondary" };
       default:
         return { text: "Unknown", color: "text-muted" };
     }
@@ -746,6 +776,28 @@ function OrderImages() {
                 >
                   {isAllSelected ? "Clear Selection" : "Select All"}
                 </button>
+                {hasPermission(
+                  allowedPermissions,
+                  "generate_order_collage"
+                ) &&
+                  remarks.trim().length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleGenerateTextImage}
+                      disabled={collageGeneratingTextImage}
+                      className="btn btn-primary tooltip-link ms-2"
+                      title="Generate a text-only image and save to order media"
+                    >
+                      {collageGeneratingTextImage ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true" />
+                          Generating...
+                        </>
+                      ) : (
+                        "Generate Text Image"
+                      )}
+                    </button>
+                  )}
               </div>
               <div className="order-images-buttons">
               {hasPermission(
@@ -901,7 +953,7 @@ function OrderImages() {
                                 checked={isSelected}
                                 onChange={(e) => {
                                   e.stopPropagation();
-                                  /* handleImageSelect(image.id); */
+                                  handleImageSelect(image.id);
                                 }}
                                 className="form-check-input"
                               />
@@ -936,7 +988,13 @@ function OrderImages() {
                                 </div>
                               )}
                             </div>
-                            <div className={`image-status ${statusInfo.color}`}>
+                            <div
+                              className={
+                                image.status === 4
+                                  ? "image-status image-status--text-image"
+                                  : `image-status ${statusInfo.color}`
+                              }
+                            >
                               {statusInfo.text}
                             </div>
                           </div>

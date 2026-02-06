@@ -22,8 +22,8 @@ exports.up = async function(knex) {
     table.text("media_url").notNullable(); // Local file path for direct access
     table.string("media_type", 20).notNullable(); // 'image', 'video', 'document'
     
-    // Status - pending(0), approved(1), rejected(2)
-    table.integer("status").unsigned().notNullable().defaultTo(0);
+    // Status - pending(0), approved(1), rejected(2), terminated(3), text image(4)
+    table.integer("status").unsigned().notNullable().defaultTo(0).comment("0=Pending, 1=Approved, 2=Rejected, 3=Terminated, 4=Text Image");;
 
     // Timestamps
     table.timestamp("created_at").defaultTo(knex.fn.now());

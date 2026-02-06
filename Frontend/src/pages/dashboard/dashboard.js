@@ -54,7 +54,7 @@ function Dashboard() {
   const { lastRecord: lastAttendance, loading: attendanceLoading } =
     useSelector((state) => state.attendance);
 
-  console.log("orders", orders);
+ /*  console.log("orders", orders); */
 
   // Fetch everything on mount - always fetch orders when Dashboard component mounts
   // This ensures we get the correct data even if Orders' finalized orders are in the store

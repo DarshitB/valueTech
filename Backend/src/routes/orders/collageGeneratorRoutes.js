@@ -16,4 +16,14 @@ router.post(
   collageGeneratorController.generateCollage
 );
 
+// POST /api/collage-generator/generate-text-image
+// Body: { order_id: number, text: string (required, non-empty) }
+// Creates an image with the same text/background styling as collage overlay, saves to order media folder,
+// and inserts a row in order_media_image_video with status 4.
+router.post(
+  "/generate-text-image",
+  checkPermission("generate_order_collage"),
+  collageGeneratorController.generateTextCollageImage
+);
+
 module.exports = router;

@@ -15,10 +15,24 @@ export const generateCollage = createAsyncThunk(
   }
 );
 
+// Async action: Generate text-image collage
+export const generateTextImageCollage = createAsyncThunk(
+  "collage/generateTextImage",
+  async (payload, { rejectWithValue }) => {
+    try {
+      const res = await collageApi.generateTextImageCollage(payload);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
 // Initial state
 const initialState = {
-  generating: false, // Collage generation loading state
-  error: null, // Error message
+  generating: false,
+  generatingTextImage: false,
+  error: null,
 };
 
 // Collage slice
@@ -47,6 +61,20 @@ const collageSlice = createSlice({
         state.generating = false;
         state.error = action.payload;
         toast.error(`Failed to generate collage: ${action.payload}`);
+      })
+      // Generate text-image collage
+      .addCase(generateTextImageCollage.pending, (state) => {
+        state.generatingTextImage = true;
+        state.error = null;
+      })
+      .addCase(generateTextImageCollage.fulfilled, (state) => {
+        state.generatingTextImage = false;
+        toast.success("Text collage image generated and saved to order media");
+      })
+      .addCase(generateTextImageCollage.rejected, (state, action) => {
+        state.generatingTextImage = false;
+        state.error = action.payload;
+        toast.error(`Failed to generate text collage: ${action.payload}`);
       });
   },
 });

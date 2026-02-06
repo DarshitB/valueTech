@@ -18,7 +18,11 @@ const Order = require("../../models/orders/order");
 const orderMediaPortal = require("../../models/orders/orderMediaPortal");
 const orderMediaDocument = require("../../models/orders/orderMediaDocument");
 const OrderStatusHistory = require("../../models/orders/orderStatusHistory");
-const { ensureDirectoryExists } = require("../../utils/localFileHelper");
+const {
+  ensureDirectoryExists,
+  ensureOrderFolders,
+  ensureMediaSubfolders,
+} = require("../../utils/localFileHelper");
 
 // Import custom error classes
 const {
@@ -249,6 +253,161 @@ exports.generateCollage = async (req, res, next) => {
         download_url: `/uploads/${year}/${month}/${orderNumber}/collages/${pdfFileName}`,
         filename: pdfFileName,
         local_path: pdfPath,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Text-only image: 4:3 aspect ratio so it doesn't squish or stretch when shown in grids/galleries.
+// Use object-fit: contain (or size the container to 4:3) on the frontend to avoid distortion.
+const TEXT_IMAGE_WIDTH = 1200;
+const TEXT_IMAGE_HEIGHT = 900;
+
+/**
+ * Create a text-only image with proper font sizing so text is never cut.
+ * Iteratively reduces font size and re-wraps until content fits within bounds (like 2, 4, 6 cell collages).
+ * @param {string} text - Text to display
+ * @param {number} width - Image width
+ * @param {number} height - Image height
+ * @returns {Promise<Buffer>} Image buffer
+ */
+async function createTextOnlyImage(text, width, height) {
+  const normalizedText =
+    typeof text === "string" ? text : text == null ? "" : String(text);
+  const padding = TEXT_STYLING.padding;
+  const textAreaWidth = width - padding * 2;
+  const textAreaHeight = height - padding * 2;
+
+  let fontSize = Math.min(
+    TEXT_STYLING.fontSize,
+    Math.floor(Math.min(width, height) / 12)
+  );
+  let wrappedLines;
+  let lineHeight;
+  let totalTextHeight;
+
+  // Iteratively reduce font size and re-wrap until text fits (never cut), like 2/4/6 cell collages
+  while (fontSize >= TEXT_STYLING.minFontSize) {
+    wrappedLines = wrapTextPreserveWhitespace(
+      normalizedText,
+      textAreaWidth,
+      fontSize
+    );
+    lineHeight = fontSize * TEXT_STYLING.lineHeight;
+    totalTextHeight = wrappedLines.length * lineHeight;
+    if (totalTextHeight <= textAreaHeight) break;
+    fontSize = Math.max(
+      TEXT_STYLING.minFontSize,
+      Math.floor((textAreaHeight / wrappedLines.length) / TEXT_STYLING.lineHeight)
+    );
+  }
+
+  lineHeight = fontSize * TEXT_STYLING.lineHeight;
+  totalTextHeight = wrappedLines.length * lineHeight;
+
+  // Vertical center: block center = startY + totalTextHeight/2 - lineHeight/2; set equal to height/2
+  // So startY = (height - totalTextHeight)/2 + lineHeight/2 (with dominant-baseline="middle")
+  const centeredStartY = (height - totalTextHeight) / 2 + lineHeight / 2;
+  const minStartY = padding + fontSize / 2;
+  const lastLineBottom = (wrappedLines.length - 1) * lineHeight + fontSize / 2;
+  const maxStartY = height - padding - lastLineBottom;
+  const startY = Math.max(minStartY, Math.min(maxStartY, centeredStartY));
+
+  const escapedLines = wrappedLines.map((line) => escapeSvgText(line));
+  const svg = `
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100%" height="100%" fill="${TEXT_STYLING.backgroundColor}"/>
+      ${escapedLines
+        .map((line, index) => {
+          const y = startY + index * lineHeight;
+          return `<text 
+          x="50%" 
+          y="${y}" 
+          font-family="${TEXT_STYLING.fontFamily}" 
+          font-size="${fontSize}"
+          font-weight="bold"
+          fill="${TEXT_STYLING.textColor}" 
+          text-anchor="middle" 
+          dominant-baseline="middle"
+          xml:space="preserve"
+        >${line}</text>`;
+        })
+        .join("")}
+    </svg>
+  `;
+  return await sharp(Buffer.from(svg)).jpeg({ quality: 90 }).toBuffer();
+}
+
+/**
+ * Generate image from text only (same styling as collage text overlay).
+ * Saves to order media folder and inserts record in order_media_image_video with status 4.
+ * POST /api/collage-generator/generate-text-image
+ */
+exports.generateTextCollageImage = async (req, res, next) => {
+  try {
+    const { order_id, text } = req.body;
+    const { id: userId } = req.user;
+
+    if (!order_id) {
+      throw new BadRequestError("order_id is required");
+    }
+    const trimmedText =
+      typeof text === "string" ? text.trim() : text == null ? "" : String(text).trim();
+    if (!trimmedText) {
+      throw new BadRequestError("text is required and must not be empty");
+    }
+
+    const order = await Order.findById(order_id, req.user);
+    if (!order) {
+      throw new NotFoundError("Order not found");
+    }
+
+    const { orderPath } = ensureOrderFolders(order.order_number);
+    const { imagesPath } = ensureMediaSubfolders(orderPath);
+
+    const now = new Date();
+    const timestamp = Date.now();
+    const shortId = uuidv4().substring(0, 8);
+    const filename = `text_collage_${timestamp}_${shortId}.jpg`;
+    const outputPath = path.join(imagesPath, filename);
+
+    const textImageBuffer = await createTextOnlyImage(
+      trimmedText,
+      TEXT_IMAGE_WIDTH,
+      TEXT_IMAGE_HEIGHT
+    );
+    await sharp(textImageBuffer).jpeg({ quality: 90 }).toFile(outputPath);
+
+    const relativePath = path
+      .relative(path.join(process.cwd(), "uploads"), outputPath)
+      .replace(/\\/g, "/");
+    const media_url = `/uploads/${relativePath}`;
+
+    const mediaData = {
+      order_id: order.id,
+      uploader_type: "portal_users",
+      uploader_id: userId,
+      media_url,
+      media_type: "image",
+      status: 4,
+    };
+    const mediaId = await orderMediaPortal.insertMedia(mediaData);
+
+    res.json({
+      success: true,
+      message: "Text collage image generated and saved to order media",
+      data: {
+        id: mediaId,
+        order_id: order.id,
+        media_url,
+        media_type: "image",
+        status: 4,
+        filename,
+        width: TEXT_IMAGE_WIDTH,
+        height: TEXT_IMAGE_HEIGHT,
+        aspect_ratio: "4:3",
       },
     });
   } catch (err) {

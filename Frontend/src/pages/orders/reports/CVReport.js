@@ -2000,7 +2000,7 @@ function CVReport() {
           }
         );
 
-        /* console.log("✅ CVReport External API - Response received:", response.data); */
+        console.log("✅ CVReport RC API - Response:", response.data);
 
         if (response.data && response.data.valid) {
           const rcData = response.data;
