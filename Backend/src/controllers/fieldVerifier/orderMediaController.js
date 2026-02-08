@@ -12,6 +12,7 @@ const { insertMedia, getOrderByNumber } = require('../../models/fieldVerifier/or
 const Order = require('../../models/orders/order');
 const OrderStatusHistory = require('../../models/orders/orderStatusHistory');
 const { BadRequestError, NotFoundError } = require('../../utils/customErrors');
+const { generateAndSaveThumbnail } = require('../../utils/thumbnailHelper');
 const db = require("../../../db");
 
 /**
@@ -144,6 +145,13 @@ async function uploadMultipart(req, res, next) {
     // Copy all files to target folders in parallel for maximum performance
     const uploadedFiles = await copyMultipleFilesToFolder(filesToUpload);
 
+    // Generate thumbnails for images in parallel
+    const thumbnailPromises = filesToUpload
+      .map((f, i) => (f.fileType === 'image' ? uploadedFiles[i].path : null))
+      .filter(Boolean)
+      .map((p) => generateAndSaveThumbnail(p));
+    await Promise.all(thumbnailPromises);
+
     // Prepare database records for batch insertion
     const mediaRecords = uploadedFiles.map((uploaded, index) => {
       const fileInfo = filesToUpload[index];
@@ -260,6 +268,13 @@ async function uploadBase64(req, res, next) {
 
     // Copy all files to target folders in parallel for maximum performance
     const uploadedFiles = await copyMultipleFilesToFolder(filesToUpload);
+
+    // Generate thumbnails for images in parallel
+    const thumbnailPromises = filesToUpload
+      .map((f, i) => (f.fileType === 'image' ? uploadedFiles[i].path : null))
+      .filter(Boolean)
+      .map((p) => generateAndSaveThumbnail(p));
+    await Promise.all(thumbnailPromises);
 
     // Prepare database records for batch insertion
     const mediaRecords = uploadedFiles.map((uploaded, index) => {

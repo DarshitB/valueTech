@@ -79,6 +79,12 @@ exports.create = async (req, res, next) => {
       );
     }
 
+    // Only treat as duplicate if an active (non-deleted) user has this email
+    const activeWithEmail = await User.findByEmail(email);
+    if (activeWithEmail) {
+      return next(new ConflictError("email already exists"));
+    }
+
     const hash = await bcrypt.hash(password, 10);
 
     const [user] = await User.create({
@@ -94,22 +100,48 @@ exports.create = async (req, res, next) => {
 
     res.locals.newRecordId = user.id;
 
-    // Now fetch the user name using the created_by id
     const creator = await User.findById(user.created_by);
-
-    // Now fetch the user name using the role_id id
     const role = await Role.findById(user.role_id);
-
-    // Add user's name to the state object for response
     const enrichedUser = {
       ...user,
-      created_by: creator.name,
-      role_name: role.name,
+      created_by: creator?.name,
+      role_name: role?.name,
     };
 
     res.status(201).json(enrichedUser);
   } catch (err) {
     if (err.code === "23505") {
+      // Unique violation: email exists. If it's a deleted user, reactivate instead.
+      const existing = await User.findByEmailIncludingDeleted(req.body.email);
+      if (existing && existing.deleted_at) {
+        try {
+          const hash = await bcrypt.hash(req.body.password, 10);
+          const [reactivated] = await User.update(existing.id, {
+            name: req.body.name,
+            email: req.body.email,
+            mobile: req.body.mobile,
+            password: hash,
+            role_id: req.body.role_id,
+            city_id: req.body.city_id ?? null,
+            deleted_at: null,
+            deleted_by: null,
+            updated_at: new Date(),
+            updated_by: req.user?.id,
+          });
+          if (reactivated) {
+            const creator = await User.findById(reactivated.created_by);
+            const role = await Role.findById(reactivated.role_id);
+            res.locals.newRecordId = reactivated.id;
+            return res.status(201).json({
+              ...reactivated,
+              created_by: creator?.name,
+              role_name: role?.name,
+            });
+          }
+        } catch (reactivateErr) {
+          return next(reactivateErr);
+        }
+      }
       return next(new ConflictError("email already exists"));
     }
     next(err);

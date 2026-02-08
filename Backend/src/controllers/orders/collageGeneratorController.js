@@ -23,6 +23,7 @@ const {
   ensureOrderFolders,
   ensureMediaSubfolders,
 } = require("../../utils/localFileHelper");
+const { generateAndSaveThumbnail } = require("../../utils/thumbnailHelper");
 
 // Import custom error classes
 const {
@@ -379,6 +380,7 @@ exports.generateTextCollageImage = async (req, res, next) => {
       TEXT_IMAGE_HEIGHT
     );
     await sharp(textImageBuffer).jpeg({ quality: 90 }).toFile(outputPath);
+    await generateAndSaveThumbnail(outputPath);
 
     const relativePath = path
       .relative(path.join(process.cwd(), "uploads"), outputPath)

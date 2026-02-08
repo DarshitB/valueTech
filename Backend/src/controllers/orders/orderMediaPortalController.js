@@ -19,6 +19,10 @@ const {
   NotFoundError,
   AppError,
 } = require("../../utils/customErrors");
+const {
+  generateAndSaveThumbnail,
+  getThumbnailUrlIfExists,
+} = require("../../utils/thumbnailHelper");
 
 /**
  * Helper: Update order status to 8 (Assets Approved) when images are approved
@@ -48,6 +52,31 @@ async function updateOrderStatusToAssetsApproved(orderId, userId) {
 }
 
 /**
+ * Helper: Update order status to 7 (Assets Submitted) when any media is rejected from portal
+ */
+async function updateOrderStatusToAssetsSubmittedOnReject(orderId, userId) {
+  try {
+    await Order.updateOrder(orderId, {
+      current_status_id: 7,
+      updated_at: new Date(),
+      updated_by: userId,
+    });
+
+    const statusHistoryData = {
+      order_id: orderId,
+      status_id: 7, // Assets Submitted
+      changed_by: userId,
+      changed_at: new Date(),
+      activity_extra: "Media rejected – reverted to Assets Submitted",
+    };
+
+    await OrderStatusHistory.createStatusHistory(statusHistoryData);
+  } catch (error) {
+    console.error("Error updating order status to 7 on media reject:", error);
+  }
+}
+
+/**
  * GET /api/portal/order-media/:orderId
  * Get all media records for a specific order
  */
@@ -73,6 +102,11 @@ async function getOrderMedia(req, res, next) {
 
     // Get all media for the order
     const mediaRecords = await orderMediaPortal.getMediaByOrderId(orderIdNum);
+    const mediaWithThumbnails = mediaRecords.map((record) => ({
+      ...record,
+      thumbnail_url:
+        record.media_type === "image" ? getThumbnailUrlIfExists(record.media_url) : null,
+    }));
 
     res.json({
       success: true,
@@ -81,8 +115,8 @@ async function getOrderMedia(req, res, next) {
           id: order.id,
           order_number: order.order_number,
         },
-        media: mediaRecords,
-        total_count: mediaRecords.length,
+        media: mediaWithThumbnails,
+        total_count: mediaWithThumbnails.length,
       },
     });
   } catch (error) {
@@ -137,10 +171,18 @@ async function updateMediaStatus(req, res, next) {
     // Check if any media was approved (status = 1) and update order status
     const hasApprovedMedia = updates.some((update) => update.status === 1);
     if (hasApprovedMedia && updatedRecords.length > 0) {
-      // Get order ID from the first updated record
       const orderId = updatedRecords[0].order_id;
       if (orderId) {
         await updateOrderStatusToAssetsApproved(orderId, userId);
+      }
+    }
+
+    // When any media is rejected (status = 2), set order current_status_id to 7
+    const hasRejectedMedia = updates.some((update) => update.status === 2);
+    if (hasRejectedMedia && updatedRecords.length > 0) {
+      const orderId = updatedRecords[0].order_id;
+      if (orderId) {
+        await updateOrderStatusToAssetsSubmittedOnReject(orderId, userId);
       }
     }
 
@@ -414,6 +456,13 @@ async function uploadZip(req, res, next) {
     console.log(`📤 Uploading ${filesToUpload.length} files to order folders`);
     const uploadedFiles = await copyMultipleFilesToFolder(filesToUpload);
 
+    // Generate thumbnails for images in parallel (non-blocking for upload flow)
+    const thumbnailPromises = filesToUpload
+      .map((f, i) => (f.fileType === "image" ? uploadedFiles[i].path : null))
+      .filter(Boolean)
+      .map((p) => generateAndSaveThumbnail(p));
+    await Promise.all(thumbnailPromises);
+
     // Update media records with file paths and insert into database
     const savedMedia = [];
     for (let i = 0; i < mediaRecords.length; i++) {
@@ -536,6 +585,11 @@ async function getApprovedOrderMediaPublic(req, res, next) {
 
     // Get approved images and videos (status = 1)
     const approvedMediaRecords = await orderMediaPortal.getApprovedMediaByOrderId(orderIdNum);
+    const approvedWithThumbnails = approvedMediaRecords.map((record) => ({
+      ...record,
+      thumbnail_url:
+        record.media_type === "image" ? getThumbnailUrlIfExists(record.media_url) : null,
+    }));
 
     // Get approved reports and collages (status = "approved")
     const approvedDocuments = await orderMediaDocument.findApprovedByOrderId(orderIdNum);
@@ -557,10 +611,11 @@ async function getApprovedOrderMediaPublic(req, res, next) {
       created_at: doc.created_at,
       updated_at: doc.updated_at,
       updated_by: doc.updated_by,
+      thumbnail_url: null,
     }));
 
     // Combine all approved media (images, videos, reports, collages)
-    const allApprovedMedia = [...approvedMediaRecords, ...formattedDocuments];
+    const allApprovedMedia = [...approvedWithThumbnails, ...formattedDocuments];
 
     // Sort by created_at (newest first)
     allApprovedMedia.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));

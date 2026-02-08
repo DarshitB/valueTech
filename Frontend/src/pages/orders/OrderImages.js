@@ -118,14 +118,13 @@ function OrderImages() {
     };
   }, []); // Empty dependency array - runs only once
 
-  // Parse media URL to get the actual image link
+  // Parse media URL to get the actual image link (full resolution)
   const getImageUrl = (mediaUrl) => {
-    // Get base URL from environment variable or use default
+    if (mediaUrl == null || String(mediaUrl).trim() === "") return "";
     const baseUrl =
       process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
 
     try {
-      // First try to parse as JSON (for cases where it's a JSON string)
       const parsed = JSON.parse(mediaUrl);
       if (parsed.path) {
         return `${baseUrl}/${parsed.path}`;
@@ -135,12 +134,20 @@ function OrderImages() {
       }
       return mediaUrl;
     } catch (error) {
-      // If not JSON, treat as direct path
       if (mediaUrl.startsWith("/")) {
         return `${baseUrl}${mediaUrl}`;
       }
       return mediaUrl;
     }
+  };
+
+  // Grid display: use thumbnail_url when present, else original media_url (lightbox always uses media_url)
+  const getGridImageUrl = (mediaItem) => {
+    const thumb = mediaItem?.thumbnail_url;
+    if (thumb != null && String(thumb).trim() !== "") {
+      return getImageUrl(thumb);
+    }
+    return getImageUrl(mediaItem?.media_url);
   };
 
   // Check if media is an image
@@ -295,6 +302,13 @@ function OrderImages() {
       dispatch(fetchOrderMedia(id));
     }
   }, [dispatch, id, order]);
+
+  // Debug: log media when loaded (what GET /api/order-media/:id returns)
+  useEffect(() => {
+    if (media && !mediaLoading) {
+      console.log("Order media loaded:", media);
+    }
+  }, [media, mediaLoading]);
 
   // Set page title with breadcrumb navigation
   useLayoutEffect(() => {
@@ -906,6 +920,7 @@ function OrderImages() {
                         image.id
                       );
                       const imageUrl = getImageUrl(image.media_url);
+                      const gridImageUrl = getGridImageUrl(image);
                       const isImageFile = isImage(image.media_url);
                       const isVideoFile = isVideo(image.media_url);
                       // Get the actual selection order (1, 2, 3, etc.)
@@ -923,7 +938,7 @@ function OrderImages() {
                           >
                             {isImageFile ? (
                               <img
-                                src={imageUrl}
+                                src={gridImageUrl}
                                 alt={`Order Image ${image.id}`}
                                 onError={(e) => {
                                   e.target.src =

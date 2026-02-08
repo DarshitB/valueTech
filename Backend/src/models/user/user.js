@@ -98,7 +98,13 @@ const user = {
       .select("id", "name", "email")
       .where("users.email", email)
       .whereNull("deleted_at")
-      .first(), // find by Email to prevent duplicate Email to created user
+      .first(), // find by Email to prevent duplicate Email (active users only)
+
+  findByEmailIncludingDeleted: (email) =>
+    db("users")
+      .select("id", "name", "email", "deleted_at")
+      .where("email", email)
+      .first(),
 
   findByEmailOrMobile: (input) =>
     db("users")

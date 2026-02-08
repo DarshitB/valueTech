@@ -614,6 +614,7 @@ const order = {
       )
       .whereNull("orders.deleted_at")
       .where("orders.field_verifier_id", fieldVerifierId)
+      .where("orders.current_status_id", "<", 8)
       .whereNot("orders.current_status_id", 13);
 
     // Sort by newest first
