@@ -21,6 +21,8 @@ import {
 import { usePageTitle } from "../../../context/PageTitleContext";
 import SingleSearchSelect from "../../../components/SingleSearchSelect";
 import { toast } from "react-toastify";
+import { selectPermissions } from "../../../redux/selectors/authSelectors";
+import { hasPermission } from "../../../utils/permissionUtils";
 import "../order.scss";
 import { DeleteIcon, CloseIcon } from "../../../components/icons";
 
@@ -147,6 +149,8 @@ function MarineReport() {
 
   // Combined loading state - show loading when fetching order or report data
   const isLoadingData = orderLoading || reportLoading;
+  const allowedPermissions = useSelector(selectPermissions);
+  const canEditRefNoId = hasPermission(allowedPermissions, "edit_report_ref_no_id");
 
   // Get current date in DD-MM-YYYY format
   const getCurrentDate = useCallback(() => {
@@ -1886,6 +1890,11 @@ function MarineReport() {
     Object.keys(reportFormData).forEach((key) => {
       let value = reportFormData[key];
 
+      // Skip ref_no_id if user does not have permission (keep existing value in DB)
+      if (key === "ref_no_id" && !canEditRefNoId) {
+        return;
+      }
+
       // Check if this field was explicitly cleared by the user
       // BUT: if field has a value now, send the value (user re-entered it)
       if (clearedFieldsRef.current.has(key) && (!value || value === "")) {
@@ -2100,6 +2109,11 @@ function MarineReport() {
     // Add ALL form fields to FormData - ensure every field is included to prevent data loss
     Object.keys(reportFormData).forEach((key) => {
       let value = reportFormData[key];
+
+      // Skip ref_no_id if user does not have permission (keep existing value in DB)
+      if (key === "ref_no_id" && !canEditRefNoId) {
+        return;
+      }
 
       // Check if this field was explicitly cleared by the user
       // BUT: if field has a value now, send the value (user re-entered it)
@@ -2739,9 +2753,10 @@ function MarineReport() {
                       <input
                         type="text"
                         className="form-field"
-                        name="ref_no_id"
+                        {...(canEditRefNoId ? { name: "ref_no_id" } : {})}
                         value={reportFormData.ref_no_id}
-                        onChange={handleFormChange}
+                        onChange={canEditRefNoId ? handleFormChange : undefined}
+                        readOnly={!canEditRefNoId}
                         placeholder="Enter ID"
                         required
                       />

@@ -18,6 +18,8 @@ import { fetchAssetMakesForReports } from "../../../redux/reducers/assetMakesRed
 import { usePageTitle } from "../../../context/PageTitleContext";
 import SingleSearchSelect from "../../../components/SingleSearchSelect";
 import { toast } from "react-toastify";
+import { selectPermissions } from "../../../redux/selectors/authSelectors";
+import { hasPermission } from "../../../utils/permissionUtils";
 import "../order.scss";
 import { DeleteIcon } from "../../../components/icons";
 
@@ -157,6 +159,8 @@ function AVRReport() {
   const { list: assetMakes, loading: assetMakesLoading } = useSelector(
     (state) => state.assetMakes
   );
+  const allowedPermissions = useSelector(selectPermissions);
+  const canEditRefNoId = hasPermission(allowedPermissions, "edit_report_ref_no_id");
   // Set page title using custom hook
   const { setTitle } = usePageTitle();
   
@@ -951,6 +955,11 @@ function AVRReport() {
     Object.keys(reportFormData).forEach((key) => {
       let value = reportFormData[key];
 
+      // Skip ref_no_id if user does not have permission (keep existing value in DB)
+      if (key === "ref_no_id" && !canEditRefNoId) {
+        return;
+      }
+
       // Simple logic: if value exists, send it; if null/empty, send null
       // Note: Textarea values (with line breaks, spaces, formatting) are preserved as-is
       if (value !== null && value !== undefined && value !== "") {
@@ -1043,6 +1052,11 @@ function AVRReport() {
     // Add all form fields to reportData - simple logic: if value exists send it, if null/empty send null
     Object.keys(reportFormData).forEach((key) => {
       const value = reportFormData[key];
+
+      // Skip ref_no_id if user does not have permission (keep existing value in DB)
+      if (key === "ref_no_id" && !canEditRefNoId) {
+        return;
+      }
 
       // Simple logic: if value exists, send it; if null/empty, send null
       // Note: Textarea values (with line breaks, spaces, formatting) are preserved as-is
@@ -1245,9 +1259,10 @@ function AVRReport() {
                       <input
                         type="text"
                         className="form-field"
-                        name="ref_no_id"
+                        {...(canEditRefNoId ? { name: "ref_no_id" } : {})}
                         value={reportFormData.ref_no_id}
-                        onChange={handleFormChange}
+                        onChange={canEditRefNoId ? handleFormChange : undefined}
+                        readOnly={!canEditRefNoId}
                         placeholder="Enter ID"
                         required
                       />

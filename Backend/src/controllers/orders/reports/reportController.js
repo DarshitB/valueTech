@@ -3653,10 +3653,21 @@ function filterValidReportFields(formData, reportType) {
   const allowedColumns = validColumns[reportType.toLowerCase()] || [];
   const filteredData = {};
 
+  // Boolean columns (DB type boolean) - must be actual boolean, not string/array
+  const booleanColumns = ["is_repo"];
+
   // Only include fields that exist in the valid columns list
   Object.keys(formData).forEach((key) => {
     if (allowedColumns.includes(key)) {
-      filteredData[key] = formData[key];
+      let value = formData[key];
+      if (booleanColumns.includes(key)) {
+        if (value === true || value === "true") value = true;
+        else if (value === false || value === "false") value = false;
+        else if (Array.isArray(value)) value = value.some((v) => v === true || v === "true");
+        else if (value != null && typeof value === "string" && value.includes("true")) value = true;
+        else value = false;
+      }
+      filteredData[key] = value;
     }
   });
 

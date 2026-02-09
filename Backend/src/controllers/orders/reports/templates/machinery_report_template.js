@@ -752,7 +752,7 @@ body.single-page{
             <td>VALUER COMMENTS/REMARKS:</td>
             <td colspan="5">${renderFieldValue(formData.valuer_comments_remarks)}</td>
         </tr>
-        ${formData.is_repo == "true" ?
+        ${formData.valuation_purpose == "REPO PURPOSE" ?
             `
             <tr>
                 <td><b>SPECIAL VALUER

@@ -706,7 +706,7 @@ body.single-page{
             formData.flexible_fields || [],
             "OVER_ALL_FEED_BACK_OF_THE_INSPECTED"
         )}
-        ${formData.is_repo == "true" ?
+        ${formData.valuation_purpose == "REPO PURPOSE" ?
             `
             <tr>
                 <td><b>SPECIAL VALUER
@@ -728,7 +728,7 @@ body.single-page{
                 The aforesaid ${extraData.cat} / ${extraData.subCat} ${extraData.childCat
         } inspected by us & found in ${formData.declaration_condition
         } on the date of my inspection.This Report issued for ${formData.valuation_purpose
-        } ${formData.is_repo == "true" ? "(REPO)" : ""} of ${extraData.bank_name}, ${extraData.branch_name}, ${extraData.state_name
+        } ${formData.valuation_purpose  == "REPO PURPOSE" ? "(REPO)" : ""} of ${extraData.bank_name}, ${extraData.branch_name}, ${extraData.state_name
         } Only.
             </td>
         </tr>
