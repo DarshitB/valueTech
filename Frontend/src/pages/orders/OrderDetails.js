@@ -1367,7 +1367,7 @@ function OrderDetails() {
           alignItems: "center",
         }}
       >
-        {isDeveloperAdmin && (
+        {hasPermission(allowedPermissions, "view_complete_order_button") && (
           <button
             title="complete order"
             className={`tooltip-link${isCompletingOrder || ordersLoading ? " disabled" : ""}`}

@@ -62,10 +62,18 @@ exports.create = async (req, res, next) => {
       );
     }
 
-    // Check if email or mobile already exists in users table
+    // Check if email or mobile already exists for an active user (deleted users don't block)
     const existing = await User.findByEmailAndMobile(email, mobile);
     if (existing) {
       throw new ConflictError("Email or mobile already exists.");
+    }
+    // If a deleted user has this email, free it so we can use it
+    const trimmedEmail = String(email).trim().toLowerCase();
+    const existingAnyByEmail = await User.findByEmailIncludingDeleted(trimmedEmail);
+    if (existingAnyByEmail && existingAnyByEmail.deleted_at) {
+      await User.update(existingAnyByEmail.id, {
+        email: `deleted_${existingAnyByEmail.id}_${Date.now()}@deleted.local`,
+      });
     }
 
     // Get city id from branch selected
@@ -175,12 +183,23 @@ exports.update = async (req, res, next) => {
     const user = await User.findById(officer.user_id);
     if (!user) throw new NotFoundError("User not found");
 
-    // Check if email is used by another user
+    // Check if email is used by another active user (deleted users don't block)
     if (email) {
       const trimmedEmail = email.trim().toLowerCase();
       const existing = await User.findByEmail(trimmedEmail);
       if (existing && existing.id !== user.id) {
         throw new ConflictError("Email already in use");
+      }
+      // If a deleted user has this email, free it so this update can use it
+      const existingAny = await User.findByEmailIncludingDeleted(trimmedEmail);
+      if (
+        existingAny &&
+        existingAny.deleted_at &&
+        existingAny.id !== user.id
+      ) {
+        await User.update(existingAny.id, {
+          email: `deleted_${existingAny.id}_${Date.now()}@deleted.local`,
+        });
       }
     }
     // Check if mobile is used by another user
