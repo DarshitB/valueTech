@@ -844,22 +844,6 @@ body.single-page{
             formData.flexible_fields || [],
             "OVER_ALL_FEED_BACK_OF_THE_INSPECTED"
         )}
-        ${formData.valuation_purpose == "REPO PURPOSE" ?
-            `
-            <tr>
-                <td><b>SPECIAL VALUER
-                    COMMENTS/REMARKS FOR
-                    REPOSSESSED VEHICLE</b></td>
-                <td colspan="5">WE HAVE CARRIED OUT THE VALUATION AMOUNT OF THE VEHICLE AT RS. 5.34 LAKH, AFTER DISCOUNTED THE FAIR VALUE BY 40%
-                    FOR LACK OF MARKETABLILITY AND TIME CONSTRAINT IN LIQUIDATION SALE. CONSIDERING THE ABOVE FACTS WE HAVE
-                    ESTIMATED THE FAIR VALUE AND LIQUIDATION VALUE OF SUCH EQUIPMENT AT RS. 5.15 LAKH RESPECTIVELY. FACTORS AFFECTING
-                    VALUATION- 1.MARKET TIME LESS THAT NORMAL CONDITION - 15 %, 2. ONGOING CIRP PROCESS (REPOSSESSION PROCESS) - 5 %, 3.
-                    TIME GAP TO RESTART THE ACTUAL - 5 %, 4. GENERAL DEPRECIATION OF VEHICLE USAGE YEARS - 15 % VEHICLES & VERBAL
-                    ASSURANCE OF OEM SUBJECT TO MECHANICAL REPAIRS & ELECTRICAL FAILURE. REPO VEHICLE VALUE CONSIDERED.</td>
-            </tr>
-            `
-            : ""
-        }
         <tr>
             <td>DECLARATION:</td>
             <td colspan="5" style="text-transform: none;">
