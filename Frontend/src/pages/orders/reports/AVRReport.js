@@ -955,11 +955,6 @@ function AVRReport() {
     Object.keys(reportFormData).forEach((key) => {
       let value = reportFormData[key];
 
-      // Skip ref_no_id if user does not have permission (keep existing value in DB)
-      if (key === "ref_no_id" && !canEditRefNoId) {
-        return;
-      }
-
       // Simple logic: if value exists, send it; if null/empty, send null
       // Note: Textarea values (with line breaks, spaces, formatting) are preserved as-is
       if (value !== null && value !== undefined && value !== "") {
@@ -1052,11 +1047,6 @@ function AVRReport() {
     // Add all form fields to reportData - simple logic: if value exists send it, if null/empty send null
     Object.keys(reportFormData).forEach((key) => {
       const value = reportFormData[key];
-
-      // Skip ref_no_id if user does not have permission (keep existing value in DB)
-      if (key === "ref_no_id" && !canEditRefNoId) {
-        return;
-      }
 
       // Simple logic: if value exists, send it; if null/empty, send null
       // Note: Textarea values (with line breaks, spaces, formatting) are preserved as-is

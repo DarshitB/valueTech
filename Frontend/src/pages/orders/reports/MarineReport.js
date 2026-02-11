@@ -1890,11 +1890,6 @@ function MarineReport() {
     Object.keys(reportFormData).forEach((key) => {
       let value = reportFormData[key];
 
-      // Skip ref_no_id if user does not have permission (keep existing value in DB)
-      if (key === "ref_no_id" && !canEditRefNoId) {
-        return;
-      }
-
       // Check if this field was explicitly cleared by the user
       // BUT: if field has a value now, send the value (user re-entered it)
       if (clearedFieldsRef.current.has(key) && (!value || value === "")) {
@@ -2109,11 +2104,6 @@ function MarineReport() {
     // Add ALL form fields to FormData - ensure every field is included to prevent data loss
     Object.keys(reportFormData).forEach((key) => {
       let value = reportFormData[key];
-
-      // Skip ref_no_id if user does not have permission (keep existing value in DB)
-      if (key === "ref_no_id" && !canEditRefNoId) {
-        return;
-      }
 
       // Check if this field was explicitly cleared by the user
       // BUT: if field has a value now, send the value (user re-entered it)

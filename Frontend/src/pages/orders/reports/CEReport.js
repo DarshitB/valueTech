@@ -2517,11 +2517,6 @@ function CEReport() {
           return;
         }
 
-        // Skip ref_no_id if user does not have permission (keep existing value in DB)
-        if (key === "ref_no_id" && !canEditRefNoId) {
-          return;
-        }
-
         // Handle registration fields with options
         if (key === "registration_no") {
           if (registrationNoOption === "NOT_AVAILABLE") {
@@ -2762,11 +2757,6 @@ function CEReport() {
 
 // Skip invoice_no_date - will be added separately with fresh computed value
       if (key === "invoice_no_date") {
-        return;
-      }
-
-      // Skip ref_no_id if user does not have permission (keep existing value in DB)
-      if (key === "ref_no_id" && !canEditRefNoId) {
         return;
       }
 
