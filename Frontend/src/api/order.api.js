@@ -65,3 +65,10 @@ export const getAssetMakesForReports = (orderType) =>
  */
 export const sendOrderMail = (orderId, payload) =>
   axios.post(`${ENDPOINT}/${orderId}/send-mail`, payload);
+
+/**
+ * Get last-sent mail data for an order (for prefill).
+ * GET /api/orders/:orderId/last-mail
+ */
+export const getOrderLastMail = (orderId) =>
+  axios.get(`${ENDPOINT}/${orderId}/last-mail`);

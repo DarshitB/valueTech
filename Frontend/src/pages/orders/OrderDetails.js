@@ -27,7 +27,7 @@ import {
 } from "../../redux/reducers/orderReportReducer";
 import { fetchOfficers } from "../../redux/reducers/officerReducer";
 import { getUsers } from "../../api/user.api";
-import { sendOrderMail } from "../../api/order.api";
+import { sendOrderMail, getOrderLastMail } from "../../api/order.api";
 import { MentionsInput, Mention } from "react-mentions";
 import mentionsStyle from "./mentionsStyle";
 import "./order.scss";
@@ -197,6 +197,7 @@ function OrderDetails() {
   const [activeTab, setActiveTab] = useState("payment");
   const [showMailModal, setShowMailModal] = useState(false);
   const [isSendingMail, setIsSendingMail] = useState(false);
+  const [mailLastMailLoading, setMailLastMailLoading] = useState(false);
   const [showCompleteConfirmation, setShowCompleteConfirmation] =
     useState(false);
   const [showAuthenticateConfirmation, setShowAuthenticateConfirmation] =
@@ -305,6 +306,44 @@ function OrderDetails() {
       }
     }
   }, [dispatch, id, showMailModal, order?.category_name]);
+
+  // Prefill mail form from last-sent mail when modal opens
+  useEffect(() => {
+    if (!showMailModal || !id) {
+      setMailLastMailLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setMailLastMailLoading(true);
+    getOrderLastMail(id)
+      .then((res) => {
+        if (cancelled) return;
+        const row = res?.data?.data;
+        if (row) {
+          setMailFormData({
+            to: Array.isArray(row.to) ? row.to : [],
+            cc: Array.isArray(row.cc) ? row.cc : [],
+            bcc: Array.isArray(row.bcc) ? row.bcc : [],
+            subject: row.subject != null ? String(row.subject) : "",
+            comments: row.comments != null ? String(row.comments) : "",
+            regards: row.regards != null ? String(row.regards) : "",
+            mail_attachment: Boolean(row.mail_attachment),
+            public_link_with_image: Boolean(row.public_link_with_image),
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          // Keep existing or default form state on error
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setMailLastMailLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showMailModal, id]);
 
   // Fetch users for mentions with error handling
   useEffect(() => {
@@ -2776,7 +2815,11 @@ function OrderDetails() {
         <FormModel>
           {{
             title: "Mail Documents",
-            body: (
+            body: mailLastMailLoading ? (
+              <div className="body-form-box" style={{ padding: "24px", textAlign: "center" }}>
+                Loading…
+              </div>
+            ) : (
               <form className="body-form-box" onSubmit={handleMailFormSubmit}>
                 <div className="body-form-box">
                   <div className="form-group">

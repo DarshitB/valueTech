@@ -94,7 +94,8 @@
 
   .react-datepicker__time-list-item {
     height: auto !important;
-    &.react-datepicker__time-list-item--selected{
+
+    &.react-datepicker__time-list-item--selected {
       background-color: #5864bd !important;
     }
   }
@@ -991,6 +992,22 @@
             opacity: 0.6;
             cursor: not-allowed;
           }
+
+          /* Match other icon buttons: no border, no focus/hover glow or outline */
+          &.btn-danger {
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+
+            &:focus,
+            &:focus-visible,
+            &:hover:not(:disabled),
+            &:active {
+              border: none !important;
+              outline: none !important;
+              box-shadow: none !important;
+            }
+          }
         }
 
         .btn {
@@ -1021,12 +1038,29 @@
 
           &.btn-danger {
             background-color: #dc3545;
-            border-color: #dc3545;
             color: white;
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+
+            &:focus,
+            &:focus-visible {
+              border: none !important;
+              outline: none !important;
+              box-shadow: none !important;
+            }
 
             &:hover:not(:disabled) {
               background-color: #c82333;
-              border-color: #bd2130;
+              border: none !important;
+              outline: none !important;
+              box-shadow: none !important;
+            }
+
+            &:active {
+              border: none !important;
+              outline: none !important;
+              box-shadow: none !important;
             }
           }
 
@@ -1071,266 +1105,320 @@
       .order-images {
         display: flex;
         flex-wrap: wrap;
-        gap: 25px;
+        gap: 35px;
+        padding: 4px;
 
-        .order-image-card {
-          width: fit-content;
-          height: fit-content;
-          /* margin: 20px 0; */
-          cursor: pointer;
+        .order-images-group-grid {
+          gap: 25px;
 
-          .order-image-box {
-            position: relative;
-            width: 150px;
-            height: 150px;
-            border-radius: 10px;
-            /* overflow: hidden; */
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s ease;
+          .order-image-card {
+            width: fit-content;
+            height: fit-content;
+            /* margin: 20px 0; */
+            cursor: pointer;
 
-            &.selected {
-              box-shadow: 0 0 0 3px $primary-color, 0 4px 8px rgba(0, 0, 0, 0.1);
+            .order-image-box {
+              position: relative;
+              width: 200px;
+              height: 200px;
+              border-radius: 10px;
+              /* overflow: hidden; */
+              box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+              transition: all 0.3s ease;
+
+              &.selected {
+                box-shadow: 0 0 0 3px $primary-color, 0 4px 8px rgba(0, 0, 0, 0.1);
+              }
+
+              &:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 12px $box-shadow-color;
+              }
+
+              // Only show pointer cursor for images (not videos)
+              &:has(img),
+              &:has(.order-image-box-img-wrap) {
+                cursor: pointer;
+              }
+
+              .order-image-box-img-wrap {
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                border-radius: 10px;
+
+                img {
+                  width: 100%;
+                  height: 100%;
+                  object-fit: cover;
+                  object-position: center;
+                  display: block;
+                  border-radius: 10px;
+                }
+              }
+
+              &:hover .order-image-box-img-wrap:not(.is-rotated) img {
+                transform: scale(1.05);
+              }
+
+              video {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                object-position: center;
+                display: block;
+                border-radius: 10px;
+                background-color: #000;
+
+                &::-webkit-media-controls {
+                  background-color: rgba(0, 0, 0, 0.7);
+                  border-radius: 0 0 10px 10px;
+                }
+              }
+
+              .media-placeholder {
+                width: 100%;
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                background-color: #f8f9fa;
+                border-radius: 10px;
+                color: #6c757d;
+
+                i {
+                  font-size: 2rem;
+                  margin-bottom: 8px;
+                }
+
+                span {
+                  font-size: 0.875rem;
+                  font-weight: 500;
+                }
+              }
+
+              .order-image-card-actions {
+                position: absolute;
+                top: 0;
+                right: 0;
+                width: 100%;
+                height: 100%;
+                z-index: 1;
+
+                .form-check-input {
+                  position: absolute;
+                  top: 10px;
+                  right: 10px;
+                  width: 20px;
+                  height: 20px;
+                  cursor: pointer;
+                  border: 2px solid white;
+                  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                  display: none;
+
+                  /*  &:checked {
+                    background-color: #007bff;
+                    border-color: #007bff;
+                  } */
+
+                  &:focus {
+                    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+                  }
+                }
+
+                .icon-if-selected {
+                  position: absolute;
+                  bottom: -10px;
+                  right: -10px;
+                  /* display: none; */
+                  visibility: hidden;
+                }
+
+                &:has(.form-check-input:checked) {
+                  .icon-if-selected {
+                    visibility: visible;
+                  }
+                }
+
+                .lightbox-btn {
+                  position: absolute;
+                  top: 5px;
+                  left: 5px;
+                  width: 28px;
+                  height: 28px;
+                  background-color: rgba(255, 255, 255, 0.9);
+                  border: none;
+                  border-radius: 50%;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  cursor: pointer;
+                  z-index: 10;
+                  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                  transition: all 0.2s ease;
+                  outline: none;
+
+                  &:hover {
+                    background-color: white;
+                    transform: scale(1.1);
+                  }
+
+                  svg {
+                    color: $primary-color;
+                  }
+                }
+
+                .copy-video-url-btn {
+                  position: absolute;
+                  top: 5px;
+                  left: 35px;
+                  width: 28px;
+                  height: 28px;
+                  background-color: rgba(255, 255, 255, 0.9);
+                  border: none;
+                  border-radius: 50%;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  cursor: pointer;
+                  z-index: 10;
+                  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                  transition: all 0.2s ease;
+                  outline: none;
+
+                  &:hover {
+                    background-color: white;
+                    transform: scale(1.1);
+                  }
+
+                  svg {
+                    color: $primary-color;
+                  }
+                }
+
+                .selection-order {
+                  position: absolute;
+                  top: 5px;
+                  right: 5px;
+                  background-color: #28a745;
+                  color: #fff;
+                  border-radius: 50%;
+                  width: 24px;
+                  height: 24px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-size: 12px;
+                  font-weight: bold;
+                  border: 2px solid white;
+                }
+              }
+
+              .orientation-btn-wrap {
+                position: absolute;
+                bottom: 35px;
+                left: 5px;
+                z-index: 1;
+              }
+
+              .orientation-btn {
+                height: 24px;
+                min-width: 24px;
+                padding: 0 6px 0 4px;
+                background-color: rgba(255, 255, 255, 0.95);
+                border: none;
+                border-radius: 50px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+                transition: all 0.2s ease;
+                outline: none;
+                gap: 2px;
+
+                &:hover {
+                  background-color: white;
+                  transform: scale(1.05);
+                }
+
+                svg {
+                  color: $primary-color;
+                  width: 18px;
+                  height: 18px;
+                }
+
+                .orientation-badge {
+                  font-size: 14px;
+                  margin-left: 1px;
+                  line-height: 1;
+                  text-transform: uppercase;
+                }
+              }
+
+              .image-status {
+                position: absolute;
+                bottom: 5px;
+                left: 5px;
+                background-color: rgba(255, 255, 255, 0.9);
+                padding: 4px 8px;
+                border-radius: 12px;
+                font-size: 10px;
+                font-weight: 500;
+                /* backdrop-filter: blur(4px); */
+
+                &.text-warning {
+                  color: white !important;
+                  /* color: #856404 !important; */
+                  background-color: rgba(255, 193, 7, 1);
+                }
+
+                &.text-success {
+                  color: white !important;
+                  /* color: #155724 !important; */
+                  background-color: rgba(40, 167, 69, 1);
+                }
+
+                &.text-danger {
+                  color: white !important;
+                  /* color: #721c24 !important; */
+                  background-color: rgba(220, 53, 69, 1);
+                }
+
+                &.text-muted {
+                  color: #6c757d !important;
+                  background-color: rgba(108, 117, 125, 1);
+                }
+              }
+            }
+
+            .image-info {
+              margin-top: 10px;
+              text-align: center;
+
+              p {
+                font-size: 16px;
+                font-weight: 500;
+                margin-bottom: 5px;
+                color: $base-font-color;
+              }
+
+              small {
+                font-size: 12px;
+                line-height: 1.4;
+              }
             }
 
             &:hover {
-              transform: translateY(-2px);
-              box-shadow: 0 6px 12px $box-shadow-color;
-            }
-
-            // Only show pointer cursor for images (not videos)
-            &:has(img) {
-              cursor: pointer;
-            }
-
-            img {
-              width: 100%;
-              height: 100%;
-              object-fit: cover;
-              object-position: center;
-              display: block;
-              border-radius: 10px;
-              transition: transform 0.3s ease;
-            }
-
-            &:hover img {
-              transform: scale(1.05);
-            }
-
-            video {
-              width: 100%;
-              height: 100%;
-              object-fit: cover;
-              object-position: center;
-              display: block;
-              border-radius: 10px;
-              background-color: #000;
-
-              &::-webkit-media-controls {
-                background-color: rgba(0, 0, 0, 0.7);
-                border-radius: 0 0 10px 10px;
-              }
-            }
-
-            .media-placeholder {
-              width: 100%;
-              height: 100%;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              background-color: #f8f9fa;
-              border-radius: 10px;
-              color: #6c757d;
-
-              i {
-                font-size: 2rem;
-                margin-bottom: 8px;
-              }
-
-              span {
-                font-size: 0.875rem;
-                font-weight: 500;
-              }
-            }
-
-            .order-image-card-actions {
-              position: absolute;
-              top: 0;
-              right: 0;
-              width: 100%;
-              height: 100%;
-              z-index: 1;
-
-              .form-check-input {
-                position: absolute;
-                top: 10px;
-                right: 10px;
-                width: 20px;
-                height: 20px;
-                cursor: pointer;
-                border: 2px solid white;
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-                display: none;
-
-                /*  &:checked {
-                  background-color: #007bff;
-                  border-color: #007bff;
-                } */
-
-                &:focus {
-                  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-                }
-              }
-
-              .icon-if-selected {
-                position: absolute;
-                bottom: -10px;
-                right: -10px;
-                /* display: none; */
-                visibility: hidden;
-              }
-
-              &:has(.form-check-input:checked) {
-                .icon-if-selected {
-                  visibility: visible;
-                }
-              }
-
-              .lightbox-btn {
-                position: absolute;
-                top: 5px;
-                left: 5px;
-                width: 28px;
-                height: 28px;
-                background-color: rgba(255, 255, 255, 0.9);
-                border: none;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-                z-index: 10;
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-                transition: all 0.2s ease;
-                outline: none;
-
-                &:hover {
-                  background-color: white;
-                  transform: scale(1.1);
+              .order-image-card-actions {
+                .form-check-input {
+                  opacity: 1;
                 }
 
-                svg {
-                  color: $primary-color;
+                .lightbox-btn {
+                  display: flex;
                 }
-              }
-
-              .copy-video-url-btn {
-                position: absolute;
-                top: 5px;
-                left: 35px;
-                width: 28px;
-                height: 28px;
-                background-color: rgba(255, 255, 255, 0.9);
-                border: none;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-                z-index: 10;
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-                transition: all 0.2s ease;
-                outline: none;
-
-                &:hover {
-                  background-color: white;
-                  transform: scale(1.1);
-                }
-
-                svg {
-                  color: $primary-color;
-                }
-              }
-
-              .selection-order {
-                position: absolute;
-                top: 5px;
-                right: 5px;
-                background-color: #28a745;
-                color: #fff;
-                border-radius: 50%;
-                width: 24px;
-                height: 24px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 12px;
-                font-weight: bold;
-                border: 2px solid white;
-              }
-            }
-
-            .image-status {
-              position: absolute;
-              bottom: 5px;
-              left: 5px;
-              background-color: rgba(255, 255, 255, 0.9);
-              padding: 4px 8px;
-              border-radius: 12px;
-              font-size: 10px;
-              font-weight: 500;
-              /* backdrop-filter: blur(4px); */
-
-              &.text-warning {
-                color: white !important;
-                /* color: #856404 !important; */
-                background-color: rgba(255, 193, 7, 1);
-              }
-
-              &.text-success {
-                color: white !important;
-                /* color: #155724 !important; */
-                background-color: rgba(40, 167, 69, 1);
-              }
-
-              &.text-danger {
-                color: white !important;
-                /* color: #721c24 !important; */
-                background-color: rgba(220, 53, 69, 1);
-              }
-
-              &.text-muted {
-                color: #6c757d !important;
-                background-color: rgba(108, 117, 125, 1);
-              }
-            }
-          }
-
-          .image-info {
-            margin-top: 10px;
-            text-align: center;
-
-            p {
-              font-size: 16px;
-              font-weight: 500;
-              margin-bottom: 5px;
-              color: $base-font-color;
-            }
-
-            small {
-              font-size: 12px;
-              line-height: 1.4;
-            }
-          }
-
-          &:hover {
-            .order-image-card-actions {
-              .form-check-input {
-                opacity: 1;
-              }
-
-              .lightbox-btn {
-                display: flex;
               }
             }
           }
@@ -1352,6 +1440,22 @@
       outline: unset !important;
       box-shadow: unset !important;
     }
+  }
+}
+
+/* Override Bootstrap so delete icon button matches Share/Upload/Approve/Reject (no border, no glow) */
+.order-images-wrapper .order-images-buttons button.btn-danger {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+
+  &:hover,
+  &:focus,
+  &:focus-visible,
+  &:active {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
   }
 }
 
@@ -1450,8 +1554,8 @@
 
         .order-image-card {
           .order-image-box {
-            width: 120px;
-            height: 120px;
+            width: 150px;
+            height: 150px;
           }
         }
       }

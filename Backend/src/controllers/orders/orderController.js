@@ -1382,9 +1382,10 @@ exports.sendMail = async (req, res, next) => {
       video_ids,
       mail_attachment,
       public_url,
+      public_link_with_image,
     } =
       req.body;
-      console.log("public_url", req.body.public_url);
+      /* console.log("public_url", req.body.public_url); */
 
     // Validate order exists
     const order = await Order.findById(orderId, req.user);
@@ -1734,6 +1735,52 @@ exports.sendMail = async (req, res, next) => {
 
     await OrderStatusHistory.createStatusHistory(statusHistoryData);
 
+    // Store last-mail data for prefill (do not store document_ids or video_ids)
+    // Ensure to/cc/bcc are plain arrays of strings so jsonb gets valid JSON (e.g. ["a@b.com"])
+    const ensureEmailArray = (val) => {
+      if (Array.isArray(val)) return val.map((s) => (typeof s === "string" ? s.trim() : String(s))).filter(Boolean);
+      if (typeof val === "string" && val.trim()) return [val.trim()];
+      if (val && typeof val === "object" && !Array.isArray(val)) {
+        const keys = Object.keys(val).filter((k) => typeof k === "string" && k.trim());
+        const vals = Object.values(val).filter((s) => typeof s === "string" && s.trim());
+        return [...new Set([...keys, ...vals])];
+      }
+      return [];
+    };
+    const toArr = ensureEmailArray(to);
+    const ccArr = ensureEmailArray(cc);
+    const bccArr = ensureEmailArray(bcc);
+    const lastMailRow = {
+      order_id: parseInt(orderId),
+      to: JSON.stringify(toArr),
+      cc: JSON.stringify(ccArr),
+      bcc: JSON.stringify(bccArr),
+      subject: subject != null ? String(subject) : null,
+      comments: comments != null ? String(comments) : null,
+      regards: regards != null ? String(regards) : null,
+      mail_attachment:
+        mailAttachmentOverride !== null ? mailAttachmentOverride : document_as_attachment,
+      public_link_with_image:
+        typeof public_link_with_image === "boolean"
+          ? public_link_with_image
+          : Boolean(public_link_with_image),
+      updated_at: new Date(),
+    };
+    await db("order_last_mail")
+      .insert(lastMailRow)
+      .onConflict("order_id")
+      .merge([
+        "to",
+        "cc",
+        "bcc",
+        "subject",
+        "comments",
+        "regards",
+        "mail_attachment",
+        "public_link_with_image",
+        "updated_at",
+      ]);
+
     res.status(200).json({
       success: true,
       message: "Email sent successfully",
@@ -1752,6 +1799,42 @@ exports.sendMail = async (req, res, next) => {
         totalAttachmentsCount: attachments.length,
       },
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Get last-sent mail data for an order (for prefill).
+ * GET /api/orders/:orderId/last-mail
+ */
+exports.getLastMail = async (req, res, next) => {
+  try {
+    const { orderId } = req.params;
+    const order = await Order.findById(orderId, req.user);
+    if (!order) {
+      throw new NotFoundError("Order not found");
+    }
+    const row = await db("order_last_mail")
+      .where("order_id", parseInt(orderId))
+      .first();
+    if (!row) {
+      return res.status(200).json({ success: true, data: null });
+    }
+    const data = {
+      id: row.id,
+      order_id: row.order_id,
+      to: Array.isArray(row.to) ? row.to : [],
+      cc: Array.isArray(row.cc) ? row.cc : [],
+      bcc: Array.isArray(row.bcc) ? row.bcc : [],
+      subject: row.subject,
+      comments: row.comments,
+      regards: row.regards,
+      mail_attachment: Boolean(row.mail_attachment),
+      public_link_with_image: Boolean(row.public_link_with_image),
+      updated_at: row.updated_at,
+    };
+    return res.status(200).json({ success: true, data });
   } catch (err) {
     next(err);
   }

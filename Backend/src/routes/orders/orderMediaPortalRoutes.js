@@ -28,7 +28,7 @@ const upload = multer({
 });
 
 /**
- * GET /api/portal/order-media/public/:orderId
+ * GET /api/order-media/public/:orderId
  * Public API to get only approved media records (no authentication required)
  */
 router.get(
@@ -43,7 +43,7 @@ router.use(auth);
 // router.use(permission);
 
 /**
- * GET /api/portal/order-media/:orderId
+ * GET /api/order-media/:orderId
  * Get all media records for a specific order
  */
 router.get(
@@ -53,7 +53,7 @@ router.get(
 );
 
 /**
- * GET /api/portal/order-media/:orderId/count
+ * GET /api/order-media/:orderId/count
  * Get count of media records for a specific order
  */
 router.get(
@@ -63,7 +63,7 @@ router.get(
 );
 
 /**
- * PATCH /api/portal/order-media/status
+ * PATCH /api/order-media/status
  * Update status for multiple media records
  * Body: { updates: [{ id: 1, status: 1 }, { id: 2, status: 0 }] }
  */
@@ -76,7 +76,19 @@ router.patch(
 );
 
 /**
- * POST /api/portal/order-media/upload-zip
+ * PATCH /api/order-media/delete
+ * Soft delete media records by setting deleted_at and deleted_by
+ * Body: { ids: [1, 2, 3] }
+ */
+router.patch(
+  "/delete",
+  checkPermission("delete_order_media_files"),
+  activityLogger("order_media_image_video", (req) => { const ids = req.body.ids; if (ids && Array.isArray(ids) && ids.length > 0) { const n = parseInt(ids[0], 10); return Number.isNaN(n) ? null : n; } return null; }, "Order Media Deletion"),
+  orderMediaPortalController.softDeleteMedia
+);
+
+/**
+ * POST /api/order-media/upload-zip
  * Upload ZIP file containing images and videos
  * Body: multipart form with 'zipFile' field and 'orderId' field
  */

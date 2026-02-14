@@ -202,6 +202,41 @@ async function updateMediaStatus(req, res, next) {
 }
 
 /**
+ * PATCH /api/portal/order-media/delete
+ * Soft delete media records by setting deleted_at and deleted_by
+ * Body: { ids: [1, 2, 3] }
+ */
+async function softDeleteMedia(req, res, next) {
+  try {
+    const { ids } = req.body;
+    const { id: userId } = req.user;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      throw new BadRequestError("ids array is required and must not be empty");
+    }
+
+    const numericIds = ids.map((id) => parseInt(id, 10));
+    if (numericIds.some((n) => Number.isNaN(n))) {
+      throw new BadRequestError("Each id must be a valid number");
+    }
+
+    const updatedRecords = await orderMediaPortal.softDeleteByIds(numericIds, userId);
+    const deletedIds = Array.isArray(updatedRecords) ? updatedRecords.map((r) => r.id) : [];
+
+    res.json({
+      success: true,
+      message: `Successfully deleted ${deletedIds.length} media record(s)`,
+      data: {
+        deleted_count: deletedIds.length,
+        deleted_ids: deletedIds,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
  * GET /api/portal/order-media/:orderId/count
  * Get count of media records for a specific order
  */
@@ -645,6 +680,7 @@ async function getApprovedOrderMediaPublic(req, res, next) {
 module.exports = {
   getOrderMedia,
   updateMediaStatus,
+  softDeleteMedia,
   getOrderMediaCount,
   uploadZip,
   getApprovedOrderMediaPublic,

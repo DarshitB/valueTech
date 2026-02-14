@@ -37,4 +37,5 @@ export {
   MailInputIcon,
   ShareIcon,
   SendIcon,
+  TrashIcon,
 } from "./Icons";

@@ -127,6 +127,19 @@ export const uploadZipFile = createAsyncThunk(
   }
 );
 
+// Async action: Soft delete order media by IDs
+export const deleteOrderMedia = createAsyncThunk(
+  "orders/deleteMedia",
+  async (payload, { rejectWithValue }) => {
+    try {
+      const res = await orderMediaApi.deleteOrderMedia(payload);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
 // Async action: Update payment status/details for an order
 export const updatePaymentStatus = createAsyncThunk(
   "orders/updatePaymentStatus",
@@ -392,6 +405,18 @@ const orderSlice = createSlice({
         state.zipUploadError = action.payload;
         state.zipUploadProgress = 0;
         toast.error(`Failed to upload ZIP file: ${action.payload}`);
+      })
+
+      // Delete order media (soft delete)
+      .addCase(deleteOrderMedia.fulfilled, (state, action) => {
+        const deletedIds = action.payload?.data?.deleted_ids;
+        if (state.media?.media && Array.isArray(deletedIds) && deletedIds.length > 0) {
+          state.media.media = state.media.media.filter((item) => !deletedIds.includes(item.id));
+        }
+        toast.success(action.payload?.message || "Media deleted successfully");
+      })
+      .addCase(deleteOrderMedia.rejected, (state, action) => {
+        toast.error(`Failed to delete media: ${action.payload}`);
       })
 
       // Update payment status/details for an order

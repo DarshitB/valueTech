@@ -88,7 +88,7 @@ async function checkAndUpdateOrderStatus(orderId, userId) {
  */
 exports.generateCollage = async (req, res, next) => {
   try {
-    const { order_id, text, image_ids } = req.body;
+    const { order_id, text, image_ids, orientations } = req.body;
     const { id: userId } = req.user;
 
     // Validate input
@@ -97,6 +97,10 @@ exports.generateCollage = async (req, res, next) => {
     }
     if (!image_ids || !Array.isArray(image_ids) || image_ids.length === 0) {
       throw new BadRequestError("image_ids array is required and must not be empty");
+    }
+    // orientations: optional array, same order as image_ids (e.g. ["default", "right"])
+    if (orientations != null && (!Array.isArray(orientations) || orientations.length !== image_ids.length)) {
+      throw new BadRequestError("orientations must be an array with same length as image_ids when provided");
     }
 
     // Get order details
@@ -200,7 +204,18 @@ exports.generateCollage = async (req, res, next) => {
       // Non-fatal: continue without stamp if any issue
     }
 
-    await generateCollageImage(imagePaths, collageImagePath, text, stampBuffer, stampOffset);
+    // orientations[i] corresponds to image_ids[i]; use "default" when not provided
+    const orientationsList = orientations != null
+      ? orientations.map((o) => (o && String(o).toLowerCase()) || "default")
+      : image_ids.map(() => "default");
+
+    await generateCollageImage(imagePaths, collageImagePath, text, stampBuffer, stampOffset, orientationsList);
+
+    // Save orientation for each image to order_media_image_video
+    await orderMediaPortal.updateOrientationsByIds(
+      image_ids.map((id, idx) => ({ id, orientation: orientationsList[idx] })),
+      userId
+    );
 
     // Generate PDF from collage with simple naming: "collage 1", "collage 2", etc.
     const pdfFileName = `collage_${nextCollageNumber}.pdf`;
@@ -417,6 +432,14 @@ exports.generateTextCollageImage = async (req, res, next) => {
   }
 };
 
+/** Map orientation label to clockwise rotation in degrees (applied after EXIF). */
+const ORIENTATION_DEGREES = {
+  default: 0,
+  right: 90,
+  left: 270,
+  down: 180,
+};
+
 /**
  * Generate collage image from multiple images with optional text overlay
  * @param {string[]} imagePaths - Array of local image file paths
@@ -424,8 +447,9 @@ exports.generateTextCollageImage = async (req, res, next) => {
  * @param {string} text - Optional text to overlay on collage
  * @param {Buffer|null} stampBuffer - Optional PNG buffer to overlay as centered stamp
  * @param {{x:number,y:number}} stampOffset - Optional pixel offsets from center (x: right+, y: down+)
+ * @param {string[]} [orientations] - Optional array, same order as imagePaths: "default" | "right" | "left" | "down"
  */
-async function generateCollageImage(imagePaths, outputPath, text = "", stampBuffer = null, stampOffset = { x: 0, y: 0 }) {
+async function generateCollageImage(imagePaths, outputPath, text = "", stampBuffer = null, stampOffset = { x: 0, y: 0 }, orientations = []) {
   const imageCount = imagePaths.length;
 
   // Canvas dimensions (A4 size at 300 DPI)
@@ -475,14 +499,22 @@ async function generateCollageImage(imagePaths, outputPath, text = "", stampBuff
     const x = (actualIndex % cols) * thumbWidth;
     const y = Math.floor(actualIndex / cols) * thumbHeight;
 
+    const orientationLabel = (orientations[i] && String(orientations[i]).toLowerCase()) || "default";
+    const extraDegrees = ORIENTATION_DEGREES[orientationLabel] ?? 0;
+
     try {
-      // Process image to match browser display orientation
-      // Use rotate() without parameters to auto-rotate based on EXIF orientation
-      // This ensures the collage shows images exactly as they appear in the frontend/browser
-      // The browser automatically applies EXIF rotation, so we need to do the same
-      const processedImage = await sharp(imagePaths[i])
-        .rotate() // Auto-rotate based on EXIF orientation to match browser display
-        .resize(thumbWidth, thumbHeight, { fit: "fill" })
+      // Step 1: Apply EXIF orientation only (Sharp allows only one rotate per pipeline)
+      const afterExif = await sharp(imagePaths[i])
+        .rotate()
+        .toBuffer();
+
+      // Step 2: Apply user orientation (right/left/down) then resize to cell; second pipeline so rotation is applied
+      let pipeline = sharp(afterExif);
+      if (extraDegrees !== 0) {
+        pipeline = pipeline.rotate(extraDegrees);
+      }
+      const processedImage = await pipeline
+        .resize(thumbWidth, thumbHeight, { fit: "cover" })
         .jpeg({ quality: 90 })
         .toBuffer();
 

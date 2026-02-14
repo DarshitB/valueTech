@@ -16,11 +16,12 @@
  * - 2: Rejected
  * - 3: Terminated
  */
-import React, { useEffect, useLayoutEffect, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link, useParams } from "react-router-dom";
 import { usePageTitle } from "../../context/PageTitleContext";
 import {
+  deleteOrderMedia,
   fetchOrderById,
   fetchOrderMedia,
   updateOrderMediaStatus,
@@ -33,17 +34,47 @@ import {
   ImageCollageIcon,
   RevalidateIcon,
   SelectedIcon,
+  ShareIcon,
+  TrashIcon,
   UploadImageIcon,
   ValidateIcon,
-  ShareIcon,
 } from "../../components/icons";
-import { ZoomIn, Copy } from "lucide-react";
+import { ZoomIn, Copy, RotateCw } from "lucide-react";
 import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
 import { toast } from "react-toastify";
 import { hasPermission } from "../../utils/permissionUtils";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
 import ZipUploadModal from "../../components/ZipUploadModal";
+import ConfirmationModal from "../../components/ConfirmationModal";
+
+// Pure helpers outside component (stable reference, no closure over state)
+function formatMediaGroupDate(dateString) {
+  if (!dateString) return "No date";
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return "No date";
+  const day = date.getDate();
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const month = months[date.getMonth()];
+  const year = String(date.getFullYear()).slice(-2);
+  let hours = date.getHours();
+  const minutes = date.getMinutes();
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12;
+  const minutesStr = String(minutes).padStart(2, "0");
+  return `${day} ${month} ${year} at ${hours}:${minutesStr} ${ampm}`;
+}
+
+const STATUS_INFO = {
+  0: { text: "Pending", color: "text-warning" },
+  1: { text: "Approved", color: "text-success" },
+  2: { text: "Rejected", color: "text-danger" },
+  3: { text: "Terminated", color: "text-info" },
+  4: { text: "Text Image", color: "text-secondary" },
+};
+function getStatusInfo(status) {
+  return STATUS_INFO[status] ?? { text: "Unknown", color: "text-muted" };
+}
 
 function OrderImages() {
   // Extract order ID from route parameters
@@ -72,9 +103,12 @@ function OrderImages() {
   const [lightboxApprovals, setLightboxApprovals] = useState({}); // Track approvals in lightbox
   const [remarks, setRemarks] = useState("");
   const [zipUploadModalOpen, setZipUploadModalOpen] = useState(false);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  // Per-image orientation for collage: "default" | "left" | "right" (cycle on button click)
+  const [imageOrientations, setImageOrientations] = useState({});
 
   // Global ResizeObserver error suppression - runs once when component mounts
-  React.useEffect(() => {
+  useEffect(() => {
     // Store original error handlers
     const originalError = console.error;
     const originalWindowError = window.onerror;
@@ -120,7 +154,7 @@ function OrderImages() {
 
   // Parse media URL to get the actual image link (full resolution)
   const getImageUrl = (mediaUrl) => {
-    if (mediaUrl == null || String(mediaUrl).trim() === "") return "";
+    if (mediaUrl == null || typeof mediaUrl !== "string" || String(mediaUrl).trim() === "") return "";
     const baseUrl =
       process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
 
@@ -133,11 +167,11 @@ function OrderImages() {
         return parsed.link;
       }
       return mediaUrl;
-    } catch (error) {
-      if (mediaUrl.startsWith("/")) {
+    } catch {
+      if (typeof mediaUrl === "string" && mediaUrl.startsWith("/")) {
         return `${baseUrl}${mediaUrl}`;
       }
-      return mediaUrl;
+      return typeof mediaUrl === "string" ? mediaUrl : "";
     }
   };
 
@@ -150,87 +184,88 @@ function OrderImages() {
     return getImageUrl(mediaItem?.media_url);
   };
 
-  // Check if media is an image
+  // Check if media is an image (safe for null/undefined)
   const isImage = (mediaUrl) => {
+    if (mediaUrl == null || typeof mediaUrl !== "string") return false;
     try {
-      // Try to parse as JSON first
       const parsed = JSON.parse(mediaUrl);
-      const path = parsed.path || "";
-      return path.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/);
-    } catch (error) {
-      // If not JSON, check the direct path
-      return mediaUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/);
+      const path = parsed?.path || "";
+      return path && String(path).toLowerCase().match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/);
+    } catch {
+      return String(mediaUrl).toLowerCase().match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/);
     }
   };
 
-  // Check if media is a video
+  // Check if media is a video (safe for null/undefined)
   const isVideo = (mediaUrl) => {
+    if (mediaUrl == null || typeof mediaUrl !== "string") return false;
     try {
-      // Try to parse as JSON first
       const parsed = JSON.parse(mediaUrl);
-      const path = parsed.path || "";
-      return path.toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|webm|mkv)$/);
-    } catch (error) {
-      // If not JSON, check the direct path
-      return mediaUrl.toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|webm|mkv)$/);
+      const path = parsed?.path || "";
+      return path && String(path).toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|webm|mkv)$/);
+    } catch {
+      return String(mediaUrl).toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|webm|mkv)$/);
     }
   };
 
-  // Prepare lightbox slides array (for both images and videos) - maintain screen order
-  const lightboxSlides = React.useMemo(() => {
-    // First sort media the same way as displayed on screen (images first, then videos)
-    const sortedMedia = [...(media?.media || [])].sort((a, b) => {
-      const aIsImage = isImage(a.media_url);
-      const bIsImage = isImage(b.media_url);
-      // Images (true) should come before videos (false)
-      if (aIsImage && !bIsImage) return -1;
-      if (!aIsImage && bIsImage) return 1;
-      return 0; // Keep original order within same type
+  // Group media by created_at (date + time), sorted descending (newest first); within each group: images first, then videos
+  const mediaGroupedByDate = useMemo(() => {
+    const list = media?.media || [];
+    const byKey = {};
+    list.forEach((item) => {
+      const raw = item.created_at ?? item.createdAt ?? null;
+      const date = raw ? new Date(raw) : null;
+      const ts = date && !Number.isNaN(date.getTime()) ? date.getTime() : 0;
+      const label = formatMediaGroupDate(raw);
+      if (!byKey[label]) byKey[label] = { label, ts, items: [] };
+      byKey[label].items.push(item);
+      if (byKey[label].ts === 0 && ts) byKey[label].ts = ts;
     });
-
-    return (
-      sortedMedia
-        .map((item) => {
-          const url = getImageUrl(item.media_url);
-          const isImageFile = isImage(item.media_url);
-          const isVideoFile = isVideo(item.media_url);
-          const slidePayload = { mediaId: item.id, status: item.status };
-
-          if (isImageFile) {
-            return {
-              src: url,
-              alt: `Image ${item.id}`,
-              type: "image",
-              ...slidePayload,
-            };
-          } else if (isVideoFile) {
-            return {
-              src: url,
-              alt: `Video ${item.id}`,
-              type: "video",
-              ...slidePayload,
-            };
-          }
-          return null;
-        })
-        .filter(Boolean) || []
-    );
+    const groups = Object.values(byKey);
+    groups.sort((a, b) => b.ts - a.ts);
+    groups.forEach((g) => {
+      g.items.sort((a, b) => {
+        const aImg = isImage(a.media_url);
+        const bImg = isImage(b.media_url);
+        if (aImg && !bImg) return -1;
+        if (!aImg && bImg) return 1;
+        // Same type: sort by id so order is stable after approve/reject refetch
+        return (a.id ?? 0) - (b.id ?? 0);
+      });
+    });
+    return groups;
   }, [media?.media]);
 
-  // Compute displayed media IDs in the same order as on screen
-  const displayedMediaIds = React.useMemo(() => {
-    const sorted = [...(media?.media || [])].sort((a, b) => {
-      const aIsImage = isImage(a.media_url);
-      const bIsImage = isImage(b.media_url);
-      if (aIsImage && !bIsImage) return -1;
-      if (!aIsImage && bIsImage) return 1;
-      return 0;
+  // Lightbox slides in same order as grid (by date group, then images before videos) so next/prev matches UI
+  const lightboxSlides = useMemo(() => {
+    const slides = [];
+    mediaGroupedByDate.forEach((group) => {
+      group.items.forEach((item) => {
+        const url = getImageUrl(item.media_url);
+        const isImageFile = isImage(item.media_url);
+        const isVideoFile = isVideo(item.media_url);
+        const payload = { mediaId: item.id, status: item.status };
+        if (isImageFile) {
+          slides.push({ src: url, alt: `Image ${item.id}`, type: "image", ...payload });
+        } else if (isVideoFile) {
+          slides.push({ src: url, alt: `Video ${item.id}`, type: "video", ...payload });
+        }
+      });
     });
-    return sorted.map((m) => m.id);
-  }, [media?.media]);
+    return slides;
+  }, [mediaGroupedByDate]);
+
+  // Compute displayed media IDs in the same order as on screen (by group, then images before videos)
+  const displayedMediaIds = useMemo(() => {
+    const ids = [];
+    mediaGroupedByDate.forEach((group) => {
+      group.items.forEach((m) => ids.push(m.id));
+    });
+    return ids;
+  }, [mediaGroupedByDate]);
 
   // Determine if all displayed media are selected
-  const isAllSelected = React.useMemo(() => {
+  const isAllSelected = useMemo(() => {
     if (!displayedMediaIds.length) return false;
     if (selectedImageSequence.length !== displayedMediaIds.length) return false;
     const sel = new Set(selectedImageSequence);
@@ -242,7 +277,7 @@ function OrderImages() {
 
   // Toggle select all/clear all
   const handleSelectAll = () => {
-    if (!media?.media || media.media.length === 0) return;
+    if (!media?.media?.length) return;
     if (isAllSelected) {
       setSelectedImageSequence([]);
     } else {
@@ -250,8 +285,40 @@ function OrderImages() {
     }
   };
 
+  const handleLightboxClose = useCallback(() => {
+    setLightboxApprovals({});
+    setLightboxOpen(false);
+  }, []);
+
+  const handleCustomClose = useCallback(() => {
+    handleLightboxClose();
+  }, [handleLightboxClose]);
+
+  // Handle approval/rejection change for individual media item in lightbox (defined early for keyboard effect)
+  const handleApprovalChange = useCallback(
+    (mediaId, status) => {
+      const mediaItem = media?.media?.find((item) => item.id === parseInt(mediaId, 10));
+      if (mediaItem && mediaItem.status === status) {
+        toast.info(
+          `Image is already ${status === 1 ? "approved" : status === 2 ? "rejected" : "pending"}`
+        );
+        return;
+      }
+      setLightboxApprovals((prev) => ({ ...prev, [mediaId]: status }));
+      dispatch(
+        updateOrderMediaStatus({
+          updates: [{ id: parseInt(mediaId, 10), status }],
+        })
+      ).then((result) => {
+        if (result.meta.requestStatus === "fulfilled") dispatch(fetchOrderMedia(id));
+        else toast.error("Failed to update media status");
+      });
+    },
+    [dispatch, id, media?.media]
+  );
+
   // Handle keyboard events for lightbox navigation and approval/rejection
-  React.useEffect(() => {
+  useEffect(() => {
     const handleKeyDown = (event) => {
       if (!lightboxOpen) return;
 
@@ -291,7 +358,14 @@ function OrderImages() {
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = "unset";
     };
-  }, [lightboxOpen, lightboxIndex, lightboxSlides]);
+  }, [lightboxOpen, lightboxIndex, lightboxSlides, handleCustomClose, handleApprovalChange]);
+
+  // If slides become empty while lightbox is open (e.g. after refetch), close lightbox
+  useEffect(() => {
+    if (lightboxOpen && lightboxSlides.length === 0) {
+      handleCustomClose();
+    }
+  }, [lightboxOpen, lightboxSlides.length, handleCustomClose]);
 
   // Fetch order details and media
   useEffect(() => {
@@ -302,13 +376,6 @@ function OrderImages() {
       dispatch(fetchOrderMedia(id));
     }
   }, [dispatch, id, order]);
-
-  // Debug: log media when loaded (what GET /api/order-media/:id returns)
-  useEffect(() => {
-    if (media && !mediaLoading) {
-      console.log("Order media loaded:", media);
-    }
-  }, [media, mediaLoading]);
 
   // Set page title with breadcrumb navigation
   useLayoutEffect(() => {
@@ -329,12 +396,26 @@ function OrderImages() {
     );
   }, [id, order, setTitle]);
 
+  // Cycle orientation for an image: default → left → right → default (for collage)
+  const cycleImageOrientation = (imageId, e) => {
+    e?.stopPropagation?.();
+    setImageOrientations((prev) => {
+      const current = prev[imageId] || "default";
+      const next = current === "default" ? "left" : current === "left" ? "right" : "default";
+      return { ...prev, [imageId]: next };
+    });
+  };
+
   // Handle image selection with sequence tracking (status 4 can be selected for collage only)
   const handleImageSelect = (imageId) => {
     setSelectedImageSequence((prevSeq) => {
       if (prevSeq.includes(imageId)) {
-        const newSeq = prevSeq.filter((id) => id !== imageId);
-        return newSeq;
+        setImageOrientations((prev) => {
+          const next = { ...prev };
+          delete next[imageId];
+          return next;
+        });
+        return prevSeq.filter((mediaId) => mediaId !== imageId);
       } else {
         return [...prevSeq, imageId];
       }
@@ -343,7 +424,8 @@ function OrderImages() {
 
   // Handle copying video URL to clipboard
   const handleCopyVideoUrl = async (mediaUrl, e) => {
-    e.stopPropagation(); // Prevent triggering the card selection
+    e?.stopPropagation?.();
+    if (mediaUrl == null) return;
     try {
       const fullUrl = getImageUrl(mediaUrl);
       await navigator.clipboard.writeText(fullUrl);
@@ -447,26 +529,31 @@ function OrderImages() {
     }
 
     const trimmedRemarks = remarks.trim();
+    const imageIds = selectedImageSequence.map((id) => id.toString());
+    const orientations = selectedImageSequence.map((imageId) => imageOrientations[imageId] || "default");
     const payload = {
       order_id: id.toString(),
-      // Only send remarks if they have non-whitespace content; preserve original (with spaces/newlines)
       text: trimmedRemarks ? remarks : "",
-      image_ids: selectedImageSequence.map((id) => id.toString()), // Use sequence order
+      image_ids: imageIds,
+      orientations,
       valuer_name: order?.valuer_name || "",
     };
-    /* console.log("image collage payload", payload); */
+    console.log("Collage generate payload:", payload);
     dispatch(generateCollage(payload)).then((result) => {
       if (result.meta.requestStatus === "fulfilled") {
-        // Open PDF in new tab
-        const downloadUrl = result.payload.data.download_url;
-        const baseUrl =
-          process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
-        const fullUrl = `${baseUrl}${downloadUrl}`;
-        window.open(fullUrl, "_blank");
-
-        // Clear selection after successful generation
+        const downloadUrl = result.payload?.data?.download_url;
+        if (downloadUrl) {
+          const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
+          const fullUrl = downloadUrl.startsWith("http") ? downloadUrl : `${baseUrl}${downloadUrl.startsWith("/") ? "" : "/"}${downloadUrl}`;
+          window.open(fullUrl, "_blank");
+        }
         setSelectedImageSequence([]);
         setRemarks("");
+        setImageOrientations((prev) => {
+          const next = { ...prev };
+          selectedImageSequence.forEach((imageId) => delete next[imageId]);
+          return next;
+        });
       }
     });
   };
@@ -587,19 +674,6 @@ function OrderImages() {
     return null;
   };
 
-  // Handle lightbox close and submit approvals
-  const handleLightboxClose = () => {
-    // Clear approvals and close lightbox
-    setLightboxApprovals({});
-    setLightboxOpen(false);
-  };
-
-  // Custom close handler that ensures proper cleanup
-  // Used by both Escape key and close button to maintain consistency
-  const handleCustomClose = () => {
-    handleLightboxClose();
-  };
-
   // Handle slide transitions with ResizeObserver error suppression
   // Prevents console errors during video-to-image transitions
   const handleSlideTransition = ({ index }) => {
@@ -627,70 +701,22 @@ function OrderImages() {
     }, 100);
   };
 
-  // Handle lightbox open for both images and videos
-  // Initializes approval states based on current media status
-  const handleLightboxOpen = (mediaItem) => {
-    // Find the index in the sorted slides array
-    const slideIndex = lightboxSlides.findIndex(
-      (slide) => slide.src === getImageUrl(mediaItem.media_url)
-    );
-
-    if (slideIndex !== -1) {
+  // Handle lightbox open: find slide by media id so order matches grid; init approval state from current media
+  const handleLightboxOpen = useCallback(
+    (mediaItem) => {
+      const slideIndex = lightboxSlides.findIndex((slide) => slide.mediaId === mediaItem.id);
+      if (slideIndex === -1) return;
       setLightboxIndex(slideIndex);
       setLightboxOpen(true);
-
-      // Initialize approvals with current media status (only for non-pending items)
       const currentApprovals = {};
       lightboxSlides.forEach((slide) => {
-        const mediaItem = media.media.find((item) => item.id === slide.mediaId);
-        if (mediaItem && mediaItem.status !== 0) {
-          // Only set if not pending (status 0)
-          currentApprovals[slide.mediaId] = mediaItem.status;
-        }
+        const item = media?.media?.find((m) => m.id === slide.mediaId);
+        if (item && item.status !== 0) currentApprovals[slide.mediaId] = item.status;
       });
       setLightboxApprovals(currentApprovals);
-    }
-  };
-
-  // Handle approval/rejection change for individual media item in lightbox
-  // Validates if status change is needed before making API call
-  const handleApprovalChange = (mediaId, status) => {
-    // Find the current media item to check its current status
-    const mediaItem = media.media.find((item) => item.id === parseInt(mediaId));
-
-    // If the status is the same as current, don't make unnecessary API call
-    if (mediaItem && mediaItem.status === status) {
-      toast.info(
-        `Image is already ${
-          status === 1 ? "approved" : status === 2 ? "rejected" : "pending"
-        }`
-      );
-      return;
-    }
-
-    // Update local state for immediate UI feedback
-    setLightboxApprovals((prev) => ({
-      ...prev,
-      [mediaId]: status,
-    }));
-
-    // Submit the change immediately to backend
-    const updates = [
-      {
-        id: parseInt(mediaId),
-        status: status,
-      },
-    ];
-
-    dispatch(updateOrderMediaStatus({ updates })).then((result) => {
-      if (result.meta.requestStatus === "fulfilled") {
-        // Refresh media data to show updated statuses
-        dispatch(fetchOrderMedia(id));
-      } else {
-        toast.error("Failed to update media status");
-      }
-    });
-  };
+    },
+    [lightboxSlides, media?.media]
+  );
 
   // Handle approve selected images (for bulk operations; exclude status 4 Text Image)
   const handleApprove = () => {
@@ -750,22 +776,20 @@ function OrderImages() {
     });
   };
 
-  // Get status text and color
-  const getStatusInfo = (status) => {
-    switch (status) {
-      case 0:
-        return { text: "Pending", color: "text-warning" };
-      case 1:
-        return { text: "Approved", color: "text-success" };
-      case 2:
-        return { text: "Rejected", color: "text-danger" };
-      case 3:
-        return { text: "Terminated", color: "text-info" }; // light blue sky color
-      case 4:
-        return { text: "Text Image", color: "text-secondary" };
-      default:
-        return { text: "Unknown", color: "text-muted" };
-    }
+  // Handle delete selected media (soft delete)
+  const handleDelete = () => {
+    if (selectedImageSequence.length === 0) return;
+    const ids = [...selectedImageSequence];
+    dispatch(deleteOrderMedia({ ids })).then((result) => {
+      if (result.meta.requestStatus === "fulfilled") {
+        setSelectedImageSequence([]);
+        setImageOrientations((prev) => {
+          const next = { ...prev };
+          ids.forEach((imageId) => delete next[imageId]);
+          return next;
+        });
+      }
+    });
   };
 
   return (
@@ -814,17 +838,33 @@ function OrderImages() {
                   )}
               </div>
               <div className="order-images-buttons">
-              {hasPermission(
+                {hasPermission(
+                  allowedPermissions,
+                  "delete_order_media_files"
+                ) && (
+                  <button
+                    onClick={() =>
+                      selectedImageSequence.length > 0 &&
+                      setShowDeleteConfirmation(true)
+                    }
+                    disabled={selectedImageSequence.length === 0}
+                    title="Delete Selected Media"
+                    className="tooltip-link"
+                  >
+                    <TrashIcon />
+                  </button>
+                )}
+                {hasPermission(
                   allowedPermissions,
                   "share_public_url_of_media_files"
                 ) && (
-                <button
-                  onClick={handleShareUrl}
-                  title="Share Public URL"
-                  className="tooltip-link"
-                >
-                  <ShareIcon />
-                </button>
+                  <button
+                    onClick={handleShareUrl}
+                    title="Share Public URL"
+                    className="tooltip-link"
+                  >
+                    <ShareIcon />
+                  </button>
                 )}
                 {hasPermission(
                   allowedPermissions,
@@ -904,128 +944,153 @@ function OrderImages() {
                 </div>
               ) : media?.media?.length > 0 ? (
                 <div className="order-images">
-                  {/* Sort media: images first, then videos */}
-                  {[...media.media]
-                    .sort((a, b) => {
-                      const aIsImage = isImage(a.media_url);
-                      const bIsImage = isImage(b.media_url);
-                      // Images (true) should come before videos (false)
-                      if (aIsImage && !bIsImage) return -1;
-                      if (!aIsImage && bIsImage) return 1;
-                      return 0; // Keep original order within same type
-                    })
-                    .map((image, index) => {
-                      const statusInfo = getStatusInfo(image.status);
-                      const isSelected = selectedImageSequence.includes(
-                        image.id
-                      );
-                      const imageUrl = getImageUrl(image.media_url);
-                      const gridImageUrl = getGridImageUrl(image);
-                      const isImageFile = isImage(image.media_url);
-                      const isVideoFile = isVideo(image.media_url);
-                      // Get the actual selection order (1, 2, 3, etc.)
-                      const selectionOrder = isSelected
-                        ? selectedImageSequence.indexOf(image.id) + 1
-                        : 0;
+                  {mediaGroupedByDate.map((group) => (
+                    <div
+                      key={`${group.label}-${group.items[0]?.id ?? 0}`}
+                      className="order-images-group"
+                      style={{ marginBottom: "32px" }}
+                    >
+                      <div
+                        className="order-images-group-heading"
+                        style={{
+                          fontSize: "1rem",
+                          fontWeight: 600,
+                          marginBottom: "12px",
+                          color: "var(--bs-body-color)",
+                        }}
+                      >
+                        {group.label}
+                      </div>
+                      <div className="order-images-group-grid d-flex flex-wrap gap-3">
+                        {group.items.map((image, index) => {
+                          const statusInfo = getStatusInfo(image.status);
+                          const isSelected = selectedImageSequence.includes(
+                            image.id
+                          );
+                          const imageUrl = getImageUrl(image.media_url);
+                          const gridImageUrl = getGridImageUrl(image);
+                          const isImageFile = isImage(image.media_url);
+                          const isVideoFile = isVideo(image.media_url);
+                          const selectionOrder = isSelected
+                            ? selectedImageSequence.indexOf(image.id) + 1
+                            : 0;
 
-                      return (
-                        <div key={image.id} className="order-image-card">
-                          <div
-                            className={`order-image-box ${
-                              isSelected ? "selected" : ""
-                            }`}
-                            onClick={() => handleImageSelect(image.id)}
-                          >
-                            {isImageFile ? (
-                              <img
-                                src={gridImageUrl}
-                                alt={`Order Image ${image.id}`}
-                                onError={(e) => {
-                                  e.target.src =
-                                    "https://via.placeholder.com/200x200?text=Image+Not+Found";
-                                }}
-                              />
-                            ) : isVideoFile ? (
-                              <video
-                                src={imageUrl}
-                                controls
-                                preload="metadata"
-                                onError={(e) => {
-                                  console.error("Video load error:", e);
-                                }}
+                          return (
+                            <div key={image.id} className="order-image-card">
+                              <div
+                                className={`order-image-box ${
+                                  isSelected ? "selected" : ""
+                                }`}
+                                onClick={() => handleImageSelect(image.id)}
                               >
-                                Your browser does not support the video tag.
-                              </video>
-                            ) : (
-                              <div className="media-placeholder">
-                                <i className="fas fa-file"></i>
-                                <span>Media File</span>
-                              </div>
-                            )}
-                            <div className="order-image-card-actions">
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  handleImageSelect(image.id);
-                                }}
-                                className="form-check-input"
-                              />
-                              <SelectedIcon className="icon-if-selected" />
-                              {(isImageFile || isVideoFile) && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleLightboxOpen(image);
-                                  }}
-                                  className="lightbox-btn"
-                                  title="View in lightbox"
-                                >
-                                  <ZoomIn size={16} />
-                                </button>
-                              )}
-                              {isVideoFile && (
-                                <button
-                                  onClick={(e) => {
-                                    handleCopyVideoUrl(image.media_url, e);
-                                  }}
-                                  className="copy-video-url-btn"
-                                  title="Copy video URL"
-                                  style={{ marginLeft: "5px" }}
-                                >
-                                  <Copy size={16} />
-                                </button>
-                              )}
-                              {isSelected && (
-                                <div className="selection-order">
-                                  {selectionOrder}
+                                {isImageFile ? (
+                                  <div
+                                    className={`order-image-box-img-wrap ${imageOrientations[image.id] && imageOrientations[image.id] !== "default" ? "is-rotated" : ""}`}
+                                  >
+                                    <img
+                                      src={gridImageUrl}
+                                      alt={`Order Image ${image.id}`}
+                                      style={{
+                                        transform:
+                                          imageOrientations[image.id] === "left"
+                                            ? "rotate(-90deg)"
+                                            : imageOrientations[image.id] === "right"
+                                              ? "rotate(90deg)"
+                                              : undefined,
+                                      }}
+                                      onError={(e) => {
+                                        e.target.src =
+                                          "https://via.placeholder.com/200x200?text=Image+Not+Found";
+                                      }}
+                                    />
+                                  </div>
+                                ) : isVideoFile ? (
+                                  <video
+                                    src={imageUrl}
+                                    controls
+                                    preload="metadata"
+                                    onError={(e) => {
+                                      console.error("Video load error:", e);
+                                    }}
+                                  >
+                                    Your browser does not support the video tag.
+                                  </video>
+                                ) : (
+                                  <div className="media-placeholder">
+                                    <i className="fas fa-file"></i>
+                                    <span>Media File</span>
+                                  </div>
+                                )}
+                                <div className="order-image-card-actions">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={(e) => {
+                                      e.stopPropagation();
+                                      handleImageSelect(image.id);
+                                    }}
+                                    className="form-check-input"
+                                  />
+                                  <SelectedIcon className="icon-if-selected" />
+                                  {(isImageFile || isVideoFile) && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleLightboxOpen(image);
+                                      }}
+                                      className="lightbox-btn"
+                                      title="View in lightbox"
+                                    >
+                                      <ZoomIn size={16} />
+                                    </button>
+                                  )}
+                                  {isVideoFile && (
+                                    <button
+                                      onClick={(e) => {
+                                        handleCopyVideoUrl(image.media_url, e);
+                                      }}
+                                      className="copy-video-url-btn"
+                                      title="Copy video URL"
+                                      style={{ marginLeft: "5px" }}
+                                    >
+                                      <Copy size={16} />
+                                    </button>
+                                  )}
+                                  {isSelected && (
+                                    <div className="selection-order">
+                                      {selectionOrder}
+                                    </div>
+                                  )}
                                 </div>
-                              )}
+                                {isImageFile && isSelected && image.status === 1 && (
+                                  <div className="orientation-btn-wrap">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => cycleImageOrientation(image.id, e)}
+                                      className="orientation-btn"
+                                      title={`Orientation: ${imageOrientations[image.id] || "default"} (click to cycle)`}
+                                    >
+                                      <RotateCw size={14} />
+                                      <span className="orientation-badge">{imageOrientations[image.id] || "default"}</span>
+                                    </button>
+                                  </div>
+                                )}
+                                <div
+                                  className={
+                                    image.status === 4
+                                      ? "image-status image-status--text-image"
+                                      : `image-status ${statusInfo.color}`
+                                  }
+                                >
+                                  {statusInfo.text}
+                                </div>
+                              </div>
                             </div>
-                            <div
-                              className={
-                                image.status === 4
-                                  ? "image-status image-status--text-image"
-                                  : `image-status ${statusInfo.color}`
-                              }
-                            >
-                              {statusInfo.text}
-                            </div>
-                          </div>
-                          <div className="image-info">
-                            <p className="mb-1">
-                              {isImageFile
-                                ? "Image"
-                                : isVideoFile
-                                ? "Video"
-                                : "Media"}{" "}
-                              {index + 1}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="text-center text-muted">
@@ -1133,6 +1198,19 @@ function OrderImages() {
         onClose={() => setZipUploadModalOpen(false)}
         orderId={id}
       />
+
+      {/* Delete selected media confirmation */}
+      {showDeleteConfirmation && (
+        <ConfirmationModal
+          title="Confirm Deletion"
+          message={`Are you sure you want to delete the selected ${selectedImageSequence.length} media file(s)?`}
+          onConfirm={() => {
+            setShowDeleteConfirmation(false);
+            handleDelete();
+          }}
+          onCancel={() => setShowDeleteConfirmation(false)}
+        />
+      )}
     </section>
   );
 }

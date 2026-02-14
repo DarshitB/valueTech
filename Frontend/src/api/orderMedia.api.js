@@ -17,3 +17,6 @@ export const uploadZipFile = (formData) => axios.post(`${ENDPOINT}/upload-zip`, 
     'Content-Type': 'multipart/form-data',
   },
 });
+
+// Soft delete order media by IDs (requires delete_order_media_files permission)
+export const deleteOrderMedia = (payload) => axios.patch(`${ENDPOINT}/delete`, payload);
