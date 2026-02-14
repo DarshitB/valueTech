@@ -377,6 +377,24 @@ function OrderImages() {
     }
   }, [dispatch, id, order]);
 
+  // Log get media API response when it arrives
+  /* useEffect(() => {
+    if (!mediaLoading && media != null) {
+      console.log("[OrderImages] get media API response:", media);
+    }
+  }, [media, mediaLoading]); */
+
+  // Sync orientation from API: each media record has "orientation"; null/default → "default", show on screen until user changes
+  useEffect(() => {
+    const list = media?.media || [];
+    if (list.length === 0) return;
+    const fromApi = {};
+    list.forEach((item) => {
+      fromApi[item.id] = getDbOrientation(item);
+    });
+    setImageOrientations((prev) => ({ ...fromApi, ...prev }));
+  }, [media?.media]);
+
   // Set page title with breadcrumb navigation
   useLayoutEffect(() => {
     setTitle(
@@ -406,15 +424,21 @@ function OrderImages() {
     });
   };
 
+  // Normalize orientation from DB: null/undefined/"default" → "default"; "left"/"right" as-is
+  const getDbOrientation = (mediaItem) => {
+    if (!mediaItem) return "default";
+    const raw = mediaItem.orientation;
+    return raw === "left" || raw === "right" ? raw : "default";
+  };
+
   // Handle image selection with sequence tracking (status 4 can be selected for collage only)
   const handleImageSelect = (imageId) => {
     setSelectedImageSequence((prevSeq) => {
       if (prevSeq.includes(imageId)) {
-        setImageOrientations((prev) => {
-          const next = { ...prev };
-          delete next[imageId];
-          return next;
-        });
+        // On deselect: revert orientation to database value (null → default)
+        const mediaItem = media?.media?.find((m) => m.id === imageId);
+        const dbOrientation = getDbOrientation(mediaItem);
+        setImageOrientations((prev) => ({ ...prev, [imageId]: dbOrientation }));
         return prevSeq.filter((mediaId) => mediaId !== imageId);
       } else {
         return [...prevSeq, imageId];
