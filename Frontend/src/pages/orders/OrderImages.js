@@ -338,7 +338,7 @@ function OrderImages() {
           break;
 
         case "Enter":
-          // Mark current media as rejected (skip status 4 Text Image)
+          event.preventDefault();
           const currentSlideReject = lightboxSlides[lightboxIndex];
           if (currentSlideReject && currentSlideReject.status !== 4) {
             handleApprovalChange(currentSlideReject.mediaId, 2); // 2 = rejected
@@ -373,6 +373,15 @@ function OrderImages() {
       handleCustomClose();
     }
   }, [lightboxOpen, lightboxSlides.length, handleCustomClose]);
+
+  // Clamp lightbox index when slides shrink (e.g. after media refetch) so we don't show out-of-bounds
+  useEffect(() => {
+    if (!lightboxOpen || lightboxSlides.length === 0) return;
+    const maxIndex = lightboxSlides.length - 1;
+    if (lightboxIndex > maxIndex) {
+      setLightboxIndex(maxIndex);
+    }
+  }, [lightboxOpen, lightboxSlides.length, lightboxIndex]);
 
   // Fetch order details and media
   useEffect(() => {
@@ -670,72 +679,79 @@ function OrderImages() {
     );
   };
 
-  // Custom video renderer for lightbox with error handling
-  const VideoRenderer = ({ slide }) => {
-    if (slide.type === "video") {
+  const VideoRenderer = useCallback(({ slide }) => {
+    if (slide.type !== "video") return null;
+    return (
+      <video
+        src={slide.src}
+        controls
+        autoPlay
+        style={{ width: "100%", height: "100%", objectFit: "contain" }}
+        onError={() => toast.error("Failed to load video")}
+      />
+    );
+  }, []);
+
+  const handleSlideTransition = useCallback(({ index }) => {
+    setLightboxIndex(index);
+  }, []);
+
+  // Lightbox padding so image doesn't touch screen edges
+  const LIGHTBOX_PADDING_PX = 24;
+
+  // Lightbox image: no crop; rotated image sized so post-rotation fits within padded area.
+  const renderSlideMedia = useCallback((slide) => {
+    if (slide.type === "video") return <VideoRenderer slide={slide} />;
+    const orientation = slide.orientation ?? "default";
+    const isRotated = orientation === "left" || orientation === "right";
+    const transform =
+      orientation === "left"
+        ? "rotate(-90deg)"
+        : orientation === "right"
+          ? "rotate(90deg)"
+          : undefined;
+    const paddedVh = `calc(100vh - ${2 * LIGHTBOX_PADDING_PX}px)`;
+    const paddedVw = `calc(100vw - ${2 * LIGHTBOX_PADDING_PX}px)`;
+    if (isRotated) {
       return (
-        <video
-          src={slide.src}
-          controls
-          autoPlay
+        <div
           style={{
             width: "100%",
             height: "100%",
-            objectFit: "contain",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
-          onError={(e) => {
-            console.error("Video load error:", e);
-            toast.error("Failed to load video");
-          }}
-          onLoadStart={() => {
-            // Suppress ResizeObserver errors during video load
-            const originalError = console.error;
-            console.error = (...args) => {
-              const errorMessage = args[0];
-              if (
-                typeof errorMessage === "string" &&
-                (errorMessage.includes(
-                  "ResizeObserver loop completed with undelivered notifications"
-                ) ||
-                  errorMessage.includes("ResizeObserver"))
-              ) {
-                return; // Suppress ResizeObserver errors
-              }
-              originalError.apply(console, args);
-            };
-          }}
-        />
+        >
+          <img
+            src={slide.src}
+            alt={slide.alt}
+            style={{
+              maxWidth: `min(${paddedVh}, 100%)`,
+              maxHeight: `min(${paddedVw}, 100%)`,
+              width: `min(${paddedVh}, 100%)`,
+              height: `min(${paddedVw}, 100%)`,
+              objectFit: "contain",
+              display: "block",
+              transform,
+            }}
+          />
+        </div>
       );
     }
-    return null;
-  };
-
-  // Handle slide transitions with ResizeObserver error suppression
-  // Prevents console errors during video-to-image transitions
-  const handleSlideTransition = ({ index }) => {
-    setLightboxIndex(index);
-
-    // Temporarily suppress ResizeObserver errors during transitions
-    const originalError = console.error;
-    console.error = (...args) => {
-      const errorMessage = args[0];
-      if (
-        typeof errorMessage === "string" &&
-        (errorMessage.includes(
-          "ResizeObserver loop completed with undelivered notifications"
-        ) ||
-          errorMessage.includes("ResizeObserver"))
-      ) {
-        return; // Suppress ResizeObserver errors
-      }
-      originalError.apply(console, args);
-    };
-
-    // Restore console.error after transition completes
-    setTimeout(() => {
-      console.error = originalError;
-    }, 100);
-  };
+    return (
+      <img
+        src={slide.src}
+        alt={slide.alt}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "contain",
+          display: "block",
+        }}
+      />
+    );
+  }, [VideoRenderer]);
 
   // Handle lightbox open: find slide by media id so order matches grid; init approval state from current media
   const handleLightboxOpen = useCallback(
@@ -1159,58 +1175,7 @@ function OrderImages() {
           iconClose: () => (
             <span style={{ fontSize: "20px", color: "white" }}>×</span>
           ),
-          slide: ({ slide }) => {
-            // Backdrop: full size, closes lightbox on click. Content layer (image/video only) is
-            // centered. Approval component is fixed to viewport bottom (full width), not tied to image.
-            const slideContent =
-              slide.type === "video" ? (
-                <VideoRenderer slide={slide} />
-              ) : (
-                (() => {
-                  const orientation = slide.orientation ?? "default";
-                  const isRotated = orientation === "left" || orientation === "right";
-                  const transform =
-                    orientation === "left"
-                      ? "rotate(-90deg)"
-                      : orientation === "right"
-                        ? "rotate(90deg)"
-                        : undefined;
-                  return isRotated ? (
-                    <div
-                      style={{
-                        aspectRatio: "1",
-                        maxWidth: "100%",
-                        maxHeight: "100%",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <img
-                        src={slide.src}
-                        alt={slide.alt}
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "contain",
-                          transform,
-                        }}
-                      />
-                    </div>
-                  ) : (
-                    <img
-                      src={slide.src}
-                      alt={slide.alt}
-                      style={{
-                        maxWidth: "100%",
-                        maxHeight: "100%",
-                        objectFit: "contain",
-                      }}
-                    />
-                  );
-                })()
-              );
-            return (
+          slide: ({ slide }) => (
               <div
                 style={{
                   position: "relative",
@@ -1218,6 +1183,7 @@ function OrderImages() {
                   height: "100%",
                 }}
               >
+                {/* Backdrop: full size, click closes lightbox */}
                 <div
                   style={{
                     position: "absolute",
@@ -1230,25 +1196,41 @@ function OrderImages() {
                   tabIndex={0}
                   aria-label="Close lightbox"
                 />
+                {/* Content area: padded so image doesn't touch edges. Full-size container so portrait/landscape/rotated all fit. */}
                 <div
                   style={{
                     position: "absolute",
-                    top: "50%",
-                    left: "50%",
-                    transform: "translate(-50%, -50%)",
-                    maxWidth: "100%",
-                    maxHeight: "100%",
+                    top: LIGHTBOX_PADDING_PX,
+                    left: LIGHTBOX_PADDING_PX,
+                    right: LIGHTBOX_PADDING_PX,
+                    bottom: LIGHTBOX_PADDING_PX,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     zIndex: 1,
                   }}
-                  onClick={(e) => e.stopPropagation()}
                   role="presentation"
                 >
-                  {slideContent}
+                  {/* Inner div: click on image, video, or dark area closes lightbox; not on approval bar or nav */}
+                  <div
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                    onClick={(e) => {
+                      if (e.target.closest(".approval-component-lightbox")) return;
+                      if (e.target.closest("button")) return;
+                      handleCustomClose();
+                    }}
+                    role="presentation"
+                  >
+                    {renderSlideMedia(slide)}
+                  </div>
                 </div>
-                {/* Approval bar fixed to lightbox viewport bottom (full width), not tied to image size */}
+                {/* Approval bar fixed to lightbox viewport bottom (full width) */}
                 <div
                   style={{
                     position: "absolute",
@@ -1259,6 +1241,7 @@ function OrderImages() {
                     justifyContent: "center",
                     paddingBottom: "16px",
                     zIndex: 2,
+                    pointerEvents: "auto",
                   }}
                   onClick={(e) => e.stopPropagation()}
                   role="presentation"
@@ -1266,8 +1249,7 @@ function OrderImages() {
                   <ApprovalComponent slide={slide} />
                 </div>
               </div>
-            );
-          },
+          ),
         }}
         animation={{
           fade: 150, // Reduced from 200 to minimize transition time

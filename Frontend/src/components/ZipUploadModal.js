@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { uploadZipFile } from "../redux/reducers/orderReducer";
+import { uploadZipFile, fetchOrderMedia } from "../redux/reducers/orderReducer";
 import { hasPermission } from "../utils/permissionUtils";
 import { selectPermissions } from "../redux/selectors/authSelectors";
 import { toast } from "react-toastify";
@@ -117,6 +117,8 @@ const ZipUploadModal = ({ isOpen, onClose, orderId }) => {
 
     dispatch(uploadZipFile(formData)).then((result) => {
       if (result.meta.requestStatus === "fulfilled") {
+        // Refresh order media so new images show without page reload
+        dispatch(fetchOrderMedia(orderId));
         // Reset state and close modal
         setSelectedFile(null);
         if (fileInputRef.current) {
