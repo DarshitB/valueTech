@@ -514,7 +514,7 @@ async function generateCollageImage(imagePaths, outputPath, text = "", stampBuff
         pipeline = pipeline.rotate(extraDegrees);
       }
       const processedImage = await pipeline
-        .resize(thumbWidth, thumbHeight, { fit: "cover" })
+        .resize(thumbWidth, thumbHeight, { fit: "fill" })
         .jpeg({ quality: 90 })
         .toBuffer();
 

@@ -236,7 +236,7 @@ function OrderImages() {
     return groups;
   }, [media?.media]);
 
-  // Lightbox slides in same order as grid (by date group, then images before videos) so next/prev matches UI
+  // Lightbox slides in same order as grid; include orientation from local state so lightbox matches grid rotation
   const lightboxSlides = useMemo(() => {
     const slides = [];
     mediaGroupedByDate.forEach((group) => {
@@ -246,14 +246,21 @@ function OrderImages() {
         const isVideoFile = isVideo(item.media_url);
         const payload = { mediaId: item.id, status: item.status };
         if (isImageFile) {
-          slides.push({ src: url, alt: `Image ${item.id}`, type: "image", ...payload });
+          const orientation = imageOrientations[item.id] ?? "default";
+          slides.push({
+            src: url,
+            alt: `Image ${item.id}`,
+            type: "image",
+            orientation,
+            ...payload,
+          });
         } else if (isVideoFile) {
           slides.push({ src: url, alt: `Video ${item.id}`, type: "video", ...payload });
         }
       });
     });
     return slides;
-  }, [mediaGroupedByDate]);
+  }, [mediaGroupedByDate, imageOrientations]);
 
   // Compute displayed media IDs in the same order as on screen (by group, then images before videos)
   const displayedMediaIds = useMemo(() => {
@@ -562,7 +569,7 @@ function OrderImages() {
       orientations,
       valuer_name: order?.valuer_name || "",
     };
-    console.log("Collage generate payload:", payload);
+    /* console.log("Collage generate payload:", payload); */
     dispatch(generateCollage(payload)).then((result) => {
       if (result.meta.requestStatus === "fulfilled") {
         const downloadUrl = result.payload?.data?.download_url;
@@ -578,6 +585,7 @@ function OrderImages() {
           selectedImageSequence.forEach((imageId) => delete next[imageId]);
           return next;
         });
+        dispatch(fetchOrderMedia(id));
       }
     });
   };
@@ -609,7 +617,11 @@ function OrderImages() {
     };
 
     return (
-      <div className="approval-component-lightbox">
+      <div
+        className="approval-component-lightbox"
+        onClick={(e) => e.stopPropagation()}
+        role="presentation"
+      >
         <div className="approval-component-lightbox-status-note">
           Press Space for Approved, Enter for Rejected
         </div>
@@ -1148,45 +1160,113 @@ function OrderImages() {
             <span style={{ fontSize: "20px", color: "white" }}>×</span>
           ),
           slide: ({ slide }) => {
-            if (slide.type === "video") {
-              return (
-                <div
-                  style={{
-                    position: "relative",
-                    width: "100%",
-                    height: "100%",
-                  }}
-                >
-                  <VideoRenderer slide={slide} />
-                  <ApprovalComponent slide={slide} />
-                </div>
+            // Backdrop: full size, closes lightbox on click. Content layer (image/video only) is
+            // centered. Approval component is fixed to viewport bottom (full width), not tied to image.
+            const slideContent =
+              slide.type === "video" ? (
+                <VideoRenderer slide={slide} />
+              ) : (
+                (() => {
+                  const orientation = slide.orientation ?? "default";
+                  const isRotated = orientation === "left" || orientation === "right";
+                  const transform =
+                    orientation === "left"
+                      ? "rotate(-90deg)"
+                      : orientation === "right"
+                        ? "rotate(90deg)"
+                        : undefined;
+                  return isRotated ? (
+                    <div
+                      style={{
+                        aspectRatio: "1",
+                        maxWidth: "100%",
+                        maxHeight: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <img
+                        src={slide.src}
+                        alt={slide.alt}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "contain",
+                          transform,
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <img
+                      src={slide.src}
+                      alt={slide.alt}
+                      style={{
+                        maxWidth: "100%",
+                        maxHeight: "100%",
+                        objectFit: "contain",
+                      }}
+                    />
+                  );
+                })()
               );
-            } else {
-              // For images, create a container with the image and approval component
-              return (
+            return (
+              <div
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  height: "100%",
+                }}
+              >
                 <div
                   style={{
-                    position: "relative",
-                    width: "100%",
-                    height: "100%",
+                    position: "absolute",
+                    inset: 0,
+                    zIndex: 0,
+                  }}
+                  onClick={handleCustomClose}
+                  onKeyDown={(e) => e.key === "Enter" && handleCustomClose()}
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Close lightbox"
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "50%",
+                    left: "50%",
+                    transform: "translate(-50%, -50%)",
+                    maxWidth: "100%",
+                    maxHeight: "100%",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
+                    zIndex: 1,
                   }}
+                  onClick={(e) => e.stopPropagation()}
+                  role="presentation"
                 >
-                  <img
-                    src={slide.src}
-                    alt={slide.alt}
-                    style={{
-                      maxWidth: "100%",
-                      maxHeight: "100%",
-                      objectFit: "contain",
-                    }}
-                  />
+                  {slideContent}
+                </div>
+                {/* Approval bar fixed to lightbox viewport bottom (full width), not tied to image size */}
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    display: "flex",
+                    justifyContent: "center",
+                    paddingBottom: "16px",
+                    zIndex: 2,
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  role="presentation"
+                >
                   <ApprovalComponent slide={slide} />
                 </div>
-              );
-            }
+              </div>
+            );
           },
         }}
         animation={{
