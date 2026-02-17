@@ -780,6 +780,7 @@ function CEReport() {
 
     // RC, PERMIT, TAX, FITNESS & INSURANCE DETAILS
     bill_of_entry: "",
+    proforma_invoice_heading: "Proforma Invoice Verified",
     proforma_invoice_verified: "",
     tax_upto: "",
     bill_of_lading: "",
@@ -5426,23 +5427,56 @@ function CEReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="proforma_invoice_verified">
-                      Proforma Invoice Verified{" "}
-                      <span class="text-danger">*</span>
+                      Proforma / Tax Invoice{" "}
+                      <span className="text-danger">*</span>
                     </label>
-                    <SingleSearchSelect
-                      options={[
-                        { value: "COPY VERIFIED", label: "COPY VERIFIED" },
-                        {
-                          value: "COPY NOT AVAILABLE",
-                          label: "COPY NOT AVAILABLE",
-                        },
-                      ]}
-                      value={reportFormData.proforma_invoice_verified}
-                      onChange={(value) =>
-                        handleSelectChange("proforma_invoice_verified", value)
-                      }
-                      required
-                    />
+                    <div className="d-flex gap-2 align-items-center mb-2 drop-down-w-100">
+                      <div style={{ width: "100px", flexShrink: 0 }}>
+                        Heading:
+                      </div>
+                      <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                        <SingleSearchSelect
+                          options={[
+                            {
+                              value: "Proforma Invoice Verified",
+                              label: "Proforma Invoice Verified",
+                            },
+                            {
+                              value: "Tax Invoice Copy",
+                              label: "Tax Invoice Copy",
+                            },
+                          ]}
+                          value={
+                            reportFormData.proforma_invoice_heading ||
+                            "Proforma Invoice Verified"
+                          }
+                          onChange={(value) =>
+                            handleSelectChange("proforma_invoice_heading", value)
+                          }
+                        />
+                      </div>
+                    </div>
+                    <div className="d-flex gap-2 align-items-center">
+                      <div style={{ width: "100px", flexShrink: 0 }}>
+                        Value:
+                      </div>
+                      <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                        <SingleSearchSelect
+                          options={[
+                            { value: "COPY VERIFIED", label: "COPY VERIFIED" },
+                            {
+                              value: "COPY NOT AVAILABLE",
+                              label: "COPY NOT AVAILABLE",
+                            },
+                          ]}
+                          value={reportFormData.proforma_invoice_verified}
+                          onChange={(value) =>
+                            handleSelectChange("proforma_invoice_verified", value)
+                          }
+                          required
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div className="col-md-3">

@@ -742,7 +742,7 @@ body.single-page{
         <tr>
             <td>BILL OF ENTRY:</td>
             <td>${formData.bill_of_entry}</td>
-            <td>PROFORMA INVOICE VERIFIED:</td>
+            <td>${formData.proforma_invoice_heading || "PROFORMA INVOICE VERIFIED"}:</td>
             <td>${formData.proforma_invoice_verified}</td>
             <td>TAX UPTO:</td>
             <td>
