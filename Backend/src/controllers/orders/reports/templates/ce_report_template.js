@@ -125,6 +125,39 @@ function generateCEReportHTML(formData, extraData, bgImageBase64, stampImageBase
             margin-top: -30px; /* Adjusted: 195px desired - 225px spacer = -30px offset */
             margin-bottom: 0; /* No bottom margin - bottom padding handled by wrapper */
         }
+        
+        /* Main table only: 6 equal columns (100%/6 each); colspan N = N/6 width. */
+        table.main-table {
+            table-layout: fixed;
+            width: 100%;
+        }
+        table.main-table col.col-1,
+        table.main-table col.col-2,
+        table.main-table col.col-3,
+        table.main-table col.col-4,
+        table.main-table col.col-5 { width: 16.666% !important; }
+        table.main-table col.col-6 { width: 16.668% !important; }
+        table.main-table td:not([colspan]),
+        table.main-table th:not([colspan]) { width: 16.666% !important; min-width: 16.666% !important; max-width: 16.666% !important; }
+        table.main-table td[colspan="2"],
+        table.main-table th[colspan="2"] { width: 33.333% !important; min-width: 33.333% !important; max-width: 33.333% !important; }
+        table.main-table td[colspan="3"],
+        table.main-table th[colspan="3"] { width: 50% !important; min-width: 50% !important; max-width: 50% !important; }
+        table.main-table td[colspan="4"],
+        table.main-table th[colspan="4"] { width: 66.666% !important; min-width: 66.666% !important; max-width: 66.666% !important; }
+        table.main-table td[colspan="5"],
+        table.main-table th[colspan="5"] { width: 83.333% !important; min-width: 83.333% !important; max-width: 83.333% !important; }
+        table.main-table td[colspan="6"],
+        table.main-table th[colspan="6"] { width: 100% !important; min-width: 100% !important; max-width: 100% !important; }
+        /* Zero-height hidden row to force 6 equal columns; no border. */
+        table.main-table tr.column-definition-row {
+            height: 0 !important; min-height: 0 !important; max-height: 0 !important; line-height: 0 !important; border: none !important;
+        }
+        table.main-table tr.column-definition-row td {
+            height: 0 !important; min-height: 0 !important; max-height: 0 !important;
+            padding: 0 !important; margin: 0 !important; border: none !important; border-width: 0 !important;
+            visibility: hidden !important; line-height: 0 !important; overflow: hidden !important; font-size: 0 !important;
+        }
        
         /* Removed single-page stretching CSS to allow proper JS measurement */
         /* This was causing JS to think all content fits on one page */
@@ -326,8 +359,13 @@ body.single-page{
             text-align: center;
             font-size: 9.3px;
             text-transform: uppercase;
-            width: 16.66%;
             word-wrap: break-word;
+        }
+        table.main-table th,
+        table.main-table td {
+            box-sizing: border-box;
+            overflow: hidden;
+            overflow-wrap: break-word;
         }
         
         ${reportTypeSelection === "Rough" ? `
@@ -364,8 +402,14 @@ body.single-page{
 <body>
     ${reportTypeSelection === "Rough" ? '<div class="watermark">Rough</div>' : ''}
     <div class="content-wrapper">
-        <table style="min-height: calc(100% - 225px);">
+        <table class="main-table" style="min-height: calc(100% - 225px);">
+        <colgroup>
+            <col class="col-1"><col class="col-2"><col class="col-3"><col class="col-4"><col class="col-5"><col class="col-6">
+        </colgroup>
         <thead>
+        <tr class="column-definition-row" aria-hidden="true">
+            <td style="width: 16.666%; border: none !important; border-width: 0;"></td><td style="width: 16.666%; border: none !important; border-width: 0;"></td><td style="width: 16.666%; border: none !important; border-width: 0;"></td><td style="width: 16.666%; border: none !important; border-width: 0;"></td><td style="width: 16.666%; border: none !important; border-width: 0;"></td><td style="width: 16.668%; border: none !important; border-width: 0;"></td>
+        </tr>
         <tr class="spacer-row">
             <td colspan="6" style="height: 225px; border: none; padding: 0;"></td>
         </tr>
@@ -379,7 +423,7 @@ body.single-page{
             <th colspan="6">${formData.general_details_heading}</th>
         </tr>
         <tr>
-            <td style="width: 20%;">REF NO.</td>
+            <td>REF NO.</td>
             <td colspan="2">${formData.ref_no_year}/${formData.ref_no_bank}/${formData.state_name
         }/${formData.ref_no_code}/${formData.ref_no_month}${formData.ref_no_id}</td>
             <td style="text-transform: uppercase;">${formData.report_date_heading}:</td>
