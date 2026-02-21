@@ -227,13 +227,19 @@ exports.generateCollage = async (req, res, next) => {
       throw new Error("Failed to generate collage PDF");
     }
 
+    // number_of_image_used: "X + Y" where X = images, Y = text images (order_media_image_video status 4)
+    const textImageCount = sortedMediaFiles.filter((m) => Number(m.status) === 4).length;
+    const imageCount = sortedMediaFiles.length - textImageCount;
+    const number_of_image_used = `${imageCount} image(s) + ${textImageCount} text image(s)`;
+
     // Save document record to database
     const documentData = {
       order_id: order.id,
       media_url: `/uploads/${year}/${month}/${orderNumber}/collages/${pdfFileName}`,
       media_type: "pdf",
       document_type: "collage",
-      created_type: "generate", // Added missing field
+      created_type: "generate",
+      number_of_image_used,
       created_by: userId,
       created_at: new Date(),
     };
