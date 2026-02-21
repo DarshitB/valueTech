@@ -916,6 +916,9 @@ function OrderDocuments() {
               <th width="200px" scope="col">
                 Name
               </th>
+              {type === "collage" && (
+                <th scope="col">Image Count</th>
+              )}
               <th scope="col">Created By</th>
               <th scope="col">Created At</th>
               <th width="150px" style={{ textAlign: "center" }} scope="col">
@@ -953,6 +956,9 @@ function OrderDocuments() {
                     <ApprovalBadge status={doc.status} />
                   </div>
                 </td>
+                {type === "collage" && (
+                  <td>{doc.number_of_image_used ?? "-"}</td>
+                )}
                 <td>{doc.created_by_name || "-"}</td>
                 <td>{formatDate(doc.created_at)}</td>
                 <td style={{ textAlign: "center" }}>

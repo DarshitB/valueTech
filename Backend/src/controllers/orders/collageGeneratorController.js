@@ -227,10 +227,15 @@ exports.generateCollage = async (req, res, next) => {
       throw new Error("Failed to generate collage PDF");
     }
 
-    // number_of_image_used: "X + Y" where X = images, Y = text images (order_media_image_video status 4)
+    // number_of_image_used: only include parts that are present (e.g. "5 image(s) + 3 text image(s) + text box")
     const textImageCount = sortedMediaFiles.filter((m) => Number(m.status) === 4).length;
     const imageCount = sortedMediaFiles.length - textImageCount;
-    const number_of_image_used = `${imageCount} image(s) + ${textImageCount} text image(s)`;
+    const hasTextOverlay = text != null && String(text).trim() !== "";
+    const parts = [];
+    if (imageCount > 0) parts.push(`${imageCount} image(s)`);
+    if (textImageCount > 0) parts.push(`${textImageCount} text image(s)`);
+    if (hasTextOverlay) parts.push("text box");
+    const number_of_image_used = parts.length > 0 ? parts.join(" + ") : "0 image(s)";
 
     // Save document record to database
     const documentData = {
