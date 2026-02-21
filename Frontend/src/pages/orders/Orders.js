@@ -3,7 +3,7 @@ import "./order.scss";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import {
-  fetchFinalizedOrders,
+  fetchOrdersWithWoStatus,
   addOrder,
   editOrder,
   removeOrder,
@@ -49,11 +49,11 @@ function Orders() {
 
   // console.log("officers", officers);
   /*   console.log("orders", orders); */
-  // Fetch everything on mount - always fetch finalized orders when component mounts
+  // Fetch everything on mount - always fetch WO status orders (status 13 and 14) when component mounts
   // This ensures we get the correct data even if Dashboard's orders are in the store
   useEffect(() => {
-    // Always fetch finalized orders when Orders component mounts
-    dispatch(fetchFinalizedOrders());
+    // Always fetch WO status orders when Orders component mounts
+    dispatch(fetchOrdersWithWoStatus());
 
     // Only fetch other data if not already loaded
     if (!officers || officers.length === 0) {
@@ -137,91 +137,91 @@ function Orders() {
 
   // State for order type filter - load from localStorage (shared with Dashboard)
   const [selectedOrderType, setSelectedOrderType] = useState(() => {
-    const saved = localStorage.getItem("filter_orderType");
+    const saved = localStorage.getItem("filter_orders_orderType");
     return saved || "";
   });
 
   // State for priority filter - load from localStorage (shared with Dashboard)
   const [selectedPriority, setSelectedPriority] = useState(() => {
-    const saved = localStorage.getItem("filter_priority");
+    const saved = localStorage.getItem("filter_orders_priority");
     return saved || "";
   });
 
   // State for additional filters - load from localStorage (shared with Dashboard)
   const [selectedBank, setSelectedBank] = useState(() => {
-    const saved = localStorage.getItem("filter_bank");
+    const saved = localStorage.getItem("filter_orders_bank");
     return saved || "";
   });
 
   const [selectedBranch, setSelectedBranch] = useState(() => {
-    const saved = localStorage.getItem("filter_branch");
+    const saved = localStorage.getItem("filter_orders_branch");
     return saved || "";
   });
 
   const [selectedOfficer, setSelectedOfficer] = useState(() => {
-    const saved = localStorage.getItem("filter_officer");
+    const saved = localStorage.getItem("filter_orders_officer");
     return saved || "";
   });
 
   const [selectedManager, setSelectedManager] = useState(() => {
-    const saved = localStorage.getItem("filter_manager");
+    const saved = localStorage.getItem("filter_orders_manager");
     return saved || "";
   });
 
   const [selectedFieldVerifier, setSelectedFieldVerifier] = useState(() => {
-    const saved = localStorage.getItem("filter_fieldVerifier");
+    const saved = localStorage.getItem("filter_orders_fieldVerifier");
     return saved || "";
   });
 
   const [selectedValuerName, setSelectedValuerName] = useState(() => {
-    const saved = localStorage.getItem("filter_valuerName");
+    const saved = localStorage.getItem("filter_orders_valuerName");
     return saved || "";
   });
 
   const [selectedOrderStatus, setSelectedOrderStatus] = useState(() => {
-    const saved = localStorage.getItem("filter_orderStatus");
+    const saved = localStorage.getItem("filter_orders_orderStatus");
     return saved || "";
   });
 
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState(() => {
-    const saved = localStorage.getItem("filter_paymentStatus");
+    const saved = localStorage.getItem("filter_orders_paymentStatus");
     return saved || "";
   });
 
   const [selectedCategory, setSelectedCategory] = useState(() => {
-    const saved = localStorage.getItem("filter_category");
+    const saved = localStorage.getItem("filter_orders_category");
     return saved || "";
   });
 
   const [selectedAssetCategory, setSelectedAssetCategory] = useState(() => {
-    const saved = localStorage.getItem("filter_assetCategory");
+    const saved = localStorage.getItem("filter_orders_assetCategory");
     return saved || "";
   });
 
   const [selectedSubCategory, setSelectedSubCategory] = useState(() => {
-    const saved = localStorage.getItem("filter_subCategory");
+    const saved = localStorage.getItem("filter_orders_subCategory");
     return saved || "";
   });
 
   const [selectedCreatedBy, setSelectedCreatedBy] = useState(() => {
-    const saved = localStorage.getItem("filter_createdBy");
+    const saved = localStorage.getItem("filter_orders_createdBy");
     return saved || "";
   });
 
   const [selectedUserAssigned, setSelectedUserAssigned] = useState(() => {
-    const saved = localStorage.getItem("filter_userAssigned");
+    const saved = localStorage.getItem("filter_orders_userAssigned");
     return saved || "";
   });
 
   // State for date filter
   const [selectedDatePreset, setSelectedDatePreset] = useState(() => {
-    const saved = localStorage.getItem("filter_datePreset");
+    const saved = localStorage.getItem("filter_orders_datePreset");
     return saved || "";
   });
 
   const [selectedDateRange, setSelectedDateRange] = useState(() => {
-    const savedStart = localStorage.getItem("filter_dateRangeStart");
-    const savedEnd = localStorage.getItem("filter_dateRangeEnd");
+    const savedStart = localStorage.getItem("filter_orders_dateRangeStart");
+    const savedEnd = localStorage.getItem("filter_orders_dateRangeEnd");
     return {
       start: savedStart ? new Date(savedStart) : null,
       end: savedEnd ? new Date(savedEnd) : null,
@@ -767,24 +767,24 @@ function Orders() {
     setSelectedDateRange({ start: null, end: null });
 
     // Clear from localStorage
-    localStorage.removeItem("filter_orderType");
-    localStorage.removeItem("filter_priority");
-    localStorage.removeItem("filter_bank");
-    localStorage.removeItem("filter_branch");
-    localStorage.removeItem("filter_officer");
-    localStorage.removeItem("filter_manager");
-    localStorage.removeItem("filter_fieldVerifier");
-    localStorage.removeItem("filter_valuerName");
-    localStorage.removeItem("filter_orderStatus");
-    localStorage.removeItem("filter_paymentStatus");
-    localStorage.removeItem("filter_category");
-    localStorage.removeItem("filter_assetCategory");
-    localStorage.removeItem("filter_subCategory");
-    localStorage.removeItem("filter_createdBy");
-    localStorage.removeItem("filter_userAssigned");
-    localStorage.removeItem("filter_datePreset");
-    localStorage.removeItem("filter_dateRangeStart");
-    localStorage.removeItem("filter_dateRangeEnd");
+    localStorage.removeItem("filter_orders_orderType");
+    localStorage.removeItem("filter_orders_priority");
+    localStorage.removeItem("filter_orders_bank");
+    localStorage.removeItem("filter_orders_branch");
+    localStorage.removeItem("filter_orders_officer");
+    localStorage.removeItem("filter_orders_manager");
+    localStorage.removeItem("filter_orders_fieldVerifier");
+    localStorage.removeItem("filter_orders_valuerName");
+    localStorage.removeItem("filter_orders_orderStatus");
+    localStorage.removeItem("filter_orders_paymentStatus");
+    localStorage.removeItem("filter_orders_category");
+    localStorage.removeItem("filter_orders_assetCategory");
+    localStorage.removeItem("filter_orders_subCategory");
+    localStorage.removeItem("filter_orders_createdBy");
+    localStorage.removeItem("filter_orders_userAssigned");
+    localStorage.removeItem("filter_orders_datePreset");
+    localStorage.removeItem("filter_orders_dateRangeStart");
+    localStorage.removeItem("filter_orders_dateRangeEnd");
   };
 
   // Helper function to get date range based on preset
@@ -1176,7 +1176,7 @@ function Orders() {
                 onChange={(value) => {
                   const val = value || "";
                   setSelectedOrderType(val);
-                  localStorage.setItem("filter_orderType", val);
+                  localStorage.setItem("filter_orders_orderType", val);
                 }}
                 placeholder="All Types"
               />
@@ -1196,7 +1196,7 @@ function Orders() {
                 onChange={(value) => {
                   const val = value || "";
                   setSelectedPriority(val);
-                  localStorage.setItem("filter_priority", val);
+                  localStorage.setItem("filter_orders_priority", val);
                 }}
                 placeholder="All Priorities"
               />
@@ -1215,7 +1215,7 @@ function Orders() {
                 onChange={(value) => {
                   const val = value || "";
                   setSelectedOrderStatus(val);
-                  localStorage.setItem("filter_orderStatus", val);
+                  localStorage.setItem("filter_orders_orderStatus", val);
                 }}
                 placeholder="All Status"
               />
@@ -1236,18 +1236,18 @@ function Orders() {
                     const val = value || "";
                     const previousValue = selectedDatePreset;
                     setSelectedDatePreset(val);
-                    localStorage.setItem("filter_datePreset", val);
+                    localStorage.setItem("filter_orders_datePreset", val);
                     // Clear date range when changing from "fromTo" to another preset or empty
                     if (previousValue === "fromTo" && val !== "fromTo") {
                       setSelectedDateRange({ start: null, end: null });
-                      localStorage.removeItem("filter_dateRangeStart");
-                      localStorage.removeItem("filter_dateRangeEnd");
+                      localStorage.removeItem("filter_orders_dateRangeStart");
+                      localStorage.removeItem("filter_orders_dateRangeEnd");
                     }
                     // Clear date range when preset is selected (except for fromTo)
                     if (val && val !== "fromTo") {
                       setSelectedDateRange({ start: null, end: null });
-                      localStorage.removeItem("filter_dateRangeStart");
-                      localStorage.removeItem("filter_dateRangeEnd");
+                      localStorage.removeItem("filter_orders_dateRangeStart");
+                      localStorage.removeItem("filter_orders_dateRangeEnd");
                     }
                   }}
                   placeholder="Date Preset"
@@ -1264,11 +1264,11 @@ function Orders() {
                           }));
                           if (date) {
                             localStorage.setItem(
-                              "filter_dateRangeStart",
+                              "filter_orders_dateRangeStart",
                               date.toISOString()
                             );
                           } else {
-                            localStorage.removeItem("filter_dateRangeStart");
+                            localStorage.removeItem("filter_orders_dateRangeStart");
                           }
                           // Set preset to fromTo if dates are manually selected
                           if (
@@ -1276,7 +1276,7 @@ function Orders() {
                             (date || selectedDateRange.end)
                           ) {
                             setSelectedDatePreset("fromTo");
-                            localStorage.setItem("filter_datePreset", "fromTo");
+                            localStorage.setItem("filter_orders_datePreset", "fromTo");
                           }
                         }}
                         selectsStart
@@ -1301,11 +1301,11 @@ function Orders() {
                           }));
                           if (date) {
                             localStorage.setItem(
-                              "filter_dateRangeEnd",
+                              "filter_orders_dateRangeEnd",
                               date.toISOString()
                             );
                           } else {
-                            localStorage.removeItem("filter_dateRangeEnd");
+                            localStorage.removeItem("filter_orders_dateRangeEnd");
                           }
                           // Set preset to fromTo if dates are manually selected
                           if (
@@ -1313,7 +1313,7 @@ function Orders() {
                             (selectedDateRange.start || date)
                           ) {
                             setSelectedDatePreset("fromTo");
-                            localStorage.setItem("filter_datePreset", "fromTo");
+                            localStorage.setItem("filter_orders_datePreset", "fromTo");
                           }
                         }}
                         selectsEnd
@@ -1380,7 +1380,7 @@ function Orders() {
                   onChange={(value) => {
                     const val = value || "";
                     setSelectedCategory(val);
-                    localStorage.setItem("filter_category", val);
+                    localStorage.setItem("filter_orders_category", val);
                   }}
                   placeholder="All Categories"
                 />
@@ -1402,7 +1402,7 @@ function Orders() {
                   onChange={(value) => {
                     const val = value || "";
                     setSelectedAssetCategory(val);
-                    localStorage.setItem("filter_assetCategory", val);
+                    localStorage.setItem("filter_orders_assetCategory", val);
                   }}
                   placeholder="All Asset Categories"
                 />
@@ -1424,7 +1424,7 @@ function Orders() {
                   onChange={(value) => {
                     const val = value || "";
                     setSelectedSubCategory(val);
-                    localStorage.setItem("filter_subCategory", val);
+                    localStorage.setItem("filter_orders_subCategory", val);
                   }}
                   placeholder="All Sub Categories"
                 />
@@ -1444,7 +1444,7 @@ function Orders() {
                   onChange={(value) => {
                     const val = value || "";
                     setSelectedValuerName(val);
-                    localStorage.setItem("filter_valuerName", val);
+                    localStorage.setItem("filter_orders_valuerName", val);
                   }}
                   placeholder="All Valuers"
                 />
@@ -1463,7 +1463,7 @@ function Orders() {
                   onChange={(value) => {
                     const val = value || "";
                     setSelectedManager(val);
-                    localStorage.setItem("filter_manager", val);
+                    localStorage.setItem("filter_orders_manager", val);
                   }}
                   placeholder="All Managers"
                 />
@@ -1483,7 +1483,7 @@ function Orders() {
                   onChange={(value) => {
                     const val = value || "";
                     setSelectedBank(val);
-                    localStorage.setItem("filter_bank", val);
+                    localStorage.setItem("filter_orders_bank", val);
                   }}
                   placeholder="All Banks"
                 />
@@ -1502,7 +1502,7 @@ function Orders() {
                   onChange={(value) => {
                     const val = value || "";
                     setSelectedBranch(val);
-                    localStorage.setItem("filter_branch", val);
+                    localStorage.setItem("filter_orders_branch", val);
                   }}
                   placeholder="All Branches"
                 />
@@ -1524,7 +1524,7 @@ function Orders() {
                   onChange={(value) => {
                     const val = value || "";
                     setSelectedOfficer(val);
-                    localStorage.setItem("filter_officer", val);
+                    localStorage.setItem("filter_orders_officer", val);
                   }}
                   placeholder="All Officers"
                 />
@@ -1546,7 +1546,7 @@ function Orders() {
                   onChange={(value) => {
                     const val = value || "";
                     setSelectedFieldVerifier(val);
-                    localStorage.setItem("filter_fieldVerifier", val);
+                    localStorage.setItem("filter_orders_fieldVerifier", val);
                   }}
                   placeholder="All Field Verifiers"
                 />
@@ -1568,7 +1568,7 @@ function Orders() {
                   onChange={(value) => {
                     const val = value || "";
                     setSelectedPaymentStatus(val);
-                    localStorage.setItem("filter_paymentStatus", val);
+                    localStorage.setItem("filter_orders_paymentStatus", val);
                   }}
                   placeholder="All Payment Statuses"
                 />
@@ -1587,7 +1587,7 @@ function Orders() {
                   onChange={(value) => {
                     const val = value || "";
                     setSelectedCreatedBy(val);
-                    localStorage.setItem("filter_createdBy", val);
+                    localStorage.setItem("filter_orders_createdBy", val);
                   }}
                   placeholder="All Created By"
                 />
@@ -1606,7 +1606,7 @@ function Orders() {
                   onChange={(value) => {
                     const val = value || "";
                     setSelectedUserAssigned(val);
-                    localStorage.setItem("filter_userAssigned", val);
+                    localStorage.setItem("filter_orders_userAssigned", val);
                   }}
                   placeholder="All Users Assigned"
                 />
@@ -1739,11 +1739,16 @@ function Orders() {
                       ? "clickable-row"
                       : ""
                   }
-                  onClick={() => {
+                  onClick={(e) => {
                     if (
                       hasPermission(allowedPermissions, "view_order_details")
                     ) {
-                      navigate(`/orders/${order.id}/details`);
+                      const path = `/orders/${order.id}/details`;
+                      if (e.ctrlKey || e.metaKey) {
+                        window.open(path, "_blank", "noopener,noreferrer");
+                      } else {
+                        navigate(path);
+                      }
                     }
                   }}
                   style={{

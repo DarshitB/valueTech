@@ -12,8 +12,10 @@ const activityLogger = require("../../middleware/activityLogger"); // Middleware
 // Apply authentication middleware to all routes
 router.use(auth);
 
+// Get all orders (excludes status 13 and 14 - use /finalized-and-on-hold-orders for those)
 router.get("/", orderController.getAll);
-router.get("/finalized-orders", orderController.getAllWithStatus13);
+// Get orders that are finalized (status 13) or on hold (status 14)
+router.get("/finalized-and-on-hold-orders", orderController.getAllWithWoStatus);
 router.get("/:orderId/last-mail", orderController.getLastMail);
 router.get("/:id", orderController.getById);
 router.post(

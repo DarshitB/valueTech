@@ -5,7 +5,7 @@ const ENDPOINT = "/api/orders"; // Base endpoint for all state-related requests
 
 export const getOrders = () => axios.get(ENDPOINT); // Fetch all orders
 
-export const getFinalizedOrders = () => axios.get(`${ENDPOINT}/finalized-orders`); // Fetch all finalized orders
+export const getOrdersWithWoStatus = () => axios.get(`${ENDPOINT}/finalized-and-on-hold-orders`); // Fetch orders finalized (13) or on hold (14)
 
 export const getOrderById = (id) => axios.get(`${ENDPOINT}/${id}`); // Get order by ID
 export const createOrder = (data) => axios.post(ENDPOINT, data); // Add order

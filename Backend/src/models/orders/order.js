@@ -17,7 +17,7 @@ function parseRole(roleNameRaw) {
 }
 
 const order = {
-  // Get all orders (with status and user details included)
+  // Get all orders (excludes status 13 finalized and 14 on hold - those are fetched via getAllOrdersWithWoStatus / finalized-and-on-hold-orders)
   getAllOrders: async (user) => {
     // Base order query
     const baseQuery = db("orders")
@@ -102,7 +102,7 @@ const order = {
         "orders.covered_distance_by_verifier"
       )
       .whereNull("orders.deleted_at")
-      .whereNot("orders.current_status_id", 13);
+      .whereNotIn("orders.current_status_id", [13, 14]);
 
     // Role-based filters - check if role contains specific keywords
     const roleName = (user.role_name || "").toUpperCase();
@@ -272,8 +272,8 @@ const order = {
     return ordersWithAssignedUsers;
   },
 
-  // Get all orders with status 13 (same logic as getAllOrders but only includes status 13)
-  getAllOrdersWithStatus13: async (user) => {
+  // Get all orders that are finalized (status 13) or on hold (status 14) - same logic as getAllOrders but only these statuses
+  getAllOrdersWithWoStatus: async (user) => {
     // Base order query
     const baseQuery = db("orders")
       .leftJoin(
@@ -357,7 +357,7 @@ const order = {
         "orders.covered_distance_by_verifier"
       )
       .whereNull("orders.deleted_at")
-      .where("orders.current_status_id", 13);
+      .whereIn("orders.current_status_id", [13, 14]);
 
     // Role-based filters - check if role contains specific keywords
     const roleName = (user.role_name || "").toUpperCase();
@@ -527,7 +527,7 @@ const order = {
     return ordersWithAssignedUsers;
   },
 
-  // Get orders for mobile app filtered by field verifier ID
+  // Get orders for mobile app filtered by field verifier ID (excludes finalized 13 and on hold 14)
   getForMobile: async (fieldVerifierId) => {
     // Base order query
     const baseQuery = db("orders")
@@ -615,7 +615,7 @@ const order = {
       .whereNull("orders.deleted_at")
       .where("orders.field_verifier_id", fieldVerifierId)
       .where("orders.current_status_id", "<", 8)
-      .whereNot("orders.current_status_id", 13);
+      .whereNotIn("orders.current_status_id", [13, 14]);
 
     // Sort by newest first
     baseQuery.orderBy("orders.created_at", "desc");

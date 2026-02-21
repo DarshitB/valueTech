@@ -12,11 +12,11 @@ export const fetchOrders = createAsyncThunk(
   }
 );
 
-// Async action: Fetch all finalized orders
-export const fetchFinalizedOrders = createAsyncThunk(
-  "orders/fetchFinalized",
+// Async action: Fetch orders with WO status (status 13 and 14)
+export const fetchOrdersWithWoStatus = createAsyncThunk(
+  "orders/fetchWoStatus",
   async () => {
-    const res = await orderApi.getFinalizedOrders();
+    const res = await orderApi.getOrdersWithWoStatus();
     return res.data;
   }
 );
@@ -249,18 +249,18 @@ const orderSlice = createSlice({
       })
 
       // Fetch finalized orders
-      .addCase(fetchFinalizedOrders.pending, (state) => {
+      .addCase(fetchOrdersWithWoStatus.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchFinalizedOrders.fulfilled, (state, action) => {
+      .addCase(fetchOrdersWithWoStatus.fulfilled, (state, action) => {
         state.list = action.payload;
         state.loading = false;
       })
-      .addCase(fetchFinalizedOrders.rejected, (state, action) => {
+      .addCase(fetchOrdersWithWoStatus.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
-        toast.error(`Failed to fetch finalized orders: ${action.payload}`);
+        toast.error(`Failed to fetch WO status orders: ${action.payload}`);
       })
 
       // Fetch order by ID

@@ -35,16 +35,16 @@ const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "
     if (editorRef.current && !isUpdatingRef.current) {
       const currentContent = editorRef.current.innerHTML;
       const newContent = value || "";
-      
+
       // Only update if the value is different to avoid cursor jumping
       if (currentContent !== newContent) {
         const selection = window.getSelection();
         const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
         const wasFocused = document.activeElement === editorRef.current;
-        
+
         isUpdatingRef.current = true;
         editorRef.current.innerHTML = newContent;
-        
+
         // Restore cursor position if it was focused
         if (wasFocused && range) {
           try {
@@ -54,7 +54,7 @@ const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "
             // Ignore if range is invalid
           }
         }
-        
+
         setTimeout(() => {
           isUpdatingRef.current = false;
         }, 0);
@@ -78,7 +78,7 @@ const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "
     e.preventDefault();
     // Get plain text only - strip all formatting (bold, italic, etc.)
     let plainText = e.clipboardData.getData("text/plain");
-    
+
     // Remove extra spaces and normalize line breaks
     plainText = plainText
       .replace(/\r\n/g, '\n') // Normalize line breaks
@@ -87,10 +87,10 @@ const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "
       .map(line => line.trim()) // Remove leading/trailing spaces from each line
       .filter(line => line.length > 0) // Remove empty lines
       .join('\n');
-    
+
     // Convert to HTML with line breaks, but as plain text (no formatting)
     const htmlText = plainText.replace(/\n/g, '<br>');
-    
+
     // Insert as plain text with line breaks (no bold, italic, etc.)
     document.execCommand("insertHTML", false, htmlText || '');
   };
@@ -170,7 +170,7 @@ function CVReport() {
   const [otherAssetMake, setOtherAssetMake] = useState("");
   // Set page title using custom hook
   const { setTitle } = usePageTitle();
-  
+
   // State for report type selection (Rough/Production)
   const [reportTypeSelection, setReportTypeSelection] = useState("Rough");
 
@@ -700,9 +700,9 @@ function CVReport() {
     if (categoryName) parts.push(categoryName);
     if (subCategoryName) parts.push(subCategoryName);
     if (childCategoryName) parts.push(childCategoryName);
-    
+
     if (parts.length === 0) return "";
-    
+
     // Format: (category_name) / (sub_category_name) (child_category_name)
     if (parts.length === 1) return parts[0];
     if (parts.length === 2) return `${parts[0]} / ${parts[1]}`;
@@ -742,12 +742,12 @@ function CVReport() {
         // Check if there's already a saved report - if so, don't override heading fields
         // The report loading effect will handle setting saved values
         // Also check if report fetch is complete - only prefill if fetch completed and no report exists
-        const hasSavedReport = reportFetchCompleted && 
-                               currentReport?.report && 
-                               currentReport.order_id === parseInt(id);
-        
+        const hasSavedReport = reportFetchCompleted &&
+          currentReport?.report &&
+          currentReport.order_id === parseInt(id);
+
         // Also check if heading fields already have values (from saved report)
-        const hasSavedHeadingValues = 
+        const hasSavedHeadingValues =
           prev.valueation_report_for_heading ||
           prev.general_details_heading ||
           prev.inspected_equipment_heading ||
@@ -760,7 +760,7 @@ function CVReport() {
         // 2. Headings are empty/null (need defaults)
         // This ensures headings always have values when category data is available
         const shouldPrefillHeadings = (!hasSavedReport || !hasSavedHeadingValues) && categorySuffix;
-        
+
         const categorySuffixUpper = categorySuffix ? categorySuffix.toUpperCase().trim() : "";
 
         return {
@@ -892,7 +892,7 @@ function CVReport() {
 
       // Extract category_suffix from saved headings or use default from order
       let extractedCategorySuffix = "";
-      
+
       // IMPORTANT: Don't extract category_suffix from valueation_report_for_heading if it exists
       // because user may have manually edited it with extra text
       // Only extract from other headings or use default from order
@@ -902,7 +902,7 @@ function CVReport() {
           extractedCategorySuffix = match[1].trim();
         }
       }
-      
+
       // If no category_suffix found in headings, use default from order
       if (!extractedCategorySuffix && order) {
         extractedCategorySuffix = buildCategorySuffix(
@@ -911,10 +911,10 @@ function CVReport() {
           order?.child_category_name
         );
       }
-      
+
       // Set category_suffix
       updated.category_suffix = extractedCategorySuffix;
-      
+
       // For valueation_report_for_heading: 
       // 1. If saved value exists in database, use it (user may have manually edited it)
       // 2. If no saved value, generate from category_suffix
@@ -931,7 +931,7 @@ function CVReport() {
         updated.valueation_report_for_heading = buildValuationReportHeading(categorySuffixUpper, isRepo);
         if (isRepo) updated.valuation_purpose = "REPO PURPOSE";
       }
-      
+
       // Generate other headings from category_suffix
       const categorySuffixUpper = extractedCategorySuffix ? extractedCategorySuffix.toUpperCase().trim() : "";
       updated.general_details_heading = categorySuffixUpper
@@ -1107,28 +1107,28 @@ function CVReport() {
     const categorySuffix = reportFormData.category_suffix || "";
     const categorySuffixUpper = categorySuffix ? categorySuffix.toUpperCase().trim() : "";
     const isRepo = isRepoPurpose(reportFormData.valuation_purpose);
-    
+
     setReportFormData((prev) => {
       // Skip if neither category_suffix nor repo-ness (from valuation_purpose) changed
       const prevIsRepo = isRepoPurpose(prev.valuation_purpose);
       if (prev.category_suffix === categorySuffix && prevIsRepo === isRepo) {
         return prev;
       }
-      
+
       const updated = { ...prev };
-      
+
       // Only auto-update valueation_report_for_heading if:
       // 1. It's empty (no data saved), OR
       // 2. It matches the auto-generated pattern (was auto-generated, not manually edited)
-      const shouldUpdateValuationHeading = 
-        !prev.valueation_report_for_heading || 
+      const shouldUpdateValuationHeading =
+        !prev.valueation_report_for_heading ||
         prev.valueation_report_for_heading.trim() === "" ||
         isAutoGeneratedHeading(prev.valueation_report_for_heading, prev.category_suffix || "");
-      
+
       if (shouldUpdateValuationHeading) {
         updated.valueation_report_for_heading = buildValuationReportHeading(categorySuffixUpper, isRepo);
       }
-      
+
       // Always update other headings (they are not editable)
       updated.general_details_heading = categorySuffixUpper
         ? `GENERAL DETAILS OF THE INSPECTED ${categorySuffixUpper}`
@@ -1145,7 +1145,7 @@ function CVReport() {
       updated.overall_feedback_heading = categorySuffixUpper
         ? `OVER ALL FEED BACK OF THE INSPECTED ${categorySuffixUpper}`
         : "";
-      
+
       return updated;
     });
   }, [reportFormData.category_suffix, reportFormData.valuation_purpose, isAutoGeneratedHeading, buildValuationReportHeading]);
@@ -1181,15 +1181,15 @@ function CVReport() {
         if (name === "category_suffix") {
           const categorySuffixUpper = value ? value.toUpperCase().trim() : "";
           const isRepo = isRepoPurpose(prev.valuation_purpose);
-          
+
           // Only auto-update valueation_report_for_heading if:
           // 1. It's empty (no data saved), OR
           // 2. It matches the auto-generated pattern (was auto-generated, not manually edited)
-          const shouldUpdateValuationHeading = 
-            !prev.valueation_report_for_heading || 
+          const shouldUpdateValuationHeading =
+            !prev.valueation_report_for_heading ||
             prev.valueation_report_for_heading.trim() === "" ||
             isAutoGeneratedHeading(prev.valueation_report_for_heading, prev.category_suffix || "");
-          
+
           if (shouldUpdateValuationHeading) {
             updated.valueation_report_for_heading = buildValuationReportHeading(categorySuffixUpper, isRepo);
           }
@@ -1396,7 +1396,7 @@ function CVReport() {
   // Handle date input formatting (DD-MM-YYYY)
   const handleDateChange = useCallback((e) => {
     const { name, value } = e.target;
-    
+
     // Allow empty strings to clear the field
     if (!value || value.trim() === "") {
       // Track that this field was explicitly cleared
@@ -1407,12 +1407,12 @@ function CVReport() {
       }));
       return;
     }
-    
+
     // If field gets a value, remove it from cleared fields tracking
     clearedFieldsRef.current.delete(name);
-    
+
     if (typeof value !== "string") return;
-    
+
     let numericValue = value.replace(/\D/g, ""); // Remove non-numeric characters
     if (numericValue.length > 8) numericValue = numericValue.substring(0, 8); // Limit to 8 digits (DDMMYYYY)
 
@@ -1440,7 +1440,7 @@ function CVReport() {
   // Handle currency input formatting (Indian number format)
   const handleCurrencyChange = useCallback((e) => {
     const { name, value } = e.target;
-    
+
     // Allow empty strings to clear the field
     if (!value || value.trim() === "") {
       // Track that this field was explicitly cleared
@@ -1451,10 +1451,10 @@ function CVReport() {
       }));
       return;
     }
-    
+
     // If field gets a value, remove it from cleared fields tracking
     clearedFieldsRef.current.delete(name);
-    
+
     if (typeof value !== "string") return;
 
     // Remove everything except digits and one dot
@@ -1609,7 +1609,7 @@ function CVReport() {
 
       // Create FormData for multipart/form-data submission
       const formData = new FormData();
-      
+
       // Add report type selection (Rough/Production)
       formData.append("report_type_selection", reportTypeSelection);
 
@@ -2731,8 +2731,8 @@ function CVReport() {
             {reportLoading && externalApiLoading
               ? "Loading Report Data and Fetching RC Details..."
               : reportLoading
-              ? "Loading Report Data..."
-              : "Fetching RC Details from External API..."}
+                ? "Loading Report Data..."
+                : "Fetching RC Details from External API..."}
           </div>
         </div>
       )}
@@ -2744,16 +2744,16 @@ function CVReport() {
               <h2>CV Report</h2>
               <div className="d-flex align-items-center gap-2">
                 {hasPermission(allowedPermissions, "rc_fill_allow") &&
-                hasPermission(allowedPermissions, "rc_fill_api_call_on_button") && (
-                  <button
-                    type="button"
-                    className="btn btn-outline-primary"
-                    onClick={handleRCFillClick}
-                    disabled={externalApiLoading}
-                  >
-                    {externalApiLoading ? "Fetching RC..." : "RC Fill"}
-                  </button>
-                )}
+                  hasPermission(allowedPermissions, "rc_fill_api_call_on_button") && (
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary"
+                      onClick={handleRCFillClick}
+                      disabled={externalApiLoading}
+                    >
+                      {externalApiLoading ? "Fetching RC..." : "RC Fill"}
+                    </button>
+                  )}
                 <Link to={`/orders/${id}/details/images`} className="btn btn-primary">View Images</Link>
               </div>
             </div>
@@ -3358,7 +3358,7 @@ function CVReport() {
                 <div className="col-md-6">
                   <div className="form-group">
                     <label htmlFor="fuel_type">
-                    Chassis No Type <span className="text-danger">*</span>
+                      Chassis No Type <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -4249,8 +4249,10 @@ function CVReport() {
               <div className="row">
                 <div className="col-md-4">
                   <div className="form-group">
-                    <label htmlFor="period_of_insurance">
-                      Period Of Insurance
+                    <label htmlFor="period_of_insurance" style={{display: 'flex', alignItems: 'center', gap: '5px'}}>
+                      Period Of Insurance <small className="text-muted d-block mt-1">
+                       ( Add just end date )
+                      </small>
                     </label>
                     <input
                       type="text"
@@ -4258,7 +4260,9 @@ function CVReport() {
                       id="period_of_insurance"
                       name="period_of_insurance"
                       value={reportFormData.period_of_insurance}
-                      onChange={handleFormChange}
+                      onChange={handleDateChange}
+                      placeholder="DD-MM-YYYY"
+                      maxLength="10"
                     />
                   </div>
                 </div>

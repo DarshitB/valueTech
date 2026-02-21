@@ -161,91 +161,91 @@ function Dashboard() {
 
   // State for order type filter - load from localStorage (shared with Orders)
   const [selectedOrderType, setSelectedOrderType] = useState(() => {
-    const saved = localStorage.getItem("filter_orderType");
+    const saved = localStorage.getItem("filter_dashboard_orderType");
     return saved || "";
   });
 
   // State for priority filter - load from localStorage (shared with Orders)
   const [selectedPriority, setSelectedPriority] = useState(() => {
-    const saved = localStorage.getItem("filter_priority");
+    const saved = localStorage.getItem("filter_dashboard_priority");
     return saved || "";
   });
 
   // State for additional filters - load from localStorage (shared with Orders)
   const [selectedBank, setSelectedBank] = useState(() => {
-    const saved = localStorage.getItem("filter_bank");
+    const saved = localStorage.getItem("filter_dashboard_bank");
     return saved || "";
   });
 
   const [selectedBranch, setSelectedBranch] = useState(() => {
-    const saved = localStorage.getItem("filter_branch");
+    const saved = localStorage.getItem("filter_dashboard_branch");
     return saved || "";
   });
 
   const [selectedOfficer, setSelectedOfficer] = useState(() => {
-    const saved = localStorage.getItem("filter_officer");
+    const saved = localStorage.getItem("filter_dashboard_officer");
     return saved || "";
   });
 
   const [selectedManager, setSelectedManager] = useState(() => {
-    const saved = localStorage.getItem("filter_manager");
+    const saved = localStorage.getItem("filter_dashboard_manager");
     return saved || "";
   });
 
   const [selectedFieldVerifier, setSelectedFieldVerifier] = useState(() => {
-    const saved = localStorage.getItem("filter_fieldVerifier");
+    const saved = localStorage.getItem("filter_dashboard_fieldVerifier");
     return saved || "";
   });
 
   const [selectedValuerName, setSelectedValuerName] = useState(() => {
-    const saved = localStorage.getItem("filter_valuerName");
+    const saved = localStorage.getItem("filter_dashboard_valuerName");
     return saved || "";
   });
 
   const [selectedOrderStatus, setSelectedOrderStatus] = useState(() => {
-    const saved = localStorage.getItem("filter_orderStatus");
+    const saved = localStorage.getItem("filter_dashboard_orderStatus");
     return saved || "";
   });
 
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState(() => {
-    const saved = localStorage.getItem("filter_paymentStatus");
+    const saved = localStorage.getItem("filter_dashboard_paymentStatus");
     return saved || "";
   });
 
   const [selectedCategory, setSelectedCategory] = useState(() => {
-    const saved = localStorage.getItem("filter_category");
+    const saved = localStorage.getItem("filter_dashboard_category");
     return saved || "";
   });
 
   const [selectedAssetCategory, setSelectedAssetCategory] = useState(() => {
-    const saved = localStorage.getItem("filter_assetCategory");
+    const saved = localStorage.getItem("filter_dashboard_assetCategory");
     return saved || "";
   });
 
   const [selectedSubCategory, setSelectedSubCategory] = useState(() => {
-    const saved = localStorage.getItem("filter_subCategory");
+    const saved = localStorage.getItem("filter_dashboard_subCategory");
     return saved || "";
   });
 
   const [selectedCreatedBy, setSelectedCreatedBy] = useState(() => {
-    const saved = localStorage.getItem("filter_createdBy");
+    const saved = localStorage.getItem("filter_dashboard_createdBy");
     return saved || "";
   });
 
   const [selectedUserAssigned, setSelectedUserAssigned] = useState(() => {
-    const saved = localStorage.getItem("filter_userAssigned");
+    const saved = localStorage.getItem("filter_dashboard_userAssigned");
     return saved || "";
   });
 
   // State for date filter
   const [selectedDatePreset, setSelectedDatePreset] = useState(() => {
-    const saved = localStorage.getItem("filter_datePreset");
+    const saved = localStorage.getItem("filter_dashboard_datePreset");
     return saved || "";
   });
 
   const [selectedDateRange, setSelectedDateRange] = useState(() => {
-    const savedStart = localStorage.getItem("filter_dateRangeStart");
-    const savedEnd = localStorage.getItem("filter_dateRangeEnd");
+    const savedStart = localStorage.getItem("filter_dashboard_dateRangeStart");
+    const savedEnd = localStorage.getItem("filter_dashboard_dateRangeEnd");
     return {
       start: savedStart ? new Date(savedStart) : null,
       end: savedEnd ? new Date(savedEnd) : null,
@@ -961,24 +961,24 @@ function Dashboard() {
     setSelectedDateRange({ start: null, end: null });
 
     // Clear from localStorage
-    localStorage.removeItem("filter_orderType");
-    localStorage.removeItem("filter_priority");
-    localStorage.removeItem("filter_bank");
-    localStorage.removeItem("filter_branch");
-    localStorage.removeItem("filter_officer");
-    localStorage.removeItem("filter_manager");
-    localStorage.removeItem("filter_fieldVerifier");
-    localStorage.removeItem("filter_valuerName");
-    localStorage.removeItem("filter_orderStatus");
-    localStorage.removeItem("filter_paymentStatus");
-    localStorage.removeItem("filter_category");
-    localStorage.removeItem("filter_assetCategory");
-    localStorage.removeItem("filter_subCategory");
-    localStorage.removeItem("filter_createdBy");
-    localStorage.removeItem("filter_userAssigned");
-    localStorage.removeItem("filter_datePreset");
-    localStorage.removeItem("filter_dateRangeStart");
-    localStorage.removeItem("filter_dateRangeEnd");
+    localStorage.removeItem("filter_dashboard_orderType");
+    localStorage.removeItem("filter_dashboard_priority");
+    localStorage.removeItem("filter_dashboard_bank");
+    localStorage.removeItem("filter_dashboard_branch");
+    localStorage.removeItem("filter_dashboard_officer");
+    localStorage.removeItem("filter_dashboard_manager");
+    localStorage.removeItem("filter_dashboard_fieldVerifier");
+    localStorage.removeItem("filter_dashboard_valuerName");
+    localStorage.removeItem("filter_dashboard_orderStatus");
+    localStorage.removeItem("filter_dashboard_paymentStatus");
+    localStorage.removeItem("filter_dashboard_category");
+    localStorage.removeItem("filter_dashboard_assetCategory");
+    localStorage.removeItem("filter_dashboard_subCategory");
+    localStorage.removeItem("filter_dashboard_createdBy");
+    localStorage.removeItem("filter_dashboard_userAssigned");
+    localStorage.removeItem("filter_dashboard_datePreset");
+    localStorage.removeItem("filter_dashboard_dateRangeStart");
+    localStorage.removeItem("filter_dashboard_dateRangeEnd");
   };
 
   // Check if any filter is set
@@ -1794,7 +1794,7 @@ function Dashboard() {
                             onChange={(value) => {
                               const val = value || "";
                               setSelectedOrderType(val);
-                              localStorage.setItem("filter_orderType", val);
+                              localStorage.setItem("filter_dashboard_orderType", val);
                             }}
                             placeholder="All Types"
                           />
@@ -1814,7 +1814,7 @@ function Dashboard() {
                             onChange={(value) => {
                               const val = value || "";
                               setSelectedPriority(val);
-                              localStorage.setItem("filter_priority", val);
+                              localStorage.setItem("filter_dashboard_priority", val);
                             }}
                             placeholder="All Priorities"
                           />
@@ -1836,7 +1836,7 @@ function Dashboard() {
                             onChange={(value) => {
                               const val = value || "";
                               setSelectedOrderStatus(val);
-                              localStorage.setItem("filter_orderStatus", val);
+                              localStorage.setItem("filter_dashboard_orderStatus", val);
                             }}
                             placeholder="All Status"
                           />
@@ -1860,7 +1860,7 @@ function Dashboard() {
                                 const val = value || "";
                                 const previousValue = selectedDatePreset;
                                 setSelectedDatePreset(val);
-                                localStorage.setItem("filter_datePreset", val);
+                                localStorage.setItem("filter_dashboard_datePreset", val);
                                 // Clear date range when changing from "fromTo" to another preset or empty
                                 if (
                                   previousValue === "fromTo" &&
@@ -1871,9 +1871,9 @@ function Dashboard() {
                                     end: null,
                                   });
                                   localStorage.removeItem(
-                                    "filter_dateRangeStart"
+                                    "filter_dashboard_dateRangeStart"
                                   );
-                                  localStorage.removeItem("filter_dateRangeEnd");
+                                  localStorage.removeItem("filter_dashboard_dateRangeEnd");
                                 }
                                 // Clear date range when preset is selected (except for fromTo)
                                 if (val && val !== "fromTo") {
@@ -1882,9 +1882,9 @@ function Dashboard() {
                                     end: null,
                                   });
                                   localStorage.removeItem(
-                                    "filter_dateRangeStart"
+                                    "filter_dashboard_dateRangeStart"
                                   );
-                                  localStorage.removeItem("filter_dateRangeEnd");
+                                  localStorage.removeItem("filter_dashboard_dateRangeEnd");
                                 }
                               }}
                               placeholder="Date Preset"
@@ -1901,12 +1901,12 @@ function Dashboard() {
                                       }));
                                       if (date) {
                                         localStorage.setItem(
-                                          "filter_dateRangeStart",
+                                          "filter_dashboard_dateRangeStart",
                                           date.toISOString()
                                         );
                                       } else {
                                         localStorage.removeItem(
-                                          "filter_dateRangeStart"
+                                          "filter_dashboard_dateRangeStart"
                                         );
                                       }
                                       // Set preset to fromTo if dates are manually selected
@@ -1916,7 +1916,7 @@ function Dashboard() {
                                       ) {
                                         setSelectedDatePreset("fromTo");
                                         localStorage.setItem(
-                                          "filter_datePreset",
+                                          "filter_dashboard_datePreset",
                                           "fromTo"
                                         );
                                       }
@@ -1943,12 +1943,12 @@ function Dashboard() {
                                       }));
                                       if (date) {
                                         localStorage.setItem(
-                                          "filter_dateRangeEnd",
+                                          "filter_dashboard_dateRangeEnd",
                                           date.toISOString()
                                         );
                                       } else {
                                         localStorage.removeItem(
-                                          "filter_dateRangeEnd"
+                                          "filter_dashboard_dateRangeEnd"
                                         );
                                       }
                                       // Set preset to fromTo if dates are manually selected
@@ -1958,7 +1958,7 @@ function Dashboard() {
                                       ) {
                                         setSelectedDatePreset("fromTo");
                                         localStorage.setItem(
-                                          "filter_datePreset",
+                                          "filter_dashboard_datePreset",
                                           "fromTo"
                                         );
                                       }
@@ -2030,7 +2030,7 @@ function Dashboard() {
                               onChange={(value) => {
                                 const val = value || "";
                                 setSelectedCategory(val);
-                                localStorage.setItem("filter_category", val);
+                                localStorage.setItem("filter_dashboard_category", val);
                               }}
                               placeholder="All Categories"
                             />
@@ -2054,7 +2054,7 @@ function Dashboard() {
                               onChange={(value) => {
                                 const val = value || "";
                                 setSelectedAssetCategory(val);
-                                localStorage.setItem("filter_assetCategory", val);
+                                localStorage.setItem("filter_dashboard_assetCategory", val);
                               }}
                               placeholder="All Asset Categories"
                             />
@@ -2076,7 +2076,7 @@ function Dashboard() {
                               onChange={(value) => {
                                 const val = value || "";
                                 setSelectedSubCategory(val);
-                                localStorage.setItem("filter_subCategory", val);
+                                localStorage.setItem("filter_dashboard_subCategory", val);
                               }}
                               placeholder="All Sub Categories"
                             />
@@ -2098,7 +2098,7 @@ function Dashboard() {
                               onChange={(value) => {
                                 const val = value || "";
                                 setSelectedValuerName(val);
-                                localStorage.setItem("filter_valuerName", val);
+                                localStorage.setItem("filter_dashboard_valuerName", val);
                               }}
                               placeholder="All Valuers"
                             />
@@ -2120,7 +2120,7 @@ function Dashboard() {
                               onChange={(value) => {
                                 const val = value || "";
                                 setSelectedManager(val);
-                                localStorage.setItem("filter_manager", val);
+                                localStorage.setItem("filter_dashboard_manager", val);
                               }}
                               placeholder="All Managers"
                             />
@@ -2142,7 +2142,7 @@ function Dashboard() {
                               onChange={(value) => {
                                 const val = value || "";
                                 setSelectedBank(val);
-                                localStorage.setItem("filter_bank", val);
+                                localStorage.setItem("filter_dashboard_bank", val);
                               }}
                               placeholder="All Banks"
                             />
@@ -2164,7 +2164,7 @@ function Dashboard() {
                               onChange={(value) => {
                                 const val = value || "";
                                 setSelectedBranch(val);
-                                localStorage.setItem("filter_branch", val);
+                                localStorage.setItem("filter_dashboard_branch", val);
                               }}
                               placeholder="All Branches"
                             />
@@ -2186,7 +2186,7 @@ function Dashboard() {
                               onChange={(value) => {
                                 const val = value || "";
                                 setSelectedOfficer(val);
-                                localStorage.setItem("filter_officer", val);
+                                localStorage.setItem("filter_dashboard_officer", val);
                               }}
                               placeholder="All Officers"
                             />
@@ -2210,7 +2210,7 @@ function Dashboard() {
                               onChange={(value) => {
                                 const val = value || "";
                                 setSelectedFieldVerifier(val);
-                                localStorage.setItem("filter_fieldVerifier", val);
+                                localStorage.setItem("filter_dashboard_fieldVerifier", val);
                               }}
                               placeholder="All Field Verifiers"
                             />
@@ -2235,7 +2235,7 @@ function Dashboard() {
                               onChange={(value) => {
                                 const val = value || "";
                                 setSelectedPaymentStatus(val);
-                                localStorage.setItem("filter_paymentStatus", val);
+                                localStorage.setItem("filter_dashboard_paymentStatus", val);
                               }}
                               placeholder="All Payment Statuses"
                             />
@@ -2254,7 +2254,7 @@ function Dashboard() {
                             onChange={(value) => {
                               const val = value || "";
                               setSelectedCreatedBy(val);
-                              localStorage.setItem("filter_createdBy", val);
+                              localStorage.setItem("filter_dashboard_createdBy", val);
                             }}
                             placeholder="All Created By"
                           />
@@ -2273,7 +2273,7 @@ function Dashboard() {
                             onChange={(value) => {
                               const val = value || "";
                               setSelectedUserAssigned(val);
-                              localStorage.setItem("filter_userAssigned", val);
+                              localStorage.setItem("filter_dashboard_userAssigned", val);
                             }}
                             placeholder="All Users Assigned"
                           />
@@ -2547,14 +2547,19 @@ function Dashboard() {
                                   ? "clickable-row"
                                   : ""
                               }
-                              onClick={() => {
+                              onClick={(e) => {
                                 if (
                                   hasPermission(
                                     allowedPermissions,
                                     "view_order_details"
                                   )
                                 ) {
-                                  navigate(`/orders/${order.id}/details`);
+                                  const path = `/orders/${order.id}/details`;
+                                  if (e.ctrlKey || e.metaKey) {
+                                    window.open(path, "_blank", "noopener,noreferrer");
+                                  } else {
+                                    navigate(path);
+                                  }
                                 }
                               }}
                               style={{
