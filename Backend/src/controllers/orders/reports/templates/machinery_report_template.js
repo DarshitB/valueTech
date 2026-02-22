@@ -4,14 +4,14 @@
  * This is used by Machinery report template and its helper functions
  */
 const renderFieldValue = (value) => {
-  if (!value) return "";
-  // Convert string to string if it's not already
-  const strValue = String(value);
-  // Replace \r\n and \n with <br> tags for proper line breaks
-  return strValue
-    .replace(/\r\n/g, "<br>")
-    .replace(/\n/g, "<br>")
-    .replace(/\r/g, "<br>");
+    if (!value) return "";
+    // Convert string to string if it's not already
+    const strValue = String(value);
+    // Replace \r\n and \n with <br> tags for proper line breaks
+    return strValue
+        .replace(/\r\n/g, "<br>")
+        .replace(/\n/g, "<br>")
+        .replace(/\r/g, "<br>");
 };
 
 /**
@@ -25,13 +25,13 @@ const renderFieldValue = (value) => {
  * @returns {string} HTML content
  */
 function generateMachineryReportHTML(
-  formData,
-  extraData,
-  bgImageBase64,
-  stampImageBase64,
-  reportTypeSelection
+    formData,
+    extraData,
+    bgImageBase64,
+    stampImageBase64,
+    reportTypeSelection
 ) {
-  return `
+    return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -416,9 +416,8 @@ body.single-page{
         </tr>
         <tr>
             <td>REF NO.</td>
-            <td colspan="2">${formData.ref_no_year}/${formData.ref_no_bank}/${
-    formData.state_name
-  }/${formData.ref_no_code}/${formData.ref_no_month}${formData.ref_no_id}</td>
+            <td colspan="2">${formData.ref_no_year}/${formData.ref_no_bank}/${formData.state_name
+        }/${formData.ref_no_code}/${formData.ref_no_month}${formData.ref_no_id}</td>
             <td style="text-transform: uppercase;">${formData.report_date_heading}:</td>
             <td colspan="2">${formData.report_date}</td>
         </tr>
@@ -467,17 +466,15 @@ body.single-page{
         </tr>
         <tr>
             <td>REGISTRATION NO:</td>
-            <td colspan="2">${
-              formData.registration_no
-                ? formData.registration_no
-                : "NOT APPLICABLE"
-            }</td>
+            <td colspan="2">${formData.registration_no
+            ? formData.registration_no
+            : "NOT APPLICABLE"
+        }</td>
             <td>REGISTRATION DATE:</td>
-            <td colspan="2">${
-              formData.registration_date === "00-00-0000"
-                ? "NA"
-                : formData.registration_date
-            }</td>
+            <td colspan="2">${formData.registration_date === "00-00-0000"
+            ? "NA"
+            : formData.registration_date
+        }</td>
         </tr>
         <tr>
             <td>LOCATION OF MACHINERY:</td>
@@ -510,11 +507,10 @@ body.single-page{
             <td colspan="2">${formData.application_usage}</td>
             <td style="text-transform: uppercase;">${formData.invoice_no_heading || "INVOICE NO. & DATE:"}</td>
             <td colspan="2">
-                ${
-                  formData.invoice_no_date
-                    ? formData.invoice_no_date
-                    : "NOT AVAILABLE"
-                }
+                ${formData.invoice_no_date
+            ? formData.invoice_no_date
+            : "NOT AVAILABLE"
+        }
             </td>
         </tr>
         <tr>
@@ -522,17 +518,16 @@ body.single-page{
             <td colspan="2">${renderFieldValue(formData.hyp_with)}</td>
             <td>MACHINE TYPE:</td>
             <td colspan="2">
-                ${
-                  formData.machine_type
-                    ? formData.machine_type
-                    : "NOT AVAILABLE"
-                }
+                ${formData.machine_type
+            ? formData.machine_type
+            : "NOT AVAILABLE"
+        }
             </td>
         </tr>
         ${generateAdditionalRows(formData, "inspected")}
         ${generateFlexibleFieldsForSection(
-          formData.flexible_fields || [],
-          "INSPECTED_EQUIPMENT_DETAILS"
+            formData.flexible_fields || [],
+            "INSPECTED_EQUIPMENT_DETAILS"
         )}
         <tr>
             <th colspan="6">${formData.comments_on_equipment_heading}</th>
@@ -555,11 +550,10 @@ body.single-page{
             <td>MECHANICAL CONDITION:</td>
             <td colspan="2">${formData.mechanical_condition}</td>
         </tr>
-        ${
-          formData.fix_but_flex_heading_1 &&
-          formData.fix_but_flex_value_1 &&
-          formData.fix_but_flex_heading_2 &&
-          formData.fix_but_flex_value_2
+        ${formData.fix_but_flex_heading_1 &&
+            formData.fix_but_flex_value_1 &&
+            formData.fix_but_flex_heading_2 &&
+            formData.fix_but_flex_value_2
             ? `<tr>
             <td>${formData.fix_but_flex_heading_1}:</td>
             <td colspan="2">${formData.fix_but_flex_value_1}</td>
@@ -568,11 +562,10 @@ body.single-page{
         </tr>`
             : ""
         }
-        ${
-          formData.fix_but_flex_heading_3 &&
-          formData.fix_but_flex_value_3 &&
-          formData.fix_but_flex_heading_4 &&
-          formData.fix_but_flex_value_4
+        ${formData.fix_but_flex_heading_3 &&
+            formData.fix_but_flex_value_3 &&
+            formData.fix_but_flex_heading_4 &&
+            formData.fix_but_flex_value_4
             ? `<tr>
             <td>${formData.fix_but_flex_heading_3}:</td>
             <td colspan="2">${formData.fix_but_flex_value_3}</td>
@@ -581,73 +574,58 @@ body.single-page{
         </tr>`
             : ""
         }
-        ${
-          formData.fix_but_flex_heading_5 &&
-          formData.fix_but_flex_value_5 &&
-          formData.fix_but_flex_heading_6 &&
-          formData.fix_but_flex_value_6 &&
-          formData.fix_but_flex_heading_7 &&
-          formData.fix_but_flex_value_7
+        ${formData.fix_but_flex_heading_5 &&
+            formData.fix_but_flex_value_5 &&
+            formData.fix_but_flex_heading_6 &&
+            formData.fix_but_flex_value_6 &&
+            formData.fix_but_flex_heading_7 &&
+            formData.fix_but_flex_value_7
             ? `<tr>
             <td>${formData.fix_but_flex_heading_5}:</td>
-            <td colspan="2" style="padding: 0; margin: 0;">
-                <div style="display: flex; width: 100%; height: 100%;">
-                    <div style="flex: 1; border-right: 1px solid #000; padding: 1.5px; text-align: center; font-size: 9.3px; text-transform: uppercase;">
-                        ${formData.fix_but_flex_value_5}
-                    </div>
-                    <div style="flex: 1; border-right: 1px solid #000; padding: 1.5px; text-align: center; font-size: 9.3px; text-transform: uppercase;">
-                        ${formData.fix_but_flex_heading_6}
-                    </div>
-                    <div style="flex: 1; padding: 1.5px; text-align: center; font-size: 9.3px; text-transform: uppercase;">
-                        ${formData.fix_but_flex_value_6}
-                    </div>
-                </div>
+            <td>
+                ${formData.fix_but_flex_value_5}
+            </td>
+            <td>
+                ${formData.fix_but_flex_heading_6}
+            </td>
+            <td>
+                ${formData.fix_but_flex_value_6}
             </td>
             <td>${formData.fix_but_flex_heading_7}:</td>
-            <td colspan="2">${formData.fix_but_flex_value_7}</td>
+            <td>${formData.fix_but_flex_value_7}</td>
         </tr>`
             : ""
         }
-        ${
-          formData.fix_but_flex_heading_8 &&
-          formData.fix_but_flex_value_8 &&
-          formData.fix_but_flex_heading_9 &&
-          formData.fix_but_flex_value_9 &&
-          formData.fix_but_flex_heading_10 &&
-          formData.fix_but_flex_value_10
+        ${formData.fix_but_flex_heading_8 &&
+            formData.fix_but_flex_value_8 &&
+            formData.fix_but_flex_heading_9 &&
+            formData.fix_but_flex_value_9 &&
+            formData.fix_but_flex_heading_10 &&
+            formData.fix_but_flex_value_10
             ? `<tr>
             <td>${formData.fix_but_flex_heading_8}:</td>
-            <td colspan="2" style="padding: 0; margin: 0;">
-                <div style="display: flex; width: 100%; height: 100%;">
-                    <div style="flex: 1; border-right: 1px solid #000; padding: 1.5px; text-align: center; font-size: 9.3px; text-transform: uppercase;">
-                        ${formData.fix_but_flex_value_8}
-                    </div>
-                    <div style="flex: 2; padding: 1.5px; text-align: center; font-size: 9.3px; text-transform: uppercase;">
-                        ${formData.fix_but_flex_heading_9}
-                    </div>
-                </div>
+            <td>
+                ${formData.fix_but_flex_value_8}
             </td>
-            <td style="padding: 0; margin: 0;">
+            <td>
+                ${formData.fix_but_flex_heading_9}
+            </td>
+            <td>
                 ${formData.fix_but_flex_value_9}
             </td>
-            <td colspan="2">
-                <div style="display: flex; width: 100%; height: 100%;">
-                    <div style="flex: 1; border-right: 1px solid #000; padding: 1.5px; text-align: center; font-size: 9.3px; text-transform: uppercase;margin: 0 !important;">
-                        ${formData.fix_but_flex_heading_10}
-                    </div>
-                    <div style="flex: 1; padding: 1.5px; text-align: center; font-size: 9.3px; text-transform: uppercase;margin: 0 !important;">
-                        ${formData.fix_but_flex_value_10}
-                    </div>
-                </div>
-            </td
+            <td>
+                ${formData.fix_but_flex_heading_10}
+            </td>
+            <td>
+                ${formData.fix_but_flex_value_10}
+            </td>
         </tr>`
             : ""
         }
-        ${
-          formData.fix_but_flex_heading_11 &&
-          formData.fix_but_flex_value_11 &&
-          formData.fix_but_flex_heading_12 &&
-          formData.fix_but_flex_value_12
+        ${formData.fix_but_flex_heading_11 &&
+            formData.fix_but_flex_value_11 &&
+            formData.fix_but_flex_heading_12 &&
+            formData.fix_but_flex_value_12
             ? `<tr>
             <td>${formData.fix_but_flex_heading_11}:</td>
             <td colspan="2">${renderFieldValue(formData.fix_but_flex_value_11)}</td>
@@ -665,17 +643,16 @@ body.single-page{
         </tr>
         ${generateAdditionalRows(formData, "comments")}
         ${generateFlexibleFieldsForSection(
-          formData.flexible_fields || [],
-          "COMMENTS_ON_EQUIPMENT_AT_THE_TIME_OF_INSPECTION"
+            formData.flexible_fields || [],
+            "COMMENTS_ON_EQUIPMENT_AT_THE_TIME_OF_INSPECTION"
         )}
         <tr>
             <th>DAMAGES IF ANY:</th>
             <td colspan="5">
-                ${
-                  formData.damages_if_any
-                    ? formData.damages_if_any
-                    : "NOT VISIBLE"
-                }
+                ${formData.damages_if_any
+            ? formData.damages_if_any
+            : "NOT VISIBLE"
+        }
             </td>
         </tr>
         <tr>
@@ -686,57 +663,51 @@ body.single-page{
             <td colspan="2">${formData.tax_invoice_copy ? formData.tax_invoice_copy : "NOT AVAILABLE"}</td>
             <td>BILL OF ENTRY:</td>
             <td colspan="2">${formData.bill_of_entry ? formData.bill_of_entry : "NOT AVAILABLE"}</td>
-            <!-- <td>${
-              formData.tax_upto_title
-                ? formData.tax_upto_title
-                : "NOT AVAILABLE"
-            }:</td>
+            <!-- <td>${formData.tax_upto_title
+            ? formData.tax_upto_title
+            : "NOT AVAILABLE"
+        }:</td>
             <td>
-                ${
-                  formData.tax_upto
-                    ? formData.tax_upto === "00-00-0000"
-                      ? "LTT"
-                      : formData.tax_upto
-                    : "NOT AVAILABLE"
-                }
+                ${formData.tax_upto
+            ? formData.tax_upto === "00-00-0000"
+                ? "LTT"
+                : formData.tax_upto
+            : "NOT AVAILABLE"
+        }
             </td> -->
         </tr>
         <!-- <tr>
            <td>PERMIT UPTO:</td>
             <td>
-                ${
-                  formData.permit_upto
-                    ? formData.permit_upto === "00-00-0000"
-                      ? "LTT"
-                      : formData.permit_upto
-                    : "NOT AVAILABLE"
-                }
+                ${formData.permit_upto
+            ? formData.permit_upto === "00-00-0000"
+                ? "LTT"
+                : formData.permit_upto
+            : "NOT AVAILABLE"
+        }
             </td>
             <td>PERMIT TYPE:</td>
             <td>
                 ${formData.permit_type ? formData.permit_type : "NOT AVAILABLE"}
             </td>
-            <td>${
-              formData.fitness_upto_title
-                ? formData.fitness_upto_title
-                : "NOT AVAILABLE"
-            }:</td>
+            <td>${formData.fitness_upto_title
+            ? formData.fitness_upto_title
+            : "NOT AVAILABLE"
+        }:</td>
             <td>
-                ${
-                  formData.fitness_upto
-                    ? formData.fitness_upto
-                    : "NOT AVAILABLE"
-                }
+                ${formData.fitness_upto
+            ? formData.fitness_upto
+            : "NOT AVAILABLE"
+        }
             </td> 
         </tr> -->
         <tr>
             <!-- <td>INSURANCE CO.Name:</td>
             <td colspan="2">
-                ${
-                  formData.insurance_co_name
-                    ? formData.insurance_co_name
-                    : "NOT AVAILABLE"
-                }
+                ${formData.insurance_co_name
+            ? formData.insurance_co_name
+            : "NOT AVAILABLE"
+        }
             </td> -->
             <td>INSURANCE COPY:</td>
             <td colspan="2">${formData.rc_book_verified ? formData.rc_book_verified : "NOT AVAILABLE"}</td>
@@ -748,19 +719,17 @@ body.single-page{
         <tr>
             <td rowspan="2">INSURANCE VAL. DATE:</td>
             <td rowspan="2" colspan="2">
-                ${
-                  extraData.insurance_valid_date
-                    ? extraData.insurance_valid_date
-                    : "NOT AVAILABLE"
-                }
+                ${extraData.insurance_valid_date
+            ? extraData.insurance_valid_date
+            : "NOT AVAILABLE"
+        }
             </td>
             <td>INSURED VALUE:</td>
             <td colspan="2">
-                 ${
-                  formData.insured_value
-                    ? "RS. " + formData.insured_value
-                    : "NOT AVAILABLE"
-                }
+                 ${formData.insured_value
+            ? "RS. " + formData.insured_value
+            : "NOT AVAILABLE"
+        }
             </td>
         </tr>
         <tr>
@@ -786,9 +755,8 @@ body.single-page{
         <tr>
             <td>NO OF PHOTOGRAPH:</td>
             <td colspan="3">${formData.no_of_photograph} PHOTOS</td>
-            <th rowspan="2" colspan="2">AMOUNT IN WORDS :- ${
-              formData.amount_in_words
-            }</th>
+            <th rowspan="2" colspan="2">AMOUNT IN WORDS :- ${formData.amount_in_words
+        }</th>
         </tr>
         <tr>
             <td>NO OF COLLAGE:</td>
@@ -809,8 +777,8 @@ body.single-page{
             <td colspan="5">${renderFieldValue(formData.disclaimer)}</td>
         </tr>
         ${generateFlexibleFieldsForSection(
-          formData.flexible_fields || [],
-          "OVER_ALL_FEED_BACK_OF_THE_INSPECTED"
+            formData.flexible_fields || [],
+            "OVER_ALL_FEED_BACK_OF_THE_INSPECTED"
         )}
         <tr class="signature-row">
             <td colspan="6" style="height: 48px; position: relative;">
@@ -846,30 +814,30 @@ body.single-page{
  * @returns {string} HTML for additional rows
  */
 function generateAdditionalRows(formData, type) {
-  let html = "";
-  const prefix =
-    type === "inspected"
-      ? "additional_rows_inspected"
-      : "additional_rows_comments";
+    let html = "";
+    const prefix =
+        type === "inspected"
+            ? "additional_rows_inspected"
+            : "additional_rows_comments";
 
-  // First additional row
-  if (formData[`${prefix}_headding_1`] || formData[`${prefix}_value_1`]) {
-    html += `
+    // First additional row
+    if (formData[`${prefix}_headding_1`] || formData[`${prefix}_value_1`]) {
+        html += `
     <tr>
         <td>${formData[`${prefix}_headding_1`] || ""}</td>
         <td colspan="5">${formData[`${prefix}_value_1`] || ""}</td>
     </tr>
     `;
-  }
+    }
 
-  // Second and third additional rows (combined)
-  if (
-    formData[`${prefix}_headding_2`] ||
-    formData[`${prefix}_value_2`] ||
-    formData[`${prefix}_headding_3`] ||
-    formData[`${prefix}_value_3`]
-  ) {
-    html += `
+    // Second and third additional rows (combined)
+    if (
+        formData[`${prefix}_headding_2`] ||
+        formData[`${prefix}_value_2`] ||
+        formData[`${prefix}_headding_3`] ||
+        formData[`${prefix}_value_3`]
+    ) {
+        html += `
     <tr>
         <td>${formData[`${prefix}_headding_2`] || ""}</td>
         <td colspan="2">${formData[`${prefix}_value_2`] || ""}</td>
@@ -877,9 +845,9 @@ function generateAdditionalRows(formData, type) {
         <td colspan="2">${formData[`${prefix}_value_3`] || ""}</td>
     </tr>
     `;
-  }
+    }
 
-  return html;
+    return html;
 }
 
 /**
@@ -889,72 +857,72 @@ function generateAdditionalRows(formData, type) {
  * @returns {string} HTML for flexible fields in the specified section
  */
 function generateFlexibleFieldsForSection(flexibleFields, sectionName) {
-  if (!flexibleFields || flexibleFields.length === 0) {
-    return "";
-  }
+    if (!flexibleFields || flexibleFields.length === 0) {
+        return "";
+    }
 
-  // Filter fields for the specific section
-  const sectionFields = flexibleFields.filter(
-    (field) => field.section_name === sectionName
-  );
+    // Filter fields for the specific section
+    const sectionFields = flexibleFields.filter(
+        (field) => field.section_name === sectionName
+    );
 
-  if (sectionFields.length === 0) {
-    return "";
-  }
+    if (sectionFields.length === 0) {
+        return "";
+    }
 
-  let html = "";
+    let html = "";
 
-  // Process fields row by row, ensuring total columns don't exceed 6
-  let i = 0;
-  while (i < sectionFields.length) {
-    html += "<tr>";
-    let currentRowColumns = 0;
+    // Process fields row by row, ensuring total columns don't exceed 6
+    let i = 0;
+    while (i < sectionFields.length) {
+        html += "<tr>";
+        let currentRowColumns = 0;
 
-    // Add fields to current row until we reach 6 columns or run out of fields
-    while (i < sectionFields.length && currentRowColumns < 6) {
-      const field = sectionFields[i];
-      const colSpan = field.col_span ? parseInt(field.col_span) : 2;
+        // Add fields to current row until we reach 6 columns or run out of fields
+        while (i < sectionFields.length && currentRowColumns < 6) {
+            const field = sectionFields[i];
+            const colSpan = field.col_span ? parseInt(field.col_span) : 2;
 
-      // Calculate how many columns this field will take
-      let fieldColumns;
-      let valueColSpan;
+            // Calculate how many columns this field will take
+            let fieldColumns;
+            let valueColSpan;
 
-      if (colSpan === 1) {
-        // col_span 1: label (1 col) + value (5 cols) = 6 total columns
-        fieldColumns = 6;
-        valueColSpan = 5;
-      } else {
-        // col_span 2: label (1 col) + value (2 cols) = 3 total columns
-        fieldColumns = 3;
-        valueColSpan = 2;
-      }
+            if (colSpan === 1) {
+                // col_span 1: label (1 col) + value (5 cols) = 6 total columns
+                fieldColumns = 6;
+                valueColSpan = 5;
+            } else {
+                // col_span 2: label (1 col) + value (2 cols) = 3 total columns
+                fieldColumns = 3;
+                valueColSpan = 2;
+            }
 
-      // Check if this field fits in the current row
-      if (currentRowColumns + fieldColumns <= 6) {
-        html += `
+            // Check if this field fits in the current row
+            if (currentRowColumns + fieldColumns <= 6) {
+                html += `
           <td style="font-weight: bold;">${field.field_label || ""}</td>
           <td colspan="${valueColSpan}">${field.field_value || ""}</td>
         `;
-        currentRowColumns += fieldColumns;
-        i++;
-      } else {
-        // Field doesn't fit, break to next row
-        break;
-      }
+                currentRowColumns += fieldColumns;
+                i++;
+            } else {
+                // Field doesn't fit, break to next row
+                break;
+            }
+        }
+
+        // Fill remaining columns in the row if needed
+        if (currentRowColumns < 6) {
+            const remainingColumns = 6 - currentRowColumns;
+            html += `<td colspan="${remainingColumns}"></td>`;
+        }
+
+        html += "</tr>";
     }
 
-    // Fill remaining columns in the row if needed
-    if (currentRowColumns < 6) {
-      const remainingColumns = 6 - currentRowColumns;
-      html += `<td colspan="${remainingColumns}"></td>`;
-    }
-
-    html += "</tr>";
-  }
-
-  return html;
+    return html;
 }
 
 module.exports = {
-  generateMachineryReportHTML,
+    generateMachineryReportHTML,
 };
