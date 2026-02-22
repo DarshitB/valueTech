@@ -128,18 +128,22 @@ exports.getForMobile = async (req, res, next) => {
           }
 
           // Check if any media is rejected (status = 2 in order_media_image_video)
-          const rejectedMedia = await db("order_media_image_video")
+          const rejectedResult = await db("order_media_image_video")
             .where("order_id", order.id)
             .where("status", 2)
+            .count("id as count")
             .first();
 
-          if (rejectedMedia) {
+          const num_of_rejected_img = parseInt(rejectedResult?.count ?? 0, 10);
+
+          if (num_of_rejected_img > 0) {
             mobile_job_status = 4; // Images Rejected
           }
 
           return {
             ...order,
             mobile_job_status,
+            num_of_rejected_img,
           };
         })
       );
@@ -167,6 +171,68 @@ exports.getForMobile = async (req, res, next) => {
         orders: [],
       });
     }
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Get all rejected image/video URLs for an order (mobile – field verifier only)
+exports.getRejectedMediaForOrder = async (req, res, next) => {
+  try {
+    const fieldVerifierId = req.verifier.id;
+    const orderId = parseInt(req.params.orderId, 10);
+
+    if (!orderId || Number.isNaN(orderId)) {
+      return res.status(400).json({
+        state: 0,
+        message: "Invalid order ID",
+        order_id: null,
+        rejected_media: [],
+      });
+    }
+
+    const order = await db("orders")
+      .select("id", "field_verifier_id")
+      .where("id", orderId)
+      .whereNull("deleted_at")
+      .first();
+
+    if (!order) {
+      return res.status(404).json({
+        state: 0,
+        message: "Order not found",
+        order_id: orderId,
+        rejected_media: [],
+      });
+    }
+
+    if (order.field_verifier_id !== fieldVerifierId) {
+      return res.status(403).json({
+        state: 0,
+        message: "Not authorized to access this order",
+        order_id: orderId,
+        rejected_media: [],
+      });
+    }
+
+    const rejectedRows = await db("order_media_image_video")
+      .select("id", "media_url", "media_type")
+      .where("order_id", orderId)
+      .where("status", 2)
+      .orderBy("id", "asc");
+
+    const rejected_media = rejectedRows.map((row) => ({
+      id: row.id,
+      url: row.media_url,
+      media_type: row.media_type,
+    }));
+
+    res.json({
+      state: 1,
+      message: "Rejected media fetched successfully",
+      order_id: orderId,
+      rejected_media,
+    });
   } catch (err) {
     next(err);
   }

@@ -11,6 +11,7 @@ router.use(mobileAuth);
 
 router.get("/me", mobileAuthController.getMe);
 router.get("/orders", orderController.getForMobile);
+router.get("/orders/:orderId/rejected-media", orderController.getRejectedMediaForOrder);
 router.post("/order-action", orderController.mobileOrderAction);
 
 module.exports = router;
