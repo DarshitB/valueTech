@@ -988,7 +988,7 @@ function MachineryReport() {
 
       // More robust field population - try to set all relevant fields
       Object.entries(report).forEach(([key, value]) => {
-        // Skip system fields, valuer-related fields, and heading fields (already handled above)
+        // Skip system fields, valuer-related fields, heading fields, and disclaimer (always use getDisclaimer)
         if (
           key.startsWith("created_") ||
           key.startsWith("updated_") ||
@@ -998,6 +998,7 @@ function MachineryReport() {
           key === "valuer_name" ||
           key === "license_no" ||
           key === "ref_no_code" ||
+          key === "disclaimer" ||
           headingFields.includes(key)
         ) {
           return;
@@ -1082,13 +1083,8 @@ function MachineryReport() {
         updated[key] = fieldValue;
       });
 
-      // Update disclaimer to replace "VALUETECH SOLUTIONS" with actual valuer name if needed
-      if (updated.disclaimer && order?.valuer_name) {
-        updated.disclaimer = updated.disclaimer.replace(
-          /VALUETECH SOLUTIONS/g,
-          order.valuer_name
-        );
-      }
+      // Disclaimer: always use getDisclaimer (never override with saved data)
+      updated.disclaimer = getDisclaimer(order?.valuer_name || "VALUETECH SOLUTIONS", order);
 
       // Ensure ref_no_month has a default value if it's empty or null
       if (!updated.ref_no_month || updated.ref_no_month.trim() === "") {
@@ -1167,6 +1163,7 @@ function MachineryReport() {
     order,
     buildCategorySuffix,
     buildValuationReportHeading,
+    getDisclaimer,
   ]);
 
   // Set page title with breadcrumb navigation
