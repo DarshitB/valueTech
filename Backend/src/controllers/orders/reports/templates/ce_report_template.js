@@ -837,8 +837,8 @@ body.single-page{
         <tr>
             <td rowspan="2" colspan="2">INSURANCE VAL. DATE:</td>
             <td rowspan="2" colspan="2">
-                ${extraData.insurance_valid_date
-            ? extraData.insurance_valid_date
+                ${formData.insurance_valid_date
+            ? formData.insurance_valid_date
             : "NOT AVAILABLE"
         }
             </td>

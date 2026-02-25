@@ -2157,14 +2157,18 @@ function CVReport() {
               updated.period_of_insurance = rcData.insuranceUpto;
             }
 
-            // Hyp With: when lender is present from RC API, set "{lender} (present), {bank_name} under process (If Financed)"
+            // Hyp With:
+            // - If lender present from RC API: "{LENDER} (PRESENT), {BANK_NAME} HYPO. UNDER PROCESS (IF FINANCED)"
+            // - If no lender but bank name exists: "{BANK_NAME} HYPO. UNDER PROCESS (IF FINANCED)"
+            const bankName = order?.bank_name ? String(order.bank_name).trim() : "";
             if (rcData.lender != null && String(rcData.lender).trim() !== "") {
               const lender = String(rcData.lender).trim();
-              const bankName = order?.bank_name ? String(order.bank_name).trim() : "";
               const hypWithValue = bankName
-                ? `${lender} (present), ${bankName} under process (If Financed)`
+                ? `${lender} (present), ${bankName} hypo. under process (If Financed)`
                 : `${lender} (present)`;
               updated.hyp_with = hypWithValue.toUpperCase();
+            } else if (bankName) {
+              updated.hyp_with = `${bankName} hypo. under process (If Financed)`.toUpperCase();
             }
 
             /* console.log("📝 CVReport External API - Updated form data:", updated); */
