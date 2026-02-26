@@ -5574,8 +5574,11 @@ function CEReport() {
               <div className="row">
                 <div className="col-md-4">
                   <div className="form-group">
-                    <label htmlFor="insurance_valid_date">
+                    <label htmlFor="insurance_valid_date" style={{ display: "flex", alignItems: "center", gap: "5px" }}>
                       Insurance Val. Date
+                      <small className="text-muted d-block mt-1">
+                        ( Add just end date )
+                      </small>
                     </label>
                     <input
                       type="text"
@@ -5583,7 +5586,9 @@ function CEReport() {
                       id="insurance_valid_date"
                       name="insurance_valid_date"
                       value={reportFormData.insurance_valid_date}
-                      onChange={handleFormChange}
+                      onChange={handleDateChange}
+                      placeholder="DD-MM-YYYY"
+                      maxLength="10"
                     />
                   </div>
                 </div>

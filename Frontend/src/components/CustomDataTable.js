@@ -4,6 +4,18 @@ import { SearchIcon } from "./icons";
 
 const STORAGE_KEY = "customDataTable_entriesPerPage";
 
+// Recursively extract visible text from React nodes (strings, numbers, Link/component children)
+const getTextFromReactNode = (node) => {
+  if (node == null) return "";
+  if (typeof node === "string") return node;
+  if (typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(getTextFromReactNode).join("");
+  if (React.isValidElement(node) && node.props?.children != null) {
+    return getTextFromReactNode(node.props.children);
+  }
+  return "";
+};
+
 const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = true }) => {
   const { header, rows, footer, buttons, filters } = children;
 
@@ -20,16 +32,17 @@ const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = tr
     direction: "asc",
   });
 
-  // Extract raw data from row elements
+  // Extract raw data from row elements (plain text and link/component text both searchable)
   const rawData = useMemo(() => {
     return React.Children.map(rows, (row) => {
       // Filter out falsy values (false, null, undefined) from children
       const cells = React.Children.toArray(row.props.children).filter(Boolean);
       return {
         element: row,
-        data: cells.map(
-          (cell) => cell.props?.children?.toString().toLowerCase() ?? ""
-        ),
+        data: cells.map((cell) => {
+          const text = getTextFromReactNode(cell.props?.children);
+          return (text && String(text).toLowerCase()) ?? "";
+        }),
       };
     });
   }, [rows]);

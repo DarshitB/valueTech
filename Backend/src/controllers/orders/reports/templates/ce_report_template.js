@@ -18,6 +18,94 @@ const isNotApplicable = (value) =>
     typeof value === "string" && value.trim().toLowerCase() === "not applicable";
 
 /**
+ * Parse a date string (DD/MM/YYYY, YYYY-MM-DD, or similar) and return DD/MM/YYYY.
+ * @param {string} str - Date string (e.g. "22/01/2027", "2027-01-22")
+ * @returns {string|null} DD/MM/YYYY or null if unparseable
+ */
+function parseToDDMMYYYY(str) {
+    if (!str || typeof str !== "string") return null;
+    const trimmed = str.trim();
+    if (!trimmed) return null;
+    // YYYY-MM-DD first (4 digits at start - must be before DD-MM-YYYY)
+    const iso = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (iso) {
+        return `${iso[3].padStart(2, "0")}/${iso[2].padStart(2, "0")}/${iso[1]}`;
+    }
+    // DD/MM/YYYY or DD-MM-YYYY (slash or dash)
+    const dmy = trimmed.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+    if (dmy) {
+        return `${dmy[1].padStart(2, "0")}/${dmy[2].padStart(2, "0")}/${dmy[3]}`;
+    }
+    // Fallback: Date parse for other formats
+    const date = new Date(trimmed);
+    if (!Number.isNaN(date.getTime())) {
+        const d = String(date.getDate()).padStart(2, "0");
+        const m = String(date.getMonth() + 1).padStart(2, "0");
+        return `${d}/${m}/${date.getFullYear()}`;
+    }
+    return null;
+}
+
+/**
+ * Parse DD/MM/YYYY string to a Date object (for date math).
+ * @param {string} ddmmyyyy - e.g. "22/01/2027"
+ * @returns {Date|null}
+ */
+function parseDDMMYYYYToDate(ddmmyyyy) {
+    if (!ddmmyyyy || typeof ddmmyyyy !== "string") return null;
+    const m = ddmmyyyy.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!m) return null;
+    const day = parseInt(m[1], 10);
+    const month = parseInt(m[2], 10) - 1; // 0-based
+    const year = parseInt(m[3], 10);
+    const date = new Date(year, month, day);
+    if (Number.isNaN(date.getTime())) return null;
+    return date;
+}
+
+/**
+ * Format DD/MM/YYYY from a Date object.
+ * @param {Date} date
+ * @returns {string}
+ */
+function dateToDDMMYYYY(date) {
+    if (!date || Number.isNaN(date.getTime())) return null;
+    const d = String(date.getDate()).padStart(2, "0");
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const y = date.getFullYear();
+    return `${d}/${m}/${y}`;
+}
+
+/**
+ * Format period of insurance / insurance valid date as "From 00:00 Hrs of DD/MM/YYYY To 23:59 Hrs Midnight Of DD/MM/YYYY".
+ * End date is taken from payload (last date if range, or the only date). Start date is always
+ * computed as end date - 1 year + 1 day (insurance is 1 year).
+ * Splits only on " - " (space-dash-space) so "17-01-2026" is kept as one date, not split.
+ * @param {string} periodOfInsurance - e.g. "17-01-2026", "22/01/2027", "23/01/2026 - 22/01/2027"
+ * @returns {string} Formatted string or "NOT AVAILABLE" if blank/invalid
+ */
+function formatPeriodOfInsurance(periodOfInsurance) {
+    if (!periodOfInsurance || typeof periodOfInsurance !== "string") return "NOT AVAILABLE";
+    const trimmed = periodOfInsurance.trim();
+    // First try whole string as a single date (so "17-01-2026" or "17/01/2026" is used as end date)
+    let toDateStr = parseToDDMMYYYY(trimmed);
+    if (!toDateStr) {
+        // Not a single date: split only by space-dash-space (date range), not every dash
+        const parts = trimmed.split(/\s+-\s+/).map((p) => parseToDDMMYYYY(p.trim())).filter(Boolean);
+        if (parts.length === 0) return "NOT AVAILABLE";
+        toDateStr = parts[parts.length - 1];
+    }
+    const endDate = parseDDMMYYYYToDate(toDateStr);
+    if (!endDate) return "NOT AVAILABLE";
+    const startDate = new Date(endDate);
+    startDate.setFullYear(startDate.getFullYear() - 1);
+    startDate.setDate(startDate.getDate() + 1);
+    const fromDateStr = dateToDDMMYYYY(startDate);
+    if (!fromDateStr) return "NOT AVAILABLE";
+    return `From 00:00 Hrs of ${fromDateStr} To 23:59 Hrs Midnight Of ${toDateStr}`;
+}
+
+/**
  * CE Report Template
  * This template generates HTML for Commercial Equipment reports
  *
@@ -835,12 +923,9 @@ body.single-page{
             </td>
         </tr>
         <tr>
-            <td rowspan="2" colspan="2">INSURANCE VAL. DATE:</td>
+            <td rowspan="2">INSURANCE VAL. DATE:</td>
             <td rowspan="2" colspan="2">
-                ${formData.insurance_valid_date
-            ? formData.insurance_valid_date
-            : "NOT AVAILABLE"
-        }
+                ${formatPeriodOfInsurance(formData.insurance_valid_date)}
             </td>
             <td>INSURED VALUE:</td>
             <td colspan="2">
