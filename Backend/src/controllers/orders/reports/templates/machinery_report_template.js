@@ -359,6 +359,10 @@ body.single-page{
             overflow: hidden;
             overflow-wrap: break-word;
         }
+        table.main-table tr.tyre-image-row td,
+        table.main-table tr.signature-row td {
+            overflow: visible;
+        }
 
         ${reportTypeSelection === "Rough" ? `
         /* Watermark for Rough reports - appears on every page */
