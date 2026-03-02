@@ -166,6 +166,12 @@ function AVRReport() {
   
   // State for report type selection (Rough/Production)
   const [reportTypeSelection, setReportTypeSelection] = useState("Rough");
+
+  // State to track if initial report fetch has completed
+  const [reportFetchCompleted, setReportFetchCompleted] = useState(false);
+  // Ref to track if we've seen the report loading state
+  const reportLoadingStartedRef = useRef(false);
+
   // Clear report data when component mounts or order changes
   useEffect(() => {
     // Clear any existing report data first
@@ -173,6 +179,8 @@ function AVRReport() {
     isDirtyRef.current = false;
     initialFormDataRef.current = null;
     initialFlexibleFieldsRef.current = null;
+    reportLoadingStartedRef.current = false;
+    setReportFetchCompleted(false);
   }, [dispatch, id]);
 
   // Fetch order details when component mounts or ID changes
@@ -676,15 +684,42 @@ function AVRReport() {
     }
   }, [currentReport, id, parseCurrency, convertNumberToWordsIndian]);
 
-  // Handle form input changes
-  // Capture a clean snapshot the first time initial loading finishes.
+  // Track when the initial report fetch completes
   useEffect(() => {
-    if (!reportLoading && initialFormDataRef.current === null) {
+    // Step 1: Mark that loading has started when reportLoading becomes true
+    if (reportLoading && !reportLoadingStartedRef.current) {
+      reportLoadingStartedRef.current = true;
+    }
+
+    // Step 2: Mark completed only after loading started AND becomes false
+    if (!reportLoading && reportLoadingStartedRef.current && !reportFetchCompleted) {
+      const timer = setTimeout(() => {
+        setReportFetchCompleted(true);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+
+    // Fallback: if loading state never detected after 1.5s, assume completed
+    if (!reportLoadingStartedRef.current && !reportFetchCompleted) {
+      const fallbackTimer = setTimeout(() => {
+        if (!reportFetchCompleted) {
+          reportLoadingStartedRef.current = true;
+          setReportFetchCompleted(true);
+        }
+      }, 1500);
+      return () => clearTimeout(fallbackTimer);
+    }
+  }, [reportLoading, reportFetchCompleted]);
+
+  // Capture a clean snapshot the first time initial loading finishes.
+  // Any change after this point is considered "dirty".
+  useEffect(() => {
+    if (!reportLoading && initialFormDataRef.current === null && reportFetchCompleted) {
       initialFormDataRef.current = reportFormData;
       initialFlexibleFieldsRef.current = flexibleFields;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reportLoading]);
+  }, [reportLoading, reportFetchCompleted]);
 
   const handleFormChange = (e) => {
     if (initialFormDataRef.current !== null) isDirtyRef.current = true;
@@ -1064,67 +1099,56 @@ function AVRReport() {
     });
   };
 
-  // Handle save report data
-  const handleSaveReport = () => {
-    // Create report data object with only non-empty fields
+  const buildSavePayload = useCallback(() => {
     const reportData = {};
 
-    // Add all form fields to reportData - simple logic: if value exists send it, if null/empty send null
+    // All form fields
     Object.keys(reportFormData).forEach((key) => {
       const value = reportFormData[key];
-
-      // Simple logic: if value exists, send it; if null/empty, send null
-      // Note: Textarea values (with line breaks, spaces, formatting) are preserved as-is
-      if (value !== null && value !== undefined && value !== "") {
-        reportData[key] = String(value); // Preserve all formatting including line breaks
-      } else {
-        reportData[key] = null; // Send null for empty values
-      }
+      reportData[key] = (value !== null && value !== undefined && value !== "")
+        ? String(value)
+        : null;
     });
 
-    // Add chassis print file if available (as base64 or file path)
+    // Include chassis print file if available
     if (chasisPrintFile) {
       reportData["chassis_no_pencil_impression"] = chasisPrintFile;
     }
 
-    // Add flexible fields in the same format as report generation
+    // Flexible fields
     let formDataIndex = 0;
     flexibleFields.forEach((field) => {
-      // Only include fields with actual values
       if (field.field_value && field.field_value.trim() !== "") {
-        reportData[`flexible_fields[${formDataIndex}][section_name]`] =
-          field.section_name;
-        reportData[`flexible_fields[${formDataIndex}][col_span]`] =
-          field.col_span;
-        reportData[`flexible_fields[${formDataIndex}][field_label]`] =
-          field.field_label;
-        reportData[`flexible_fields[${formDataIndex}][field_value]`] =
-          String(field.field_value || ""); // Preserve all formatting including line breaks
-        reportData[`flexible_fields[${formDataIndex}][field_order]`] =
-          field.field_order;
+        reportData[`flexible_fields[${formDataIndex}][section_name]`] = field.section_name;
+        reportData[`flexible_fields[${formDataIndex}][col_span]`] = field.col_span;
+        reportData[`flexible_fields[${formDataIndex}][field_label]`] = field.field_label;
+        reportData[`flexible_fields[${formDataIndex}][field_value]`] = String(field.field_value || "");
+        reportData[`flexible_fields[${formDataIndex}][field_order]`] = field.field_order;
         formDataIndex++;
 
-        // Add second field for "Add Two" functionality
         if (
           field.col_span === 2 &&
           field.field_label_2 !== undefined &&
           field.field_value_2 &&
           field.field_value_2.trim() !== ""
         ) {
-          reportData[`flexible_fields[${formDataIndex}][section_name]`] =
-            field.section_name;
-          reportData[`flexible_fields[${formDataIndex}][col_span]`] =
-            field.col_span;
-          reportData[`flexible_fields[${formDataIndex}][field_label]`] =
-            field.field_label_2;
-          reportData[`flexible_fields[${formDataIndex}][field_value]`] =
-            String(field.field_value_2 || ""); // Preserve all formatting including line breaks
-          reportData[`flexible_fields[${formDataIndex}][field_order]`] =
-            field.field_order + 1;
+          reportData[`flexible_fields[${formDataIndex}][section_name]`] = field.section_name;
+          reportData[`flexible_fields[${formDataIndex}][col_span]`] = field.col_span;
+          reportData[`flexible_fields[${formDataIndex}][field_label]`] = field.field_label_2;
+          reportData[`flexible_fields[${formDataIndex}][field_value]`] = String(field.field_value_2 || "");
+          reportData[`flexible_fields[${formDataIndex}][field_order]`] = field.field_order + 1;
           formDataIndex++;
         }
       }
     });
+
+    return reportData;
+  }, [reportFormData, flexibleFields, chasisPrintFile]);
+
+  // Handle save report data
+  const handleSaveReport = () => {
+    // Create report data object with only non-empty fields
+    const reportData = buildSavePayload();
 
     // Only proceed if there's actual data to save
     if (Object.keys(reportData).length === 0) {
@@ -1153,7 +1177,8 @@ function AVRReport() {
   };
 
   // In-app navigation blocker — works with BrowserRouter (no data router needed).
-  // For AVRReport, we'll trigger handleSaveReport directly on navigation.
+  // Intercepts pushState (Link clicks) and popstate (browser back/forward).
+  // Saves silently then navigates. 100% reliable for in-app navigation.
   useEffect(() => {
     const originalPushState = window.history.pushState.bind(window.history);
 
@@ -1163,32 +1188,58 @@ function AVRReport() {
       }
 
       pendingNavRef.current = { type: "push", state, title, url };
-      
-      handleSaveReport();
-      
-      setTimeout(() => {
-        if (pendingNavRef.current?.type === "push") {
-          originalPushState(
-            pendingNavRef.current.state,
-            pendingNavRef.current.title,
-            pendingNavRef.current.url
+
+      const saveAndNavigate = async () => {
+        try {
+          const payload = buildSavePayload();
+          const result = await dispatch(
+            saveOrderReport({ orderId: id, reportData: payload })
           );
-          window.dispatchEvent(new PopStateEvent("popstate", { state: pendingNavRef.current.state }));
-          pendingNavRef.current = null;
+          if (result.meta.requestStatus === "fulfilled") {
+            isDirtyRef.current = false;
+            initialFormDataRef.current = reportFormData;
+            initialFlexibleFieldsRef.current = flexibleFields;
+          }
+        } catch (_) {
+          // toast already shown by thunk
+        } finally {
+          if (pendingNavRef.current?.type === "push") {
+            originalPushState(
+              pendingNavRef.current.state,
+              pendingNavRef.current.title,
+              pendingNavRef.current.url
+            );
+            window.dispatchEvent(
+              new PopStateEvent("popstate", { state: pendingNavRef.current.state })
+            );
+            pendingNavRef.current = null;
+          }
         }
-      }, 100);
+      };
+
+      saveAndNavigate();
     };
 
     const handlePopState = async (e) => {
       if (!isDirtyRef.current) return;
 
       originalPushState(window.history.state, "", window.location.href);
-      
-      handleSaveReport();
-      
-      setTimeout(() => {
+
+      try {
+        const payload = buildSavePayload();
+        const result = await dispatch(
+          saveOrderReport({ orderId: id, reportData: payload })
+        );
+        if (result.meta.requestStatus === "fulfilled") {
+          isDirtyRef.current = false;
+          initialFormDataRef.current = reportFormData;
+          initialFlexibleFieldsRef.current = flexibleFields;
+        }
+      } catch (_) {
+        // toast already shown by thunk
+      } finally {
         window.history.go(-1);
-      }, 100);
+      }
     };
 
     window.addEventListener("popstate", handlePopState);
@@ -1198,7 +1249,7 @@ function AVRReport() {
       window.removeEventListener("popstate", handlePopState);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDirtyRef.current, handleSaveReport]);
+  }, [id, buildSavePayload, dispatch]);
 
   // Shows browser's native "Leave site?" dialog when user tries to refresh,
   // close the tab, or navigate away from the site entirely.

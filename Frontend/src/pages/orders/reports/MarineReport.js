@@ -373,6 +373,10 @@ function MarineReport() {
   // State for flexible fields
   const [flexibleFields, setFlexibleFields] = useState([]);
 
+  // State to track when initial report fetch completes (for robust snapshot timing)
+  const [reportFetchCompleted, setReportFetchCompleted] = useState(false);
+  const reportLoadingStartedRef = useRef(false);
+
   // State for image selection modal (fieldId => boolean)
   const [imageModalOpen, setImageModalOpen] = useState({});
 
@@ -882,12 +886,12 @@ function MarineReport() {
   // Capture a clean snapshot the first time initial loading finishes.
   // Any change after this point is considered "dirty".
   useEffect(() => {
-    if (!reportLoading && initialFormDataRef.current === null) {
+    if (!reportLoading && initialFormDataRef.current === null && reportFetchCompleted) {
       initialFormDataRef.current = reportFormData;
       initialFlexibleFieldsRef.current = flexibleFields;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reportLoading]);
+  }, [reportLoading, reportFetchCompleted]);
 
   // Handle form input changes with optional uppercase conversion for specific fields
   const handleFormChange = useCallback((e) => {
@@ -1841,6 +1845,8 @@ function MarineReport() {
     isDirtyRef.current = false;
     initialFormDataRef.current = null;
     initialFlexibleFieldsRef.current = null;
+    setReportFetchCompleted(false);
+    reportLoadingStartedRef.current = false;
   }, [dispatch, id]);
 
   // Fetch order details when component mounts or ID changes
@@ -1857,6 +1863,24 @@ function MarineReport() {
       );
     }
   }, [dispatch, id]);
+
+  // Track when initial report fetch completes (robust guard for snapshot timing)
+  useEffect(() => {
+    // Track when loading starts
+    if (reportLoading && !reportLoadingStartedRef.current) {
+      reportLoadingStartedRef.current = true;
+      setReportFetchCompleted(false);
+    }
+
+    // When loading finishes AND we had previously started loading, mark as completed
+    if (!reportLoading && reportLoadingStartedRef.current && !reportFetchCompleted) {
+      // Add a small delay to ensure Redux state has fully updated before snapshot
+      const timer = setTimeout(() => {
+        setReportFetchCompleted(true);
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [reportLoading, reportFetchCompleted]);
 
   // Set page title with breadcrumb navigation
   useLayoutEffect(() => {
@@ -2123,9 +2147,8 @@ function MarineReport() {
     });
   };
 
-  // Handle save report data
-  const handleSaveReport = () => {
-    // Create FormData for multipart/form-data submission (same as generate API)
+  // Build save payload without validation or toasts (for silent saves during navigation)
+  const buildSavePayload = useCallback(() => {
     const formData = new FormData();
 
     // Add ALL form fields to FormData - ensure every field is included to prevent data loss
@@ -2311,6 +2334,13 @@ function MarineReport() {
       formDataIndex++;
     });
 
+    return formData;
+  }, [reportFormData, flexibleFields]);
+
+  // Handle save report data
+  const handleSaveReport = () => {
+    const formData = buildSavePayload();
+
     // Dispatch save action with FormData payload (same as generate API)
     dispatch(
       saveOrderReport({
@@ -2326,53 +2356,88 @@ function MarineReport() {
     });
   };
 
-  // In-app navigation blocker — works with BrowserRouter (no data router needed).
-  // For MarineReport, we'll trigger handleSaveReport directly on navigation.
+  // Navigation Blocker for Auto-Save on In-App Navigation (BrowserRouter-compatible)
   useEffect(() => {
-    const originalPushState = window.history.pushState.bind(window.history);
+    if (!id || !buildSavePayload) return;
 
-    window.history.pushState = function (state, title, url) {
-      if (!isDirtyRef.current) {
-        return originalPushState(state, title, url);
+    // Store original pushState for interception
+    const originalPushState = window.history.pushState;
+
+    // Intercept pushState calls (used by React Router's Link and navigate)
+    window.history.pushState = function (...args) {
+      // Check if there are unsaved changes
+      if (isDirtyRef.current) {
+        // Prevent navigation temporarily
+        const targetUrl = args[2];
+
+        // Perform silent save (no validation, no toasts)
+        const payload = buildSavePayload();
+        dispatch(
+          saveOrderReport({
+            orderId: id,
+            reportData: payload,
+          })
+        )
+          .then(() => {
+            // After save completes, reset dirty flag and perform navigation
+            isDirtyRef.current = false;
+            // Now actually navigate using original pushState
+            originalPushState.apply(window.history, args);
+            // Dispatch popstate event to trigger React Router's listener
+            window.dispatchEvent(new PopStateEvent("popstate"));
+          })
+          .catch((error) => {
+            console.error("Auto-save failed during navigation:", error);
+            // Even if save fails, allow navigation (fail-safe)
+            originalPushState.apply(window.history, args);
+            window.dispatchEvent(new PopStateEvent("popstate"));
+          });
+
+        // Return early to prevent immediate navigation
+        return;
       }
 
-      pendingNavRef.current = { type: "push", state, title, url };
-      
-      handleSaveReport();
-      
-      setTimeout(() => {
-        if (pendingNavRef.current?.type === "push") {
-          originalPushState(
-            pendingNavRef.current.state,
-            pendingNavRef.current.title,
-            pendingNavRef.current.url
-          );
-          window.dispatchEvent(new PopStateEvent("popstate", { state: pendingNavRef.current.state }));
-          pendingNavRef.current = null;
-        }
-      }, 100);
+      // No unsaved changes - allow navigation immediately
+      return originalPushState.apply(window.history, args);
     };
 
-    const handlePopState = async (e) => {
-      if (!isDirtyRef.current) return;
+    // Handle browser back/forward buttons
+    const handlePopState = async (event) => {
+      if (isDirtyRef.current) {
+        // Prevent default navigation
+        event.preventDefault();
 
-      originalPushState(window.history.state, "", window.location.href);
-      
-      handleSaveReport();
-      
-      setTimeout(() => {
-        window.history.go(-1);
-      }, 100);
+        // Push current state back to prevent navigation
+        window.history.pushState(null, "", window.location.href);
+
+        // Perform silent save
+        const payload = buildSavePayload();
+        try {
+          await dispatch(
+            saveOrderReport({
+              orderId: id,
+              reportData: payload,
+            })
+          );
+          isDirtyRef.current = false;
+          // After save, go back
+          window.history.back();
+        } catch (error) {
+          console.error("Auto-save failed during back/forward navigation:", error);
+          // Even if save fails, allow navigation
+          window.history.back();
+        }
+      }
     };
 
     window.addEventListener("popstate", handlePopState);
 
+    // Cleanup: restore original pushState and remove popstate listener
     return () => {
       window.history.pushState = originalPushState;
       window.removeEventListener("popstate", handlePopState);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDirtyRef.current, handleSaveReport]);
+  }, [id, buildSavePayload, dispatch]);
 
   // Shows browser's native "Leave site?" dialog when user tries to refresh,
   // close the tab, or navigate away from the site entirely.

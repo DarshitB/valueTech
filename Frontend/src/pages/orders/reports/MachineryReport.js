@@ -1902,6 +1902,78 @@ function MachineryReport() {
     ]
   );
 
+  // Builds the save payload — used by both handleSaveReport and the navigation blocker.
+  const buildSavePayload = useCallback(() => {
+    const fmvRaw = reportFormData.fair_market_value;
+    const fmvAmount = parseCurrency(fmvRaw);
+    const computedAmountInWords = fmvRaw ? convertNumberToWordsIndian(fmvAmount) : "";
+
+    const reportData = {};
+
+    const valuerName = reportFormData.valuer_name || "VALUETECH SOLUTIONS";
+    reportData.disclaimer = reportFormData.disclaimer || getDisclaimer(valuerName, order);
+
+    Object.keys(reportFormData).forEach((key) => {
+      let value = reportFormData[key];
+
+      if (key === "disclaimer") return;
+      if (key === "amount_in_words") { reportData[key] = computedAmountInWords || null; return; }
+      if (key === "invoice_no_date") return;
+
+      if (key === "registration_no") {
+        if (registrationNoOption === "NOT_AVAILABLE") value = "NOT AVAILABLE";
+        else if (registrationNoOption === "NOT_APPLICABLE") value = "NOT APPLICABLE";
+      }
+      if (key === "registration_date") {
+        if (registrationDateOption === "NOT_AVAILABLE") value = "NOT AVAILABLE";
+        else if (registrationDateOption === "NOT_APPLICABLE") value = "NOT APPLICABLE";
+      }
+      if (key === "location_of_machinery") {
+        if (locationOfMachineryOption === "NOT_AVAILABLE") value = "NOT AVAILABLE";
+        else if (locationOfMachineryOption === "NOT_APPLICABLE") value = "NOT APPLICABLE";
+      }
+
+      reportData[key] = (value !== null && value !== undefined && value !== "") ? String(value) : null;
+    });
+
+    reportData.report_date_heading = reportFormData.report_date_heading || "Report Date";
+
+    const invoiceNo = reportFormData.invoice_no || "";
+    const invoiceDate = reportFormData.invoice_date || "";
+    let combinedInvoiceData = "";
+    if (invoiceNo && invoiceDate) combinedInvoiceData = `${invoiceNo} Dated ${invoiceDate}`;
+    else if (invoiceNo) combinedInvoiceData = invoiceNo;
+    else if (invoiceDate) combinedInvoiceData = `Dated ${invoiceDate}`;
+    reportData.invoice_no_date = combinedInvoiceData || null;
+
+    let formDataIndex = 0;
+    flexibleFields.forEach((field) => {
+      if (field.field_value && field.field_value.trim() !== "") {
+        reportData[`flexible_fields[${formDataIndex}][section_name]`] = field.section_name;
+        reportData[`flexible_fields[${formDataIndex}][col_span]`] = field.col_span;
+        reportData[`flexible_fields[${formDataIndex}][field_label]`] = field.field_label;
+        reportData[`flexible_fields[${formDataIndex}][field_value]`] = String(field.field_value || "");
+        reportData[`flexible_fields[${formDataIndex}][field_order]`] = field.field_order;
+        formDataIndex++;
+
+        if (field.col_span === 2 && field.field_label_2 !== undefined && field.field_value_2 && field.field_value_2.trim() !== "") {
+          reportData[`flexible_fields[${formDataIndex}][section_name]`] = field.section_name;
+          reportData[`flexible_fields[${formDataIndex}][col_span]`] = field.col_span;
+          reportData[`flexible_fields[${formDataIndex}][field_label]`] = field.field_label_2;
+          reportData[`flexible_fields[${formDataIndex}][field_value]`] = String(field.field_value_2 || "");
+          reportData[`flexible_fields[${formDataIndex}][field_order]`] = field.field_order + 1;
+          formDataIndex++;
+        }
+      }
+    });
+
+    return reportData;
+  }, [
+    reportFormData, flexibleFields,
+    registrationNoOption, registrationDateOption, locationOfMachineryOption,
+    parseCurrency, convertNumberToWordsIndian, getDisclaimer, order,
+  ]);
+
   // Handle save report data
   const handleSaveReport = useCallback(() => {
     // Validate flexible fields
@@ -1926,127 +1998,8 @@ function MachineryReport() {
       return;
     }
 
-    // Create report data object with only non-empty fields
-    const reportData = {};
-
-    // Default disclaimer text - ALWAYS included in payload
-    const valuerName = reportFormData.valuer_name || "VALUETECH SOLUTIONS";
-    const defaultDisclaimer = getDisclaimer(valuerName, order);
-
-    // ALWAYS include disclaimer in payload - no conditions
-    reportData.disclaimer = reportFormData.disclaimer || defaultDisclaimer;
-
-    // Add all form fields to reportData - simple logic: if value exists send it, if null/empty send null
-    Object.keys(reportFormData).forEach((key) => {
-      let value = reportFormData[key];
-
-      // Skip disclaimer - handled separately above
-      if (key === "disclaimer") {
-        return;
-      }
-
-      // Handle amount_in_words - use computed value
-      if (key === "amount_in_words") {
-        reportData[key] = computedAmountInWords || null;
-        return;
-      }
-
-      // Skip invoice_no_date - will be added separately with fresh computed value
-      if (key === "invoice_no_date") {
-        return;
-      }
-
-      // Handle registration fields with options
-      if (key === "registration_no") {
-        if (registrationNoOption === "NOT_AVAILABLE") {
-          value = "NOT AVAILABLE";
-        } else if (registrationNoOption === "NOT_APPLICABLE") {
-          value = "NOT APPLICABLE";
-        }
-      }
-
-      if (key === "registration_date") {
-        if (registrationDateOption === "NOT_AVAILABLE") {
-          value = "NOT AVAILABLE";
-        } else if (registrationDateOption === "NOT_APPLICABLE") {
-          value = "NOT APPLICABLE";
-        }
-      }
-
-      if (key === "location_of_machinery") {
-        if (locationOfMachineryOption === "NOT_AVAILABLE") {
-          value = "NOT AVAILABLE";
-        } else if (locationOfMachineryOption === "NOT_APPLICABLE") {
-          value = "NOT APPLICABLE";
-        }
-      }
-
-      // Simple logic: if value exists, send it; if null/empty, send null
-      // Note: Textarea values (with line breaks, spaces, formatting) are preserved as-is
-      if (value !== null && value !== undefined && value !== "") {
-        reportData[key] = String(value); // Preserve all formatting including line breaks
-      } else {
-        reportData[key] = null; // Send null for empty values
-      }
-    });
-
-    // Always include report_date_heading in payload (even if user did not change it - use preselected default)
-    reportData.report_date_heading = reportFormData.report_date_heading || "Report Date";
-
-    // Add invoice_no_date (combined from invoice_no and invoice_date) - always include with fresh computed value
-    const invoiceNo = reportFormData.invoice_no || "";
-    const invoiceDate = reportFormData.invoice_date || "";
-    let combinedInvoiceData = "";
-    if (invoiceNo && invoiceDate) {
-      combinedInvoiceData = `${invoiceNo} Dated ${invoiceDate}`;
-    } else if (invoiceNo) {
-      combinedInvoiceData = invoiceNo;
-    } else if (invoiceDate) {
-      combinedInvoiceData = `Dated ${invoiceDate}`;
-    }
-    reportData.invoice_no_date = combinedInvoiceData || null;
-
-    // Add flexible fields in the same format as report generation
-    let formDataIndex = 0;
-
-    flexibleFields.forEach((field) => {
-      // Only include fields with actual values
-      if (field.field_value && field.field_value.trim() !== "") {
-        reportData[`flexible_fields[${formDataIndex}][section_name]`] =
-          field.section_name;
-        reportData[`flexible_fields[${formDataIndex}][col_span]`] =
-          field.col_span;
-        reportData[`flexible_fields[${formDataIndex}][field_label]`] =
-          field.field_label;
-        reportData[`flexible_fields[${formDataIndex}][field_value]`] = String(
-          field.field_value || ""
-        ); // Preserve all formatting including line breaks
-        reportData[`flexible_fields[${formDataIndex}][field_order]`] =
-          field.field_order;
-        formDataIndex++;
-
-        // Add second field for "Add Two" functionality
-        if (
-          field.col_span === 2 &&
-          field.field_label_2 !== undefined &&
-          field.field_value_2 &&
-          field.field_value_2.trim() !== ""
-        ) {
-          reportData[`flexible_fields[${formDataIndex}][section_name]`] =
-            field.section_name;
-          reportData[`flexible_fields[${formDataIndex}][col_span]`] =
-            field.col_span;
-          reportData[`flexible_fields[${formDataIndex}][field_label]`] =
-            field.field_label_2;
-          reportData[`flexible_fields[${formDataIndex}][field_value]`] = String(
-            field.field_value_2 || ""
-          ); // Preserve all formatting including line breaks
-          reportData[`flexible_fields[${formDataIndex}][field_order]`] =
-            field.field_order + 1;
-          formDataIndex++;
-        }
-      }
-    });
+    // Build payload using shared function
+    const reportData = buildSavePayload();
 
     // Only proceed if there's actual data to save
     if (Object.keys(reportData).length === 0) {
@@ -2081,18 +2034,14 @@ function MachineryReport() {
     validateFlexibleFields,
     dispatch,
     id,
-    order,
-    getRefNoCode,
+    buildSavePayload,
     parseCurrency,
     convertNumberToWordsIndian,
-    registrationNoOption,
-    registrationDateOption,
-    locationOfMachineryOption,
-    canEditRefNoId,
   ]);
 
   // In-app navigation blocker — works with BrowserRouter (no data router needed).
-  // For MachineryReport, we'll trigger handleSaveReport directly on navigation.
+  // Intercepts pushState (Link clicks) and popstate (browser back/forward).
+  // Saves silently then navigates. 100% reliable for in-app navigation.
   useEffect(() => {
     const originalPushState = window.history.pushState.bind(window.history);
 
@@ -2101,36 +2050,55 @@ function MachineryReport() {
         return originalPushState(state, title, url);
       }
 
-      // Save silently, then proceed
       pendingNavRef.current = { type: "push", state, title, url };
-      
-      // Call handleSaveReport which will reset isDirtyRef on success
-      handleSaveReport();
-      
-      // Navigate after a brief delay to allow save to complete
-      setTimeout(() => {
-        if (pendingNavRef.current?.type === "push") {
-          originalPushState(
-            pendingNavRef.current.state,
-            pendingNavRef.current.title,
-            pendingNavRef.current.url
+
+      const saveAndNavigate = async () => {
+        try {
+          const payload = buildSavePayload();
+          const result = await dispatch(
+            saveOrderReport({ orderId: id, reportData: payload })
           );
-          window.dispatchEvent(new PopStateEvent("popstate", { state: pendingNavRef.current.state }));
-          pendingNavRef.current = null;
+          if (result.meta.requestStatus === "fulfilled") {
+            isDirtyRef.current = false;
+            initialFormDataRef.current = reportFormData;
+            initialFlexibleFieldsRef.current = flexibleFields;
+          }
+        } catch (_) {
+          // toast already shown by thunk
+        } finally {
+          if (pendingNavRef.current?.type === "push") {
+            originalPushState(
+              pendingNavRef.current.state,
+              pendingNavRef.current.title,
+              pendingNavRef.current.url
+            );
+            window.dispatchEvent(new PopStateEvent("popstate", { state: pendingNavRef.current.state }));
+            pendingNavRef.current = null;
+          }
         }
-      }, 100);
+      };
+
+      saveAndNavigate();
     };
 
     const handlePopState = async (e) => {
       if (!isDirtyRef.current) return;
-
       originalPushState(window.history.state, "", window.location.href);
-      
-      handleSaveReport();
-      
-      setTimeout(() => {
+      try {
+        const payload = buildSavePayload();
+        const result = await dispatch(
+          saveOrderReport({ orderId: id, reportData: payload })
+        );
+        if (result.meta.requestStatus === "fulfilled") {
+          isDirtyRef.current = false;
+          initialFormDataRef.current = reportFormData;
+          initialFlexibleFieldsRef.current = flexibleFields;
+        }
+      } catch (_) {
+        // toast already shown by thunk
+      } finally {
         window.history.go(-1);
-      }, 100);
+      }
     };
 
     window.addEventListener("popstate", handlePopState);
@@ -2140,7 +2108,7 @@ function MachineryReport() {
       window.removeEventListener("popstate", handlePopState);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDirtyRef.current, handleSaveReport]);
+  }, [id, buildSavePayload, dispatch]);
 
   // Shows browser's native "Leave site?" dialog when user tries to refresh,
   // close the tab, or navigate away from the site entirely.
