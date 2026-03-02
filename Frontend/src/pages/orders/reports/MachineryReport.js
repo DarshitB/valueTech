@@ -198,6 +198,9 @@ function MachineryReport() {
     // Reset report fetch tracking flags when order changes
     reportLoadingStartedRef.current = false;
     setReportFetchCompleted(false); // Reset state
+    isDirtyRef.current = false;
+    initialFormDataRef.current = null;
+    initialFlexibleFieldsRef.current = null;
   }, [dispatch, id]);
 
   // Fetch order details when component mounts or ID changes
@@ -718,6 +721,13 @@ function MachineryReport() {
   const clearedFieldsRef = useRef(new Set());
   // Ref to track manually edited heading fields (so they don't get overwritten by category_suffix changes)
   const manuallyEditedHeadingsRef = useRef(new Set());
+
+  // Dirty tracking refs — auto-save on navigation
+  const isDirtyRef = useRef(false);
+  const initialFormDataRef = useRef(null);
+  const initialFlexibleFieldsRef = useRef(null);
+  // Ref to store the last intercepted navigation target
+  const pendingNavRef = useRef(null);
 
   // Auto-populate form data when order data is available
   useEffect(() => {
@@ -1256,9 +1266,20 @@ function MachineryReport() {
     }
   }, []);
 
+  // Capture a clean snapshot the first time initial loading finishes.
+  // Any change after this point is considered "dirty".
+  useEffect(() => {
+    if (!reportLoading && initialFormDataRef.current === null && reportFetchCompleted) {
+      initialFormDataRef.current = reportFormData;
+      initialFlexibleFieldsRef.current = flexibleFields;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reportLoading, reportFetchCompleted]);
+
   // Handle form input changes
   const handleFormChange = useCallback(
     (e) => {
+      if (initialFormDataRef.current !== null) isDirtyRef.current = true;
       const { name, value } = e.target;
 
       // Track cleared fields - if field had a value and is now empty, mark it as cleared
@@ -1390,6 +1411,7 @@ function MachineryReport() {
   // Handle SingleSearchSelect changes
   const handleSelectChange = useCallback(
     (name, value) => {
+      if (initialFormDataRef.current !== null) isDirtyRef.current = true;
       // Track cleared fields - if field had a value and is now empty/null, mark it as cleared
       if (!value || (typeof value === "string" && value.trim() === "")) {
         // Field is being cleared - track it
@@ -1441,6 +1463,7 @@ function MachineryReport() {
 
   // Handle date input formatting (DD-MM-YYYY)
   const handleDateChange = useCallback((e) => {
+    if (initialFormDataRef.current !== null) isDirtyRef.current = true;
     const { name, value } = e.target;
 
     // Allow empty strings to clear the field
@@ -1485,6 +1508,7 @@ function MachineryReport() {
 
   // Handle currency input formatting (Indian number format)
   const handleCurrencyChange = useCallback((e) => {
+    if (initialFormDataRef.current !== null) isDirtyRef.current = true;
     const { name, value } = e.target;
 
     // Allow empty strings to clear the field
@@ -1533,6 +1557,7 @@ function MachineryReport() {
 
   // Handle flexible field changes
   const handleFlexibleFieldChange = useCallback((fieldId, fieldType, value) => {
+    if (initialFormDataRef.current !== null) isDirtyRef.current = true;
     setFlexibleFields((prev) =>
       prev.map((field) =>
         field.id === fieldId ? { ...field, [fieldType]: value } : field
@@ -1543,6 +1568,7 @@ function MachineryReport() {
   // Add flexible fields (Add One - 2 fields, Add Two - 4 fields)
   const addFlexibleFields = useCallback(
     (sectionName, fieldsCount) => {
+      if (initialFormDataRef.current !== null) isDirtyRef.current = true;
       // Calculate the next order by counting total fields in this section
       // For Add Two sets, each set contributes 2 to the count
       // For Add One sets, each set contributes 1 to the count
@@ -1577,6 +1603,7 @@ function MachineryReport() {
 
   // Remove flexible field
   const removeFlexibleField = useCallback((fieldId) => {
+    if (initialFormDataRef.current !== null) isDirtyRef.current = true;
     setFlexibleFields((prev) => prev.filter((field) => field.id !== fieldId));
   }, []);
 
@@ -2041,7 +2068,13 @@ function MachineryReport() {
         orderId: id,
         reportData: reportData,
       })
-    );
+    ).then((result) => {
+      if (result.meta.requestStatus === "fulfilled") {
+        isDirtyRef.current = false;
+        initialFormDataRef.current = reportFormData;
+        initialFlexibleFieldsRef.current = flexibleFields;
+      }
+    });
   }, [
     reportFormData,
     flexibleFields,
@@ -2057,6 +2090,69 @@ function MachineryReport() {
     locationOfMachineryOption,
     canEditRefNoId,
   ]);
+
+  // In-app navigation blocker — works with BrowserRouter (no data router needed).
+  // For MachineryReport, we'll trigger handleSaveReport directly on navigation.
+  useEffect(() => {
+    const originalPushState = window.history.pushState.bind(window.history);
+
+    window.history.pushState = function (state, title, url) {
+      if (!isDirtyRef.current) {
+        return originalPushState(state, title, url);
+      }
+
+      // Save silently, then proceed
+      pendingNavRef.current = { type: "push", state, title, url };
+      
+      // Call handleSaveReport which will reset isDirtyRef on success
+      handleSaveReport();
+      
+      // Navigate after a brief delay to allow save to complete
+      setTimeout(() => {
+        if (pendingNavRef.current?.type === "push") {
+          originalPushState(
+            pendingNavRef.current.state,
+            pendingNavRef.current.title,
+            pendingNavRef.current.url
+          );
+          window.dispatchEvent(new PopStateEvent("popstate", { state: pendingNavRef.current.state }));
+          pendingNavRef.current = null;
+        }
+      }, 100);
+    };
+
+    const handlePopState = async (e) => {
+      if (!isDirtyRef.current) return;
+
+      originalPushState(window.history.state, "", window.location.href);
+      
+      handleSaveReport();
+      
+      setTimeout(() => {
+        window.history.go(-1);
+      }, 100);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.history.pushState = originalPushState;
+      window.removeEventListener("popstate", handlePopState);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDirtyRef.current, handleSaveReport]);
+
+  // Shows browser's native "Leave site?" dialog when user tries to refresh,
+  // close the tab, or navigate away from the site entirely.
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (!isDirtyRef.current) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
 
   // Render flexible fields for a section
   const renderFlexibleFields = useCallback(
@@ -2412,12 +2508,20 @@ function MachineryReport() {
           <div className="order-report-container">
             <div className="d-flex justify-content-between align-items-center">
               <h2>Machinery Report</h2>
-              <Link
-                to={`/orders/${id}/details/images`}
-                className="btn btn-primary"
-              >
-                View Images
-              </Link>
+              <div className="d-flex align-items-center gap-2">
+                <Link
+                  to={`/orders/${id}/details/documents`}
+                  className="btn btn-primary"
+                >
+                  View Documents
+                </Link>
+                <Link
+                  to={`/orders/${id}/details/images`}
+                  className="btn btn-primary"
+                >
+                  View Images
+                </Link>
+              </div>
             </div>
             <form onSubmit={handleReportSubmit} className="body-form-box">
               <div className="row">

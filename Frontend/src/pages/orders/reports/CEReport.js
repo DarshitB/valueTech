@@ -218,6 +218,9 @@ function CEReport() {
     setRegistrationNoOption(null);
     setRegistrationDateOption(null);
     setRegisteredLocationOption(null);
+    isDirtyRef.current = false;
+    initialFormDataRef.current = null;
+    initialFlexibleFieldsRef.current = null;
   }, [dispatch, id]);
 
   // Fetch order details when component mounts or ID changes
@@ -820,6 +823,16 @@ function CEReport() {
 
   // Track fields that were explicitly cleared by the user (date and currency fields)
   const clearedFieldsRef = useRef(new Set());
+
+  // Dirty tracking refs
+  const isDirtyRef = useRef(false);
+  const initialFormDataRef = useRef(null);
+  const initialFlexibleFieldsRef = useRef(null);
+
+  // Ref to store the unblock function for navigation interception
+  const unblockRef = useRef(null);
+  // Ref to store the last intercepted navigation target
+  const pendingNavRef = useRef(null);
 
   // State for registration field options (Not Available / Not Applicable)
   const [registrationNoOption, setRegistrationNoOption] = useState(null); // null, "NOT_AVAILABLE", "NOT_APPLICABLE"
@@ -1657,6 +1670,15 @@ function CEReport() {
     }
   }, [reportLoading, reportFetchCompleted, currentReport, order]);
 
+  // Capture a clean snapshot the first time initial loading finishes.
+  // Any change after this point is considered "dirty".
+  useEffect(() => {
+    if (!isInitialLoading && initialFormDataRef.current === null) {
+      initialFormDataRef.current = reportFormData;
+      initialFlexibleFieldsRef.current = flexibleFields;
+    }
+  }, [isInitialLoading]); // intentionally only depends on isInitialLoading
+
   // Function to call external RC API and prefill form data
   const fetchRCDetailsFromExternalAPI = useCallback(
     async (registrationNumber) => {
@@ -1964,6 +1986,7 @@ function CEReport() {
   // Handle form input changes
   const handleFormChange = useCallback(
     (e) => {
+      if (initialFormDataRef.current !== null) isDirtyRef.current = true;
       const { name, value } = e.target;
 
       // Track cleared fields - if field had a value and is now empty, mark it as cleared
@@ -2117,6 +2140,7 @@ function CEReport() {
   // Handle SingleSearchSelect changes
   const handleSelectChange = useCallback(
     (name, value) => {
+      if (initialFormDataRef.current !== null) isDirtyRef.current = true;
       // Track cleared fields - if field had a value and is now empty/null, mark it as cleared
       if (!value || (typeof value === "string" && value.trim() === "")) {
         // Field is being cleared - track it
@@ -2211,6 +2235,7 @@ function CEReport() {
 
   // Handle date input formatting (DD-MM-YYYY)
   const handleDateChange = useCallback((e) => {
+    if (initialFormDataRef.current !== null) isDirtyRef.current = true;
     const { name, value } = e.target;
 
     // Clear button selection when user types in registration_date
@@ -2260,6 +2285,7 @@ function CEReport() {
 
   // Handle currency input formatting (Indian number format)
   const handleCurrencyChange = useCallback((e) => {
+    if (initialFormDataRef.current !== null) isDirtyRef.current = true;
     const { name, value } = e.target;
 
     // Allow empty strings to clear the field
@@ -2308,6 +2334,7 @@ function CEReport() {
 
   // Handle flexible field changes
   const handleFlexibleFieldChange = useCallback((fieldId, fieldType, value) => {
+    if (initialFormDataRef.current !== null) isDirtyRef.current = true;
     setFlexibleFields((prev) =>
       prev.map((field) =>
         field.id === fieldId ? { ...field, [fieldType]: value } : field
@@ -2318,6 +2345,7 @@ function CEReport() {
   // Add flexible fields (Add One - 2 fields, Add Two - 4 fields)
   const addFlexibleFields = useCallback(
     (sectionName, fieldsCount) => {
+      if (initialFormDataRef.current !== null) isDirtyRef.current = true;
       // Calculate the next order by counting total fields in this section
       // For Add Two sets, each set contributes 2 to the count
       // For Add One sets, each set contributes 1 to the count
@@ -2352,6 +2380,7 @@ function CEReport() {
 
   // Remove flexible field
   const removeFlexibleField = useCallback((fieldId) => {
+    if (initialFormDataRef.current !== null) isDirtyRef.current = true;
     setFlexibleFields((prev) => prev.filter((field) => field.id !== fieldId));
   }, []);
 
@@ -2698,6 +2727,103 @@ function CEReport() {
   );
 
   // Handle save report data
+  // Builds FormData payload for the Save API.
+  // Used by both handleSaveReport and the navigation blocker.
+  const buildSavePayload = useCallback(() => {
+    const fmvRaw = reportFormData.fair_market_value;
+    const fmvAmount = parseCurrency(fmvRaw);
+    const computedAmountInWords = fmvRaw ? convertNumberToWordsIndian(fmvAmount) : "";
+
+    const reportData = {};
+
+    Object.keys(reportFormData).forEach((key) => {
+      let value = reportFormData[key];
+
+      if (key === "amount_in_words") {
+        reportData[key] = computedAmountInWords || null;
+        return;
+      }
+      if (key === "invoice_no_date") return;
+
+      if (key === "registration_no") {
+        if (registrationNoOption === "NOT_AVAILABLE") value = "NOT AVAILABLE";
+        else if (registrationNoOption === "NOT_APPLICABLE") value = "NOT APPLICABLE";
+      }
+      if (key === "registration_date") {
+        if (registrationDateOption === "NOT_AVAILABLE") value = "NOT AVAILABLE";
+        else if (registrationDateOption === "NOT_APPLICABLE") value = "NOT APPLICABLE";
+      }
+      if (key === "registered_location") {
+        if (registeredLocationOption === "NOT_AVAILABLE") value = "NOT AVAILABLE";
+        else if (registeredLocationOption === "NOT_APPLICABLE") value = "NOT APPLICABLE";
+      }
+
+      reportData[key] =
+        value !== null && value !== undefined && value !== ""
+          ? String(value)
+          : null;
+    });
+
+    reportData.report_date_heading =
+      reportFormData.report_date_heading || "Rev-Report Date";
+
+    const invoiceNo = reportFormData.invoice_no || "";
+    const invoiceDate = reportFormData.invoice_date || "";
+    let combinedInvoiceData = "";
+    if (invoiceNo && invoiceDate) combinedInvoiceData = `${invoiceNo} Dated ${invoiceDate}`;
+    else if (invoiceNo) combinedInvoiceData = invoiceNo;
+    else if (invoiceDate) combinedInvoiceData = `Dated ${invoiceDate}`;
+    reportData.invoice_no_date = combinedInvoiceData || null;
+
+    let formDataIndex = 0;
+    flexibleFields.forEach((field) => {
+      if (field.field_value && field.field_value.trim() !== "") {
+        reportData[`flexible_fields[${formDataIndex}][section_name]`] = field.section_name;
+        reportData[`flexible_fields[${formDataIndex}][col_span]`] = field.col_span;
+        reportData[`flexible_fields[${formDataIndex}][field_label]`] = field.field_label;
+        reportData[`flexible_fields[${formDataIndex}][field_value]`] = String(field.field_value || "");
+        reportData[`flexible_fields[${formDataIndex}][field_order]`] = field.field_order;
+        formDataIndex++;
+
+        if (
+          field.col_span === 2 &&
+          field.field_label_2 !== undefined &&
+          field.field_value_2 &&
+          field.field_value_2.trim() !== ""
+        ) {
+          reportData[`flexible_fields[${formDataIndex}][section_name]`] = field.section_name;
+          reportData[`flexible_fields[${formDataIndex}][col_span]`] = field.col_span;
+          reportData[`flexible_fields[${formDataIndex}][field_label]`] = field.field_label_2;
+          reportData[`flexible_fields[${formDataIndex}][field_value]`] = String(field.field_value_2 || "");
+          reportData[`flexible_fields[${formDataIndex}][field_order]`] = field.field_order + 1;
+          formDataIndex++;
+        }
+      }
+    });
+
+    if (chassisImpressionFile) {
+      reportData["chassis_no_pencil_impression"] = chassisImpressionFile;
+    }
+
+    const formData = new FormData();
+    Object.entries(reportData).forEach(([key, value]) => {
+      if (value instanceof File || value instanceof Blob) formData.append(key, value);
+      else if (value === null) formData.append(key, "");
+      else if (value !== undefined) formData.append(key, value);
+    });
+
+    return formData;
+  }, [
+    reportFormData,
+    flexibleFields,
+    chassisImpressionFile,
+    parseCurrency,
+    convertNumberToWordsIndian,
+    registrationNoOption,
+    registrationDateOption,
+    registeredLocationOption,
+  ]);
+
   const handleSaveReport = useCallback(() => {
     // Validate registration fields - must have either input value or button selected
     const registrationErrors = [];
@@ -2904,7 +3030,13 @@ function CEReport() {
         orderId: id,
         reportData: formData,
       })
-    );
+    ).then((result) => {
+      if (result.meta.requestStatus === "fulfilled") {
+        isDirtyRef.current = false;
+        initialFormDataRef.current = reportFormData;
+        initialFlexibleFieldsRef.current = flexibleFields;
+      }
+    });
   }, [
     reportFormData,
     flexibleFields,
@@ -2917,7 +3049,104 @@ function CEReport() {
     convertNumberToWordsIndian,
     numberToWords,
     canEditRefNoId,
+    registrationNoOption,
+    registrationDateOption,
+    registeredLocationOption,
   ]);
+
+  // In-app navigation blocker — works with BrowserRouter (no data router needed).
+  // Intercepts pushState (Link clicks) and popstate (browser back/forward).
+  // Saves silently then navigates. 100% reliable for in-app navigation.
+  useEffect(() => {
+    // --- Intercept pushState (Link clicks, programmatic navigation) ---
+    const originalPushState = window.history.pushState.bind(window.history);
+
+    window.history.pushState = function (state, title, url) {
+      if (!isDirtyRef.current) {
+        return originalPushState(state, title, url);
+      }
+
+      // Block the navigation, save, then replay it
+      pendingNavRef.current = { type: "push", state, title, url };
+
+      const saveAndNavigate = async () => {
+        try {
+          const formData = buildSavePayload();
+          const result = await dispatch(
+            saveOrderReport({ orderId: id, reportData: formData })
+          );
+          if (result.meta.requestStatus === "fulfilled") {
+            isDirtyRef.current = false;
+            initialFormDataRef.current = reportFormData;
+            initialFlexibleFieldsRef.current = flexibleFields;
+          }
+        } catch (_) {
+          // toast already shown by thunk
+        } finally {
+          if (pendingNavRef.current?.type === "push") {
+            originalPushState(
+              pendingNavRef.current.state,
+              pendingNavRef.current.title,
+              pendingNavRef.current.url
+            );
+            // Dispatch a popstate so React Router picks up the URL change
+            window.dispatchEvent(new PopStateEvent("popstate", { state: pendingNavRef.current.state }));
+            pendingNavRef.current = null;
+          }
+        }
+      };
+
+      saveAndNavigate();
+    };
+
+    // --- Intercept popstate (browser back/forward button) ---
+    const handlePopState = async (e) => {
+      if (!isDirtyRef.current) return;
+
+      // Push current URL back so the user stays on page while we save
+      originalPushState(window.history.state, "", window.location.href);
+
+      try {
+        const formData = buildSavePayload();
+        const result = await dispatch(
+          saveOrderReport({ orderId: id, reportData: formData })
+        );
+        if (result.meta.requestStatus === "fulfilled") {
+          isDirtyRef.current = false;
+          initialFormDataRef.current = reportFormData;
+          initialFlexibleFieldsRef.current = flexibleFields;
+        }
+      } catch (_) {
+        // toast already shown by thunk
+      } finally {
+        // Go back to where the user wanted to go
+        window.history.go(-1);
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+
+    // Cleanup: restore original pushState and remove popstate listener
+    return () => {
+      window.history.pushState = originalPushState;
+      window.removeEventListener("popstate", handlePopState);
+    };
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, buildSavePayload, dispatch]);
+
+  // Shows browser's native "Leave site?" dialog when user tries to refresh,
+  // close the tab, or navigate away from the site entirely.
+  // This is warning-only — saving before hard unload is not possible in browsers.
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (!isDirtyRef.current) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
 
   // Auto-save after external API prefills data
   useEffect(() => {
@@ -3358,12 +3587,20 @@ function CEReport() {
             )}
             <div className="d-flex justify-content-between align-items-center">
               <h2>CE Report</h2>
-              <Link
-                to={`/orders/${id}/details/images`}
-                className="btn btn-primary"
-              >
-                View Images
-              </Link>
+              <div className="d-flex align-items-center gap-2">
+                <Link
+                  to={`/orders/${id}/details/documents`}
+                  className="btn btn-primary"
+                >
+                  View Documents
+                </Link>
+                <Link
+                  to={`/orders/${id}/details/images`}
+                  className="btn btn-primary"
+                >
+                  View Images
+                </Link>
+              </div>
             </div>
             <form onSubmit={handleReportSubmit} className="body-form-box">
               <div className="row">

@@ -170,6 +170,9 @@ function AVRReport() {
   useEffect(() => {
     // Clear any existing report data first
     dispatch(clearCurrentReport());
+    isDirtyRef.current = false;
+    initialFormDataRef.current = null;
+    initialFlexibleFieldsRef.current = null;
   }, [dispatch, id]);
 
   // Fetch order details when component mounts or ID changes
@@ -528,6 +531,13 @@ function AVRReport() {
   // Track fields that were explicitly cleared by the user (date and currency fields)
   const clearedFieldsRef = useRef(new Set());
 
+  // Dirty tracking refs — auto-save on navigation
+  const isDirtyRef = useRef(false);
+  const initialFormDataRef = useRef(null);
+  const initialFlexibleFieldsRef = useRef(null);
+  // Ref to store the last intercepted navigation target
+  const pendingNavRef = useRef(null);
+
   // Auto-populate form data when order data is available
   useEffect(() => {
     if (order) {
@@ -667,7 +677,17 @@ function AVRReport() {
   }, [currentReport, id, parseCurrency, convertNumberToWordsIndian]);
 
   // Handle form input changes
+  // Capture a clean snapshot the first time initial loading finishes.
+  useEffect(() => {
+    if (!reportLoading && initialFormDataRef.current === null) {
+      initialFormDataRef.current = reportFormData;
+      initialFlexibleFieldsRef.current = flexibleFields;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reportLoading]);
+
   const handleFormChange = (e) => {
+    if (initialFormDataRef.current !== null) isDirtyRef.current = true;
     const { name, value } = e.target;
 
     // Track cleared fields - if field had a value and is now empty, mark it as cleared
@@ -725,6 +745,7 @@ function AVRReport() {
 
   // Handle SingleSearchSelect changes
   const handleSelectChange = (name, value) => {
+    if (initialFormDataRef.current !== null) isDirtyRef.current = true;
     // Track cleared fields - if field had a value and is now empty/null, mark it as cleared
     if (!value || (typeof value === "string" && value.trim() === "")) {
       // Field is being cleared - track it
@@ -822,6 +843,7 @@ function AVRReport() {
 
   // Handle date input formatting (DD-MM-YYYY)
   const handleDateChange = (e) => {
+    if (initialFormDataRef.current !== null) isDirtyRef.current = true;
     const { name, value } = e.target;
 
     // Allow empty strings to clear the field
@@ -864,6 +886,7 @@ function AVRReport() {
 
   // Handle flexible field changes
   const handleFlexibleFieldChange = (fieldId, fieldType, value) => {
+    if (initialFormDataRef.current !== null) isDirtyRef.current = true;
     setFlexibleFields((prev) =>
       prev.map((field) =>
         field.id === fieldId ? { ...field, [fieldType]: value } : field
@@ -873,6 +896,7 @@ function AVRReport() {
 
   // Add flexible fields (Add One - 2 fields only)
   const addFlexibleFields = (sectionName) => {
+    if (initialFormDataRef.current !== null) isDirtyRef.current = true;
     // Calculate the next order by counting total fields in this section
     let nextOrder = 1;
     flexibleFields
@@ -897,6 +921,7 @@ function AVRReport() {
 
   // Remove flexible field
   const removeFlexibleField = (fieldId) => {
+    if (initialFormDataRef.current !== null) isDirtyRef.current = true;
     setFlexibleFields((prev) => prev.filter((field) => field.id !== fieldId));
   };
 
@@ -1118,8 +1143,74 @@ function AVRReport() {
         orderId: id,
         reportData: reportData,
       })
-    );
+    ).then((result) => {
+      if (result.meta.requestStatus === "fulfilled") {
+        isDirtyRef.current = false;
+        initialFormDataRef.current = reportFormData;
+        initialFlexibleFieldsRef.current = flexibleFields;
+      }
+    });
   };
+
+  // In-app navigation blocker — works with BrowserRouter (no data router needed).
+  // For AVRReport, we'll trigger handleSaveReport directly on navigation.
+  useEffect(() => {
+    const originalPushState = window.history.pushState.bind(window.history);
+
+    window.history.pushState = function (state, title, url) {
+      if (!isDirtyRef.current) {
+        return originalPushState(state, title, url);
+      }
+
+      pendingNavRef.current = { type: "push", state, title, url };
+      
+      handleSaveReport();
+      
+      setTimeout(() => {
+        if (pendingNavRef.current?.type === "push") {
+          originalPushState(
+            pendingNavRef.current.state,
+            pendingNavRef.current.title,
+            pendingNavRef.current.url
+          );
+          window.dispatchEvent(new PopStateEvent("popstate", { state: pendingNavRef.current.state }));
+          pendingNavRef.current = null;
+        }
+      }, 100);
+    };
+
+    const handlePopState = async (e) => {
+      if (!isDirtyRef.current) return;
+
+      originalPushState(window.history.state, "", window.location.href);
+      
+      handleSaveReport();
+      
+      setTimeout(() => {
+        window.history.go(-1);
+      }, 100);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.history.pushState = originalPushState;
+      window.removeEventListener("popstate", handlePopState);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDirtyRef.current, handleSaveReport]);
+
+  // Shows browser's native "Leave site?" dialog when user tries to refresh,
+  // close the tab, or navigate away from the site entirely.
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (!isDirtyRef.current) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
 
   // Render flexible fields for a section
   const renderFlexibleFields = (sectionName) => {
@@ -1201,7 +1292,20 @@ function AVRReport() {
           <div className="order-report-container">
             <div className="d-flex justify-content-between align-items-center">
               <h2>AVR Report</h2>
-              <Link to={`/orders/${id}/details/images`} className="btn btn-primary">View Images</Link>
+              <div className="d-flex align-items-center gap-2">
+                <Link
+                  to={`/orders/${id}/details/documents`}
+                  className="btn btn-primary"
+                >
+                  View Documents
+                </Link>
+                <Link
+                  to={`/orders/${id}/details/images`}
+                  className="btn btn-primary"
+                >
+                  View Images
+                </Link>
+              </div>
             </div>
             <form className="body-form-box" onSubmit={handleReportSubmit}>
               <div className="row">

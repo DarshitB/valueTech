@@ -383,6 +383,13 @@ function MarineReport() {
   const prevWarRiskPolicyWordsRef = useRef("");
   const prevHullMachineryPolicyWordsRef = useRef("");
 
+  // Dirty tracking refs — auto-save on navigation
+  const isDirtyRef = useRef(false);
+  const initialFormDataRef = useRef(null);
+  const initialFlexibleFieldsRef = useRef(null);
+  // Ref to store the last intercepted navigation target
+  const pendingNavRef = useRef(null);
+
   // Function to generate disclaimer based on execute_above value
   const generateDisclaimer = useCallback((executeAbove, formData) => {
     const clientName = formData.client_name_with_full_address || "";
@@ -803,6 +810,7 @@ function MarineReport() {
   // Handle currency input formatting (Indian number format)
   const handleCurrencyChange = useCallback(
     (e) => {
+      if (initialFormDataRef.current !== null) isDirtyRef.current = true;
       const { name, value } = e.target;
 
       // Allow empty strings to clear the field
@@ -871,8 +879,19 @@ function MarineReport() {
     [formatIndianCurrency, getAmountInWords]
   );
 
+  // Capture a clean snapshot the first time initial loading finishes.
+  // Any change after this point is considered "dirty".
+  useEffect(() => {
+    if (!reportLoading && initialFormDataRef.current === null) {
+      initialFormDataRef.current = reportFormData;
+      initialFlexibleFieldsRef.current = flexibleFields;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reportLoading]);
+
   // Handle form input changes with optional uppercase conversion for specific fields
   const handleFormChange = useCallback((e) => {
+    if (initialFormDataRef.current !== null) isDirtyRef.current = true;
     const { name, value } = e.target;
 
     // Track cleared fields - if field had a value and is now empty, mark it as cleared
@@ -1098,6 +1117,7 @@ function MarineReport() {
   // Handle dimension input formatting (Indian number format with 4 decimals)
   const handleDimensionChange = useCallback(
     (e) => {
+      if (initialFormDataRef.current !== null) isDirtyRef.current = true;
       const { name, value } = e.target;
       const formattedValue = formatDimension(value);
 
@@ -1113,6 +1133,7 @@ function MarineReport() {
 
   // Handle flexible field changes
   const handleFlexibleFieldChange = (fieldId, fieldType, value) => {
+    if (initialFormDataRef.current !== null) isDirtyRef.current = true;
     setFlexibleFields((prev) =>
       prev.map((field) =>
         field.id === fieldId ? { ...field, [fieldType]: value } : field
@@ -1174,6 +1195,7 @@ function MarineReport() {
   // Handle image selection from API (stores image path and preview URL)
   const handleFlexibleFieldImageSelect = useCallback(
     (fieldId, mediaItem) => {
+      if (initialFormDataRef.current !== null) isDirtyRef.current = true;
       const imageUrl = getImageUrl(mediaItem.media_url);
       setFlexibleFields((prev) =>
         prev.map((field) =>
@@ -1218,6 +1240,7 @@ function MarineReport() {
 
   // Add flexible fields (default: Add One - 2 fields; plus custom types)
   const addFlexibleFields = (sectionName) => {
+    if (initialFormDataRef.current !== null) isDirtyRef.current = true;
     // Calculate the next order by counting total fields in this section
     const nextOrder =
       flexibleFields.filter((f) => f.section_name === sectionName).length + 1;
@@ -1290,6 +1313,7 @@ function MarineReport() {
 
   // Remove flexible field
   const removeFlexibleField = (fieldId) => {
+    if (initialFormDataRef.current !== null) isDirtyRef.current = true;
     setFlexibleFields((prev) => prev.filter((field) => field.id !== fieldId));
   };
 
@@ -1814,6 +1838,9 @@ function MarineReport() {
   // Clear report data when component mounts or order changes
   useEffect(() => {
     dispatch(clearCurrentReport());
+    isDirtyRef.current = false;
+    initialFormDataRef.current = null;
+    initialFlexibleFieldsRef.current = null;
   }, [dispatch, id]);
 
   // Fetch order details when component mounts or ID changes
@@ -2290,8 +2317,74 @@ function MarineReport() {
         orderId: id,
         reportData: formData,
       })
-    );
+    ).then((result) => {
+      if (result.meta.requestStatus === "fulfilled") {
+        isDirtyRef.current = false;
+        initialFormDataRef.current = reportFormData;
+        initialFlexibleFieldsRef.current = flexibleFields;
+      }
+    });
   };
+
+  // In-app navigation blocker — works with BrowserRouter (no data router needed).
+  // For MarineReport, we'll trigger handleSaveReport directly on navigation.
+  useEffect(() => {
+    const originalPushState = window.history.pushState.bind(window.history);
+
+    window.history.pushState = function (state, title, url) {
+      if (!isDirtyRef.current) {
+        return originalPushState(state, title, url);
+      }
+
+      pendingNavRef.current = { type: "push", state, title, url };
+      
+      handleSaveReport();
+      
+      setTimeout(() => {
+        if (pendingNavRef.current?.type === "push") {
+          originalPushState(
+            pendingNavRef.current.state,
+            pendingNavRef.current.title,
+            pendingNavRef.current.url
+          );
+          window.dispatchEvent(new PopStateEvent("popstate", { state: pendingNavRef.current.state }));
+          pendingNavRef.current = null;
+        }
+      }, 100);
+    };
+
+    const handlePopState = async (e) => {
+      if (!isDirtyRef.current) return;
+
+      originalPushState(window.history.state, "", window.location.href);
+      
+      handleSaveReport();
+      
+      setTimeout(() => {
+        window.history.go(-1);
+      }, 100);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.history.pushState = originalPushState;
+      window.removeEventListener("popstate", handlePopState);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDirtyRef.current, handleSaveReport]);
+
+  // Shows browser's native "Leave site?" dialog when user tries to refresh,
+  // close the tab, or navigate away from the site entirely.
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (!isDirtyRef.current) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
 
   return (
     <section className="order-details-wrapper">
@@ -2300,7 +2393,20 @@ function MarineReport() {
           <div className="order-report-container">
             <div className="d-flex justify-content-between align-items-center">
               <h2>Marine Report</h2>
-              <Link to={`/orders/${id}/details/images`} className="btn btn-primary">View Images</Link>
+              <div className="d-flex align-items-center gap-2">
+                <Link
+                  to={`/orders/${id}/details/documents`}
+                  className="btn btn-primary"
+                >
+                  View Documents
+                </Link>
+                <Link
+                  to={`/orders/${id}/details/images`}
+                  className="btn btn-primary"
+                >
+                  View Images
+                </Link>
+              </div>
             </div>
             <form
               className="body-form-box"
