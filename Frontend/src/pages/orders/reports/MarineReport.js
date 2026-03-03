@@ -2356,83 +2356,71 @@ function MarineReport() {
     });
   };
 
-  // Navigation Blocker for Auto-Save on In-App Navigation (BrowserRouter-compatible)
+  // Navigation Blocker - Shows confirmation dialog for unsaved changes
   useEffect(() => {
-    if (!id || !buildSavePayload) return;
+    if (!id) return;
 
-    // Store original pushState for interception
-    const originalPushState = window.history.pushState;
+    // Push a dummy state immediately so we can intercept back button
+    // This creates a history entry we can use to block navigation
+    // --- Intercept pushState (Link clicks, programmatic navigation) ---
+    // Keep auto-save behavior for React Router navigation (sidebar links, etc.)
+    const originalPushState = window.history.pushState.bind(window.history);
 
-    // Intercept pushState calls (used by React Router's Link and navigate)
-    window.history.pushState = function (...args) {
-      // Check if there are unsaved changes
-      if (isDirtyRef.current) {
-        // Prevent navigation temporarily
-        const targetUrl = args[2];
+    // Push initial state to enable blocking (BEFORE intercepting pushState)
+    originalPushState(null, "", window.location.href);
 
-        // Perform silent save (no validation, no toasts)
-        const payload = buildSavePayload();
-        dispatch(
-          saveOrderReport({
-            orderId: id,
-            reportData: payload,
-          })
-        )
-          .then(() => {
-            // After save completes, reset dirty flag and perform navigation
-            isDirtyRef.current = false;
-            // Now actually navigate using original pushState
-            originalPushState.apply(window.history, args);
-            // Dispatch popstate event to trigger React Router's listener
-            window.dispatchEvent(new PopStateEvent("popstate"));
-          })
-          .catch((error) => {
-            console.error("Auto-save failed during navigation:", error);
-            // Even if save fails, allow navigation (fail-safe)
-            originalPushState.apply(window.history, args);
-            window.dispatchEvent(new PopStateEvent("popstate"));
-          });
-
-        // Return early to prevent immediate navigation
-        return;
+    window.history.pushState = function (state, title, url) {
+      if (!isDirtyRef.current) {
+        return originalPushState(state, title, url);
       }
 
-      // No unsaved changes - allow navigation immediately
-      return originalPushState.apply(window.history, args);
+      // Block the navigation, save, then replay it (existing auto-save behavior)
+      pendingNavRef.current = { type: "push", state, title, url };
+
+      const saveAndNavigate = async () => {
+        try {
+          const formData = buildSavePayload();
+          const result = await dispatch(
+            saveOrderReport({ orderId: id, reportData: formData })
+          );
+          if (result.meta.requestStatus === "fulfilled") {
+            isDirtyRef.current = false;
+            initialFormDataRef.current = reportFormData;
+            initialFlexibleFieldsRef.current = flexibleFields;
+          }
+        } catch (_) {
+          // toast already shown by thunk
+        } finally {
+          if (pendingNavRef.current?.type === "push") {
+            originalPushState(
+              pendingNavRef.current.state,
+              pendingNavRef.current.title,
+              pendingNavRef.current.url
+            );
+            // Dispatch a popstate so React Router picks up the URL change
+            window.dispatchEvent(new PopStateEvent("popstate", { state: pendingNavRef.current.state }));
+            pendingNavRef.current = null;
+          }
+        }
+      };
+
+      saveAndNavigate();
     };
 
-    // Handle browser back/forward buttons
-    const handlePopState = async (event) => {
+    // --- Block BROWSER BACK/FORWARD BUTTON when dirty ---
+    // Completely stop Back/Forward from working when there are unsaved changes
+    const handlePopState = (e) => {
       if (isDirtyRef.current) {
-        // Prevent default navigation
-        event.preventDefault();
-
-        // Push current state back to prevent navigation
-        window.history.pushState(null, "", window.location.href);
-
-        // Perform silent save
-        const payload = buildSavePayload();
-        try {
-          await dispatch(
-            saveOrderReport({
-              orderId: id,
-              reportData: payload,
-            })
-          );
-          isDirtyRef.current = false;
-          // After save, go back
-          window.history.back();
-        } catch (error) {
-          console.error("Auto-save failed during back/forward navigation:", error);
-          // Even if save fails, allow navigation
-          window.history.back();
-        }
+        // BLOCK navigation - push state back immediately to stay on current page
+        originalPushState(null, "", window.location.href);
+        
+        // Show alert to inform user
+        alert("You have unsaved changes. Please save or discard changes before navigating.");
       }
     };
 
     window.addEventListener("popstate", handlePopState);
 
-    // Cleanup: restore original pushState and remove popstate listener
     return () => {
       window.history.pushState = originalPushState;
       window.removeEventListener("popstate", handlePopState);

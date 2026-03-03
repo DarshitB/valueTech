@@ -2408,19 +2408,23 @@ function CVReport() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reportLoading, externalApiLoading, reportFetchCompleted]);
 
-  // In-app navigation blocker — works with BrowserRouter (no data router needed).
-  // Intercepts pushState (Link clicks) and popstate (browser back/forward).
-  // Saves silently then navigates. 100% reliable for in-app navigation.
+  // Navigation Blocker - Auto-save for Links, Block Back/Forward when dirty
   useEffect(() => {
+    if (!id || !buildSavePayload) return;
+
     // --- Intercept pushState (Link clicks, programmatic navigation) ---
+    // Keep auto-save behavior for React Router navigation (sidebar links, etc.)
     const originalPushState = window.history.pushState.bind(window.history);
+
+    // Push initial state to enable blocking (BEFORE intercepting pushState)
+    originalPushState(null, "", window.location.href);
 
     window.history.pushState = function (state, title, url) {
       if (!isDirtyRef.current) {
         return originalPushState(state, title, url);
       }
 
-      // Block the navigation, save, then replay it
+      // Block the navigation, save, then replay it (existing auto-save behavior)
       pendingNavRef.current = { type: "push", state, title, url };
 
       const saveAndNavigate = async () => {
@@ -2453,34 +2457,20 @@ function CVReport() {
       saveAndNavigate();
     };
 
-    // --- Intercept popstate (browser back/forward button) ---
-    const handlePopState = async (e) => {
-      if (!isDirtyRef.current) return;
-
-      // Push current URL back so the user stays on page while we save
-      originalPushState(window.history.state, "", window.location.href);
-
-      try {
-        const formData = buildSavePayload();
-        const result = await dispatch(
-          saveOrderReport({ orderId: id, reportData: formData })
-        );
-        if (result.meta.requestStatus === "fulfilled") {
-          isDirtyRef.current = false;
-          initialFormDataRef.current = reportFormData;
-          initialFlexibleFieldsRef.current = flexibleFields;
-        }
-      } catch (_) {
-        // toast already shown by thunk
-      } finally {
-        // Go back to where the user wanted to go
-        window.history.go(-1);
+    // --- Block BROWSER BACK/FORWARD BUTTON when dirty ---
+    // Completely stop Back/Forward from working when there are unsaved changes
+    const handlePopState = (e) => {
+      if (isDirtyRef.current) {
+        // BLOCK navigation - push state back immediately to stay on current page
+        originalPushState(null, "", window.location.href);
+        
+        // Show alert to inform user
+        alert("You have unsaved changes. Please save or discard changes before navigating.");
       }
     };
 
     window.addEventListener("popstate", handlePopState);
 
-    // Cleanup: restore original pushState and remove popstate listener
     return () => {
       window.history.pushState = originalPushState;
       window.removeEventListener("popstate", handlePopState);
