@@ -142,6 +142,7 @@ function Officers() {
     email: "",
     password: "",
     confirm_password: "",
+    created_by: "",
   });
 
   const [isEdit, setIsEdit] = useState(false);
@@ -223,6 +224,7 @@ function Officers() {
       email: "",
       password: "",
       confirm_password: "",
+      created_by: "",
     });
     setShowFormModal(true);
   };
@@ -231,6 +233,17 @@ function Officers() {
   const openEditModal = (officer) => {
     setIsEdit(true);
     setEditId(officer.id);
+    
+    // Check if the officer being edited is a BANK OFFICER
+    const isOfficerBankOfficer = officer.role_name?.toUpperCase().includes("BANK OFFICER");
+    
+    // Find the creator's ID from the created_by name
+    let createdById = "";
+    if (isOfficerBankOfficer && officer.created_by) {
+      const creatorOfficer = officers.find((o) => o.name === officer.created_by);
+      createdById = creatorOfficer?.id || "";
+    }
+    
     setFormData({
       name: officer.name,
       role_id:
@@ -241,6 +254,8 @@ function Officers() {
       email: officer.email,
       password: "",
       confirm_password: "",
+      // Store the creator's ID, not name
+      created_by: createdById,
     });
     setShowFormModal(true);
   };
@@ -278,6 +293,20 @@ function Officers() {
     };
 
     if (!isEdit || formData.password) payload.password = formData.password;
+    
+    // Add created_by to payload ONLY when editing a BANK OFFICER and user has permission
+    if (isEdit && formData.created_by) {
+      // Find the officer being edited to check their role
+      const editingOfficer = officers.find((o) => o.id === editId);
+      const isEditingBankOfficer = editingOfficer?.role_name?.toUpperCase().includes("BANK OFFICER");
+      
+      // Check permission
+      const canUpdateCreatedBy = hasPermission(allowedPermissions, "update_officer_created_by");
+      
+      if (isEditingBankOfficer && canUpdateCreatedBy) {
+        payload.created_by = formData.created_by;
+      }
+    }
 
     if (isEdit) {
       dispatch(editOfficer({ id: editId, data: payload }));
@@ -460,6 +489,41 @@ function Officers() {
                     }
                   />
                 </div>
+
+                {/* Show Created By dropdown only when editing a BANK OFFICER */}
+                {isEdit && (() => {
+                  const editingOfficer = officers.find((o) => o.id === editId);
+                  const isEditingBankOfficer = editingOfficer?.role_name?.toUpperCase().includes("BANK OFFICER");
+                  
+                  if (!isEditingBankOfficer) return null;
+                  
+                  // Check permission for updating created_by
+                  const canUpdateCreatedBy = hasPermission(allowedPermissions, "update_officer_created_by");
+                  
+                  if (!canUpdateCreatedBy) return null;
+                  
+                  // Filter to show only BANK AUTHORITY users
+                  const authorityUsers = officers.filter((officer) =>
+                    officer.role_name?.toUpperCase().includes("BANK AUTHORITY")
+                  );
+                  
+                  return (
+                    <div className="form-group">
+                      <label>Created By</label>
+                      <SingleSearchSelect
+                        options={authorityUsers.map((u) => ({
+                          value: u.user_id,
+                          label: u.name,
+                        }))}
+                        value={formData.created_by}
+                        onChange={(val) =>
+                          setFormData({ ...formData, created_by: val })
+                        }
+                        placeholder="Select created by (Authority)"
+                      />
+                    </div>
+                  );
+                })()}
 
                 {/* Only show role selector if user is NOT Bank Authority */}
                 {!isBankAuthority && (
@@ -647,6 +711,7 @@ function Officers() {
                 email: "",
                 password: "",
                 confirm_password: "",
+                created_by: "",
               });
             },
           }}

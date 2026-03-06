@@ -173,6 +173,7 @@ exports.update = async (req, res, next) => {
       role_id,
       branch_id,
       department = [],
+      created_by,
     } = req.body;
 
     // Fetch officer record to get user_id
@@ -216,6 +217,14 @@ exports.update = async (req, res, next) => {
     if (!branch) throw new BadRequestError("Invalid Branch");
     const city_id = branch.city_id;
 
+    // created_by must be a valid user id (integer); ignore if missing, null, or not a number
+    const createdById =
+      created_by !== undefined && created_by !== null
+        ? parseInt(created_by, 10)
+        : null;
+    const hasValidCreatedBy =
+      createdById !== null && !Number.isNaN(createdById);
+
     // Update user
     const userUpdatePayload = {
       name,
@@ -224,6 +233,9 @@ exports.update = async (req, res, next) => {
       role_id,
       city_id,
     };
+    if (hasValidCreatedBy) {
+      userUpdatePayload.created_by = createdById;
+    }
 
     // If password is provided, hash and update
     if (password) {
@@ -233,13 +245,17 @@ exports.update = async (req, res, next) => {
     const [updatedUser] = await User.update(user.id, userUpdatePayload, trx);
 
     // Update officer
+    const officerUpdatePayload = {
+      branch_id,
+      updated_by: req.user?.id,
+      updated_at: new Date(),
+    };
+    if (hasValidCreatedBy) {
+      officerUpdatePayload.created_by = createdById;
+    }
     const updatedOfficer = await Officer.updateOfficer(
       officerId,
-      {
-        branch_id,
-        updated_by: req.user?.id,
-        updated_at: new Date(),
-      },
+      officerUpdatePayload,
       trx
     );
 
@@ -265,13 +281,20 @@ exports.update = async (req, res, next) => {
     const categoryIds = officer_categories.map((cat) => cat.category_id);
     const categories = await Category.findManyByIds(categoryIds);
 
+    // created_by: use new creator name if payload had valid created_by, else existing, else null
+    let createdByDisplay = user.created_by || null;
+    if (hasValidCreatedBy) {
+      const creatorUser = await User.findById(createdById);
+      createdByDisplay = creatorUser ? creatorUser.name : String(createdById);
+    }
+
     // Use updatedOfficer and updatedUser data
     const enriched = {
       ...updatedOfficer, // Use updated officer data instead of old officer data
       name: updatedUser.name,      // Updated name
       email: updatedUser.email,    // Updated email  
       mobile: updatedUser.mobile,  // Updated mobile
-      created_by: user.created_by || null,
+      created_by: createdByDisplay,
       updated_by: editor.name,
       branch_name: branch?.name || null,
       role_name: role?.name || null,
