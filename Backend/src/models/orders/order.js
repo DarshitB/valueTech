@@ -16,6 +16,38 @@ function parseRole(roleNameRaw) {
   };
 }
 
+// Helper: for a BANK AUTHORITY user, get all user_ids that should be visible
+// Includes:
+// - the authority themself
+// - any officers they have created
+// - any linked authorities
+// - officers created by those linked authorities
+async function getAuthorityVisibleUserIds(authorityUserId) {
+  // Get linked authorities for this main authority
+  const linkedRows = await db("bank_authority_linked_authorities")
+    .select("linked_authority_user_id")
+    .whereNull("deleted_at")
+    .where("authority_user_id", authorityUserId);
+
+  const linkedAuthorityUserIds = linkedRows.map(
+    (row) => row.linked_authority_user_id
+  );
+
+  // All authority-type users in this hierarchy: main + linked authorities
+  const allAuthorityUserIds = [authorityUserId, ...linkedAuthorityUserIds];
+
+  // Get officers created by any of these authorities
+  const officers = await db("officers")
+    .select("user_id")
+    .whereNull("deleted_at")
+    .whereIn("created_by", allAuthorityUserIds);
+
+  const officerUserIds = officers.map((o) => o.user_id);
+
+  const ids = [...allAuthorityUserIds, ...officerUserIds];
+  return [...new Set(ids)];
+}
+
 const order = {
   // Get all orders (excludes status 13 finalized and 14 on hold - those are fetched via getAllOrdersWithWoStatus / finalized-and-on-hold-orders)
   getAllOrders: async (user) => {
@@ -155,10 +187,12 @@ const order = {
 
     // Additional role-specific filters (these work alongside assigned orders)
     if ((user.role_name || "").toUpperCase().includes("BANK AUTHORITY")) {
+      const visibleUserIds = await getAuthorityVisibleUserIds(user.id);
+
       baseQuery.andWhere(function () {
-        this.where("orders.created_by", user.id)
-          .orWhere("officers.user_id", user.id)
-          .orWhere("orders.manager_id", user.id);
+        this.whereIn("orders.created_by", visibleUserIds)
+          .orWhereIn("officers.user_id", visibleUserIds)
+          .orWhereIn("orders.manager_id", visibleUserIds);
       });
     } else if ((user.role_name || "").toUpperCase().includes("BANK OFFICER")) {
       baseQuery.andWhere("officers.user_id", user.id);
@@ -410,10 +444,12 @@ const order = {
 
     // Additional role-specific filters (these work alongside assigned orders)
     if ((user.role_name || "").toUpperCase().includes("BANK AUTHORITY")) {
+      const visibleUserIds = await getAuthorityVisibleUserIds(user.id);
+
       baseQuery.andWhere(function () {
-        this.where("orders.created_by", user.id)
-          .orWhere("officers.user_id", user.id)
-          .orWhere("orders.manager_id", user.id);
+        this.whereIn("orders.created_by", visibleUserIds)
+          .orWhereIn("officers.user_id", visibleUserIds)
+          .orWhereIn("orders.manager_id", visibleUserIds);
       });
     } else if ((user.role_name || "").toUpperCase().includes("BANK OFFICER")) {
       baseQuery.andWhere("officers.user_id", user.id);
@@ -769,11 +805,14 @@ const order = {
     } else if (
       (user.role_name || "").toUpperCase().includes("BANK AUTHORITY")
     ) {
-      // BANK AUTHORITY can see orders they created, are assigned to, or manage
+      // BANK AUTHORITY can see orders they or their officers/linked users
+      // created, are assigned to, or manage
+      const visibleUserIds = await getAuthorityVisibleUserIds(user.id);
+
       if (
-        order.created_by !== user.id &&
-        order.officer_user_id !== user.id &&
-        order.manager_id !== user.id
+        !visibleUserIds.includes(order.created_by) &&
+        !visibleUserIds.includes(order.officer_user_id) &&
+        !visibleUserIds.includes(order.manager_id)
       ) {
         return null;
       }

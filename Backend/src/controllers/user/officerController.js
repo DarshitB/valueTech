@@ -46,6 +46,7 @@ exports.create = async (req, res, next) => {
       role_id,
       branch_id,
       department = [],
+      linked_authorities = [],
     } = req.body;
 
     if (
@@ -123,6 +124,13 @@ exports.create = async (req, res, next) => {
       trx
     );
 
+    await Officer.createLinkedAuthorities(
+      user.id,
+      linked_authorities,
+      req.user?.id,
+      trx
+    );
+
     // Commit the transaction
     await trx.commit();
 
@@ -131,11 +139,19 @@ exports.create = async (req, res, next) => {
     // Get extra data outside transaction
     const categoryIds = officer_categories.map((cat) => cat.category_id);
     const categories = await Category.findManyByIds(categoryIds);
-    // Enrich response with creator and role names
+    const linkedAuthorityUserIds = linked_authorities
+      .map((id) => (typeof id === "number" ? id : parseInt(id, 10)))
+      .filter((id) => !Number.isNaN(id) && id !== user.id);
+    const linkedAuthorityUsers =
+      linkedAuthorityUserIds.length > 0
+        ? await Promise.all(linkedAuthorityUserIds.map((uid) => User.findById(uid)))
+        : [];
+    const linkedAuthorityList = linkedAuthorityUsers
+      .filter(Boolean)
+      .map((u) => ({ id: u.id, name: u.name }));
     const creator = await User.findById(user.created_by);
     const role = await Role.findById(user.role_id);
 
-    // Return enriched, sanitized data
     const enriched = {
       ...officer,
       name,
@@ -144,10 +160,8 @@ exports.create = async (req, res, next) => {
       created_by: creator?.name || null,
       branch_name: branch?.name || null,
       role_name: role?.name || null,
-      departments: categories.map((cat) => ({
-        id: cat.id,
-        name: cat.name,
-      })),
+      departments: categories.map((cat) => ({ id: cat.id, name: cat.name })),
+      linked_authorities: linkedAuthorityList,
     };
 
     res.status(201).json(enriched);
@@ -175,6 +189,9 @@ exports.update = async (req, res, next) => {
       department = [],
       created_by,
     } = req.body;
+    const linked_authorities = Array.isArray(req.body.linked_authorities)
+      ? req.body.linked_authorities
+      : [];
 
     // Fetch officer record to get user_id
     const officer = await Officer.findById(officerId);
@@ -273,6 +290,13 @@ exports.update = async (req, res, next) => {
       trx
     );
 
+    await Officer.replaceLinkedAuthorities(
+      officer.user_id,
+      linked_authorities,
+      req.user?.id,
+      trx
+    );
+
     await trx.commit();
 
     // Enrich response - Use updated data
@@ -288,20 +312,28 @@ exports.update = async (req, res, next) => {
       createdByDisplay = creatorUser ? creatorUser.name : String(createdById);
     }
 
-    // Use updatedOfficer and updatedUser data
+    const linkedAuthorityUserIds = linked_authorities
+      .map((id) => (typeof id === "number" ? id : parseInt(id, 10)))
+      .filter((id) => !Number.isNaN(id) && id !== officer.user_id);
+    const linkedAuthorityUsers =
+      linkedAuthorityUserIds.length > 0
+        ? await Promise.all(linkedAuthorityUserIds.map((uid) => User.findById(uid)))
+        : [];
+    const linkedAuthorityList = linkedAuthorityUsers
+      .filter(Boolean)
+      .map((u) => ({ id: u.id, name: u.name }));
+
     const enriched = {
-      ...updatedOfficer, // Use updated officer data instead of old officer data
-      name: updatedUser.name,      // Updated name
-      email: updatedUser.email,    // Updated email  
-      mobile: updatedUser.mobile,  // Updated mobile
+      ...updatedOfficer,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      mobile: updatedUser.mobile,
       created_by: createdByDisplay,
       updated_by: editor.name,
       branch_name: branch?.name || null,
       role_name: role?.name || null,
-      departments: categories.map((cat) => ({
-        id: cat.id,
-        name: cat.name,
-      })),
+      departments: categories.map((cat) => ({ id: cat.id, name: cat.name })),
+      linked_authorities: linkedAuthorityList,
     };
 
     res.status(200).json(enriched);

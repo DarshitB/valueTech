@@ -102,6 +102,46 @@ function Officers() {
     return counts;
   }, [filteredOfficers, officers]);
 
+  // Calculate linked authorities count for each officer
+  const linkedAuthoritiesCounts = useMemo(() => {
+    const counts = {};
+    
+    filteredOfficers.forEach((officer) => {
+      // If officer's role_name is BANK OFFICER, show "-" (set to null)
+      if (officer.role_name?.toUpperCase().includes("BANK OFFICER")) {
+        counts[officer.id] = null; // null means show "-"
+      }
+      // If officer's role_name is BANK AUTHORITY, count linked authorities
+      else if (officer.role_name?.toUpperCase().includes("BANK AUTHORITY")) {
+        const linkedCount = (officer.linked_authorities || []).length;
+        counts[officer.id] = linkedCount;
+      }
+    });
+
+    return counts;
+  }, [filteredOfficers]);
+
+  // Get main authority names for each officer (can have multiple)
+  const mainAuthorityNames = useMemo(() => {
+    const names = {};
+    
+    filteredOfficers.forEach((officer) => {
+      // Find ALL officers who have this officer in their linked_authorities
+      const mainAuthorities = officers.filter((o) => {
+        if (!o.linked_authorities || !Array.isArray(o.linked_authorities)) return false;
+        // Check if current officer's user_id is in the linked_authorities
+        return o.linked_authorities.some((linked) => linked.id === officer.user_id);
+      });
+      
+      // Join all main authority names (e.g., "A, B, C")
+      names[officer.id] = mainAuthorities.length > 0
+        ? mainAuthorities.map((o) => o.name).join(", ")
+        : "-";
+    });
+
+    return names;
+  }, [filteredOfficers, officers]);
+
   // Get selected branch for breadcrumb
   const selectedBranch = useMemo(() => {
     if (!branchIdParam) return null;
@@ -143,6 +183,7 @@ function Officers() {
     password: "",
     confirm_password: "",
     created_by: "",
+    linked_authorities: [], // Changed from bank_authorities to linked_authorities
   });
 
   const [isEdit, setIsEdit] = useState(false);
@@ -226,6 +267,7 @@ function Officers() {
       password: "",
       confirm_password: "",
       created_by: "",
+      linked_authorities: [],
     });
     setShowFormModal(true);
   };
@@ -234,7 +276,7 @@ function Officers() {
   const openEditModal = (officer) => {
     setIsEdit(true);
     setEditId(officer.id);
-    setCreatedByChanged(false); // Reset the flag when opening modal
+    setCreatedByChanged(false);
     
     // Check if the officer being edited is a BANK OFFICER
     const isOfficerBankOfficer = officer.role_name?.toUpperCase().includes("BANK OFFICER");
@@ -246,6 +288,10 @@ function Officers() {
       createdByUserId = creatorOfficer?.user_id || "";
     }
     
+    // Backend sends linked_authorities with 'id' field which is actually user_id
+    // Extract just the IDs (which are user_ids from the user table)
+    const linkedAuthIds = (officer.linked_authorities || []).map((a) => a.id);
+    
     setFormData({
       name: officer.name,
       role_id:
@@ -256,8 +302,8 @@ function Officers() {
       email: officer.email,
       password: "",
       confirm_password: "",
-      // Store the creator's user_id to match the dropdown value
       created_by: createdByUserId,
+      linked_authorities: linkedAuthIds,
     });
     setShowFormModal(true);
   };
@@ -292,6 +338,7 @@ function Officers() {
       branch_id: parseInt(formData.branch_id),
       mobile: formData.mobile,
       email: formData.email,
+      linked_authorities: formData.linked_authorities,
     };
 
     if (!isEdit || formData.password) payload.password = formData.password;
@@ -416,6 +463,8 @@ function Officers() {
                 <th>Email</th>
                 <th style={{ textAlign: "center" }}>Orders</th>
                 <th style={{ textAlign: "center" }}>Bank Officers</th>
+                <th style={{ textAlign: "center" }}>Linked Authorities</th>
+                <th>Main Authority</th>
                 <th>Created By</th>
                 <th>Updated By</th>
                 <th>Action</th>
@@ -440,6 +489,14 @@ function Officers() {
                     ? bankOfficerCounts[officer.id]
                     : "-"}
                 </td>
+                <td style={{ textAlign: "center" }}>
+                  {linkedAuthoritiesCounts[officer.id] === null
+                    ? "-"
+                    : linkedAuthoritiesCounts[officer.id] !== undefined
+                    ? linkedAuthoritiesCounts[officer.id]
+                    : 0}
+                </td>
+                <td>{mainAuthorityNames[officer.id] || "-"}</td>
                 <td>{officer.created_by}</td>
                 <td>{officer.updated_by || "-"}</td>
                 <td>
@@ -570,6 +627,55 @@ function Officers() {
                     /> */}
                   </div>
                 )}
+                
+                {/* Show Linked Authorities dropdown only when editing/creating a BANK AUTHORITY */}
+                {(() => {
+                  // Check permission first
+                  const canUpdateLinkedAuthorities = hasPermission(allowedPermissions, "update_linked_authorities");
+                  
+                  if (!canUpdateLinkedAuthorities) return null;
+                  
+                  // Check if we're editing and if the officer being edited is BANK AUTHORITY
+                  if (isEdit) {
+                    const editingOfficer = officers.find((o) => o.id === editId);
+                    const isEditingBankAuthority = editingOfficer?.role_name?.toUpperCase().includes("BANK AUTHORITY");
+                    
+                    if (!isEditingBankAuthority) return null;
+                  } else {
+                    // In create mode, check if the selected role is BANK AUTHORITY
+                    const selectedRole = roles.find((r) => r.id.toString() === formData.role_id);
+                    const isCreatingBankAuthority = selectedRole?.name?.toUpperCase().includes("BANK AUTHORITY");
+                    
+                    if (!isCreatingBankAuthority) return null;
+                  }
+                  
+                  return (
+                    <div className="form-group">
+                      <label>Linked Authorities</label>
+                      <SingleSearchSelect
+                        isMulti
+                        options={officers
+                          .filter((officer) => {
+                            // Only show BANK AUTHORITY officers
+                            const isBankAuthority = officer.role_name?.toUpperCase().includes("BANK AUTHORITY");
+                            // Exclude current officer being edited
+                            const isNotCurrentOfficer = isEdit ? officer.id !== editId : true;
+                            return isBankAuthority && isNotCurrentOfficer;
+                          })
+                          .map((u) => ({
+                            value: u.user_id,
+                            label: u.name,
+                          }))}
+                        value={formData.linked_authorities}
+                        onChange={(val) =>
+                          setFormData({ ...formData, linked_authorities: val })
+                        }
+                        placeholder="Select linked authorities"
+                      />
+                    </div>
+                  );
+                })()}
+                
                 {!isBankAuthority && (
                   <>
                     <div className="form-group">
@@ -588,6 +694,7 @@ function Officers() {
                         isDisabled={isBankAuthority}
                       />
                     </div>
+
                     <div className="form-group">
                       <label>Branch</label>
                       <SingleSearchSelect
@@ -717,6 +824,7 @@ function Officers() {
                 password: "",
                 confirm_password: "",
                 created_by: "",
+                linked_authorities: [],
               });
             },
           }}

@@ -62,6 +62,7 @@ const officer = {
       return officers.map((o) => ({
         ...o,
         departments: [],
+        linked_authorities: [],
       }));
     }
     // Fetch categories only for found officers
@@ -71,6 +72,18 @@ const officer = {
       .whereIn("officer_categories.officer_id", officerIds)
       .whereNull("officer_categories.deleted_at");
 
+    // Fetch linked authorities (other bank authorities) per officer user_id
+    const officerUserIds = [...new Set(officers.map((o) => o.user_id))];
+    const linkedAuthorityRows = await db("bank_authority_linked_authorities")
+      .leftJoin("users", "bank_authority_linked_authorities.linked_authority_user_id", "users.id")
+      .select(
+        "bank_authority_linked_authorities.authority_user_id",
+        "users.id as linked_id",
+        "users.name as linked_name"
+      )
+      .whereIn("bank_authority_linked_authorities.authority_user_id", officerUserIds)
+      .whereNull("bank_authority_linked_authorities.deleted_at");
+
     // Map categories to their officers
     const categoryMap = {};
     for (const c of categories) {
@@ -78,10 +91,19 @@ const officer = {
       categoryMap[c.officer_id].push({ id: c.id, name: c.name });
     }
 
-    // Attach categories to each officer
+    // Map linked_authorities by authority_user_id (officer's user_id)
+    const linkedAuthorityMap = {};
+    for (const row of linkedAuthorityRows) {
+      const key = row.authority_user_id;
+      if (!linkedAuthorityMap[key]) linkedAuthorityMap[key] = [];
+      linkedAuthorityMap[key].push({ id: row.linked_id, name: row.linked_name });
+    }
+
+    // Attach categories and linked_authorities to each officer
     return officers.map((officer) => ({
       ...officer,
       departments: categoryMap[officer.id] || [],
+      linked_authorities: linkedAuthorityMap[officer.user_id] || [],
     }));
   },
 
@@ -118,7 +140,14 @@ const officer = {
       .where("officer_categories.officer_id", id)
       .whereNull("officer_categories.deleted_at");
 
-    return { ...officer, departments };
+    const linkedAuthorityRows = await db("bank_authority_linked_authorities")
+      .leftJoin("users", "bank_authority_linked_authorities.linked_authority_user_id", "users.id")
+      .select("users.id", "users.name")
+      .where("bank_authority_linked_authorities.authority_user_id", officer.user_id)
+      .whereNull("bank_authority_linked_authorities.deleted_at");
+    const linked_authorities = linkedAuthorityRows.map((row) => ({ id: row.id, name: row.name }));
+
+    return { ...officer, departments, linked_authorities };
   },
 
   // Create officer
@@ -150,6 +179,36 @@ const officer = {
     return await trx("officer_categories")
       .insert(newCategoryData)
       .returning("*");
+  },
+
+  // Linked authorities (bank_authority_linked_authorities) – same pattern as officer_categories
+  createLinkedAuthorities: async (authorityUserId, linkedAuthorityUserIds, createdBy, trx = db) => {
+    if (!Array.isArray(linkedAuthorityUserIds) || linkedAuthorityUserIds.length === 0) return [];
+    const validIds = linkedAuthorityUserIds
+      .map((id) => (typeof id === "number" ? id : parseInt(id, 10)))
+      .filter((id) => !Number.isNaN(id) && id !== authorityUserId);
+    const rows = validIds.map((linkedId) => ({
+      authority_user_id: authorityUserId,
+      linked_authority_user_id: linkedId,
+      created_by: createdBy || null,
+      created_at: new Date(),
+    }));
+    return await trx("bank_authority_linked_authorities").insert(rows).returning("*");
+  },
+
+  replaceLinkedAuthorities: async (authorityUserId, linkedAuthorityUserIds, createdBy, trx = db) => {
+    await trx("bank_authority_linked_authorities").where("authority_user_id", authorityUserId).del();
+    if (!Array.isArray(linkedAuthorityUserIds) || linkedAuthorityUserIds.length === 0) return [];
+    const validIds = linkedAuthorityUserIds
+      .map((id) => (typeof id === "number" ? id : parseInt(id, 10)))
+      .filter((id) => !Number.isNaN(id) && id !== authorityUserId);
+    const rows = validIds.map((linkedId) => ({
+      authority_user_id: authorityUserId,
+      linked_authority_user_id: linkedId,
+      created_by: createdBy || null,
+      created_at: new Date(),
+    }));
+    return await trx("bank_authority_linked_authorities").insert(rows).returning("*");
   },
 
   // Soft delete officer + its categories

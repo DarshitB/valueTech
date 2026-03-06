@@ -1403,14 +1403,7 @@ function Dashboard() {
                   <div className="row">
                     {isBankAuthority ? (
                       <>
-                        <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 col-xs-12">
-                          <div className="padding-top-bottom">
-                            <div className="sneak-peek-card order-status total-orders">
-                              <h3>Total Orders</h3>
-                              <p>{formatTwoDigits(filteredTableOrdersCount)}</p>
-                            </div>
-                          </div>
-                        </div>
+                     
                         <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 col-xs-12">
                           <div className="padding-top-bottom">
                             <div className="sneak-peek-card order-status today-orders-card">
