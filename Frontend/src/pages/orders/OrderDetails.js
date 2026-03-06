@@ -288,7 +288,9 @@ function OrderDetails() {
       if (hasPermission(allowedPermissions, "view_order_comments")) {
         dispatch(fetchComments(id));
       }
-      dispatch(fetchOrderMediaDocuments(id));
+      if (hasPermission(allowedPermissions, "view_order_media_documents")) {
+        dispatch(fetchOrderMediaDocuments(id));
+      }
       dispatch(fetchOfficers());
     }
   }, [dispatch, id, allowedPermissions]);
@@ -2115,6 +2117,18 @@ function OrderDetails() {
                   <p>Payment Status</p>
                   <h6>{order?.payment_status ? order.payment_status : "-"}</h6>
                 </div>
+              )}
+            {hasPermission(
+              allowedPermissions,
+              "view_order_media_documents"
+            ) &&
+              (isBankUser) && (
+                <Link
+                  to={`/orders/${id}/details/documents`}
+                  className="order-impo-info-card documents-link"
+                >
+                  <FolderIcon /> <h6>View Documents</h6>
+                </Link>
               )}
           </div>
         </div>

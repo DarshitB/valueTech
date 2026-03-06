@@ -49,6 +49,32 @@ function Officers() {
   // get loggedin user
   const users = useSelector(selectUser);
 
+  // Local state
+  const [formData, setFormData] = useState({
+    name: "",
+    role_id: "",
+    department: [],
+    branch_id: "",
+    mobile: "",
+    email: "",
+    password: "",
+    confirm_password: "",
+    created_by: "",
+    linked_authorities: [], // Changed from bank_authorities to linked_authorities
+  });
+
+  const [isEdit, setIsEdit] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [confirmDeleteName, setConfirmDeleteName] = useState("");
+  const [mobileError, setMobileError] = useState(null);
+  const [emailError, setEmailError] = useState(null);
+  const [createdByChanged, setCreatedByChanged] = useState(false);
+  const [selectedBankId, setSelectedBankId] = useState("");
+  const [selectedBranchId, setSelectedBranchId] = useState("");
+  const [selectedRoleId, setSelectedRoleId] = useState("");
+
   useEffect(() => {
     dispatch(fetchOfficers());
     dispatch(fetchRoles());
@@ -57,14 +83,51 @@ function Officers() {
     dispatch(fetchOrders());
   }, [dispatch]);
 
-  // Filter officers by branch_id if branch_id param exists
+  // Filter officers by branch_id (URL) and local filters (bank, branch, role)
   const filteredOfficers = useMemo(() => {
-    if (!branchIdParam) {
-      return officers;
+    let result = officers;
+
+    if (branchIdParam) {
+      const branchId = parseInt(branchIdParam, 10);
+      result = result.filter((officer) => officer.branch_id === branchId);
     }
-    const branchId = parseInt(branchIdParam, 10);
-    return officers.filter((officer) => officer.branch_id === branchId);
-  }, [officers, branchIdParam]);
+
+    // Filter by selected bank using officer's branch -> bank_id
+    if (selectedBankId) {
+      result = result.filter((officer) => {
+        const branch = branches.find((b) => b.id === officer.branch_id);
+        return branch && String(branch.bank_id) === String(selectedBankId);
+      });
+    }
+
+    // Filter by selected branch
+    if (selectedBranchId) {
+      result = result.filter(
+        (officer) => String(officer.branch_id) === String(selectedBranchId)
+      );
+    }
+
+    // Filter by selected role
+    if (selectedRoleId) {
+      const selectedRole = roles.find(
+        (r) => String(r.id) === String(selectedRoleId)
+      );
+      const roleName = selectedRole?.name;
+      if (roleName) {
+        result = result.filter((officer) => officer.role_name === roleName);
+      }
+    }
+
+    return result;
+  }, [
+    officers,
+    branchIdParam,
+    branches,
+    roles,
+    selectedBankId,
+    selectedBranchId,
+    selectedRoleId,
+  ]);
 
   // Calculate order counts for each officer
   const officerOrderCounts = useMemo(() => {
@@ -173,28 +236,6 @@ function Officers() {
     }
   }, [selectedBranch, setTitle]);
 
-  const [formData, setFormData] = useState({
-    name: "",
-    role_id: "",
-    department: [],
-    branch_id: "",
-    mobile: "",
-    email: "",
-    password: "",
-    confirm_password: "",
-    created_by: "",
-    linked_authorities: [], // Changed from bank_authorities to linked_authorities
-  });
-
-  const [isEdit, setIsEdit] = useState(false);
-  const [editId, setEditId] = useState(null);
-  const [showFormModal, setShowFormModal] = useState(false);
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-  const [confirmDeleteName, setConfirmDeleteName] = useState("");
-  const [mobileError, setMobileError] = useState(null);
-  const [emailError, setEmailError] = useState(null);
-  const [createdByChanged, setCreatedByChanged] = useState(false);
-
   /* console.log("users",users); */
 
   // Check if current user is BANK AUTHORITY - matches any role containing "BANK AUTHORITY"
@@ -216,6 +257,118 @@ function Officers() {
       role.name?.toUpperCase().includes("BANK OFFICER")
     );
   });
+
+  // Bank filter options: distinct banks from officers, respecting other filters
+  const bankOptions = useMemo(() => {
+    const map = new Map();
+
+    officers.forEach((officer) => {
+      // Respect current branch filter
+      if (
+        selectedBranchId &&
+        String(officer.branch_id) !== String(selectedBranchId)
+      ) {
+        return;
+      }
+
+      // Respect current role filter
+      if (selectedRoleId) {
+        const selectedRole = roles.find(
+          (r) => String(r.id) === String(selectedRoleId)
+        );
+        const roleName = selectedRole?.name;
+        if (roleName && officer.role_name !== roleName) return;
+      }
+
+      const branch = branches.find((b) => b.id === officer.branch_id);
+      if (!branch || !branch.bank_id) return;
+
+      if (!map.has(branch.bank_id)) {
+        map.set(branch.bank_id, branch.bank_name || `Bank #${branch.bank_id}`);
+      }
+    });
+
+    return Array.from(map.entries()).map(([id, name]) => ({
+      value: String(id),
+      label: name,
+    }));
+  }, [officers, branches, roles, selectedBranchId, selectedRoleId]);
+
+  // Branch filter options: distinct branches from officers, respecting other filters
+  const branchOptions = useMemo(() => {
+    const map = new Map();
+
+    officers.forEach((officer) => {
+      // Respect current bank filter
+      const branch = branches.find((b) => b.id === officer.branch_id);
+      if (!branch) return;
+
+      if (
+        selectedBankId &&
+        String(branch.bank_id) !== String(selectedBankId)
+      ) {
+        return;
+      }
+
+      // Respect current role filter
+      if (selectedRoleId) {
+        const selectedRole = roles.find(
+          (r) => String(r.id) === String(selectedRoleId)
+        );
+        const roleName = selectedRole?.name;
+        if (roleName && officer.role_name !== roleName) return;
+      }
+
+      if (!map.has(branch.id)) {
+        map.set(
+          branch.id,
+          `${branch.name} - ${branch.bank_name} - ${branch.city_name}`
+        );
+      }
+    });
+
+    return Array.from(map.entries()).map(([id, label]) => ({
+      value: String(id),
+      label,
+    }));
+  }, [officers, branches, roles, selectedBankId, selectedRoleId]);
+
+  // Role filter options: distinct roles from officers, respecting bank/branch filters
+  const roleFilterOptions = useMemo(() => {
+    const map = new Map();
+
+    officers.forEach((officer) => {
+      // Respect current bank/branch filters
+      const branch = branches.find((b) => b.id === officer.branch_id);
+      if (!branch) return;
+
+      if (
+        selectedBankId &&
+        String(branch.bank_id) !== String(selectedBankId)
+      ) {
+        return;
+      }
+
+      if (
+        selectedBranchId &&
+        String(officer.branch_id) !== String(selectedBranchId)
+      ) {
+        return;
+      }
+
+      const role = roles.find((r) => r.name === officer.role_name);
+      if (!role) return;
+
+      if (!map.has(role.id)) {
+        map.set(role.id, role.name);
+      }
+    });
+
+    return Array.from(map.entries()).map(([id, name]) => ({
+      value: String(id),
+      label: name,
+    }));
+  }, [officers, branches, roles, selectedBankId, selectedBranchId]);
 
   const openAddModal = () => {
     setIsEdit(false);
@@ -438,7 +591,75 @@ function Officers() {
   };
   /* console.log(officers); */
   return (
-    <div className="height-full-occupied user-data-container">
+    <div className="height-full-occupied user-data-container officer-data-container">
+      {/* Officer table filters (Bank, Branch, Role) */}
+      {(hasPermission(allowedPermissions, "officer_table_filter_bank") ||
+        hasPermission(allowedPermissions, "officer_table_filter_branch") ||
+        hasPermission(allowedPermissions, "officer_table_filter_role")) && (
+        <div className="filter-container-card" style={{ marginBottom: "16px" }}>
+          <div
+            className="filter-row"
+            style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}
+          >
+            {hasPermission(
+              allowedPermissions,
+              "officer_table_filter_bank"
+            ) && (
+              <SingleSearchSelect
+                className="search-selector"
+                options={[{ value: "", label: "All Banks" }, ...bankOptions]}
+                value={selectedBankId || ""}
+                onChange={(value) => {
+                  const val = value || "";
+                  setSelectedBankId(val);
+                  // Reset branch when bank changes
+                  setSelectedBranchId("");
+                }}
+                placeholder="All Banks"
+              />
+            )}
+
+            {hasPermission(
+              allowedPermissions,
+              "officer_table_filter_branch"
+            ) && (
+              <SingleSearchSelect
+                className="search-selector"
+                options={[
+                  { value: "", label: "All Branches" },
+                  ...branchOptions,
+                ]}
+                value={selectedBranchId || ""}
+                onChange={(value) => {
+                  const val = value || "";
+                  setSelectedBranchId(val);
+                }}
+                placeholder="All Branches"
+              />
+            )}
+
+            {hasPermission(
+              allowedPermissions,
+              "officer_table_filter_role"
+            ) && (
+              <SingleSearchSelect
+                className="search-selector"
+                options={[
+                  { value: "", label: "All Roles" },
+                  ...roleFilterOptions,
+                ]}
+                value={selectedRoleId || ""}
+                onChange={(value) => {
+                  const val = value || "";
+                  setSelectedRoleId(val);
+                }}
+                placeholder="All Roles"
+              />
+            )}
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <p>Loading...</p>
       ) : (
@@ -628,54 +849,6 @@ function Officers() {
                   </div>
                 )}
                 
-                {/* Show Linked Authorities dropdown only when editing/creating a BANK AUTHORITY */}
-                {(() => {
-                  // Check permission first
-                  const canUpdateLinkedAuthorities = hasPermission(allowedPermissions, "update_linked_authorities");
-                  
-                  if (!canUpdateLinkedAuthorities) return null;
-                  
-                  // Check if we're editing and if the officer being edited is BANK AUTHORITY
-                  if (isEdit) {
-                    const editingOfficer = officers.find((o) => o.id === editId);
-                    const isEditingBankAuthority = editingOfficer?.role_name?.toUpperCase().includes("BANK AUTHORITY");
-                    
-                    if (!isEditingBankAuthority) return null;
-                  } else {
-                    // In create mode, check if the selected role is BANK AUTHORITY
-                    const selectedRole = roles.find((r) => r.id.toString() === formData.role_id);
-                    const isCreatingBankAuthority = selectedRole?.name?.toUpperCase().includes("BANK AUTHORITY");
-                    
-                    if (!isCreatingBankAuthority) return null;
-                  }
-                  
-                  return (
-                    <div className="form-group">
-                      <label>Linked Authorities</label>
-                      <SingleSearchSelect
-                        isMulti
-                        options={officers
-                          .filter((officer) => {
-                            // Only show BANK AUTHORITY officers
-                            const isBankAuthority = officer.role_name?.toUpperCase().includes("BANK AUTHORITY");
-                            // Exclude current officer being edited
-                            const isNotCurrentOfficer = isEdit ? officer.id !== editId : true;
-                            return isBankAuthority && isNotCurrentOfficer;
-                          })
-                          .map((u) => ({
-                            value: u.user_id,
-                            label: u.name,
-                          }))}
-                        value={formData.linked_authorities}
-                        onChange={(val) =>
-                          setFormData({ ...formData, linked_authorities: val })
-                        }
-                        placeholder="Select linked authorities"
-                      />
-                    </div>
-                  );
-                })()}
-                
                 {!isBankAuthority && (
                   <>
                     <div className="form-group">
@@ -713,6 +886,92 @@ function Officers() {
                     </div>
                   </>
                 )}
+
+                {/* Show Linked Authorities dropdown only when editing/creating a BANK AUTHORITY */}
+                {(() => {
+                  // Check permission first
+                  const canUpdateLinkedAuthorities = hasPermission(
+                    allowedPermissions,
+                    "update_linked_authorities"
+                  );
+
+                  if (!canUpdateLinkedAuthorities) return null;
+
+                  // Determine if target officer is BANK AUTHORITY
+                  if (isEdit) {
+                    const editingOfficer = officers.find((o) => o.id === editId);
+                    const isEditingBankAuthority =
+                      editingOfficer?.role_name
+                        ?.toUpperCase()
+                        .includes("BANK AUTHORITY");
+
+                    if (!isEditingBankAuthority) return null;
+                  } else {
+                    // In create mode, check if the selected role is BANK AUTHORITY
+                    const selectedRole = roles.find(
+                      (r) => r.id.toString() === formData.role_id
+                    );
+                    const isCreatingBankAuthority = selectedRole?.name
+                      ?.toUpperCase()
+                      .includes("BANK AUTHORITY");
+
+                    if (!isCreatingBankAuthority) return null;
+                  }
+
+                  // Find main authority's bank name
+                  let mainBankName = "";
+                  if (isEdit) {
+                    const editingOfficer = officers.find((o) => o.id === editId);
+                    mainBankName = editingOfficer?.bank_name || "";
+                  } else if (formData.branch_id) {
+                    const selectedBranch = branches.find(
+                      (b) => b.id === formData.branch_id
+                    );
+                    mainBankName = selectedBranch?.bank_name || "";
+                  }
+
+                  return (
+                    <div className="form-group">
+                      <label>Linked Authorities</label>
+                      <SingleSearchSelect
+                        isMulti
+                        options={officers
+                          .filter((officer) => {
+                            // Only show BANK AUTHORITY officers
+                            const isBankAuthorityOpt = officer.role_name
+                              ?.toUpperCase()
+                              .includes("BANK AUTHORITY");
+                            // Exclude current officer being edited
+                            const isNotCurrentOfficer = isEdit
+                              ? officer.id !== editId
+                              : true;
+                            // Match same bank as main authority (by bank_name)
+                            const sameBank =
+                              mainBankName &&
+                              officer.bank_name &&
+                              officer.bank_name === mainBankName;
+
+                            return (
+                              isBankAuthorityOpt &&
+                              isNotCurrentOfficer &&
+                              sameBank
+                            );
+                          })
+                          .map((u) => ({
+                            value: u.user_id,
+                            label: [u.name, u.bank_name, u.branch_name]
+                              .filter(Boolean)
+                              .join(" - "),
+                          }))}
+                        value={formData.linked_authorities}
+                        onChange={(val) =>
+                          setFormData({ ...formData, linked_authorities: val })
+                        }
+                        placeholder="Select linked authorities"
+                      />
+                    </div>
+                  );
+                })()}
 
                 <div className="form-group">
                   <label>Email</label>

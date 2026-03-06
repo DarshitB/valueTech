@@ -244,6 +244,30 @@
   }
 }
 
+.officer-data-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  .filter-container-card {
+    flex-shrink: 0;
+  }
+  .dataTable-container {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 20px 30px 20px 20px;
+    .dataTable-table{
+      thead {
+        z-index: 0;
+      }
+    }
+  }
+}
+
 // Filter Container Card Styles
 .filter-container-card {
   background-color: #ffffff;
@@ -476,6 +500,13 @@
 
       &:last-child {
         margin-bottom: 0;
+      }
+
+      &.documents-link {
+        flex-direction: row;
+        gap: 10px;
+        justify-content: flex-start;
+        align-items: center;
       }
 
       p {
