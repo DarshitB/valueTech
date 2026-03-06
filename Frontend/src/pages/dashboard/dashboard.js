@@ -54,7 +54,7 @@ function Dashboard() {
   const { lastRecord: lastAttendance, loading: attendanceLoading } =
     useSelector((state) => state.attendance);
 
- /*  console.log("orders", orders); */
+  /*  console.log("orders", orders); */
 
   // Fetch everything on mount - always fetch orders when Dashboard component mounts
   // This ensures we get the correct data even if Orders' finalized orders are in the store
@@ -1134,7 +1134,7 @@ function Dashboard() {
       if (hasPermission(allowedPermissions, "edit_order_created_at") && formData.created_at) {
         const currentCreatedAt = currentOrder.created_at ? new Date(currentOrder.created_at) : null;
         const newCreatedAt = formData.created_at;
-        
+
         // Only add if changed
         if (!currentCreatedAt || currentCreatedAt.getTime() !== newCreatedAt.getTime()) {
           payload.created_at = newCreatedAt.toISOString();
@@ -1395,16 +1395,15 @@ function Dashboard() {
                   allowedPermissions,
                   "view_dashboard_checkin_checkout"
                 )
-                    ? "col-xl-12"
-                    : "col-xl-12"
+                  ? "col-xl-12"
+                  : "col-xl-12"
                   } col-lg-12 col-md-12 col-sm-12 col-xs-12`}
               >
                 <div className="left-part-of-sneak-peek">
                   <div className="row">
                     {isBankAuthority ? (
                       <>
-                     
-                        <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 col-xs-12">
+                        <div className="col-xl-4 col-lg-4 col-md-4 col-sm-12 col-xs-12">
                           <div className="padding-top-bottom">
                             <div className="sneak-peek-card order-status today-orders-card">
                               <h3>Today's Orders</h3>
@@ -1412,152 +1411,77 @@ function Dashboard() {
                             </div>
                           </div>
                         </div>
-                        <div className="col-xl-4 col-lg-6 col-md-8 col-sm-12 col-xs-12">
-                          <div className="row">
-                            {/* For Bank Authority and Bank Officer users - custom layout */}
-                            {isBankAuthority || isBankOfficer ? (
-                              <>
-                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
-                                  <div className="padding-top-bottom">
-                                    <div className="sneak-peek-card order-status ongoing-orders">
-                                      <h3>Total Orders</h3>
-                                      <p>{formatTwoDigits(orders.length)}</p>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
-                                  <div className="padding-top-bottom">
-                                    <div className="sneak-peek-card order-status re-validate-orders">
-                                      <h3>Ongoing</h3>
-                                      <p>
-                                        {formatTwoDigits(
-                                          orders.filter((order) => {
-                                            const status =
-                                              order.current_status_name?.toLowerCase();
-                                            // Count orders that are not "submitted" or "completed"
-                                            return (
-                                              status &&
-                                              status !== "submitted" &&
-                                              status !== "completed"
-                                            );
-                                          }).length
-                                        )}
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
-                                  <div className="padding-top-bottom">
-                                    <div className="sneak-peek-card order-status submitted-orders">
-                                      <h3>Document Submitted</h3>
-                                      <p>-</p>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
-                                  <div className="padding-top-bottom">
-                                    <div className="sneak-peek-card order-status validate-orders">
-                                      <h3>Completed</h3>
-                                      <p>-</p>
-                                    </div>
-                                  </div>
-                                </div>
-                              </>
-                            ) : (
-                              /* For other users - original layout */
-                              <>
-                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
-                                  <div className="padding-top-bottom">
-                                    <div className="sneak-peek-card order-status ongoing-orders">
-                                      <h3>Ongoing</h3>
-                                      <p>
-                                        {formatTwoDigits(
-                                          orders.filter(
-                                            (order) =>
-                                              order.current_status_id < 7
-                                          ).length
-                                        )}
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
-                                  <div className="padding-top-bottom">
-                                    <div className="sneak-peek-card order-status submitted-orders">
-                                      <h3>Submitted</h3>
-                                      <p>
-                                        {formatTwoDigits(
-                                          orders.filter(
-                                            (order) =>
-                                              order.current_status_id === 7
-                                          ).length
-                                        )}
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
-                                  <div className="padding-top-bottom">
-                                    <div className="sneak-peek-card order-status validate-orders">
-                                      <h3>Validate</h3>
-                                      <p>
-                                        {formatTwoDigits(
-                                          orders.filter(
-                                            (order) =>
-                                              order.current_status_id === 8
-                                          ).length
-                                        )}
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-xs-6">
-                                  <div className="padding-top-bottom">
-                                    <div className="sneak-peek-card order-status re-validate-orders">
-                                      <h3>re-validate</h3>
-                                      <p>
-                                        {formatTwoDigits(
-                                          orders.filter(
-                                            (order) =>
-                                              order.has_rejected_media ===
-                                              true ||
-                                              order.has_rejected_images === true
-                                          ).length
-                                        )}
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-                              </>
-                            )}
+                        <div className="col-xl-2 col-lg-4 col-md-4 col-sm-12 col-xs-12">
+                          <div className="padding-top-bottom">
+                            <div className="sneak-peek-card order-status ongoing-orders">
+                              <h3>Total Orders</h3>
+                              <p>{formatTwoDigits(orders.length)}</p>
+                            </div>
                           </div>
                         </div>
-                        <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 col-xs-12">
+                        <div className="col-xl-2 col-lg-4 col-md-4 col-sm-12 col-xs-12">
                           <div className="padding-top-bottom">
-                            <div className="sneak-peek-card today-orders">
-                              <DashboardIcon className="sneak-peek-card-icon" />
+                            <div className="sneak-peek-card order-status re-validate-orders">
+                              <h3>Ongoing</h3>
+                              <p>
+                                {formatTwoDigits(
+                                  orders.filter((order) => {
+                                    const status =
+                                      order.current_status_name?.toLowerCase();
+                                    // Count orders that are not "submitted" or "completed"
+                                    return (
+                                      status &&
+                                      status !== "submitted" &&
+                                      status !== "completed"
+                                    );
+                                  }).length
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="col-xl-2 col-lg-4 col-md-4 col-sm-12 col-xs-12">
+                          <div className="padding-top-bottom">
+                            <div className="sneak-peek-card order-status submitted-orders">
+                              <h3>Document Submitted</h3>
+                              <p>{formatTwoDigits(
+                                orders.filter(
+                                  (order) =>
+                                    order.current_status_id === 7
+                                ).length
+                              )}</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="col-xl-2 col-lg-4 col-md-4 col-sm-12 col-xs-12">
+                          <div className="padding-top-bottom">
+                            <div className="sneak-peek-card order-status validate-orders">
+                              <h3>Completed</h3>
+                              <p>{formatTwoDigits(completedOrdersCount)}</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="col-xl-4 col-lg-4 col-md-4 col-sm-12 col-xs-12">
+                          <div className="padding-top-bottom">
+                            <div className="sneak-peek-card order-status today-orders-card">
                               <h3>Total Officer</h3>
                               <p>{formatTwoDigits(officers.length)}</p>
                             </div>
                           </div>
                         </div>
-                        <div className="col-xl-3 col-lg-2 col-md-4 col-sm-12 col-xs-12">
-                          <div className="row">
-                            <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12">
-                              <div className="padding-top-bottom">
-                                <div className="sneak-peek-card order-status ongoing-orders">
-                                  <h3>Active Officer</h3>
-                                  <p>-</p>
-                                </div>
-                              </div>
+                        <div className="col-xl-4 col-lg-4 col-md-4 col-sm-12 col-xs-12">
+                          <div className="padding-top-bottom">
+                            <div className="sneak-peek-card order-status ongoing-orders">
+                              <h3>Active Officer</h3>
+                              <p>-</p>
                             </div>
-                            <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12">
-                              <div className="padding-top-bottom">
-                                <div className="sneak-peek-card order-status submitted-orders">
-                                  <h3>Inactive Officer</h3>
-                                  <p>-</p>
-                                </div>
-                              </div>
+                          </div>
+                        </div>
+                        <div className="col-xl-4 col-lg-4 col-md-4 col-sm-12 col-xs-12">
+                          <div className="padding-top-bottom">
+                            <div className="sneak-peek-card order-status submitted-orders">
+                              <h3>Inactive Officer</h3>
+                              <p>-</p>
                             </div>
                           </div>
                         </div>
@@ -1618,7 +1542,12 @@ function Dashboard() {
                                   <div className="padding-top-bottom">
                                     <div className="sneak-peek-card order-status submitted-orders">
                                       <h3>Document Submitted</h3>
-                                      <p>-</p>
+                                      {formatTwoDigits(
+                                        orders.filter(
+                                          (order) =>
+                                            order.current_status_id === 7
+                                        ).length
+                                      )}
                                     </div>
                                   </div>
                                 </div>
@@ -2765,10 +2694,10 @@ function Dashboard() {
                 <div
                   key={order.id}
                   className={`telecoller-dashboard-order-card clickable-card ${order.current_status_id === 5
-                      ? "reassign-order"
-                      : order.current_status_id >= 7
-                        ? "complete-order"
-                        : ""
+                    ? "reassign-order"
+                    : order.current_status_id >= 7
+                      ? "complete-order"
+                      : ""
                     }`}
                   onClick={() => openEditModal(order)}
                   style={{ cursor: "pointer" }}
@@ -3051,23 +2980,23 @@ function Dashboard() {
                   {/* Created At field - Show based on permission */}
                   {((isEdit && hasPermission(allowedPermissions, "edit_order_created_at")) ||
                     (!isEdit && hasPermission(allowedPermissions, "add_order_created_at"))) && (
-                    <div className="form-group">
-                      <label htmlFor="createdAt">Created At</label>
-                      <DatePicker
-                        id="createdAt"
-                        selected={formData.created_at}
-                        onChange={(date) => setFormData({ ...formData, created_at: date })}
-                        showTimeSelect
-                        timeFormat="HH:mm"
-                        timeIntervals={15}
-                        dateFormat="d MMM yyyy h:mm aa"
-                        placeholderText="Select date and time (optional)"
-                        className="form-field"
-                        renderCustomHeader={renderDatePickerHeader}
-                        isClearable
-                      />
-                    </div>
-                  )}
+                      <div className="form-group">
+                        <label htmlFor="createdAt">Created At</label>
+                        <DatePicker
+                          id="createdAt"
+                          selected={formData.created_at}
+                          onChange={(date) => setFormData({ ...formData, created_at: date })}
+                          showTimeSelect
+                          timeFormat="HH:mm"
+                          timeIntervals={15}
+                          dateFormat="d MMM yyyy h:mm aa"
+                          placeholderText="Select date and time (optional)"
+                          className="form-field"
+                          renderCustomHeader={renderDatePickerHeader}
+                          isClearable
+                        />
+                      </div>
+                    )}
 
                   {/* Subcategory field - Show based on permission */}
                   {hasPermission(
@@ -3266,8 +3195,8 @@ function Dashboard() {
                             <label
                               key={priority}
                               className={`radio-label ${priority.toLowerCase()} ${attributesFormData.order_priority === priority
-                                  ? "selected"
-                                  : ""
+                                ? "selected"
+                                : ""
                                 }`}
                             >
                               <input
@@ -3299,8 +3228,8 @@ function Dashboard() {
                           <label
                             key={type}
                             className={`radio-label ${attributesFormData.order_type === type
-                                ? "selected"
-                                : ""
+                              ? "selected"
+                              : ""
                               }`}
                           >
                             <input

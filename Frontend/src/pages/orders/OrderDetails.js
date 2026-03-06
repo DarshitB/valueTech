@@ -1451,7 +1451,7 @@ function OrderDetails() {
           allowedPermissions,
           "view_order_media_documents"
         ) &&
-          (!isBankUser || (order?.current_status_id > 12)) && (
+          !isBankUser && (
             <Link
               to={`/orders/${id}/details/documents`}
               title="Documents"
