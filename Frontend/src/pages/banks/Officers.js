@@ -152,6 +152,7 @@ function Officers() {
   const [confirmDeleteName, setConfirmDeleteName] = useState("");
   const [mobileError, setMobileError] = useState(null);
   const [emailError, setEmailError] = useState(null);
+  const [createdByChanged, setCreatedByChanged] = useState(false);
 
   /* console.log("users",users); */
 
@@ -233,15 +234,16 @@ function Officers() {
   const openEditModal = (officer) => {
     setIsEdit(true);
     setEditId(officer.id);
+    setCreatedByChanged(false); // Reset the flag when opening modal
     
     // Check if the officer being edited is a BANK OFFICER
     const isOfficerBankOfficer = officer.role_name?.toUpperCase().includes("BANK OFFICER");
     
-    // Find the creator's ID from the created_by name
-    let createdById = "";
+    // Find the creator's user_id from the created_by name
+    let createdByUserId = "";
     if (isOfficerBankOfficer && officer.created_by) {
       const creatorOfficer = officers.find((o) => o.name === officer.created_by);
-      createdById = creatorOfficer?.id || "";
+      createdByUserId = creatorOfficer?.user_id || "";
     }
     
     setFormData({
@@ -254,8 +256,8 @@ function Officers() {
       email: officer.email,
       password: "",
       confirm_password: "",
-      // Store the creator's ID, not name
-      created_by: createdById,
+      // Store the creator's user_id to match the dropdown value
+      created_by: createdByUserId,
     });
     setShowFormModal(true);
   };
@@ -294,8 +296,8 @@ function Officers() {
 
     if (!isEdit || formData.password) payload.password = formData.password;
     
-    // Add created_by to payload ONLY when editing a BANK OFFICER and user has permission
-    if (isEdit && formData.created_by) {
+    // Add created_by to payload ONLY if user manually changed it
+    if (isEdit && createdByChanged) {
       // Find the officer being edited to check their role
       const editingOfficer = officers.find((o) => o.id === editId);
       const isEditingBankOfficer = editingOfficer?.role_name?.toUpperCase().includes("BANK OFFICER");
@@ -304,7 +306,8 @@ function Officers() {
       const canUpdateCreatedBy = hasPermission(allowedPermissions, "update_officer_created_by");
       
       if (isEditingBankOfficer && canUpdateCreatedBy) {
-        payload.created_by = formData.created_by;
+        // Only add to payload if user manually changed it - null if cleared, value if selected
+        payload.created_by = formData.created_by ? formData.created_by : null;
       }
     }
 
@@ -516,9 +519,10 @@ function Officers() {
                           label: u.name,
                         }))}
                         value={formData.created_by}
-                        onChange={(val) =>
-                          setFormData({ ...formData, created_by: val })
-                        }
+                        onChange={(val) => {
+                          setFormData({ ...formData, created_by: val });
+                          setCreatedByChanged(true); // Mark as changed when user selects
+                        }}
                         placeholder="Select created by (Authority)"
                       />
                     </div>
@@ -702,6 +706,7 @@ function Officers() {
               setShowFormModal(false);
               setIsEdit(false);
               setEditId(null);
+              setCreatedByChanged(false); // Reset the flag
               setFormData({
                 name: "",
                 role_id: "",
