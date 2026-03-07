@@ -174,8 +174,11 @@ function Officers() {
       if (officer.role_name?.toUpperCase().includes("BANK OFFICER")) {
         counts[officer.id] = null; // null means show "-"
       }
-      // If officer's role_name is BANK AUTHORITY, count linked authorities
-      else if (officer.role_name?.toUpperCase().includes("BANK AUTHORITY")) {
+      // If officer's role_name is BANK AUTHORITY or CREDIT HEAD, count linked authorities
+      else if (
+        officer.role_name?.toUpperCase().includes("BANK AUTHORITY") ||
+        officer.role_name?.toUpperCase().includes("CREDIT HEAD")
+      ) {
         const linkedCount = (officer.linked_authorities || []).length;
         counts[officer.id] = linkedCount;
       }
@@ -243,20 +246,34 @@ function Officers() {
     ?.toUpperCase()
     .includes("BANK AUTHORITY");
 
-  const officerRoles = roles.filter((role) => {
-    // If user is BANK AUTHORITY or Bank Officer, allow only Bank Officer to be selected
-    if (
-      users?.role.name?.toUpperCase().includes("BANK AUTHORITY") ||
-      users?.role.name?.toUpperCase().includes("BANK OFFICER")
-    ) {
-      return role.name?.toUpperCase().includes("BANK OFFICER");
-    }
-    // Otherwise, allow both
-    return (
-      role.name?.toUpperCase().includes("BANK AUTHORITY") ||
-      role.name?.toUpperCase().includes("BANK OFFICER")
-    );
-  });
+  const officerRoles = roles
+    .filter((role) => {
+      // If user is BANK AUTHORITY or Bank Officer, allow only Bank Officer to be selected
+      if (
+        users?.role.name?.toUpperCase().includes("BANK AUTHORITY") ||
+        users?.role.name?.toUpperCase().includes("BANK OFFICER")
+      ) {
+        return role.name?.toUpperCase().includes("BANK OFFICER");
+      }
+      // Otherwise, allow CREDIT HEAD, BANK AUTHORITY, and BANK OFFICER
+      return (
+        role.name?.toUpperCase().includes("CREDIT HEAD") ||
+        role.name?.toUpperCase().includes("BANK AUTHORITY") ||
+        role.name?.toUpperCase().includes("BANK OFFICER")
+      );
+    })
+    .sort((a, b) => {
+      // CREDIT HEAD first, then others
+      const aIsCreditHead = (a.name || "")
+        .toUpperCase()
+        .includes("CREDIT HEAD");
+      const bIsCreditHead = (b.name || "")
+        .toUpperCase()
+        .includes("CREDIT HEAD");
+      if (aIsCreditHead && !bIsCreditHead) return -1;
+      if (!aIsCreditHead && bIsCreditHead) return 1;
+      return 0;
+    });
 
   // Bank filter options: distinct banks from officers, respecting other filters
   const bankOptions = useMemo(() => {
@@ -811,7 +828,10 @@ function Officers() {
                 {!isBankAuthority && (
                   <div className="form-group">
                     <label>Role</label>
-                    <div className="radio-group officer">
+                    <div
+                      className="radio-group officer"
+                      style={{ display: "flex", flexWrap: "nowrap" }}
+                    >
                       {officerRoles.map((role) => (
                         <label
                           key={role.id}
@@ -820,6 +840,7 @@ function Officers() {
                               ? "selected"
                               : ""
                           }`}
+                          style={{ width: "33.33%", flexShrink: 0 }}
                         >
                           <input
                             type="radio"
@@ -887,7 +908,7 @@ function Officers() {
                   </>
                 )}
 
-                {/* Show Linked Authorities dropdown only when editing/creating a BANK AUTHORITY */}
+                {/* Show Linked Authorities dropdown only when editing/creating a BANK AUTHORITY or CREDIT HEAD */}
                 {(() => {
                   // Check permission first
                   const canUpdateLinkedAuthorities = hasPermission(
@@ -897,25 +918,32 @@ function Officers() {
 
                   if (!canUpdateLinkedAuthorities) return null;
 
-                  // Determine if target officer is BANK AUTHORITY
+                  // Determine if target officer is BANK AUTHORITY or CREDIT HEAD
                   if (isEdit) {
                     const editingOfficer = officers.find((o) => o.id === editId);
-                    const isEditingBankAuthority =
+                    const isEditingBankAuthorityOrCreditHead =
                       editingOfficer?.role_name
                         ?.toUpperCase()
-                        .includes("BANK AUTHORITY");
+                        .includes("BANK AUTHORITY") ||
+                      editingOfficer?.role_name
+                        ?.toUpperCase()
+                        .includes("CREDIT HEAD");
 
-                    if (!isEditingBankAuthority) return null;
+                    if (!isEditingBankAuthorityOrCreditHead) return null;
                   } else {
-                    // In create mode, check if the selected role is BANK AUTHORITY
+                    // In create mode, check if the selected role is BANK AUTHORITY or CREDIT HEAD
                     const selectedRole = roles.find(
                       (r) => r.id.toString() === formData.role_id
                     );
-                    const isCreatingBankAuthority = selectedRole?.name
-                      ?.toUpperCase()
-                      .includes("BANK AUTHORITY");
+                    const isCreatingBankAuthorityOrCreditHead =
+                      selectedRole?.name
+                        ?.toUpperCase()
+                        .includes("BANK AUTHORITY") ||
+                      selectedRole?.name
+                        ?.toUpperCase()
+                        .includes("CREDIT HEAD");
 
-                    if (!isCreatingBankAuthority) return null;
+                    if (!isCreatingBankAuthorityOrCreditHead) return null;
                   }
 
                   // Find main authority's bank name
@@ -937,7 +965,7 @@ function Officers() {
                         isMulti
                         options={officers
                           .filter((officer) => {
-                            // Only show BANK AUTHORITY officers
+                            // Only show BANK AUTHORITY officers in the list (not CREDIT HEAD)
                             const isBankAuthorityOpt = officer.role_name
                               ?.toUpperCase()
                               .includes("BANK AUTHORITY");

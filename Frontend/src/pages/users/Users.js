@@ -429,7 +429,8 @@ function Users() {
                             !role.name
                               .toUpperCase()
                               .includes("BANK AUTHORITY") &&
-                            !role.name.toUpperCase().includes("BANK OFFICER")
+                            !role.name.toUpperCase().includes("BANK OFFICER") &&
+                            !role.name.toUpperCase().includes("CREDIT HEAD")
                         )
                         .map((role) => (
                           <label

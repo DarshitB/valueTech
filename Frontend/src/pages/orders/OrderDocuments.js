@@ -164,12 +164,15 @@ function OrderDocuments() {
     }
 
     // Filter documents based on user role
-    // BANK OFFICER and BANK AUTHORITY can only see approved/verified collages and reports
+    // BANK OFFICER and BANK AUTHORITY: only see approved collages/reports when order status is 12 or more
     const filterDocuments = (docArray, docType) => {
       const filtered = docArray.filter((doc) => doc?.document_type === docType);
 
-      // If user is BANK OFFICER or BANK AUTHORITY, only show approved documents for collages and reports
       if (isBankUser && (docType === "collage" || docType === "report")) {
+        const statusId = order?.current_status_id;
+        if (statusId == null || statusId < 12) {
+          return [];
+        }
         return filtered.filter((doc) => doc?.status === "approved");
       }
 
@@ -183,7 +186,7 @@ function OrderDocuments() {
         (doc) => doc?.document_type === "documents"
       ),
     };
-  }, [documents, isBankUser]);
+  }, [documents, isBankUser, order?.current_status_id]);
 
   // Secure URL parsing utility
   const parseMediaUrl = useCallback((mediaUrl) => {
@@ -919,7 +922,10 @@ function OrderDocuments() {
               {type === "collage" && (
                 <th scope="col">Image Count</th>
               )}
-              <th scope="col">Created By</th>
+              {hasPermission(
+                allowedPermissions,
+                "view_order_media_documents_created_by"
+              ) && <th scope="col">Created By</th>}
               <th scope="col">Created At</th>
               <th width="150px" style={{ textAlign: "center" }} scope="col">
                 Actions
@@ -959,7 +965,10 @@ function OrderDocuments() {
                 {type === "collage" && (
                   <td>{doc.number_of_image_used ?? "-"}</td>
                 )}
-                <td>{doc.created_by_name || "-"}</td>
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_media_documents_created_by"
+                ) && <td>{doc.created_by_name || "-"}</td>}
                 <td>{formatDate(doc.created_at)}</td>
                 <td style={{ textAlign: "center" }}>
                   <button
@@ -1056,7 +1065,10 @@ function OrderDocuments() {
                 Name
               </th>
               <th scope="col">Type</th>
-              <th scope="col">Uploaded By</th>
+              {hasPermission(
+                allowedPermissions,
+                "view_order_media_documents_created_by"
+              ) && <th scope="col">Uploaded By</th>}
               <th scope="col">Uploaded At</th>
               <th width="150px" style={{ textAlign: "center" }} scope="col">
                 Actions
@@ -1094,7 +1106,12 @@ function OrderDocuments() {
                   </div>
                 </td>
                 <td>{doc.media_type || doc.file_type || "-"}</td>
-                <td>{doc.created_by_name || doc.uploaded_by_name || "-"}</td>
+                {hasPermission(
+                  allowedPermissions,
+                  "view_order_media_documents_created_by"
+                ) && (
+                  <td>{doc.created_by_name || doc.uploaded_by_name || "-"}</td>
+                )}
                 <td>{formatDate(doc.created_at)}</td>
                 <td style={{ textAlign: "center" }}>
                   <button
