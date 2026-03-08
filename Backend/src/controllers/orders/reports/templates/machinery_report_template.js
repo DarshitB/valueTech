@@ -770,6 +770,10 @@ body.single-page{
             <td>VALUER COMMENTS/REMARKS:</td>
             <td colspan="5">${renderFieldValue(formData.valuer_comments_remarks)}</td>
         </tr>
+        ${generateFlexibleFieldsForSection(
+            formData.flexible_fields || [],
+            "OVER_ALL_FEED_BACK_OF_THE_INSPECTED"
+        )}
         <tr>
             <td>DECLARATION:</td>
             <td colspan="5">
@@ -780,10 +784,6 @@ body.single-page{
             <td>DISCLAIMER:</td>
             <td colspan="5">${renderFieldValue(formData.disclaimer)}</td>
         </tr>
-        ${generateFlexibleFieldsForSection(
-            formData.flexible_fields || [],
-            "OVER_ALL_FEED_BACK_OF_THE_INSPECTED"
-        )}
         <tr class="signature-row">
             <td colspan="6" style="height: 48px; position: relative;">
                 ${stampImageBase64 ? `<img src="${stampImageBase64}" alt="stamp" style="position:absolute; left:50%; bottom: -5px; transform:translateX(calc(-50% - 250px)); height: 125px; z-index:2; pointer-events:none;" />` : ""}

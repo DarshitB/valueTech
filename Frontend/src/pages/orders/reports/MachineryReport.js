@@ -1273,7 +1273,7 @@ function MachineryReport() {
       initialFormDataRef.current = reportFormData;
       initialFlexibleFieldsRef.current = flexibleFields;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reportLoading, reportFetchCompleted]);
 
   // Handle form input changes
@@ -2097,7 +2097,7 @@ function MachineryReport() {
       if (isDirtyRef.current) {
         // BLOCK navigation - push state back immediately to stay on current page
         originalPushState(null, "", window.location.href);
-        
+
         // Show alert to inform user
         alert("You have unsaved changes. Please save or discard changes before navigating.");
       }
@@ -2109,7 +2109,7 @@ function MachineryReport() {
       window.history.pushState = originalPushState;
       window.removeEventListener("popstate", handlePopState);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, buildSavePayload, dispatch]);
 
   // Shows browser's native "Leave site?" dialog when user tries to refresh,
@@ -2534,7 +2534,7 @@ function MachineryReport() {
                 </div>
                 <div className="col-12">
                   <div className="form-group">
-                  <div className="d-flex align-items-end gap-3 flex-wrap" style={{ gap: "10px" }}>
+                    <div className="d-flex align-items-end gap-3 flex-wrap" style={{ gap: "10px" }}>
                       <div className="flex-grow-1" style={{ minWidth: "200px" }}>
                         <label htmlFor="general_details_heading">
                           General Details Heading
@@ -2642,7 +2642,7 @@ function MachineryReport() {
                         }
                       />
                     </div>
-                    
+
                   </div>
                 </div>
                 <div className="col-md-3">
@@ -4357,6 +4357,32 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* Flexible Fields for Additional Fields */}
+              <div className="row mt-3">
+                <div className="col-12">
+                  <div className="flexible-buttons-container">
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary btn-sm"
+                      onClick={() =>
+                        addFlexibleFields(
+                          "OVER_ALL_FEED_BACK_OF_THE_INSPECTED",
+                          2
+                        )
+                      }
+                    >
+                      Add New Set
+                    </button>
+                  </div>
+                  {renderFlexibleFieldsWithTextarea(
+                    "OVER_ALL_FEED_BACK_OF_THE_INSPECTED"
+                  )}
+                </div>
+              </div>
+              
+              <div className="row">
                 <div className="col-md-12">
                   <div className="form-group">
                     <label htmlFor="declaration">
@@ -4390,28 +4416,7 @@ function MachineryReport() {
                 </div>
               </div>
 
-              {/* Flexible Fields for Additional Fields */}
-              <div className="row mt-3">
-                <div className="col-12">
-                  <div className="flexible-buttons-container">
-                    <button
-                      type="button"
-                      className="btn btn-outline-primary btn-sm"
-                      onClick={() =>
-                        addFlexibleFields(
-                          "OVER_ALL_FEED_BACK_OF_THE_INSPECTED",
-                          2
-                        )
-                      }
-                    >
-                      Add New Set
-                    </button>
-                  </div>
-                  {renderFlexibleFieldsWithTextarea(
-                    "OVER_ALL_FEED_BACK_OF_THE_INSPECTED"
-                  )}
-                </div>
-              </div>
+
 
               {/* Generate Report Buttons - Rough and Production */}
               <div className="row">
