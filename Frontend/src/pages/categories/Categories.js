@@ -13,11 +13,25 @@ import CustomDataTable from "../../components/CustomDataTable";
 import { DeleteIcon, EditIcon } from "../../components/icons";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import FormModel from "../../components/FormModel";
+import SingleSearchSelect from "../../components/SingleSearchSelect";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
 import { hasPermission } from "../../utils/permissionUtils";
 import { usePageTitle } from "../../context/PageTitleContext";
 import { toast } from "react-toastify";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+
+const REPORT_TYPE_OPTIONS = [
+  "report_cv",
+  "report_ce",
+  "report_avr",
+  "report_marine",
+  "report_machinery",
+];
+
+const reportTypeSelectOptions = REPORT_TYPE_OPTIONS.map((opt) => ({
+  value: opt,
+  label: opt,
+}));
 
 function Categories() {
   const dispatch = useDispatch();
@@ -47,13 +61,16 @@ function Categories() {
   // Get logged-in user's permissions
   const allowedPermissions = useSelector(selectPermissions);
 
-  // State for adding a category
+  // State for adding a category (modal)
+  const [showAddModal, setShowAddModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryReportType, setNewCategoryReportType] = useState("");
 
   // State for editing
   const [showEditModal, setShowEditModal] = useState(false);
   const [editCategoryId, setEditCategoryId] = useState(null);
   const [editCategoryName, setEditCategoryName] = useState("");
+  const [editCategoryReportType, setEditCategoryReportType] = useState("");
 
   // State for delete confirmation
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
@@ -99,28 +116,46 @@ function Categories() {
     return counts;
   }, [orders, childCategories, subCategories]);
 
-  // ➕ Handle Add
-  const handleAdd = () => {
-    if (!newCategoryName.trim()) return;
-    dispatch(addCategory({ name: newCategoryName }));
+  // ➕ Handle Add (submit from Add modal)
+  const handleAddSubmit = () => {
+    if (!newCategoryName.trim()) {
+      toast.error("Category name is required");
+      return;
+    }
+    if (!newCategoryReportType.trim()) {
+      toast.error("Report type is required");
+      return;
+    }
+    dispatch(addCategory({ name: newCategoryName, report_type: newCategoryReportType }));
+    setShowAddModal(false);
     setNewCategoryName("");
+    setNewCategoryReportType("");
   };
 
   // 🛠️ Open Edit Modal
-  const openEditModal = (id, name) => {
+  const openEditModal = (id, name, reportType) => {
     setEditCategoryId(id);
     setEditCategoryName(name);
+    setEditCategoryReportType(reportType || "");
     setShowEditModal(true);
   };
 
   // ✅ Submit Edit
   const handleEditSubmit = async () => {
-    if (!editCategoryName.trim()) return;
+    if (!editCategoryName.trim()) {
+      toast.error("Category name is required");
+      return;
+    }
+    if (!editCategoryReportType.trim()) {
+      toast.error("Report type is required");
+      return;
+    }
     try {
+      const data = { name: editCategoryName, report_type: editCategoryReportType };
       const result = await dispatch(
         editCategory({
           id: editCategoryId,
-          data: { name: editCategoryName },
+          data,
         })
       );
 
@@ -130,6 +165,7 @@ function Categories() {
         setShowEditModal(false);
         setEditCategoryId(null);
         setEditCategoryName("");
+        setEditCategoryReportType("");
       }
     } catch (error) {
       toast.error("Failed to submit category");
@@ -161,28 +197,13 @@ function Categories() {
             buttons: (
               <div className="add-action-buttons">
                 {hasPermission(allowedPermissions, "add_category") && (
-                  <>
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault(); // prevent page reload
-                        handleAdd();
-                      }}
-                      className="add-action-buttons"
-                    >
-                      <input
-                        type="text"
-                        className="input-filed"
-                        placeholder="Add category"
-                        value={newCategoryName}
-                        onChange={(e) =>
-                          setNewCategoryName(e.target.value.toUpperCase())
-                        }
-                      />
-                      <button className="btn" type="submit">
-                        Add Category
-                      </button>
-                    </form>
-                  </>
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={() => setShowAddModal(true)}
+                  >
+                    Add Category
+                  </button>
                 )}
               </div>
             ),
@@ -192,6 +213,7 @@ function Categories() {
               <tr>
                 <th style={{ width: "55px" }}>ID</th>
                 <th style={{ width: "225px" }}>Name</th>
+                <th style={{ width: "150px" }}>Report Type</th>
                 <th style={{ width: "150px" }}>No. of Orders</th>
                 <th style={{ width: "150px" }}>Created By</th>
                 <th>Updated By</th>
@@ -227,6 +249,7 @@ function Categories() {
                 >
                   {item.name}
                 </td>
+                <td>{item.report_type || "-"}</td>
                 <td>{categoryOrderCounts[item.id] || 0}</td>
                 <td>{item.created_by}</td>
                 <td>{item.updated_by || "-"}</td>
@@ -236,7 +259,7 @@ function Categories() {
                       className="action-icons"
                       onClick={(e) => {
                         e.stopPropagation();
-                        openEditModal(item.id, item.name);
+                        openEditModal(item.id, item.name, item.report_type);
                       }}
                     >
                       <EditIcon />
@@ -258,6 +281,64 @@ function Categories() {
             )),
           }}
         </CustomDataTable>
+      )}
+
+      {/* ➕ Add Category Modal */}
+      {showAddModal && (
+        <FormModel>
+          {{
+            title: "Add Category",
+            body: (
+              <form
+                className="body-form-box"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleAddSubmit();
+                }}
+              >
+                <div className="body-form-box">
+                  <div className="form-group">
+                    <label htmlFor="add_category_input">Category</label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="add_category_input"
+                      value={newCategoryName}
+                      onChange={(e) =>
+                        setNewCategoryName(e.target.value.toUpperCase())
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="add_report_type_select">Report Type</label>
+                    <SingleSearchSelect
+                      id="add_report_type_select"
+                      className="search-selector"
+                      options={reportTypeSelectOptions}
+                      value={newCategoryReportType || null}
+                      onChange={(val) =>
+                        setNewCategoryReportType(val ?? "")
+                      }
+                      placeholder="Select report type"
+                      required
+                    />
+                  </div>
+                  <div className="form-buttons">
+                    <button className="submit-button" type="submit">
+                      Add Category
+                    </button>
+                  </div>
+                </div>
+              </form>
+            ),
+            onClose: () => {
+              setShowAddModal(false);
+              setNewCategoryName("");
+              setNewCategoryReportType("");
+            },
+          }}
+        </FormModel>
       )}
 
       {/* 📝 Edit Category Modal */}
@@ -284,6 +365,21 @@ function Categories() {
                       onChange={(e) =>
                         setEditCategoryName(e.target.value.toUpperCase())
                       }
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="edit_report_type_select">Report Type</label>
+                    <SingleSearchSelect
+                      id="edit_report_type_select"
+                      className="search-selector"
+                      options={reportTypeSelectOptions}
+                      value={editCategoryReportType || null}
+                      onChange={(val) =>
+                        setEditCategoryReportType(val ?? "")
+                      }
+                      placeholder="Select report type"
+                      required
                     />
                   </div>
                   <div className="form-buttons">
@@ -298,6 +394,7 @@ function Categories() {
               setShowEditModal(false);
               setEditCategoryId(null);
               setEditCategoryName("");
+              setEditCategoryReportType("");
             },
           }}
         </FormModel>

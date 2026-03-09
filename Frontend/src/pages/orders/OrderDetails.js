@@ -1470,7 +1470,7 @@ function OrderDetails() {
         {hasPermission(allowedPermissions, "generate_order_report") && (
           <>
             {/* CV Report - Commercial Vehicle */}
-            {order?.category_name === "COMMERCIAL VEHICLE" && (
+            {(order?.category_name === "COMMERCIAL VEHICLE" || order?.category_report_type === "report_cv") && (
               <>
                 {order?.valuer_name &&
                   order.valuer_name.trim() !== "" ? (
@@ -1512,7 +1512,7 @@ function OrderDetails() {
             )}
 
             {/* CE Report - Construction Equipment */}
-            {order?.category_name === "CONSTRUCTION EQUIPMENT" && (
+            {(order?.category_name === "CONSTRUCTION EQUIPMENT" || order?.category_report_type === "report_ce") && (
               <>
                 {order?.valuer_name &&
                   order.valuer_name.trim() !== "" ? (
@@ -1554,8 +1554,7 @@ function OrderDetails() {
             )}
 
             {/* AVR Report - Categories containing AVR */}
-            {order?.category_name &&
-              order.category_name.toUpperCase().includes("AVR") && (
+            {((order?.category_name && order.category_name.toUpperCase().includes("AVR")) || order?.category_report_type === "report_avr") && (
                 <>
                   {order?.valuer_name &&
                     order.valuer_name.trim() !== "" ? (
@@ -1598,7 +1597,7 @@ function OrderDetails() {
               )}
 
             {/* Machinery Report */}
-            {order?.category_name === "MACHINERY" && (
+            {(order?.category_name === "MACHINERY" || order?.category_report_type === "report_machinery") && (
               <>
                 {order?.valuer_name &&
                   order.valuer_name.trim() !== "" ? (
@@ -1638,7 +1637,7 @@ function OrderDetails() {
                 )}
               </>
             )}
-            {order?.category_name === "MARINE" && (
+            {(order?.category_name === "MARINE" || order?.category_report_type === "report_marine") && (
               <>
                 {order?.valuer_name &&
                   order.valuer_name.trim() !== "" ? (

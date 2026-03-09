@@ -31,18 +31,21 @@ exports.getById = async (req, res, next) => {
 // Create new category
 exports.create = async (req, res, next) => {
   try {
-    const { name } = req.body;
+    const { name, report_type } = req.body;
     if (!name) throw new BadRequestError("Category name is required");
 
     const existing = await Category.findByName(name);
     if (existing)
       throw new ConflictError("Category with the same name already exists");
 
-    const [category] = await Category.create({
+    const createData = {
       name,
       created_by: req.user.id,
       created_at: new Date(),
-    });
+    };
+    if (report_type !== undefined) createData.report_type = report_type;
+
+    const [category] = await Category.create(createData);
 
     res.locals.newRecordId = category.id;
 
@@ -61,7 +64,7 @@ exports.create = async (req, res, next) => {
 exports.update = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name } = req.body;
+    const { name, report_type } = req.body;
 
     /* console.log("id", id); */
     const existing = await Category.findById(id);
@@ -73,11 +76,14 @@ exports.update = async (req, res, next) => {
       throw new ConflictError("Category with the same name already exists");
     }
 
-    const [updated] = await Category.update(id, {
+    const updateData = {
       name,
       updated_by: req.user.id,
       updated_at: new Date(),
-    });
+    };
+    if (report_type !== undefined) updateData.report_type = report_type;
+
+    const [updated] = await Category.update(id, updateData);
 
     const creator = await User.findById(updated.created_by);
     const editor = await User.findById(updated.updated_by);

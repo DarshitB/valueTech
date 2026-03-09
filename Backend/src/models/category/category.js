@@ -9,6 +9,7 @@ const category = {
       .select(
         "category.id",
         "category.name",
+        "category.report_type",
         "category.is_active",
         "category.created_at",
         "created_user.name as created_by",
@@ -26,6 +27,7 @@ const category = {
       .select(
         "category.id",
         "category.name",
+        "category.report_type",
         "category.is_active",
         "category.created_at",
         "created_user.name as created_by",
@@ -45,6 +47,7 @@ const category = {
         .select(
           "category.id",
           "category.name",
+          "category.report_type",
           "category.is_active",
           "category.created_at",
           "created_user.name as created_by",

@@ -48,6 +48,27 @@ async function getAuthorityVisibleUserIds(authorityUserId) {
   return [...new Set(ids)];
 }
 
+// Helper: get all category_ids (departments) assigned to the logged-in officer user
+// via officer_categories. Used to filter orders by department for officer-type roles.
+async function getOfficerDepartmentCategoryIds(userId) {
+  const rows = await db("officers")
+    .leftJoin(
+      "officer_categories",
+      "officers.id",
+      "officer_categories.officer_id"
+    )
+    .select("officer_categories.category_id")
+    .where("officers.user_id", userId)
+    .whereNull("officers.deleted_at")
+    .whereNull("officer_categories.deleted_at");
+
+  const ids = rows
+    .map((row) => row.category_id)
+    .filter((id) => id !== null && id !== undefined);
+
+  return [...new Set(ids)];
+}
+
 const order = {
   // Get all orders (excludes status 13 finalized and 14 on hold - those are fetched via getAllOrdersWithWoStatus / finalized-and-on-hold-orders)
   getAllOrders: async (user) => {
@@ -128,6 +149,7 @@ const order = {
         "sub_category.name as sub_category_name",
         "category.id as category_id",
         "category.name as category_name",
+        "category.report_type as category_report_type",
         "orders.valuer_name",
         "orders.job_started_at",
         "orders.job_started_by",
@@ -204,6 +226,22 @@ const order = {
         this.whereNull("orders.supervisor_number")
           .orWhereNull("orders.driver_number");
       }); */
+    }
+
+    // Additional department-based filtering for officer-type roles
+    if (
+      roleName.includes("BANK OFFICER") ||
+      roleName.includes("BANK AUTHORITY") ||
+      roleName.includes("CREDIT HEAD")
+    ) {
+      const departmentCategoryIds = await getOfficerDepartmentCategoryIds(
+        user.id
+      );
+
+      if (departmentCategoryIds.length > 0) {
+        baseQuery.whereIn("category.id", departmentCategoryIds);
+      }
+      // If officer has no departments, do not apply any extra category filter
     }
 
     // Sort by newest first
@@ -385,6 +423,7 @@ const order = {
         "sub_category.name as sub_category_name",
         "category.id as category_id",
         "category.name as category_name",
+        "category.report_type as category_report_type",
         "orders.valuer_name",
         "orders.job_started_at",
         "orders.job_started_by",
@@ -461,6 +500,22 @@ const order = {
         this.whereNull("orders.supervisor_number")
           .orWhereNull("orders.driver_number");
       }); */
+    }
+
+    // Additional department-based filtering for officer-type roles
+    if (
+      roleName.includes("BANK OFFICER") ||
+      roleName.includes("BANK AUTHORITY") ||
+      roleName.includes("CREDIT HEAD")
+    ) {
+      const departmentCategoryIds = await getOfficerDepartmentCategoryIds(
+        user.id
+      );
+
+      if (departmentCategoryIds.length > 0) {
+        baseQuery.whereIn("category.id", departmentCategoryIds);
+      }
+      // If officer has no departments, do not apply any extra category filter
     }
 
     // Sort by newest first
@@ -646,6 +701,7 @@ const order = {
         "sub_category.name as sub_category_name",
         "category.id as category_id",
         "category.name as category_name",
+        "category.report_type as category_report_type",
         "orders.valuer_name"
       )
       .whereNull("orders.deleted_at")
@@ -740,6 +796,7 @@ const order = {
         "sub_category.name as sub_category_name",
         "category.id as category_id",
         "category.name as category_name",
+        "category.report_type as category_report_type",
         "orders.valuer_name",
         "orders.job_started_at",
         "orders.job_started_by",
@@ -816,6 +873,25 @@ const order = {
       ) {
         return null;
       }
+    }
+
+    // Department-based access check for officer-type roles on single order
+    if (
+      roleName.includes("BANK OFFICER") ||
+      roleName.includes("BANK AUTHORITY") ||
+      roleName.includes("CREDIT HEAD")
+    ) {
+      const departmentCategoryIds = await getOfficerDepartmentCategoryIds(
+        user.id
+      );
+
+      if (
+        departmentCategoryIds.length > 0 &&
+        !departmentCategoryIds.includes(order.category_id)
+      ) {
+        return null;
+      }
+      // If officer has no departments, do not block access based on category
     }
 
     // Get status history for this order
