@@ -2,8 +2,9 @@ const db = require("../../../db");
 const { PROTECTED_ROLE } = require("../../constants/protectedRoles");
 
 const user = {
-  findAll: () =>
-    db("users")
+  // Get all non-officer users with their departments (from user_categories)
+  findAll: async () => {
+    const users = await db("users")
       .leftJoin("roles", "users.role_id", "roles.id")
       .leftJoin("cities", "users.city_id", "cities.id")
       .leftJoin("states", "cities.state_id", "states.id") // Join states through cities
@@ -29,10 +30,42 @@ const user = {
       )
       .whereNull("users.deleted_at")
       .whereNotIn("roles.name", ["BANK AUTHORITY", "BANK OFFICER"])
-      .where("roles.name", "!=", PROTECTED_ROLE), // Get all users excluding protected roles and soft-deleted ones
+      .where("roles.name", "!=", PROTECTED_ROLE); // Get all users excluding protected roles and soft-deleted ones
 
-  findById: (id) =>
-    db("users")
+    if (!users.length) {
+      return users.map((u) => ({ ...u, departments: [] }));
+    }
+
+    const userIds = users.map((u) => u.id);
+
+    const departmentRows = await db("user_categories")
+      .leftJoin("category", "user_categories.category_id", "category.id")
+      .select(
+        "user_categories.user_id",
+        "category.id as category_id",
+        "category.name as category_name"
+      )
+      .whereIn("user_categories.user_id", userIds)
+      .whereNull("user_categories.deleted_at");
+
+    const deptMap = {};
+    for (const row of departmentRows) {
+      if (!deptMap[row.user_id]) deptMap[row.user_id] = [];
+      deptMap[row.user_id].push({
+        id: row.category_id,
+        name: row.category_name,
+      });
+    }
+
+    return users.map((u) => ({
+      ...u,
+      departments: deptMap[u.id] || [],
+    }));
+  },
+
+  // Get single user by ID with departments (from user_categories)
+  findById: async (id) => {
+    const baseUser = await db("users")
       .leftJoin("roles", "users.role_id", "roles.id")
       .leftJoin("cities", "users.city_id", "cities.id")
       .leftJoin("states", "cities.state_id", "states.id") // Join states through cities
@@ -62,7 +95,26 @@ const user = {
       )
       .where("users.id", id)
       .whereNull("users.deleted_at")
-      .first(), // Get single user by ID (excluding soft-deleted)
+      .first(); // Get single user by ID (excluding soft-deleted)
+
+    if (!baseUser) return null;
+
+    const departmentRows = await db("user_categories")
+      .leftJoin("category", "user_categories.category_id", "category.id")
+      .select("category.id", "category.name")
+      .where("user_categories.user_id", id)
+      .whereNull("user_categories.deleted_at");
+
+    const departments = departmentRows.map((row) => ({
+      id: row.id,
+      name: row.name,
+    }));
+
+    return {
+      ...baseUser,
+      departments,
+    };
+  },
 
   findByMobile: (mobile) =>
     db("users")

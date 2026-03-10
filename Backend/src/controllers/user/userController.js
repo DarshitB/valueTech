@@ -1,5 +1,7 @@
 const User = require("../../models/user/user");
 const Role = require("../../models/permissions/role");
+const Category = require("../../models/category/category");
+const db = require("../../../db");
 const bcrypt = require("bcrypt");
 const {
   NotFoundError,
@@ -71,7 +73,8 @@ exports.checkEmailExistence = async (req, res) => {
 
 exports.create = async (req, res, next) => {
   try {
-    const { email, password, role_id, name, mobile, city_id } = req.body;
+    const { email, password, role_id, name, mobile, city_id, department = [] } =
+      req.body;
 
     if (!email || !password || !role_id || !name) {
       throw new BadRequestError(
@@ -102,10 +105,39 @@ exports.create = async (req, res, next) => {
 
     const creator = await User.findById(user.created_by);
     const role = await Role.findById(user.role_id);
+
+    // Create user_categories (departments) for non-officer roles
+    let departments = [];
+    const roleNameUpper = (role?.name || "").toUpperCase();
+    const isOfficerRole =
+      roleNameUpper.includes("BANK OFFICER") ||
+      roleNameUpper.includes("BANK AUTHORITY");
+
+    if (!isOfficerRole && Array.isArray(department) && department.length > 0) {
+      const validCategoryIds = department
+        .map((id) => (typeof id === "number" ? id : parseInt(id, 10)))
+        .filter((id) => !Number.isNaN(id));
+
+      if (validCategoryIds.length > 0) {
+        const rows = validCategoryIds.map((catId) => ({
+          user_id: user.id,
+          category_id: catId,
+          created_by: req.user?.id || null,
+          created_at: new Date(),
+        }));
+
+        await db("user_categories").insert(rows);
+
+        const cats = await Category.findManyByIds(validCategoryIds);
+        departments = cats.map((c) => ({ id: c.id, name: c.name }));
+      }
+    }
+
     const enrichedUser = {
       ...user,
       created_by: creator?.name,
       role_name: role?.name,
+      departments,
     };
 
     res.status(201).json(enrichedUser);
@@ -151,7 +183,8 @@ exports.create = async (req, res, next) => {
 exports.update = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, email, password, role_id, mobile, city_id } = req.body;
+    const { name, email, password, role_id, mobile, city_id, department } =
+      req.body;
 
     const existing = await User.findById(id);
     if (!existing) throw new NotFoundError("User not found");
@@ -179,12 +212,55 @@ exports.update = async (req, res, next) => {
     // Now fetch the user name using the role_id id
     const role = await Role.findById(updated.role_id);
 
+    // Maintain user_categories (departments) for non-officer roles
+    const roleNameUpper = (role?.name || "").toUpperCase();
+    const isOfficerRole =
+      roleNameUpper.includes("BANK OFFICER") ||
+      roleNameUpper.includes("BANK AUTHORITY");
+
+    if (isOfficerRole) {
+      // Ensure officer roles don't carry user_categories
+      await db("user_categories").where({ user_id: updated.id }).del();
+    } else if (department !== undefined) {
+      // Replace departments only when department payload is provided
+      await db("user_categories").where({ user_id: updated.id }).del();
+
+      if (Array.isArray(department) && department.length > 0) {
+        const validCategoryIds = department
+          .map((cid) => (typeof cid === "number" ? cid : parseInt(cid, 10)))
+          .filter((cid) => !Number.isNaN(cid));
+
+        if (validCategoryIds.length > 0) {
+          const rows = validCategoryIds.map((catId) => ({
+            user_id: updated.id,
+            category_id: catId,
+            created_by: req.user?.id || null,
+            created_at: new Date(),
+          }));
+          await db("user_categories").insert(rows);
+        }
+      }
+    }
+
+    // Fetch current departments for response
+    const departmentRows = await db("user_categories")
+      .leftJoin("category", "user_categories.category_id", "category.id")
+      .select("category.id", "category.name")
+      .where("user_categories.user_id", updated.id)
+      .whereNull("user_categories.deleted_at");
+
+    const departments = departmentRows.map((row) => ({
+      id: row.id,
+      name: row.name,
+    }));
+
     // Add user's name to the state object for response
     const enrichedUsers = {
       ...updated,
       created_by: creator.name,
       updated_by: editor.name,
       role_name: role.name,
+      departments,
     };
 
     /* console.log(updated); */

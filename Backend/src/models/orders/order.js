@@ -69,6 +69,21 @@ async function getOfficerDepartmentCategoryIds(userId) {
   return [...new Set(ids)];
 }
 
+// Helper: get all category_ids (departments) assigned to a non-officer user
+// via user_categories. Used to filter orders by department for non-officer roles.
+async function getUserDepartmentCategoryIds(userId) {
+  const rows = await db("user_categories")
+    .select("category_id")
+    .where("user_id", userId)
+    .whereNull("deleted_at");
+
+  const ids = rows
+    .map((row) => row.category_id)
+    .filter((id) => id !== null && id !== undefined);
+
+  return [...new Set(ids)];
+}
+
 const order = {
   // Get all orders (excludes status 13 finalized and 14 on hold - those are fetched via getAllOrdersWithWoStatus / finalized-and-on-hold-orders)
   getAllOrders: async (user) => {
@@ -228,7 +243,9 @@ const order = {
       }); */
     }
 
-    // Additional department-based filtering for officer-type roles
+    // Additional department-based filtering:
+    // - Officer-type roles (BANK OFFICER / BANK AUTHORITY / CREDIT HEAD) use officer_categories
+    // - Other roles (e.g. manager, telecaller, etc.) use user_categories
     if (
       roleName.includes("BANK OFFICER") ||
       roleName.includes("BANK AUTHORITY") ||
@@ -242,6 +259,13 @@ const order = {
         baseQuery.whereIn("category.id", departmentCategoryIds);
       }
       // If officer has no departments, do not apply any extra category filter
+    } else {
+      const departmentCategoryIds = await getUserDepartmentCategoryIds(user.id);
+
+      if (departmentCategoryIds.length > 0) {
+        baseQuery.whereIn("category.id", departmentCategoryIds);
+      }
+      // If user has no departments, do not apply any extra category filter
     }
 
     // Sort by newest first
@@ -502,7 +526,9 @@ const order = {
       }); */
     }
 
-    // Additional department-based filtering for officer-type roles
+    // Additional department-based filtering:
+    // - Officer-type roles (BANK OFFICER / BANK AUTHORITY / CREDIT HEAD) use officer_categories
+    // - Other roles (e.g. manager, telecaller, etc.) use user_categories
     if (
       roleName.includes("BANK OFFICER") ||
       roleName.includes("BANK AUTHORITY") ||
@@ -516,6 +542,13 @@ const order = {
         baseQuery.whereIn("category.id", departmentCategoryIds);
       }
       // If officer has no departments, do not apply any extra category filter
+    } else {
+      const departmentCategoryIds = await getUserDepartmentCategoryIds(user.id);
+
+      if (departmentCategoryIds.length > 0) {
+        baseQuery.whereIn("category.id", departmentCategoryIds);
+      }
+      // If user has no departments, do not apply any extra category filter
     }
 
     // Sort by newest first
@@ -875,7 +908,9 @@ const order = {
       }
     }
 
-    // Department-based access check for officer-type roles on single order
+    // Department-based access check:
+    // - Officer-type roles use officer_categories
+    // - Other roles use user_categories
     if (
       roleName.includes("BANK OFFICER") ||
       roleName.includes("BANK AUTHORITY") ||
@@ -892,6 +927,16 @@ const order = {
         return null;
       }
       // If officer has no departments, do not block access based on category
+    } else {
+      const departmentCategoryIds = await getUserDepartmentCategoryIds(user.id);
+
+      if (
+        departmentCategoryIds.length > 0 &&
+        !departmentCategoryIds.includes(order.category_id)
+      ) {
+        return null;
+      }
+      // If user has no departments, do not block access based on category
     }
 
     // Get status history for this order

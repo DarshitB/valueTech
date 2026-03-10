@@ -11,6 +11,7 @@ import {
 } from "../../redux/reducers/userReducer";
 import { fetchRoles } from "../../redux/reducers/roleReducer";
 import { fetchCities } from "../../redux/reducers/cityReducer";
+import { fetchCategories } from "../../redux/reducers/categoryReducer";
 import CustomDataTable from "../../components/CustomDataTable";
 import {
   DeleteIcon,
@@ -37,12 +38,14 @@ function Users() {
   const { list: users, loading } = useSelector((state) => state.users);
   const { list: roles } = useSelector((state) => state.roles);
   const { list: cities } = useSelector((state) => state.cities);
+  const { list: categories } = useSelector((state) => state.categories);
 
   // 🔃 Fetch everything on mount
   useEffect(() => {
     dispatch(fetchUsers());
     dispatch(fetchRoles());
     dispatch(fetchCities());
+    dispatch(fetchCategories());
   }, [dispatch]);
 
   // 👤 New/Edit User State
@@ -52,6 +55,7 @@ function Users() {
     mobile: "",
     role_id: "",
     city_id: "",
+    department: [],
     password: "",
     confirm_password: "",
   });
@@ -75,6 +79,7 @@ function Users() {
       mobile: "",
       role_id: "",
       city_id: "",
+      department: [],
       password: "",
       confirm_password: "",
     });
@@ -91,6 +96,9 @@ function Users() {
       mobile: user.mobile,
       role_id: user.role_id?.toString() || "",
       city_id: user.city_id || "",
+      department: Array.isArray(user.departments)
+        ? user.departments.map((d) => d.id)
+        : [],
       password: "",
       confirm_password: "",
     });
@@ -166,8 +174,9 @@ function Users() {
       name: formData.name,
       email: formData.email,
       mobile: formData.mobile,
-      role_id: parseInt(formData.role_id),
-      city_id: parseInt(formData.city_id),
+      role_id: parseInt(formData.role_id, 10),
+      city_id: parseInt(formData.city_id, 10),
+      department: formData.department,
     };
 
     if (!isEdit || formData.password) {
@@ -474,6 +483,21 @@ function Users() {
                       placeholder="Select city"
                     />
                   </div>
+                  <div className="form-group">
+                    <label>Department</label>
+                    <SingleSearchSelect
+                      isMulti
+                      options={categories.map((c) => ({
+                        value: c.id,
+                        label: c.name,
+                      }))}
+                      value={formData.department}
+                      onChange={(val) =>
+                        setFormData({ ...formData, department: val })
+                      }
+                      placeholder="Select departments"
+                    />
+                  </div>
 
                   <div className="form-group">
                     <label>Password</label>
@@ -525,9 +549,11 @@ function Users() {
               setEditUserId(null);
               setFormData({
                 name: "",
-                contact_number: "",
+                email: "",
+                mobile: "",
                 role_id: "",
-                city_ids: [],
+                city_id: "",
+                department: [],
                 password: "",
                 confirm_password: "",
               });
