@@ -2868,6 +2868,7 @@ function filterValidReportFields(formData, reportType) {
       "valuer_comments_remarks",
       "declaration",
       "disclaimer",
+      "valuer_special_remarks",
       "chassis_no_pencil_impression",
     ],
     report_avr: [
@@ -2930,6 +2931,7 @@ function filterValidReportFields(formData, reportType) {
       "valuer_comments_remarks",
       "declaration",
       "disclaimer",
+      "valuer_special_remarks",
       "chassis_no_pencil_impression",
     ],
     report_machinery: [
@@ -3031,6 +3033,7 @@ function filterValidReportFields(formData, reportType) {
       "no_of_photograph",
       "no_of_collage",
       "valuer_comments_remarks",
+      "valuer_special_remarks",
       "declaration",
       "disclaimer",
     ],
@@ -3169,6 +3172,7 @@ function filterValidReportFields(formData, reportType) {
       "no_of_photograph",
       "no_of_collage",
       "valuer_comments_remarks",
+      "valuer_special_remarks",
       "declaration",
       "disclaimer",
       "chassis_no_pencil_impression",
@@ -3647,6 +3651,7 @@ function filterValidReportFields(formData, reportType) {
       "any_outstanding_deficiencies_as_reported_by_any_port_state",
       "recent_oil_company_inspections_screenings",
       "date_place_of_last_sire_inspection",
+      "valuer_special_remarks",
       "disclaimer",
     ],
   };

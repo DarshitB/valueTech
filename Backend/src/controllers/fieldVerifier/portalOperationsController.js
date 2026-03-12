@@ -90,6 +90,7 @@ exports.create = async (req, res, next) => {
       bank_account_type,
       bank_account_number,
       bank_IFSC_code,
+      created_by,
     } = req.body;
 
     if (!name || !username || !mobile || !password || !city_id) {
@@ -125,7 +126,10 @@ exports.create = async (req, res, next) => {
       bank_account_type,
       bank_account_number,
       bank_IFSC_code,
-      created_by: req.user?.id,
+      created_by:
+        created_by !== undefined && created_by !== null
+          ? created_by
+          : req.user?.id,
       created_at: new Date(),
     });
 
@@ -170,6 +174,7 @@ exports.update = async (req, res, next) => {
       bank_account_type,
       bank_account_number,
       bank_IFSC_code,
+      created_by,
     } = req.body;
 
     const existing = await FieldVerifier.findById(id, req.user);
@@ -207,6 +212,11 @@ exports.update = async (req, res, next) => {
       updated_by: req.user?.id,
       updated_at: new Date(),
     };
+
+    // Only update created_by when explicitly provided and non-null
+    if (created_by !== undefined && created_by !== null) {
+      updatedData.created_by = created_by;
+    }
 
     if (password) {
       updatedData.password = await bcrypt.hash(password, 10);

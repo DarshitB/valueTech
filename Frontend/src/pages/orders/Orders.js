@@ -1691,6 +1691,10 @@ function Orders() {
                   ) && <th style={{ width: "150px" }}>Officer</th>}
                   {hasPermission(
                     allowedPermissions,
+                    "view_order_table_customer_name"
+                  ) && <th style={{ width: "200px" }}>Customer Name</th>}
+                  {hasPermission(
+                    allowedPermissions,
                     "view_order_table_registration_number"
                   ) && <th style={{ width: "200px" }}>Registration Number</th>}
                   {hasPermission(
@@ -1810,6 +1814,10 @@ function Orders() {
                     allowedPermissions,
                     "view_order_table_Branch_Officer"
                   ) && <td>{order.officer_name || "-"}</td>}
+                  {hasPermission(
+                    allowedPermissions,
+                    "view_order_table_customer_name"
+                  ) && <td>{order.customer_name || "-"}</td>}
                   {hasPermission(
                     allowedPermissions,
                     "view_order_table_registration_number"

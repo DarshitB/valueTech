@@ -785,25 +785,33 @@ body.single-page{
         </tr>
         <tr>
             <td>VALUER COMMENTS/REMARKS:</td>
-            <td colspan="5">${renderFieldValue(formData.valuer_comments_remarks)}</td>
+            <td colspan="5" style="text-align: left;">${renderFieldValue(formData.valuer_comments_remarks)}</td>
         </tr>
+        ${formData.valuer_special_remarks != null &&
+            formData.valuer_special_remarks !== ""
+            ? `<tr>
+            <td>VALUER SPECIAL REMARKS:</td>
+            <td colspan="5" style="text-align: left;">${formData.valuer_special_remarks}</td>
+        </tr>`
+            : ""
+        }
         ${generateFlexibleFieldsForSection(
             formData.flexible_fields || [],
             "OVER_ALL_FEED_BACK_OF_THE_INSPECTED"
         )}
         <tr>
             <td>DECLARATION:</td>
-            <td colspan="5" style="text-transform: none;">
+            <td colspan="5" style="text-transform: none;text-align: left;">
                 The aforesaid ${extraData.cat} / ${extraData.subCat} ${extraData.childCat
         } inspected by us & found in ${formData.declaration
         } on the date of my inspection.This Report issued for ${formData.valuation_purpose
-        } ${formData.valuation_purpose  == "REPO PURPOSE" ? "(REPO)" : ""} of ${extraData.bank_name}, ${extraData.branch_name}, ${extraData.state_name
+        } ${formData.valuation_purpose == "REPO PURPOSE" ? "(REPO)" : ""} of ${extraData.bank_name}, ${extraData.branch_name}, ${extraData.state_name
         } Only.
             </td>
         </tr>
         <tr>
             <td>DISCLAIMER:</td>
-            <td colspan="5" style="text-transform: none;">${formData.valuer_name
+            <td colspan="5" style="text-transform: none;text-align: left;">${formData.valuer_name
         } will not be held liable for any direct, indirect consequential or exemplary
 damages for any loss resulting from use of this report. The above valuation given based on submitted R.C. Book. We are not responsible for
 the genuineness of the vehicle documents. To give loan to the applicant is the responsiiblity of the finance company/bank. We are not

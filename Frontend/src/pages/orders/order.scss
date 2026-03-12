@@ -250,9 +250,11 @@
   height: 100%;
   overflow: hidden;
   position: relative;
+
   .filter-container-card {
     flex-shrink: 0;
   }
+
   .dataTable-container {
     flex: 1;
     min-height: 0;
@@ -260,11 +262,25 @@
     flex-direction: column;
     overflow: hidden;
     padding: 20px 30px 20px 20px;
-    .dataTable-table{
-      thead {
-        z-index: 0;
-      }
-    }
+
+  }
+}
+
+.user-data-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+
+  .dataTable-container {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 20px 30px 20px 20px;
+
   }
 }
 

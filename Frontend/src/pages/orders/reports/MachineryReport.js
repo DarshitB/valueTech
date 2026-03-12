@@ -710,6 +710,7 @@ function MachineryReport() {
     no_of_collage: "",
 
     valuer_comments_remarks: "",
+    valuer_special_remarks: "",
     declaration: "",
     disclaimer: "", // Will be set dynamically when order loads
   });
@@ -4352,6 +4353,24 @@ function MachineryReport() {
                       id="valuer_comments_remarks"
                       name="valuer_comments_remarks"
                       value={reportFormData.valuer_comments_remarks}
+                      onChange={handleFormChange}
+                      rows={2}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group">
+                    <label htmlFor="valuer_special_remarks">
+                      Valuer Special Remarks
+                    </label>
+                    <WysiwygTextarea
+                      className="form-field"
+                      id="valuer_special_remarks"
+                      name="valuer_special_remarks"
+                      value={reportFormData.valuer_special_remarks}
                       onChange={handleFormChange}
                       rows={2}
                     />

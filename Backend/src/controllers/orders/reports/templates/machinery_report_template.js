@@ -768,21 +768,29 @@ body.single-page{
         </tr>
         <tr>
             <td>VALUER COMMENTS/REMARKS:</td>
-            <td colspan="5">${renderFieldValue(formData.valuer_comments_remarks)}</td>
+            <td colspan="5" style="text-align: left;">${renderFieldValue(formData.valuer_comments_remarks)}</td>
         </tr>
+        ${formData.valuer_special_remarks != null &&
+            formData.valuer_special_remarks !== ""
+            ? `<tr>
+            <td>VALUER SPECIAL REMARKS:</td>
+            <td colspan="5" style="text-align: left;">${formData.valuer_special_remarks}</td>
+        </tr>`
+            : ""
+        }
         ${generateFlexibleFieldsForSection(
             formData.flexible_fields || [],
             "OVER_ALL_FEED_BACK_OF_THE_INSPECTED"
         )}
         <tr>
             <td>DECLARATION:</td>
-            <td colspan="5">
+            <td colspan="5" style="text-align: left;">
                 ${renderFieldValue(formData.declaration)}
             </td>
         </tr>
         <tr>
             <td>DISCLAIMER:</td>
-            <td colspan="5">${renderFieldValue(formData.disclaimer)}</td>
+            <td colspan="5" style="text-align: left;">${renderFieldValue(formData.disclaimer)}</td>
         </tr>
         <tr class="signature-row">
             <td colspan="6" style="height: 48px; position: relative;">

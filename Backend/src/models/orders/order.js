@@ -268,6 +268,11 @@ const order = {
       // If user has no departments, do not apply any extra category filter
     }
 
+    // For MANAGER roles, exclude orders with current_status_id >= 8
+    if (roleName.includes("MANAGER")) {
+      baseQuery.andWhere("orders.current_status_id", "<", 8);
+    }
+
     // Sort by newest first
     baseQuery.orderBy("orders.created_at", "asc");
 
@@ -549,6 +554,11 @@ const order = {
         baseQuery.whereIn("category.id", departmentCategoryIds);
       }
       // If user has no departments, do not apply any extra category filter
+    }
+
+    // For MANAGER roles, exclude orders with current_status_id >= 8
+    if (roleName.includes("MANAGER")) {
+      baseQuery.andWhere("orders.current_status_id", "<", 8);
     }
 
     // Sort by newest first

@@ -11,6 +11,7 @@ import {
 } from "../../redux/reducers/fieldVerifierReducer";
 import { fetchCities } from "../../redux/reducers/cityReducer";
 import { fetchOrders } from "../../redux/reducers/orderReducer";
+import { fetchUsers } from "../../redux/reducers/userReducer";
 import CustomDataTable from "../../components/CustomDataTable";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import FormModel from "../../components/FormModel";
@@ -33,6 +34,7 @@ function FieldVerifiers() {
     (state) => state.fieldVerifier
   );
   /*  console.log(fieldVerifiers); */
+  const { list: users } = useSelector((state) => state.users);
   const { list: cities } = useSelector((state) => state.cities); // Fetch cities
   const { list: orders } = useSelector((state) => state.orders);
 
@@ -69,6 +71,7 @@ function FieldVerifiers() {
   const [isEdit, setIsEdit] = useState(false);
   const [editId, setEditId] = useState(null);
   const [showFormModal, setShowFormModal] = useState(false);
+  const [selectedManagerFilter, setSelectedManagerFilter] = useState("");
 
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [confirmDeleteName, setConfirmDeleteName] = useState("");
@@ -80,6 +83,7 @@ function FieldVerifiers() {
     dispatch(fetchFieldVerifiers());
     dispatch(fetchCities());
     dispatch(fetchOrders());
+    dispatch(fetchUsers());
   }, [dispatch]);
 
   // Calculate order counts for each field verifier
@@ -93,6 +97,51 @@ function FieldVerifiers() {
     });
     return counts;
   }, [fieldVerifiers, orders]);
+
+  // Manager options for filter (only MANAGER role and present as creator of at least one field verifier)
+  const managerFilterOptions = useMemo(() => {
+    const creatorNames = new Set(
+      fieldVerifiers
+        .filter((v) => v.created_by)
+        .map((v) => v.created_by)
+    );
+
+    return users
+      .filter((u) => {
+        const isManager = String(u.role_name || "")
+          .toUpperCase()
+          .includes("MANAGER");
+        const isCreatorInList = creatorNames.has(u.name);
+        return isManager && isCreatorInList;
+      })
+      .map((u) => ({
+        value: u.id,
+        label: `${u.name} (${u.role_name})`,
+      }));
+  }, [users, fieldVerifiers]);
+
+  // Map user id -> user for quick lookup
+  const usersById = useMemo(() => {
+    const map = {};
+    users.forEach((u) => {
+      if (u && u.id != null) {
+        map[u.id] = u;
+      }
+    });
+    return map;
+  }, [users]);
+
+  // Apply manager/created_by filter to field verifiers
+  const filteredFieldVerifiers = useMemo(() => {
+    if (!selectedManagerFilter) return fieldVerifiers;
+
+    const managerUser = usersById[selectedManagerFilter];
+    if (!managerUser || !managerUser.name) return fieldVerifiers;
+
+    return fieldVerifiers.filter(
+      (verifier) => verifier.created_by === managerUser.name
+    );
+  }, [fieldVerifiers, selectedManagerFilter, usersById]);
 
   const openAddModal = () => {
     setIsEdit(false);
@@ -112,6 +161,7 @@ function FieldVerifiers() {
       bank_account_type: "",
       bank_account_number: "",
       bank_IFSC_code: "",
+      created_by: "",
     });
     setShowFormModal(true);
   };
@@ -119,6 +169,14 @@ function FieldVerifiers() {
   const openEditModal = (verifier) => {
     setIsEdit(true);
     setEditId(verifier.id);
+
+    // Map created_by name (string) to user_id (from users list)
+    let createdByUserId = "";
+    if (verifier.created_by) {
+      const creatorUser = users.find((u) => u.name === verifier.created_by);
+      createdByUserId = creatorUser?.id || "";
+    }
+
     setFormData({
       name: verifier.name,
       username: verifier.username,
@@ -136,6 +194,7 @@ function FieldVerifiers() {
       bank_account_type: verifier.bank_account_type || "",
       bank_account_number: verifier.bank_account_number || "",
       bank_IFSC_code: verifier.bank_IFSC_code || "",
+      created_by: createdByUserId,
     });
     setShowFormModal(true);
   };
@@ -181,6 +240,16 @@ function FieldVerifiers() {
 
     if (!isEdit || formData.password) {
       payload.password = formData.password;
+    }
+
+    // Add created_by in create & edit when user has permission
+    const canUpdateCreatedBy = hasPermission(
+      allowedPermissions,
+      "update_field_verifier_manager"
+    );
+    if (canUpdateCreatedBy) {
+      // Null when cleared, otherwise selected manager's user_id
+      payload.created_by = formData.created_by ? formData.created_by : null;
     }
 
     if (isEdit) {
@@ -249,19 +318,41 @@ function FieldVerifiers() {
 
   return (
     <div className="height-full-occupied user-data-container">
+      {/* Manager filter above table, similar to other components */}
+      {hasPermission(allowedPermissions, "field_verifier_filter_manager") && (
+        <div className="filter-container-card" style={{ marginBottom: "16px" }}>
+          <div
+            className="filter-row"
+            style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}
+          >
+            <SingleSearchSelect
+              className="search-selector"
+              options={[
+                { value: "", label: "All Managers" },
+                ...managerFilterOptions,
+              ]}
+              value={selectedManagerFilter || ""}
+              onChange={(value) => {
+                const val = value || "";
+                setSelectedManagerFilter(val);
+              }}
+              placeholder="All Managers"
+            />
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <p>Loading...</p>
       ) : (
         <CustomDataTable>
           {{
-            buttons: hasPermission(
-              allowedPermissions,
-              "add_field_verifier"
-            ) && (
-              <button className="btn" onClick={openAddModal}>
-                Add Field Verifier
-              </button>
-            ),
+            buttons:
+              hasPermission(allowedPermissions, "add_field_verifier") && (
+                <button className="btn" onClick={openAddModal}>
+                  Add Field Verifier
+                </button>
+              ),
             header: (
               <tr>
                 <th style={{ width: "52px" }}>ID</th>
@@ -269,14 +360,14 @@ function FieldVerifiers() {
                 <th style={{ width: "200px" }}>Username</th>
                 <th style={{ width: "125px" }}>Mobile</th>
                 <th style={{ width: "125px" }}>City</th>
-                <th>Orders</th>
-                <th style={{ width: "125px" }}>Created By</th>
+                <th style={{ width: "125px" }}>Orders</th>
+                <th>Created By/Manager</th>
                 <th style={{ width: "125px" }}>Updated By</th>
                 <th style={{ width: "100px" }}>Status</th>
                 <th style={{ width: "150px" }}>Action</th>
               </tr>
             ),
-            rows: fieldVerifiers.map((verifier, index) => (
+            rows: filteredFieldVerifiers.map((verifier, index) => (
               <tr key={verifier.id}>
                 <td className="sequential-number">{index + 1}</td>
                 <td>{verifier.name}</td>
@@ -390,6 +481,34 @@ function FieldVerifiers() {
                     />
                   </div>
                 </div>
+
+                {/* Manager (Created By) - controlled by permission */}
+                {hasPermission(
+                  allowedPermissions,
+                  "update_field_verifier_manager"
+                ) && (
+                    <div className="form-group">
+                      <label>Manager</label>
+                      <SingleSearchSelect
+                        className="search-selector"
+                        options={users
+                          .filter((u) =>
+                            String(u.role_name || "")
+                              .toUpperCase()
+                              .includes("MANAGER")
+                          )
+                          .map((u) => ({
+                            value: u.id,
+                            label: `${u.name} (${u.role_name})`,
+                          }))}
+                        value={formData.created_by}
+                        onChange={(val) =>
+                          setFormData({ ...formData, created_by: val })
+                        }
+                        placeholder="Select manager"
+                      />
+                    </div>
+                  )}
                 <div className="form-group-row">
                   <div className="form-group">
                     <label>Mobile</label>

@@ -696,6 +696,7 @@ function Officers() {
                 <th>Name</th>
                 <th>Role</th>
                 <th>Department</th>
+                <th>Bank</th>
                 <th>Branch</th>
                 <th>Mobile</th>
                 <th>Email</th>
@@ -714,6 +715,7 @@ function Officers() {
                 <td>{officer.name}</td>
                 <td>{officer.role_name}</td>
                 <td>{officer.departments.map((d) => d.name).join(", ")}</td>
+                <td>{officer.bank_name}</td>
                 <td>{officer.branch_name}</td>
                 <td>{officer.mobile}</td>
                 <td>{officer.email}</td>

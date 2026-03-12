@@ -811,6 +811,7 @@ function CEReport() {
     no_of_collage: "",
 
     valuer_comments_remarks: "",
+    valuer_special_remarks: "",
     declaration: "",
   });
 
@@ -4758,7 +4759,7 @@ function CEReport() {
                       id="battery_available"
                       name="battery_available"
                       value={reportFormData.battery_available}
-                      readOnly
+                      onChange={handleFormChange}
                       required
                     />
                   </div>
@@ -6082,6 +6083,24 @@ function CEReport() {
                 </div>
               </div>
 
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group">
+                    <label htmlFor="valuer_special_remarks">
+                      Valuer Special Remarks
+                    </label>
+                    <WysiwygTextarea
+                      className="form-field"
+                      id="valuer_special_remarks"
+                      name="valuer_special_remarks"
+                      value={reportFormData.valuer_special_remarks}
+                      onChange={handleFormChange}
+                      rows={2}
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Flexible Fields for Additional Fields */}
               <div className="row mt-3">
                 <div className="col-12">
@@ -6137,6 +6156,9 @@ function CEReport() {
                         },
                         { value: "KNOCK DOWN", label: "KNOCK DOWN" },
                         { value: "PARKING YARD", label: "PARKING YARD" },
+                        { value: "Dismantled Condition", label: "Dismantled Condition" },
+                        { value: "Normal Working Condition", label: "Normal Working Condition" },
+                        { value: "Total Operational & Functional Condition", label: "Total Operational & Functional Condition" },
                       ]}
                       value={reportFormData.declaration}
                       onChange={(value) =>

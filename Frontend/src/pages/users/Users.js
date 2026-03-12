@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import {
@@ -69,6 +69,40 @@ function Users() {
 
   const [mobileError, setMobileError] = useState(null);
   const [emailError, setEmailError] = useState(null);
+
+  // Role filter state for table
+  const [selectedRoleId, setSelectedRoleId] = useState("");
+
+  // Distinct role options based on users currently loaded
+  const roleFilterOptions = useMemo(() => {
+    const map = new Map();
+
+    users.forEach((user) => {
+      const role = roles.find((r) => r.id === user.role_id);
+      if (!role) return;
+      if (!map.has(role.id)) {
+        map.set(role.id, role.name);
+      }
+    });
+
+    return Array.from(map.entries()).map(([id, name]) => ({
+      value: String(id),
+      label: name,
+    }));
+  }, [users, roles]);
+
+  // Apply role filter to users list
+  const filteredUsers = useMemo(() => {
+    if (!selectedRoleId) return users;
+
+    const selectedRole = roles.find(
+      (r) => String(r.id) === String(selectedRoleId)
+    );
+    const roleName = selectedRole?.name;
+    if (!roleName) return users;
+
+    return users.filter((u) => u.role_name === roleName);
+  }, [users, roles, selectedRoleId]);
 
   // Open Add User Form
   const openAddModal = () => {
@@ -271,6 +305,30 @@ function Users() {
 
   return (
     <div className="height-full-occupied user-data-container">
+      {/* Role filter above table */}
+      {hasPermission(allowedPermissions, "user_table_filter_role") && (
+        <div className="filter-container-card" style={{ marginBottom: "16px" }}>
+          <div
+            className="filter-row"
+            style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}
+          >
+            <SingleSearchSelect
+              className="search-selector"
+              options={[
+                { value: "", label: "All Roles" },
+                ...roleFilterOptions,
+              ]}
+              value={selectedRoleId || ""}
+              onChange={(value) => {
+                const val = value || "";
+                setSelectedRoleId(val);
+              }}
+              placeholder="All Roles"
+            />
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <p>Loading...</p>
       ) : (
@@ -296,7 +354,7 @@ function Users() {
                 <th style={{ textAlign: "center", width: "150px" }}>Action</th>
               </tr>
             ),
-            rows: users.map((user, index) => (
+            rows: filteredUsers.map((user, index) => (
               <tr key={user.id}>
                 <td className="sequential-number">{index + 1}</td>
                 <td>{user.name}</td>

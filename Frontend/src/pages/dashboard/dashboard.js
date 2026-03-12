@@ -406,6 +406,9 @@ function Dashboard() {
   const [editOrderId, setEditOrderId] = useState(null);
   const [showFormModal, setShowFormModal] = useState(false);
 
+  // Helper: is current user a MANAGER editing an existing order?
+  const isManagerEditing = isManager && isEdit;
+
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [confirmDeleteName, setConfirmDeleteName] = useState("");
 
@@ -1067,6 +1070,9 @@ function Dashboard() {
   ]);
 
   const handleSubmit = () => {
+    const canEditRegistration =
+      hasPermission(allowedPermissions, "edit_order_registration_number");
+
     // Collect all validation errors
     if (!formData.customer_name.trim()) {
       toast.error("Name is required.");
@@ -1115,8 +1121,9 @@ function Dashboard() {
       }
 
       if (
+        canEditRegistration &&
         formData.registration_number !==
-        (currentOrder.registration_number || "")
+          (currentOrder.registration_number || "")
       ) {
         payload.registration_number =
           formData.registration_number.trim() || null;
@@ -1149,9 +1156,12 @@ function Dashboard() {
         supervisor_number: formData.supervisor_number.trim() || null,
         driver_number: formData.driver_number.trim() || null,
         child_category_id: formData.child_category_id,
-        registration_number: formData.registration_number.trim() || null,
         place_of_inspection: formData.place_of_inspection.trim() || null,
       };
+
+      if (canEditRegistration) {
+        payload.registration_number = formData.registration_number.trim() || null;
+      }
 
       // Add number_of_order_duplication only if user has permission and has entered a value (add order only)
       if (hasPermission(allowedPermissions, "view_order_add_number_of_order_duplication")) {
@@ -1303,6 +1313,28 @@ function Dashboard() {
       })
       .map((u) => ({ value: u.id, label: `${u.name} (${u.role_name})` }));
   }, [users]);
+
+  // Determine which manager is currently selected for assigning a field verifier
+  const selectedManagerIdForFieldVerifier =
+    formData.manager_id || (isManager ? currentUser?.id : null);
+
+  // Filter field verifiers to only those created by the selected manager
+  const fieldVerifiersForSelectedManager = useMemo(() => {
+    if (!selectedManagerIdForFieldVerifier) return [];
+    if (!Array.isArray(fieldVerifiers) || !Array.isArray(users)) return [];
+
+    const managerUser = users.find(
+      (u) => u.id === selectedManagerIdForFieldVerifier
+    );
+    if (!managerUser) return [];
+
+    const managerName = managerUser.name;
+    if (!managerName) return [];
+
+    return fieldVerifiers.filter(
+      (verifier) => verifier.created_by === managerName
+    );
+  }, [selectedManagerIdForFieldVerifier, fieldVerifiers, users]);
 
   return (
     <div className="dashboard-container height-full-occupied">
@@ -2297,6 +2329,12 @@ function Dashboard() {
                             ) && <th style={{ width: "150px" }}>Officer</th>}
                             {hasPermission(
                               allowedPermissions,
+                              "view_order_table_customer_name_db"
+                            ) && (
+                              <th style={{ width: "200px" }}>Customer Name</th>
+                            )}
+                            {hasPermission(
+                              allowedPermissions,
                               "view_order_table_registration_number_db"
                             ) && (
                                 <th style={{ width: "200px" }}>
@@ -2549,7 +2587,11 @@ function Dashboard() {
                               {hasPermission(
                                 allowedPermissions,
                                 "view_order_table_Branch_Officer_db"
-                              ) && <td>{order.officer_name || "-"}</td>}
+                            ) && <td>{order.officer_name || "-"}</td>}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_customer_name_db"
+                              ) && <td>{order.customer_name || "-"}</td>}
                               {hasPermission(
                                 allowedPermissions,
                                 "view_order_table_registration_number_db"
@@ -2799,6 +2841,7 @@ function Dashboard() {
                       name="nameField"
                       value={formData.customer_name}
                       onChange={(e) => {
+                        if (isManagerEditing) return;
                         // Only allow TELECALLER to change this field if they have permission
                         if (!isTelecaller) {
                           const customer_name = e.target.value.toUpperCase();
@@ -2808,7 +2851,7 @@ function Dashboard() {
                           });
                         }
                       }}
-                      disabled={isTelecaller}
+                      disabled={isTelecaller || isManagerEditing}
                     />
                   </div>
                   <div className="form-group-row">
@@ -2915,17 +2958,29 @@ function Dashboard() {
                       name="registrationNumber"
                       value={formData.registration_number}
                       onChange={(e) => {
-                        // Only allow TELECALLER to change this field if they have permission
-                        if (!isTelecaller) {
-                          const registration_number =
-                            e.target.value.toUpperCase();
-                          setFormData({
-                            ...formData,
-                            registration_number,
-                          });
-                        }
+                        const canEditRegistrationField =
+                          !isTelecaller &&
+                          hasPermission(
+                            allowedPermissions,
+                            "edit_order_registration_number"
+                          );
+
+                        if (!canEditRegistrationField) return;
+
+                        const registration_number =
+                          e.target.value.toUpperCase();
+                        setFormData({
+                          ...formData,
+                          registration_number,
+                        });
                       }}
-                      disabled={isTelecaller}
+                      disabled={
+                        isTelecaller ||
+                        !hasPermission(
+                          allowedPermissions,
+                          "edit_order_registration_number"
+                        )
+                      }
                     />
                   </div>
 
@@ -2977,9 +3032,18 @@ function Dashboard() {
                     </div>
                   )}
 
-                  {/* Created At field - Show based on permission */}
-                  {((isEdit && hasPermission(allowedPermissions, "edit_order_created_at")) ||
-                    (!isEdit && hasPermission(allowedPermissions, "add_order_created_at"))) && (
+                  {/* Created At field - Show based on permission (managers cannot edit) */}
+                  {!isManager &&
+                    ((isEdit &&
+                      hasPermission(
+                        allowedPermissions,
+                        "edit_order_created_at"
+                      )) ||
+                      (!isEdit &&
+                        hasPermission(
+                          allowedPermissions,
+                          "add_order_created_at"
+                        ))) && (
                       <div className="form-group">
                         <label htmlFor="createdAt">Created At</label>
                         <DatePicker
@@ -3016,6 +3080,7 @@ function Dashboard() {
                           )}
                           value={formData.child_category_id}
                           onChange={(val) => {
+                            if (isManagerEditing) return;
                             // Only allow TELECALLER to change this field if they have permission
                             if (!isTelecaller) {
                               setFormData({
@@ -3025,7 +3090,7 @@ function Dashboard() {
                             }
                           }}
                           placeholder="Select Subcategory"
-                          disabled={isTelecaller}
+                          disabled={isTelecaller || isManagerEditing}
                         />
                       </div>
                     )}
@@ -3046,13 +3111,14 @@ function Dashboard() {
                           }))}
                           value={formData.officer_id}
                           onChange={(val) => {
+                            if (isManagerEditing) return;
                             // Only allow TELECALLER to change this field if they have permission
                             if (!isTelecaller) {
                               setFormData({ ...formData, officer_id: val });
                             }
                           }}
                           placeholder="Select officer"
-                          disabled={isTelecaller}
+                          disabled={isTelecaller || isManagerEditing}
                         />
                       </div>
                     )}
@@ -3079,10 +3145,8 @@ function Dashboard() {
                               setFormData({
                                 ...formData,
                                 manager_id: val,
-                                // Clear field verifier when manager is removed
-                                field_verifier_id: val
-                                  ? formData.field_verifier_id
-                                  : null,
+                                // Clear field verifier whenever manager changes
+                                field_verifier_id: null,
                               });
                             }
                           }}
@@ -3092,8 +3156,8 @@ function Dashboard() {
                       </div>
                     )}
 
-                  {/* Field Verifier - Show when manager is assigned, user is MANAGER, or user has permission to edit manager field (but not Bank Officer) */}
-                  {(formData.manager_id || isManager || isSuperAdmin) &&
+                  {/* Field Verifier - Show only when a manager is selected (or current user is MANAGER/SUPER ADMIN) and user has permission (but not Bank Officer) */}
+                  {selectedManagerIdForFieldVerifier &&
                     hasPermission(
                       allowedPermissions,
                       "view_order_add_edit_manager_filed"
@@ -3106,10 +3170,12 @@ function Dashboard() {
                         <SingleSearchSelect
                           id="fieldVerifierField"
                           className="search-selector"
-                          options={fieldVerifiers.map((verifier) => ({
-                            value: verifier.id,
-                            label: verifier.name,
-                          }))}
+                          options={fieldVerifiersForSelectedManager.map(
+                            (verifier) => ({
+                              value: verifier.id,
+                              label: verifier.name,
+                            })
+                          )}
                           value={formData.field_verifier_id}
                           onChange={(val) => {
                             // Only allow TELECALLER to change this field if they have permission
