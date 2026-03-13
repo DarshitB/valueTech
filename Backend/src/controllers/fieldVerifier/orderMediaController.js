@@ -81,8 +81,9 @@ async function updateOrderStatusToAssetsSubmitted(orderId, verifierId, imageCoun
  */
 async function uploadMultipart(req, res, next) {
   let tempPaths = [];
+  let finalUploadedPaths = [];
   try {
-    const { order_number } = req.body;
+    const { order_number, image_count, video_count } = req.body;
     const files = req.files;
     const { id } = req.verifier;
 
@@ -96,7 +97,42 @@ async function uploadMultipart(req, res, next) {
     } */
 
     if (!order_number) throw new BadRequestError('order_number is required');
-    if (!files || !Array.isArray(files) || files.length === 0) throw new BadRequestError('No files uploaded');
+    if (!files || !Array.isArray(files) || files.length === 0)
+      throw new BadRequestError('No files uploaded');
+
+    // Enforce "all or nothing" based on expected image/video counts
+    // If counts are not provided, treat them as 0
+    const expectedImageCount = parseInt(image_count ?? 0, 10);
+    const expectedVideoCount = parseInt(video_count ?? 0, 10);
+
+    if (
+      Number.isNaN(expectedImageCount) ||
+      Number.isNaN(expectedVideoCount) ||
+      expectedImageCount < 0 ||
+      expectedVideoCount < 0
+    ) {
+      throw new BadRequestError(
+        'image_count and video_count must be non-negative integers'
+      );
+    }
+
+    const actualImageCount = files.filter(
+      (f) => f.mimetype && f.mimetype.startsWith('image/')
+    ).length;
+    const actualVideoCount = files.filter(
+      (f) => f.mimetype && f.mimetype.startsWith('video/')
+    ).length;
+
+    if (
+      actualImageCount !== expectedImageCount ||
+      actualVideoCount !== expectedVideoCount
+    ) {
+      throw new BadRequestError(
+        `Uploaded files count does not match expected image_count/video_count. ` +
+          `image_count_from_api=${expectedImageCount}, actual_images=${actualImageCount}, ` +
+          `video_count_from_api=${expectedVideoCount}, actual_videos=${actualVideoCount}`
+      );
+    }
 
     const orderRow = await getOrderByNumber(order_number);
     if (!orderRow) throw new BadRequestError('Order not found with provided order_number');
@@ -136,7 +172,7 @@ async function uploadMultipart(req, res, next) {
         name: generatedFilename,
         mimeType: f.mimetype,
         targetFolderPath: targetFolderPath,
-        fileType: f.mimetype.startsWith('video') ? 'video' : 'image'
+        fileType: f.mimetype.startsWith('video') ? 'video' : 'image',
       });
 
       tempPaths.push(f.path);
@@ -144,6 +180,7 @@ async function uploadMultipart(req, res, next) {
 
     // Copy all files to target folders in parallel for maximum performance
     const uploadedFiles = await copyMultipleFilesToFolder(filesToUpload);
+    finalUploadedPaths = uploadedFiles.map((u) => u.path);
 
     // Generate thumbnails for images in parallel
     const thumbnailPromises = filesToUpload
@@ -174,8 +211,18 @@ async function uploadMultipart(req, res, next) {
         id: mediaId,
         localFileId: uploadedFiles[i].id,
         link: uploadedFiles[i].webContentLink, // Use local file path for media access
-        filename: filesToUpload[i].name
+        filename: filesToUpload[i].name,
       });
+    }
+
+    // Final safety check: ensure we saved exactly as many as expected
+    if (
+      uploadedFiles.length !== files.length ||
+      saved.length !== files.length
+    ) {
+      throw new Error(
+        'Mismatch between expected and saved media records; rolling back this upload'
+      );
     }
 
     // Cleanup temp files
@@ -185,13 +232,20 @@ async function uploadMultipart(req, res, next) {
     // Update order status to 7 (Assets Submitted) after successful upload
     await updateOrderStatusToAssetsSubmitted(orderRow.id, id, filesToUpload.length);
 
-    res.json({ state: 1, message: 'successfully uploaded the images', files: saved });
+    res.json({
+      state: 1,
+      message: 'successfully uploaded the images',
+      files: saved,
+    });
   } catch (err) {
-    // If there's an error, still try to cleanup temp files
+    // If there's an error, still try to cleanup temp files and any copied files
     console.error('uploadMultipart error:', err);
-    if (tempPaths && tempPaths.length > 0) {
-      /* console.log(`🧹 Error occurred, cleaning up ${tempPaths.length} temp files...`); */
-      cleanupTempFiles(tempPaths);
+    const allPathsToCleanup = [
+      ...(tempPaths || []),
+      ...(finalUploadedPaths || []),
+    ];
+    if (allPathsToCleanup.length > 0) {
+      cleanupTempFiles(allPathsToCleanup);
     }
     next(err);
   }
@@ -210,12 +264,30 @@ async function uploadMultipart(req, res, next) {
  */
 async function uploadBase64(req, res, next) {
   let tempPaths = [];
+  let finalUploadedPaths = [];
   try {
-    const { order_number, files } = req.body;
+    const { order_number, files, image_count, video_count } = req.body;
     const { id } = req.verifier;
 
     if (!order_number) throw new BadRequestError('order_number is required');
-    if (!files || !Array.isArray(files) || files.length === 0) throw new BadRequestError('No files in payload');
+    if (!files || !Array.isArray(files) || files.length === 0)
+      throw new BadRequestError('No files in payload');
+
+    // Enforce "all or nothing" based on expected image/video counts
+    // If counts are not provided, treat them as 0
+    const expectedImageCount = parseInt(image_count ?? 0, 10);
+    const expectedVideoCount = parseInt(video_count ?? 0, 10);
+
+    if (
+      Number.isNaN(expectedImageCount) ||
+      Number.isNaN(expectedVideoCount) ||
+      expectedImageCount < 0 ||
+      expectedVideoCount < 0
+    ) {
+      throw new BadRequestError(
+        'image_count and video_count must be non-negative integers'
+      );
+    }
 
     /* console.log("files", files); */
     
@@ -253,21 +325,42 @@ async function uploadBase64(req, res, next) {
       const generatedFilename = `${order_number}_${fileType}_${randomNumber}.${extension}`;
 
       // Choose target folder path
-      const targetFolderPath = mime && mime.startsWith('video') ? videosPath : imagesPath;
+      const targetFolderPath =
+        mime && mime.startsWith('video') ? videosPath : imagesPath;
 
       filesToUpload.push({
         path: tmpPath,
         name: generatedFilename,
         mimeType: mime,
         targetFolderPath: targetFolderPath,
-        fileType: mime.startsWith('video') ? 'video' : 'image'
+        fileType: mime.startsWith('video') ? 'video' : 'image',
       });
 
       tempPaths.push(tmpPath);
     }
 
+    // Validate actual vs expected counts based on prepared files
+    const actualImageCount = filesToUpload.filter(
+      (f) => f.fileType === 'image'
+    ).length;
+    const actualVideoCount = filesToUpload.filter(
+      (f) => f.fileType === 'video'
+    ).length;
+
+    if (
+      actualImageCount !== expectedImageCount ||
+      actualVideoCount !== expectedVideoCount
+    ) {
+      throw new BadRequestError(
+        `Uploaded files count does not match expected image_count/video_count. ` +
+          `image_count_from_api=${expectedImageCount}, actual_images=${actualImageCount}, ` +
+          `video_count_from_api=${expectedVideoCount}, actual_videos=${actualVideoCount}`
+      );
+    }
+
     // Copy all files to target folders in parallel for maximum performance
     const uploadedFiles = await copyMultipleFilesToFolder(filesToUpload);
+    finalUploadedPaths = uploadedFiles.map((u) => u.path);
 
     // Generate thumbnails for images in parallel
     const thumbnailPromises = filesToUpload
@@ -294,12 +387,22 @@ async function uploadBase64(req, res, next) {
     const saved = [];
     for (let i = 0; i < mediaRecords.length; i++) {
       const mediaId = await insertMedia(mediaRecords[i]);
-      saved.push({ 
-        id: mediaId, 
-        localFileId: uploadedFiles[i].id, 
+      saved.push({
+        id: mediaId,
+        localFileId: uploadedFiles[i].id,
         link: uploadedFiles[i].webContentLink, // Use local file path for media access
-        filename: filesToUpload[i].name 
+        filename: filesToUpload[i].name,
       });
+    }
+
+    // Final safety check: ensure we saved exactly as many as expected
+    if (
+      uploadedFiles.length !== filesToUpload.length ||
+      saved.length !== filesToUpload.length
+    ) {
+      throw new Error(
+        'Mismatch between expected and saved media records; rolling back this upload'
+      );
     }
 
     // Cleanup temp files ONLY after successful database insertion
@@ -311,11 +414,14 @@ async function uploadBase64(req, res, next) {
 
     res.json({ state: 1, message: 'successfully uploaded the images', files: saved });
   } catch (err) {
-    // If there's an error, still try to cleanup temp files
+    // If there's an error, still try to cleanup temp files and any copied files
     console.error('uploadBase64 error:', err);
-    if (tempPaths && tempPaths.length > 0) {
-      /* console.log(`🧹 Error occurred, cleaning up ${tempPaths.length} temp files...`); */
-      cleanupTempFiles(tempPaths);
+    const allPathsToCleanup = [
+      ...(tempPaths || []),
+      ...(finalUploadedPaths || []),
+    ];
+    if (allPathsToCleanup.length > 0) {
+      cleanupTempFiles(allPathsToCleanup);
     }
     next(err);
   }

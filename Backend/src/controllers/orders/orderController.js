@@ -359,6 +359,7 @@ exports.create = async (req, res, next) => {
       child_category_id,
       officer_id,
       manager_id,
+      telecaller_id,
       field_verifier_id,
       registration_number,
       place_of_inspection,
@@ -407,6 +408,13 @@ exports.create = async (req, res, next) => {
     if (manager_id) {
       const manager = await User.findById(manager_id);
       if (!manager) throw new BadRequestError("Invalid manager selected");
+    }
+
+    // Validate telecaller if provided
+    if (telecaller_id) {
+      const telecaller = await User.findById(telecaller_id);
+      if (!telecaller)
+        throw new BadRequestError("Invalid telecaller selected");
     }
 
     // Determine order status based on field_verifier_id, manager_id, supervisor_number, and driver_number
@@ -483,6 +491,7 @@ exports.create = async (req, res, next) => {
         child_category_id: child_category_id || null,
         officer_id: officer_id || null,
         manager_id: finalManagerId || null,
+        telecaller_id: telecaller_id || null,
         field_verifier_id: field_verifier_id || null,
         registration_number: registration_number || null,
         place_of_inspection: place_of_inspection || null,
@@ -568,6 +577,7 @@ exports.update = async (req, res, next) => {
       child_category_id,
       officer_id,
       manager_id,
+      telecaller_id,
       field_verifier_id,
       registration_number,
       place_of_inspection,
@@ -595,6 +605,13 @@ exports.update = async (req, res, next) => {
     if (manager_id) {
       const manager = await User.findById(manager_id);
       if (!manager) throw new BadRequestError("Invalid manager selected");
+    }
+
+    // Validate telecaller if provided
+    if (telecaller_id) {
+      const telecaller = await User.findById(telecaller_id);
+      if (!telecaller)
+        throw new BadRequestError("Invalid telecaller selected");
     }
 
     // Check if Telecaller changed place_of_inspection - if yes, reset manager and field verifier
@@ -707,6 +724,10 @@ exports.update = async (req, res, next) => {
       ),
       officer_id: getIntegerValue(officer_id, existingOrder.officer_id),
       manager_id: finalManagerId,
+      telecaller_id: getIntegerValue(
+        telecaller_id,
+        existingOrder.telecaller_id
+      ),
       field_verifier_id: resetManagerAndFieldVerifier
         ? null
         : getIntegerValue(field_verifier_id, existingOrder.field_verifier_id),

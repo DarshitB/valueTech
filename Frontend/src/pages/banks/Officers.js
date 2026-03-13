@@ -427,6 +427,14 @@ function Officers() {
       }
     }
 
+    // If page is opened with a specific branch_id in URL, override branch preselection
+    if (branchIdParam) {
+      const branchId = parseInt(branchIdParam, 10);
+      if (!Number.isNaN(branchId)) {
+        preSelectedBranch = branchId;
+      }
+    }
+
     setFormData({
       name: "",
       role_id: defaultRoleId,
@@ -607,21 +615,39 @@ function Officers() {
     setConfirmDeleteId(null);
   };
   /* console.log(officers); */
+
+  const hasBankFilterPermission = hasPermission(
+    allowedPermissions,
+    "officer_table_filter_bank"
+  );
+  const hasBranchFilterPermission = hasPermission(
+    allowedPermissions,
+    "officer_table_filter_branch"
+  );
+  const hasRoleFilterPermission = hasPermission(
+    allowedPermissions,
+    "officer_table_filter_role"
+  );
+
+  const shouldShowFilterBar =
+    // When no branch_id in URL, show if any filter permission exists
+    (!branchIdParam &&
+      (hasBankFilterPermission ||
+        hasBranchFilterPermission ||
+        hasRoleFilterPermission)) ||
+    // When branch_id is in URL, show only if role filter is allowed
+    (!!branchIdParam && hasRoleFilterPermission);
+
   return (
     <div className="height-full-occupied user-data-container officer-data-container">
       {/* Officer table filters (Bank, Branch, Role) */}
-      {(hasPermission(allowedPermissions, "officer_table_filter_bank") ||
-        hasPermission(allowedPermissions, "officer_table_filter_branch") ||
-        hasPermission(allowedPermissions, "officer_table_filter_role")) && (
+      {shouldShowFilterBar && (
         <div className="filter-container-card" style={{ marginBottom: "16px" }}>
           <div
             className="filter-row"
             style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}
           >
-            {hasPermission(
-              allowedPermissions,
-              "officer_table_filter_bank"
-            ) && (
+            {!branchIdParam && hasBankFilterPermission && (
               <SingleSearchSelect
                 className="search-selector"
                 options={[{ value: "", label: "All Banks" }, ...bankOptions]}
@@ -636,10 +662,7 @@ function Officers() {
               />
             )}
 
-            {hasPermission(
-              allowedPermissions,
-              "officer_table_filter_branch"
-            ) && (
+            {!branchIdParam && hasBranchFilterPermission && (
               <SingleSearchSelect
                 className="search-selector"
                 options={[
@@ -655,10 +678,7 @@ function Officers() {
               />
             )}
 
-            {hasPermission(
-              allowedPermissions,
-              "officer_table_filter_role"
-            ) && (
+            {hasRoleFilterPermission && (
               <SingleSearchSelect
                 className="search-selector"
                 options={[
@@ -904,7 +924,7 @@ function Officers() {
                           setFormData({ ...formData, branch_id: val })
                         }
                         placeholder="Select branch"
-                        isDisabled={isBankAuthority}
+                        disabled={isBankAuthority || (!isEdit && !!branchIdParam)}
                       />
                     </div>
                   </>

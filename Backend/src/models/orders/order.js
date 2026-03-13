@@ -101,6 +101,7 @@ const order = {
       .leftJoin("cities", "bank_branch.city_id", "cities.id")
       .leftJoin("states", "cities.state_id", "states.id")
       .leftJoin("users as manager", "orders.manager_id", "manager.id")
+      .leftJoin("users as telecaller", "orders.telecaller_id", "telecaller.id")
       .leftJoin("users as created_user", "orders.created_by", "created_user.id")
       .leftJoin("users as updated_user", "orders.updated_by", "updated_user.id")
       .leftJoin(
@@ -144,6 +145,8 @@ const order = {
         "states.name as state_name",
         "orders.manager_id",
         "manager.name as manager_name",
+        "orders.telecaller_id",
+        "telecaller.name as telecaller_name",
         "orders.registration_number",
         "orders.place_of_inspection",
         "orders.date_of_inspection",
@@ -236,11 +239,11 @@ const order = {
     } else if ((user.role_name || "").toUpperCase().includes("MANAGER")) {
       baseQuery.andWhere("orders.manager_id", user.id);
     } else if ((user.role_name || "").toUpperCase().includes("TELECALLER")) {
-      // TELECALLER can only see orders that don't have supervisor_number or driver_number
-      /* baseQuery.andWhere(function () {
-        this.whereNull("orders.supervisor_number")
-          .orWhereNull("orders.driver_number");
-      }); */
+      // TELECALLER can only see orders assigned to them via telecaller_id,
+      // and only while no manager is assigned yet
+      baseQuery
+        .andWhere("orders.telecaller_id", user.id)
+        .whereNull("orders.manager_id");
     }
 
     // Additional department-based filtering:
@@ -389,6 +392,7 @@ const order = {
       .leftJoin("cities", "bank_branch.city_id", "cities.id")
       .leftJoin("states", "cities.state_id", "states.id")
       .leftJoin("users as manager", "orders.manager_id", "manager.id")
+      .leftJoin("users as telecaller", "orders.telecaller_id", "telecaller.id")
       .leftJoin("users as created_user", "orders.created_by", "created_user.id")
       .leftJoin("users as updated_user", "orders.updated_by", "updated_user.id")
       .leftJoin(
@@ -432,6 +436,8 @@ const order = {
         "states.name as state_name",
         "orders.manager_id",
         "manager.name as manager_name",
+        "orders.telecaller_id",
+        "telecaller.name as telecaller_name",
         "orders.registration_number",
         "orders.place_of_inspection",
         "orders.date_of_inspection",
@@ -524,11 +530,11 @@ const order = {
     } else if ((user.role_name || "").toUpperCase().includes("MANAGER")) {
       baseQuery.andWhere("orders.manager_id", user.id);
     } else if ((user.role_name || "").toUpperCase().includes("TELECALLER")) {
-      // TELECALLER can only see orders that don't have supervisor_number or driver_number
-      /* baseQuery.andWhere(function () {
-        this.whereNull("orders.supervisor_number")
-          .orWhereNull("orders.driver_number");
-      }); */
+      // TELECALLER can only see orders assigned to them via telecaller_id,
+      // and only while no manager is assigned yet
+      baseQuery
+        .andWhere("orders.telecaller_id", user.id)
+        .whereNull("orders.manager_id");
     }
 
     // Additional department-based filtering:
@@ -677,6 +683,7 @@ const order = {
       .leftJoin("cities", "bank_branch.city_id", "cities.id")
       .leftJoin("states", "cities.state_id", "states.id")
       .leftJoin("users as manager", "orders.manager_id", "manager.id")
+      .leftJoin("users as telecaller", "orders.telecaller_id", "telecaller.id")
       .leftJoin("users as created_user", "orders.created_by", "created_user.id")
       .leftJoin("users as updated_user", "orders.updated_by", "updated_user.id")
       .leftJoin(
@@ -774,6 +781,7 @@ const order = {
       .leftJoin("cities", "bank_branch.city_id", "cities.id")
       .leftJoin("states", "cities.state_id", "states.id")
       .leftJoin("users as manager", "orders.manager_id", "manager.id")
+      .leftJoin("users as telecaller", "orders.telecaller_id", "telecaller.id")
       .leftJoin("users as created_user", "orders.created_by", "created_user.id")
       .leftJoin("users as updated_user", "orders.updated_by", "updated_user.id")
       .leftJoin(
@@ -819,6 +827,10 @@ const order = {
         "states.name as state_name",
         "orders.manager_id",
         "manager.name as manager_name",
+        "orders.telecaller_id",
+        "telecaller.name as telecaller_name",
+        "orders.telecaller_id",
+        "telecaller.name as telecaller_name",
         "orders.registration_number",
         "orders.place_of_inspection",
         "orders.date_of_inspection",
@@ -902,6 +914,11 @@ const order = {
       order.manager_id !== user.id
     ) {
       return null; // Manager can only see their own orders
+    } else if (
+      (user.role_name || "").toUpperCase().includes("TELECALLER") &&
+      order.telecaller_id !== user.id
+    ) {
+      return null; // Telecaller can only see orders assigned to them
     } else if (
       (user.role_name || "").toUpperCase().includes("BANK AUTHORITY")
     ) {

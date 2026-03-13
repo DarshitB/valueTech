@@ -136,7 +136,7 @@ function Dashboard() {
   // Accordion state for Advanced Filters
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
 
-  // Filter users by role for officer and manager selection
+  // Filter users by role for officer, manager and telecaller selection
   const bankOfficers = officers.filter(
     (officer) =>
       officer.role_name.toUpperCase().includes("BANK OFFICER") ||
@@ -147,6 +147,10 @@ function Dashboard() {
     user.role_name.toUpperCase().includes("MANAGER")
   );
 
+  const telecallers = users.filter((user) =>
+    String(user.role_name || "").toUpperCase().includes("TELECALLER")
+  );
+
   // Fields allowed for TELECALLER role
   const telecallerAllowedFields = [
     "contact",
@@ -155,6 +159,12 @@ function Dashboard() {
     "driver_number",
     "place_of_inspection",
   ];
+
+  // Permission: can telecaller see customer name in edit modal
+  const canTelecallerSeeCustomerName = hasPermission(
+    allowedPermissions,
+    "show_customer_name_to_telecaller"
+  );
 
   // State for filtered child categories for Bank Officers
   const [filteredChildCategories, setFilteredChildCategories] = useState([]);
@@ -398,6 +408,7 @@ function Dashboard() {
     number_of_order_duplication: "",
     officer_id: null,
     manager_id: null,
+    telecaller_id: null,
     field_verifier_id: null,
     created_at: null,
   });
@@ -755,6 +766,7 @@ function Dashboard() {
       number_of_order_duplication: "",
       officer_id: null,
       manager_id: null,
+      telecaller_id: null,
       field_verifier_id: null,
       created_at: null,
     });
@@ -778,6 +790,7 @@ function Dashboard() {
       number_of_order_duplication: "",
       officer_id: order.officer_id || null,
       manager_id: order.manager_id || null,
+      telecaller_id: order.telecaller_id || null,
       field_verifier_id: order.field_verifier_id || null,
       created_at: order.created_at ? new Date(order.created_at) : null,
     });
@@ -1183,6 +1196,7 @@ function Dashboard() {
     // Handle officer_id, manager_id, and field_verifier_id based on permissions and user role
     let newOfficerId = null;
     let newManagerId = null;
+    let newTelecallerId = null;
     let newFieldVerifierId = null;
 
     // Officer ID handling - Bank Officers get their own officer ID automatically
@@ -1224,6 +1238,11 @@ function Dashboard() {
       }
     }
 
+    // TELECALLER ID handling - use form data when user has permission
+    if (hasPermission(allowedPermissions, "view_order_add_edit_telecaller_filed")) {
+      newTelecallerId = formData.telecaller_id;
+    }
+
     // Field Verifier for Super Admin - can assign field verifier even without manager
     if (isSuperAdmin && formData.field_verifier_id) {
       newFieldVerifierId = formData.field_verifier_id;
@@ -1241,6 +1260,10 @@ function Dashboard() {
         payload.manager_id = newManagerId;
       }
 
+      if (newTelecallerId !== (currentOrder.telecaller_id || null)) {
+        payload.telecaller_id = newTelecallerId;
+      }
+
       if (newFieldVerifierId !== (currentOrder.field_verifier_id || null)) {
         payload.field_verifier_id = newFieldVerifierId;
       }
@@ -1251,6 +1274,9 @@ function Dashboard() {
       }
       if (newManagerId !== null) {
         payload.manager_id = newManagerId;
+      }
+      if (newTelecallerId !== null) {
+        payload.telecaller_id = newTelecallerId;
       }
       if (newFieldVerifierId !== null) {
         payload.field_verifier_id = newFieldVerifierId;
@@ -1339,7 +1365,7 @@ function Dashboard() {
   return (
     <div className="dashboard-container height-full-occupied">
       {/* Manager dashboard */}
-      {isManager && (
+      {isManager && hasStatisticsPermission && (
         <div className="manager-dashboard">
           <div className="row">
             <div className="col-md-6">
@@ -1421,7 +1447,7 @@ function Dashboard() {
           </div>
         ) : (
           <div className="row">
-            {hasStatisticsPermission && (
+            {hasStatisticsPermission && !isTelecaller && !isManager && (
               <div
                 className={`${hasPermission(
                   allowedPermissions,
@@ -2745,7 +2771,7 @@ function Dashboard() {
                   style={{ cursor: "pointer" }}
                 >
                   <div className="telecoller-dashboard-order-card-header">
-                    <h3>Order ID {order.order_number || "-----"}</h3>
+                    <h3>Order ID - {order.order_number || "-----"}</h3>
                   </div>
                   <div className="telecoller-dashboard-order-card-body">
                     <div className="telecoller-dashboard-order-card-body-item">
@@ -2756,10 +2782,15 @@ function Dashboard() {
                       <span>Asset Regn No.</span>
                       <p>{order.registration_number || "-----"}</p>
                     </div>
-                    <div className="telecoller-dashboard-order-card-body-item">
-                      <span>Client Name</span>
-                      <p>{order.customer_name || "-----"}</p>
-                    </div>
+                    {hasPermission(
+                      allowedPermissions,
+                      "show_customer_name_to_telecaller"
+                    ) && (
+                      <div className="telecoller-dashboard-order-card-body-item">
+                        <span>Client Name</span>
+                        <p>{order.customer_name || "-----"}</p>
+                      </div>
+                    )}
                     <div className="telecoller-dashboard-order-card-body-item two-rows">
                       <div className="telecoller-dashboard-order-card-body-item-inner">
                         <span>Contact Number</span>
@@ -2780,16 +2811,35 @@ function Dashboard() {
                         <p>{order.driver_number || "-----"}</p>
                       </div>
                     </div>
-                    <div className="telecoller-dashboard-order-card-body-item two-rows">
-                      <div className="telecoller-dashboard-order-card-body-item-inner">
-                        <span>Bank</span>
-                        <p>{order.bank_name || "-----"}</p>
+                    {(hasPermission(
+                      allowedPermissions,
+                      "show_bank_to_telelcaller"
+                    ) ||
+                      hasPermission(
+                        allowedPermissions,
+                        "show_officer_to_telecaller"
+                      )) && (
+                      <div className="telecoller-dashboard-order-card-body-item two-rows">
+                        {hasPermission(
+                          allowedPermissions,
+                          "show_bank_to_telelcaller"
+                        ) && (
+                          <div className="telecoller-dashboard-order-card-body-item-inner">
+                            <span>Bank</span>
+                            <p>{order.bank_name || "-----"}</p>
+                          </div>
+                        )}
+                        {hasPermission(
+                          allowedPermissions,
+                          "show_officer_to_telecaller"
+                        ) && (
+                          <div className="telecoller-dashboard-order-card-body-item-inner">
+                            <span>Officer</span>
+                            <p>{order.officer_name || "-----"}</p>
+                          </div>
+                        )}
                       </div>
-                      <div className="telecoller-dashboard-order-card-body-item-inner">
-                        <span>Officer</span>
-                        <p>{order.officer_name || "-----"}</p>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               ))
@@ -2833,27 +2883,29 @@ function Dashboard() {
                 }}
               >
                 <div className="body-form-box">
-                  <div className="form-group">
-                    <label htmlFor="nameField">Name *</label>
-                    <input
-                      className="form-field"
-                      id="nameField"
-                      name="nameField"
-                      value={formData.customer_name}
-                      onChange={(e) => {
-                        if (isManagerEditing) return;
-                        // Only allow TELECALLER to change this field if they have permission
-                        if (!isTelecaller) {
-                          const customer_name = e.target.value.toUpperCase();
-                          setFormData({
-                            ...formData,
-                            customer_name,
-                          });
-                        }
-                      }}
-                      disabled={isTelecaller || isManagerEditing}
-                    />
-                  </div>
+                  {(!isTelecaller || canTelecallerSeeCustomerName) && (
+                    <div className="form-group">
+                      <label htmlFor="nameField">Name *</label>
+                      <input
+                        className="form-field"
+                        id="nameField"
+                        name="nameField"
+                        value={formData.customer_name}
+                        onChange={(e) => {
+                          if (isManagerEditing) return;
+                          // Only allow TELECALLER to change this field if they have permission
+                          if (!isTelecaller) {
+                            const customer_name = e.target.value.toUpperCase();
+                            setFormData({
+                              ...formData,
+                              customer_name,
+                            });
+                          }
+                        }}
+                        disabled={isTelecaller || isManagerEditing}
+                      />
+                    </div>
+                  )}
                   <div className="form-group-row">
                     <div className="form-group">
                       <label htmlFor="contactNumber">Contact Number *</label>
@@ -3094,6 +3146,32 @@ function Dashboard() {
                         />
                       </div>
                     )}
+                  {/* Telecaller field - Show based on permission */}
+                  {hasPermission(
+                    allowedPermissions,
+                    "view_order_add_edit_telecaller_filed"
+                  ) && (
+                    <div className="form-group">
+                      <label htmlFor="telecallerField">Telecaller</label>
+                      <SingleSearchSelect
+                        id="telecallerField"
+                        className="search-selector"
+                        options={telecallers.map((user) => ({
+                          value: user.id,
+                          label: `${user.name} (${user.role_name})`,
+                        }))}
+                        value={formData.telecaller_id}
+                        onChange={(val) => {
+                          setFormData({
+                            ...formData,
+                            telecaller_id: val,
+                          });
+                        }}
+                        placeholder="Select telecaller"
+                      />
+                    </div>
+                  )}
+
                   {/* Officer field - Show based on permission but hidden for Bank Officers */}
                   {hasPermission(
                     allowedPermissions,
@@ -3218,6 +3296,7 @@ function Dashboard() {
                 number_of_order_duplication: "",
                 officer_id: null,
                 manager_id: null,
+        telecaller_id: null,
                 field_verifier_id: null,
                 created_at: null,
               });
