@@ -4427,7 +4427,7 @@ function MachineryReport() {
                 </div>
               </div>
 
-              <div className="row">
+              <div className="row" style={{ display: "none" }}>
                 <div className="col-md-12">
                   <div className="form-group">
                     <label htmlFor="valuer_special_remarks">
