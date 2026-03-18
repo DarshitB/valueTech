@@ -457,7 +457,7 @@ exports.generateReport = async (req, res, next) => {
     const { order_id } = req.params;
     const { report_type: requestedReportType } = req.body;
     const { id: userId } = req.user;
-    console.log("req.body", req.body);
+    /* console.log("req.body", req.body); */
 
     if (!requestedReportType || typeof requestedReportType !== "string") {
       throw new BadRequestError("report_type is required");
