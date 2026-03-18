@@ -3012,6 +3012,7 @@ function filterValidReportFields(formData, reportType) {
       "damages_if_any",
       "rc_book_verified",
       "bill_of_entry",
+      "tax_invoice_copy_heading",
       "tax_invoice_copy",
       "tax_upto_title",
       "tax_upto",

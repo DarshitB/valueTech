@@ -663,7 +663,7 @@ body.single-page{
             <th colspan="6">${formData.insurance_details_heading}</th>
         </tr>
         <tr>
-            <td>INVOICE COPY:</td>
+            <td>${formData.tax_invoice_copy_heading || "INVOICE COPY:"}:</td>
             <td colspan="2">${formData.tax_invoice_copy ? formData.tax_invoice_copy : "NOT AVAILABLE"}</td>
             <td>BILL OF ENTRY:</td>
             <td colspan="2">${formData.bill_of_entry ? formData.bill_of_entry : "NOT AVAILABLE"}</td>

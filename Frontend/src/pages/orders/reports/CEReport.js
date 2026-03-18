@@ -1988,7 +1988,13 @@ function CEReport() {
   const handleFormChange = useCallback(
     (e) => {
       if (initialFormDataRef.current !== null) isDirtyRef.current = true;
-      const { name, value } = e.target;
+      const { name } = e.target;
+
+      // Normalize WysiwygTextarea "empty" value: it can send "<br>" when visually blank
+      let value = e.target.value;
+      if (typeof value === "string" && value.trim() === "<br>") {
+        value = "";
+      }
 
       // Track cleared fields - if field had a value and is now empty, mark it as cleared
       if (!value || (typeof value === "string" && value.trim() === "")) {
