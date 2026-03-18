@@ -37,11 +37,27 @@ const WysiwygTextarea = ({
   const editorRef = useRef(null);
   const isUpdatingRef = useRef(false);
 
+  // Normalize empty WYSIWYG HTML created by contentEditable.
+  // contentEditable often produces "<br>" / "<div><br></div>" when visually empty.
+  const normalizeWysiwygHtml = (html) => {
+    if (typeof html !== "string") return html;
+    const trimmed = html.trim();
+    if (!trimmed) return "";
+
+    const stripped = trimmed
+      .replace(/<br\s*\/?>/gi, "")
+      .replace(/<\/?(div|p|span)[^>]*>/gi, "")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/\s+/g, "");
+
+    return stripped === "" ? "" : html;
+  };
+
   // Update content when value prop changes (from external source)
   useEffect(() => {
     if (editorRef.current && !isUpdatingRef.current) {
       const currentContent = editorRef.current.innerHTML;
-      const newContent = value || "";
+      const newContent = normalizeWysiwygHtml(value) || "";
 
       // Only update if the value is different to avoid cursor jumping
       if (currentContent !== newContent) {
@@ -72,10 +88,11 @@ const WysiwygTextarea = ({
   const handleInput = (e) => {
     if (!isUpdatingRef.current && onChange) {
       const htmlContent = e.target.innerHTML;
+      const normalizedValue = normalizeWysiwygHtml(htmlContent);
       onChange({
         target: {
           name: name,
-          value: htmlContent,
+          value: normalizedValue,
         },
       });
     }
@@ -105,7 +122,8 @@ const WysiwygTextarea = ({
   // Handle placeholder display
   useEffect(() => {
     if (editorRef.current) {
-      if (!value || value === "" || value === "<br>") {
+      const normalized = normalizeWysiwygHtml(value);
+      if (!normalized) {
         editorRef.current.classList.add("empty");
       } else {
         editorRef.current.classList.remove("empty");
@@ -1301,10 +1319,17 @@ function MachineryReport() {
       if (initialFormDataRef.current !== null) isDirtyRef.current = true;
       const { name } = e.target;
 
-      // Normalize WysiwygTextarea "empty" value: it can send "<br>" when visually blank
+      // Normalize WysiwygTextarea "empty" value when visually blank.
+      // WYSIWYG contentEditable can produce "<br>", "<div><br></div>", "<p><br></p>", etc.
       let value = e.target.value;
-      if (typeof value === "string" && value.trim() === "<br>") {
-        value = "";
+      if (typeof value === "string") {
+        const trimmed = value.trim();
+        const stripped = trimmed
+          .replace(/<br\s*\/?>/gi, "")
+          .replace(/<\/?(div|p|span)[^>]*>/gi, "")
+          .replace(/&nbsp;/gi, " ")
+          .replace(/\s+/g, "");
+        if (stripped === "") value = "";
       }
 
       // Track cleared fields - if field had a value and is now empty, mark it as cleared
@@ -1778,6 +1803,17 @@ function MachineryReport() {
           }
         }
 
+        // Final guard: normalize any WYSIWYG empties already present in state.
+        if (typeof value === "string") {
+          const trimmed = value.trim();
+          const stripped = trimmed
+            .replace(/<br\s*\/?>/gi, "")
+            .replace(/<\/?(div|p|span)[^>]*>/gi, "")
+            .replace(/&nbsp;/gi, " ")
+            .replace(/\s+/g, "");
+          if (stripped === "") value = "";
+        }
+
         // Simple logic: if value exists, send it; if null/empty, send null
         // Note: Textarea values (with line breaks, spaces, formatting) are preserved as-is
         if (value !== null && value !== undefined && value !== "") {
@@ -1966,6 +2002,17 @@ function MachineryReport() {
       if (key === "location_of_machinery") {
         if (locationOfMachineryOption === "NOT_AVAILABLE") value = "NOT AVAILABLE";
         else if (locationOfMachineryOption === "NOT_APPLICABLE") value = "NOT APPLICABLE";
+      }
+
+      // Final guard: normalize any WYSIWYG empties already present in state.
+      if (typeof value === "string") {
+        const trimmed = value.trim();
+        const stripped = trimmed
+          .replace(/<br\s*\/?>/gi, "")
+          .replace(/<\/?(div|p|span)[^>]*>/gi, "")
+          .replace(/&nbsp;/gi, " ")
+          .replace(/\s+/g, "");
+        if (stripped === "") value = "";
       }
 
       reportData[key] = (value !== null && value !== undefined && value !== "") ? String(value) : null;
@@ -4427,7 +4474,7 @@ function MachineryReport() {
                 </div>
               </div>
 
-              <div className="row" style={{ display: "none" }}>
+              <div className="row">
                 <div className="col-md-12">
                   <div className="form-group">
                     <label htmlFor="valuer_special_remarks">
