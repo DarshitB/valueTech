@@ -459,6 +459,10 @@ exports.generateReport = async (req, res, next) => {
     const { id: userId } = req.user;
     /* console.log("req.body", req.body); */
 
+    if (!requestedReportType || typeof requestedReportType !== "string") {
+      throw new BadRequestError("report_type is required");
+    }
+
     // Define report types that have asset_make field
     const reportTypesWithAssetMake = [
       "report_cv",
