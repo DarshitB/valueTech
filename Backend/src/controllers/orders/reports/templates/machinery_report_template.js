@@ -770,14 +770,7 @@ body.single-page{
             <td>VALUER COMMENTS/REMARKS:</td>
             <td colspan="5" style="text-align: left;">${renderFieldValue(formData.valuer_comments_remarks)}</td>
         </tr>
-        ${formData.valuer_special_remarks != null &&
-            formData.valuer_special_remarks !== ""
-            ? `<tr>
-            <td>VALUER SPECIAL REMARKS:</td>
-            <td colspan="5" style="text-align: left;">${formData.valuer_special_remarks}</td>
-        </tr>`
-            : ""
-        }
+       
         ${generateFlexibleFieldsForSection(
             formData.flexible_fields || [],
             "OVER_ALL_FEED_BACK_OF_THE_INSPECTED"
