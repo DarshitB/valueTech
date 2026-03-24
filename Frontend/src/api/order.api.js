@@ -7,6 +7,10 @@ export const getOrders = () => axios.get(ENDPOINT); // Fetch all orders
 
 export const getOrdersWithWoStatus = () => axios.get(`${ENDPOINT}/finalized-and-on-hold-orders`); // Fetch orders finalized (13) or on hold (14)
 
+// Fetch finalized orders by child category ID
+export const getFinalizedOrdersByChildCategory = (childCategoryId) =>
+  axios.get(`${ENDPOINT}/child-category/${childCategoryId}/finalized`);
+
 export const getOrderById = (id) => axios.get(`${ENDPOINT}/${id}`); // Get order by ID
 export const createOrder = (data) => axios.post(ENDPOINT, data); // Add order
 export const updateOrder = (id, payload) =>

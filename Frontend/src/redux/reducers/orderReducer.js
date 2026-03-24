@@ -21,6 +21,19 @@ export const fetchOrdersWithWoStatus = createAsyncThunk(
   }
 );
 
+// Async action: Fetch finalized orders by child category ID
+export const fetchFinalizedOrdersByChildCategory = createAsyncThunk(
+  "orders/fetchFinalizedByChildCategory",
+  async (childCategoryId, { rejectWithValue }) => {
+    try {
+      const res = await orderApi.getFinalizedOrdersByChildCategory(childCategoryId);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
 // Async action: Fetch a single order by ID
 export const fetchOrderById = createAsyncThunk(
   "orders/fetchById",
@@ -223,6 +236,9 @@ const initialState = {
   paymentError: null,     // Payment update error
   attributesUpdating: false, // Attributes update loading
   attributesError: null,     // Attributes update error
+  finalizedByChildCategory: null, // Finalized orders API response payload
+  finalizedByChildCategoryLoading: false,
+  finalizedByChildCategoryError: null,
 };
 
 // Order slice
@@ -261,6 +277,21 @@ const orderSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
         toast.error(`Failed to fetch WO status orders: ${action.payload}`);
+      })
+
+      // Fetch finalized orders by child category ID
+      .addCase(fetchFinalizedOrdersByChildCategory.pending, (state) => {
+        state.finalizedByChildCategoryLoading = true;
+        state.finalizedByChildCategoryError = null;
+      })
+      .addCase(fetchFinalizedOrdersByChildCategory.fulfilled, (state, action) => {
+        state.finalizedByChildCategoryLoading = false;
+        state.finalizedByChildCategory = action.payload?.data || null;
+      })
+      .addCase(fetchFinalizedOrdersByChildCategory.rejected, (state, action) => {
+        state.finalizedByChildCategoryLoading = false;
+        state.finalizedByChildCategoryError = action.payload;
+        toast.error(`Failed to fetch finalized orders: ${action.payload}`);
       })
 
       // Fetch order by ID

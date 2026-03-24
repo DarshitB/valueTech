@@ -96,6 +96,38 @@ exports.getAllWithWoStatus = async (req, res, next) => {
   }
 };
 
+// Get orders by child category where current_status_id = 13
+exports.getByChildCategoryWithFinalizedStatus = async (req, res, next) => {
+  try {
+    const { child_category_id } = req.params;
+    const childCategoryId = parseInt(child_category_id, 10);
+
+    if (Number.isNaN(childCategoryId)) {
+      throw new BadRequestError("Invalid child category ID");
+    }
+
+    const orders = await db("orders")
+      .select("*")
+      .where("child_category_id", childCategoryId)
+      .where("current_status_id", 13)
+      .whereNull("deleted_at")
+      .orderBy("id", "desc");
+
+    res.status(200).json({
+      success: true,
+      message: "Orders fetched successfully",
+      data: {
+        child_category_id: childCategoryId,
+        current_status_id: 13,
+        total_orders: orders.length,
+        orders,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // Get All Orders for Mobile App
 exports.getForMobile = async (req, res, next) => {
   try {

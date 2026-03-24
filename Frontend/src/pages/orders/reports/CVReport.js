@@ -22,8 +22,10 @@ import { toast } from "react-toastify";
 import { selectPermissions } from "../../../redux/selectors/authSelectors";
 import { hasPermission } from "../../../utils/permissionUtils";
 import "../order.scss";
-import { DeleteIcon } from "../../../components/icons";
+import { DeleteIcon, ViewIcon } from "../../../components/icons";
 import axios from "axios";
+import { getFinalizedOrdersByChildCategory } from "../../../api/order.api";
+import { getOrderReport } from "../../../api/orderReport.api";
 
 // WYSIWYG Textarea Component - preserves HTML formatting
 const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "", name, readOnly = false }) => {
@@ -173,6 +175,9 @@ function CVReport() {
 
   // State for report type selection (Rough/Production)
   const [reportTypeSelection, setReportTypeSelection] = useState("Rough");
+  const [finalizedReportRows, setFinalizedReportRows] = useState([]);
+  const [finalizedReportsLoading, setFinalizedReportsLoading] = useState(false);
+  const [entriesToShow, setEntriesToShow] = useState(10);
 
   // State to track if initial report fetch has completed (using state instead of ref to trigger re-renders)
   const [reportFetchCompleted, setReportFetchCompleted] = useState(false);
@@ -822,6 +827,80 @@ function CVReport() {
       });
     }
   }, [order, getLicenseNumber, getRefNoCode, buildCategorySuffix, buildValuationReportHeading, currentReport, id, reportFetchCompleted]);
+
+  // Fetch finalized orders for current child category and load their CV report summary rows
+  useEffect(() => {
+    const childCategoryId = order?.child_category_id;
+    if (!childCategoryId) {
+      setFinalizedReportRows([]);
+      return;
+    }
+
+    const fetchFinalizedRows = async () => {
+      try {
+        setFinalizedReportsLoading(true);
+
+        const finalizedRes = await getFinalizedOrdersByChildCategory(childCategoryId);
+        const finalizedOrders = (finalizedRes?.data?.data?.orders || []).filter(
+          (orderItem) =>
+            String(orderItem?.id) !== String(id) &&
+            String(orderItem?.order_number || "").trim() !==
+              String(order?.order_number || "").trim()
+        );
+
+        if (!Array.isArray(finalizedOrders) || finalizedOrders.length === 0) {
+          setFinalizedReportRows([]);
+          return;
+        }
+
+        const rows = await Promise.all(
+          finalizedOrders.map(async (orderItem) => {
+            try {
+              const reportRes = await getOrderReport(orderItem.id, "report_cv");
+              const report = reportRes?.data?.data?.report || {};
+
+              return {
+                id: orderItem.id,
+                order_number: orderItem.order_number || "-",
+                asset_make:
+                  report.asset_make_name ||
+                  report.new_asset_make ||
+                  report.asset_make ||
+                  "-",
+                manufacture_year: report.manufacture_year || "-",
+                current_invoice_cost: report.current_invoice_cost || "-",
+                depreciation: report.depreciation || "-",
+                depreciation_value: report.depreciation_value || "-",
+                appraiser_value: report.appraiser_value || "-",
+                fair_market_value: report.fair_market_value || "-",
+              };
+            } catch (_) {
+              // If report doesn't exist for this finalized order, still show order_number row
+              return {
+                id: orderItem.id,
+                order_number: orderItem.order_number || "-",
+                asset_make: "-",
+                manufacture_year: "-",
+                current_invoice_cost: "-",
+                depreciation: "-",
+                depreciation_value: "-",
+                appraiser_value: "-",
+                fair_market_value: "-",
+              };
+            }
+          })
+        );
+
+        setFinalizedReportRows(rows);
+      } catch (_) {
+        setFinalizedReportRows([]);
+      } finally {
+        setFinalizedReportsLoading(false);
+      }
+    };
+
+    fetchFinalizedRows();
+  }, [order?.child_category_id]);
 
   // Track when the initial report fetch completes
   // We need to ensure: (1) fetch has started (reportLoading = true), (2) fetch has completed (reportLoading = false)
@@ -2909,6 +2988,10 @@ function CVReport() {
     numberToWords,
   ]);
 
+  const visibleFinalizedRows = useMemo(() => {
+    return finalizedReportRows.slice(0, entriesToShow);
+  }, [finalizedReportRows, entriesToShow]);
+
   // Calculate overall loading state
   const isLoading = reportLoading || externalApiLoading;
 
@@ -4534,6 +4617,85 @@ function CVReport() {
 
               {/* Over All Feed Back Of The Inspected Section */}
               <div className="row">
+                <div className="col-12 mb-3">
+                  <h4>Sub Category Orders</h4>
+                  <hr />
+                  <div className="show-x-entries mb-2">
+                    Show &nbsp;
+                    <select
+                      value={entriesToShow}
+                      onChange={(e) => setEntriesToShow(Number(e.target.value))}
+                      className="count-of-page-selector"
+                    >
+                      {[5, 10, 25, 50, 100].map((size) => (
+                        <option key={size} value={size}>
+                          {size}
+                        </option>
+                      ))}
+                    </select>{" "}
+                    &nbsp; Entries of {finalizedReportRows.length} entries
+                  </div>
+                  <div className="table-responsive">
+                    <table className="table table-bordered table-striped">
+                      <thead
+                        style={{
+                          backgroundColor: "rgba(88, 100, 189, 0.5)",
+                          color: "#fff",
+                        }}
+                      >
+                        <tr>
+                          <th style={{color: '#fff'}}>Order Number</th>
+                          <th style={{color: '#fff'}}>Asset Make</th>
+                          <th style={{color: '#fff'}}>Manufacture Year</th>
+                          <th style={{color: '#fff'}}>Current Invoice Cost</th>
+                          <th style={{color: '#fff'}}>Depreciation</th>
+                          <th style={{color: '#fff'}}>Depreciation Value</th>
+                          <th style={{color: '#fff'}}>Appraiser Value</th>
+                          <th style={{color: '#fff'}}>Fair Market Value</th>
+                          <th style={{color: '#fff'}}>View</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {finalizedReportsLoading ? (
+                          <tr>
+                            <td colSpan={9} className="text-center">
+                              Loading finalized reports...
+                            </td>
+                          </tr>
+                        ) : finalizedReportRows.length === 0 ? (
+                          <tr>
+                            <td colSpan={9} className="text-center">
+                              No finalized reports found
+                            </td>
+                          </tr>
+                        ) : (
+                          visibleFinalizedRows.map((row) => (
+                            <tr key={row.id}>
+                              <td>{row.order_number}</td>
+                              <td>{row.asset_make}</td>
+                              <td>{row.manufacture_year}</td>
+                              <td>{row.current_invoice_cost}</td>
+                              <td>{row.depreciation}%</td>
+                              <td>{row.depreciation_value}</td>
+                              <td>{row.appraiser_value}</td>
+                              <td>{row.fair_market_value}</td>
+                              <td>
+                                <Link
+                                  to={`/orders/${row.id}/details`}
+                                  className=""
+                                  title="View"
+                                >
+                                  <ViewIcon size={16} color="#fff" />
+                                </Link>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
                 <div className="col-12">
                   <h4>OVER ALL FEED BACK OF THE INSPECTED</h4>
                   <hr />
