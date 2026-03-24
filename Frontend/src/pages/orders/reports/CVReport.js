@@ -177,7 +177,7 @@ function CVReport() {
   const [reportTypeSelection, setReportTypeSelection] = useState("Rough");
   const [finalizedReportRows, setFinalizedReportRows] = useState([]);
   const [finalizedReportsLoading, setFinalizedReportsLoading] = useState(false);
-  const [entriesToShow, setEntriesToShow] = useState(10);
+  const [entriesToShow, setEntriesToShow] = useState(5);
 
   // State to track if initial report fetch has completed (using state instead of ref to trigger re-renders)
   const [reportFetchCompleted, setReportFetchCompleted] = useState(false);
