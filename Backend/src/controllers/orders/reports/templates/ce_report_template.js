@@ -578,12 +578,24 @@ body.single-page{
         </tr>`
             : ""
         }
+        ${formData.supplier_names ? `
+        <tr>
+            <td>OWNER SERIAL NO:</td>
+            <td>${formData.owner_serial_no}</td>
+            <td>MANUFACTURE YEAR:</td>
+            <td>${formData.manufacture_year}</td>
+            <td>SUPPLIER NAME:</td>
+            <td>${formData.supplier_names}</td>
+        </tr>
+            ` : `
         <tr>
             <td>OWNER SERIAL NO:</td>
             <td colspan="2">${formData.owner_serial_no}</td>
             <td>MANUFACTURE YEAR:</td>
             <td colspan="2">${formData.manufacture_year}</td>
-        </tr>
+        </tr>`}
+        
+        
         <tr>
             <td>ASSET MAKE:</td>
             <td colspan="2">${formData.asset_make}</td>

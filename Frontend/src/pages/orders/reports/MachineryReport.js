@@ -22,7 +22,9 @@ import { toast } from "react-toastify";
 import { selectPermissions } from "../../../redux/selectors/authSelectors";
 import { hasPermission } from "../../../utils/permissionUtils";
 import "../order.scss";
-import { DeleteIcon } from "../../../components/icons";
+import { DeleteIcon, ViewIcon } from "../../../components/icons";
+import { getFinalizedOrdersByChildCategory } from "../../../api/order.api";
+import { getOrderReport } from "../../../api/orderReport.api";
 
 // WYSIWYG Textarea Component - preserves HTML formatting
 const WysiwygTextarea = ({
@@ -193,6 +195,10 @@ function MachineryReport() {
   );
   const allowedPermissions = useSelector(selectPermissions);
   const canEditRefNoId = hasPermission(allowedPermissions, "edit_report_ref_no_id");
+  const canViewSubCategoryOrders = hasPermission(
+    allowedPermissions,
+    "view_finalized_sub_category_orders"
+  );
   const [showOtherAssetMake, setShowOtherAssetMake] = useState(false);
   const [otherAssetMake, setOtherAssetMake] = useState("");
   // State to track if initial report fetch has completed (using state instead of ref to trigger re-renders)
@@ -208,6 +214,15 @@ function MachineryReport() {
 
   // State for report type selection (Rough/Production)
   const [reportTypeSelection, setReportTypeSelection] = useState("Rough");
+
+  // Fetch finalized orders for current child category (table summary at bottom)
+  const [finalizedReportRows, setFinalizedReportRows] = useState([]);
+  const [finalizedReportsLoading, setFinalizedReportsLoading] = useState(false);
+  const [entriesToShow, setEntriesToShow] = useState(5);
+  const visibleFinalizedRows = useMemo(
+    () => finalizedReportRows.slice(0, entriesToShow),
+    [finalizedReportRows, entriesToShow]
+  );
 
   // Clear report data when component mounts or order changes
   useEffect(() => {
@@ -236,6 +251,89 @@ function MachineryReport() {
       dispatch(fetchAssetMakesForReports("report_machinery"));
     }
   }, [dispatch, id]);
+
+  // Fetch finalized orders for current child category and load their Machinery report summary rows
+  useEffect(() => {
+    if (!canViewSubCategoryOrders) {
+      setFinalizedReportRows([]);
+      setFinalizedReportsLoading(false);
+      return;
+    }
+
+    const childCategoryId = order?.child_category_id;
+    if (!childCategoryId) {
+      setFinalizedReportRows([]);
+      return;
+    }
+
+    const fetchFinalizedRows = async () => {
+      try {
+        setFinalizedReportsLoading(true);
+
+        const finalizedRes = await getFinalizedOrdersByChildCategory(childCategoryId);
+        const finalizedOrders = (finalizedRes?.data?.data?.orders || []).filter(
+          (orderItem) =>
+            String(orderItem?.id) !== String(id) &&
+            String(orderItem?.order_number || "").trim() !==
+              String(order?.order_number || "").trim()
+        );
+
+        if (!Array.isArray(finalizedOrders) || finalizedOrders.length === 0) {
+          setFinalizedReportRows([]);
+          return;
+        }
+
+        const rows = await Promise.all(
+          finalizedOrders.map(async (orderItem) => {
+            try {
+              const reportRes = await getOrderReport(orderItem.id, "report_machinery");
+              const report = reportRes?.data?.data?.report || {};
+
+              return {
+                id: orderItem.id,
+                order_number: orderItem.order_number || "-",
+                asset_make:
+                  report.asset_make_name ||
+                  report.new_asset_make ||
+                  report.asset_make ||
+                  "-",
+                manufacture_year: report.manufacture_year || "-",
+                current_invoice_cost:
+                  report.tax_invoice_cost ||
+                  report.current_invoice_cost ||
+                  "-",
+                depreciation: report.depreciation || "-",
+                depreciation_value: report.depreciation_value || "-",
+                appraiser_value: report.appraiser_value || "-",
+                fair_market_value: report.fair_market_value || "-",
+              };
+            } catch (_) {
+              // If report doesn't exist for this finalized order, still show order_number row
+              return {
+                id: orderItem.id,
+                order_number: orderItem.order_number || "-",
+                asset_make: "-",
+                manufacture_year: "-",
+                current_invoice_cost: "-",
+                depreciation: "-",
+                depreciation_value: "-",
+                appraiser_value: "-",
+                fair_market_value: "-",
+              };
+            }
+          })
+        );
+
+        setFinalizedReportRows(rows);
+      } catch (_) {
+        setFinalizedReportRows([]);
+      } finally {
+        setFinalizedReportsLoading(false);
+      }
+    };
+
+    fetchFinalizedRows();
+  }, [order?.child_category_id, order?.order_number, id, canViewSubCategoryOrders]);
 
   // Reset form data when component mounts or order ID changes
   useEffect(() => {
@@ -358,6 +456,8 @@ function MachineryReport() {
       rc_book_verified: "",
       tax_invoice_copy_heading: "Proforma Invoice Verified",
       tax_invoice_copy: "COPY AVAILABLE & VERIFIED",
+      quotation_copy: "",
+      supplier_names: "",
       tax_upto_title: "",
       tax_upto: "",
       permit_upto: "",
@@ -371,6 +471,7 @@ function MachineryReport() {
       insured_value: "",
       insurance_verified: "",
       bill_of_entry: "",
+      bill_of_landing: "",
     });
 
     // Reset flexible fields
@@ -379,6 +480,8 @@ function MachineryReport() {
     // Clear the cleared fields tracking when form resets
     clearedFieldsRef.current.clear();
     manuallyEditedHeadingsRef.current.clear(); // Reset manually edited headings when form resets
+    setChassisImpressionFile(null);
+    setChassisPreviewUrl("");
   }, [id]);
 
   // Build disclaimer text directly with valuer name and bank/branch/city from order
@@ -720,6 +823,8 @@ function MachineryReport() {
     rc_book_verified: "",
     tax_invoice_copy_heading: "Proforma Invoice Verified",
     tax_invoice_copy: "COPY AVAILABLE & VERIFIED",
+    quotation_copy: "",
+    supplier_names: "",
     tax_upto_title: "",
     tax_upto: "",
     permit_upto: "",
@@ -733,6 +838,7 @@ function MachineryReport() {
     insured_value: "",
     insurance_verified: "",
     bill_of_entry: "",
+    bill_of_landing: "",
 
     // OVER ALL FEED BACK OF THE INSPECTED
     tax_invoice_cost: "",
@@ -750,6 +856,10 @@ function MachineryReport() {
     declaration: "",
     disclaimer: "", // Will be set dynamically when order loads
   });
+
+  // File state for chassis impression
+  const [chassisImpressionFile, setChassisImpressionFile] = useState(null);
+  const [chassisPreviewUrl, setChassisPreviewUrl] = useState("");
 
   // State for flexible fields
   const [flexibleFields, setFlexibleFields] = useState([]);
@@ -1605,6 +1715,70 @@ function MachineryReport() {
     }));
   }, []);
 
+  // Handle chassis impression file selection
+  const handleFileChange = useCallback((e) => {
+    const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+    setChassisImpressionFile(file);
+  }, []);
+
+  const resolveChassisImageUrl = useCallback((value) => {
+    if (!value || typeof value !== "string") return "";
+
+    const baseUrl =
+      process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
+
+    // Attempt to parse JSON structure first
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === "object" && parsed.path) {
+        const cleanPath = parsed.path.startsWith("/")
+          ? parsed.path
+          : `/${parsed.path}`;
+        return `${baseUrl}${cleanPath}`;
+      }
+    } catch (err) {
+      // Ignore JSON parse errors, fall back to raw string
+    }
+
+    // Allow absolute URLs or data URIs as is
+    if (
+      value.startsWith("http://") ||
+      value.startsWith("https://") ||
+      value.startsWith("data:")
+    ) {
+      return value;
+    }
+
+    const cleanPath = value.startsWith("/") ? value : `/${value}`;
+    return `${baseUrl}${cleanPath}`;
+  }, []);
+
+  // Show either the newly selected image OR the stored image path preview
+  useEffect(() => {
+    let objectUrl = "";
+
+    if (chassisImpressionFile instanceof File) {
+      objectUrl = URL.createObjectURL(chassisImpressionFile);
+      setChassisPreviewUrl(objectUrl);
+    } else {
+      const existingValue = reportFormData?.chassis_no_pencil_impression;
+      if (
+        existingValue &&
+        existingValue !== null &&
+        existingValue !== undefined
+      ) {
+        const resolved = resolveChassisImageUrl(existingValue);
+        setChassisPreviewUrl(resolved);
+      } else {
+        setChassisPreviewUrl("");
+      }
+    }
+
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [chassisImpressionFile, reportFormData?.chassis_no_pencil_impression, resolveChassisImageUrl]);
+
   // Handle flexible field changes
   const handleFlexibleFieldChange = useCallback((fieldId, fieldType, value) => {
     if (initialFormDataRef.current !== null) isDirtyRef.current = true;
@@ -1837,6 +2011,11 @@ function MachineryReport() {
         reportFormData.disclaimer || defaultDisclaimer
       );
 
+      // Add chassis impression image if selected
+      if (chassisImpressionFile) {
+        formData.append("chassis_no_pencil_impression", chassisImpressionFile);
+      }
+
       // Add flexible fields to FormData with proper sequential ordering
       let formDataIndex = 0;
       flexibleFields.forEach((field) => {
@@ -1963,6 +2142,7 @@ function MachineryReport() {
       registrationNoOption,
       registrationDateOption,
       locationOfMachineryOption,
+      chassisImpressionFile,
       reportTypeSelection,
       canEditRefNoId,
     ]
@@ -2049,9 +2229,15 @@ function MachineryReport() {
       }
     });
 
+    // Attach selected chassis impression file (if any)
+    if (chassisImpressionFile) {
+      reportData["chassis_no_pencil_impression"] = chassisImpressionFile;
+    }
+
     return reportData;
   }, [
     reportFormData, flexibleFields,
+    chassisImpressionFile,
     registrationNoOption, registrationDateOption, locationOfMachineryOption,
     parseCurrency, convertNumberToWordsIndian, getDisclaimer, order,
   ]);
@@ -2097,11 +2283,28 @@ function MachineryReport() {
     // Don't clear clearedFieldsRef after save - user might generate report next
     // It will be cleared when component unmounts or order changes (handled in useEffect)
 
+    // If chassis impression is selected, save as multipart/form-data
+    const savePayload = chassisImpressionFile
+      ? (() => {
+          const fd = new FormData();
+          Object.entries(reportData).forEach(([key, value]) => {
+            if (value instanceof File || value instanceof Blob) {
+              fd.append(key, value);
+            } else if (value === null) {
+              fd.append(key, "");
+            } else if (value !== undefined) {
+              fd.append(key, value);
+            }
+          });
+          return fd;
+        })()
+      : reportData;
+
     // Dispatch save action with JSON data
     dispatch(
       saveOrderReport({
         orderId: id,
-        reportData: reportData,
+        reportData: savePayload,
       })
     ).then((result) => {
       if (result.meta.requestStatus === "fulfilled") {
@@ -2114,6 +2317,7 @@ function MachineryReport() {
     reportFormData,
     flexibleFields,
     validateFlexibleFields,
+    chassisImpressionFile,
     dispatch,
     id,
     buildSavePayload,
@@ -2145,9 +2349,24 @@ function MachineryReport() {
 
       const saveAndNavigate = async () => {
         try {
-          const formData = buildSavePayload();
+          const reportData = buildSavePayload();
+          const payload = chassisImpressionFile
+            ? (() => {
+                const fd = new FormData();
+                Object.entries(reportData).forEach(([key, value]) => {
+                  if (value instanceof File || value instanceof Blob) {
+                    fd.append(key, value);
+                  } else if (value === null) {
+                    fd.append(key, "");
+                  } else if (value !== undefined) {
+                    fd.append(key, value);
+                  }
+                });
+                return fd;
+              })()
+            : reportData;
           const result = await dispatch(
-            saveOrderReport({ orderId: id, reportData: formData })
+            saveOrderReport({ orderId: id, reportData: payload })
           );
           if (result.meta.requestStatus === "fulfilled") {
             isDirtyRef.current = false;
@@ -2192,7 +2411,7 @@ function MachineryReport() {
       window.removeEventListener("popstate", handlePopState);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, buildSavePayload, dispatch]);
+  }, [id, buildSavePayload, chassisImpressionFile, dispatch]);
 
   // Shows browser's native "Leave site?" dialog when user tries to refresh,
   // close the tab, or navigate away from the site entirely.
@@ -3144,7 +3363,7 @@ function MachineryReport() {
                 </div>
               </div>
               <div className="row">
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="owner_serial_no">
                       Owner Serial No <span class="text-danger">*</span>
@@ -3170,7 +3389,7 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="manufacture_year">
                       Manufacture Year <span class="text-danger">*</span>
@@ -3186,7 +3405,22 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="supplier_names">
+                      Supplier Name
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="supplier_names"
+                      name="supplier_names"
+                      value={reportFormData.supplier_names}
+                      onChange={handleFormChange}
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="asset_make">
                       Asset Make & Supplier <span class="text-danger">*</span>
@@ -3231,7 +3465,7 @@ function MachineryReport() {
                     </div>
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="model">
                       Model <span class="text-danger">*</span>
@@ -3248,9 +3482,7 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-              </div>
-              <div className="row">
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="control_system">
                       Control System <span class="text-danger">*</span>
@@ -3266,7 +3498,9 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+              </div>
+              <div className="row">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="machine_serial_no">
                       Machine Serial No <span class="text-danger">*</span>
@@ -3282,7 +3516,7 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="laf_id">
                       LAF Id <span class="text-danger">*</span>
@@ -3298,7 +3532,7 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="application_usage">
                       Application / Usage <span class="text-danger">*</span>
@@ -3317,7 +3551,7 @@ function MachineryReport() {
               </div>
 
               <div className="row">
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="invoice_no">Invoice No. & Date</label>
                     <div className="d-flex gap-2 align-items-center mb-2 drop-down-w-100">
@@ -3503,6 +3737,7 @@ function MachineryReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.control_panel_unit}
                       onChange={(value) =>
@@ -3525,6 +3760,7 @@ function MachineryReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.machine_condition}
                       onChange={(value) =>
@@ -3547,6 +3783,7 @@ function MachineryReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.electrical_condition}
                       onChange={(value) =>
@@ -3569,6 +3806,7 @@ function MachineryReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.mechanical_condition}
                       onChange={(value) =>
@@ -4030,12 +4268,12 @@ function MachineryReport() {
                         <SingleSearchSelect
                           options={[
                             {
-                              value: "Proforma Invoice Verified",
-                              label: "Proforma Invoice Verified",
+                              value: "Proforma Invoice",
+                              label: "Proforma Invoice",
                             },
                             {
-                              value: "Tax Invoice Copy",
-                              label: "Tax Invoice Copy",
+                              value: "Tax Invoice",
+                              label: "Tax Invoice",
                             },
                           ]}
                           value={
@@ -4074,6 +4312,26 @@ function MachineryReport() {
                 <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="rc_book_verified">
+                      Quotation Copy
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "COPY VERIFIED", label: "COPY VERIFIED" },
+                        {
+                          value: "COPY NOT AVAILABLE",
+                          label: "COPY NOT AVAILABLE",
+                        },
+                      ]}
+                      value={reportFormData.quotation_copy}
+                      onChange={(value) =>
+                        handleSelectChange("quotation_copy", value)
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="rc_book_verified">
                       Insurance Copy
                     </label>
                     <SingleSearchSelect
@@ -4096,14 +4354,38 @@ function MachineryReport() {
                     <label htmlFor="bill_of_entry">
                       Bill of Entry
                     </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="bill_of_entry"
-                      name="bill_of_entry"
+                    <SingleSearchSelect
+                      options={[
+                        { value: "COPY VERIFIED", label: "COPY VERIFIED" },
+                        {
+                          value: "COPY NOT AVAILABLE",
+                          label: "COPY NOT AVAILABLE",
+                        },
+                      ]}
                       value={reportFormData.bill_of_entry}
-                      onChange={handleFormChange}
-                      placeholder="Bill of Entry"
+                      onChange={(value) =>
+                        handleSelectChange("bill_of_entry", value)
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="bill_of_entry">
+                    Bill of Landing
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "COPY VERIFIED", label: "COPY VERIFIED" },
+                        {
+                          value: "COPY NOT AVAILABLE",
+                          label: "COPY NOT AVAILABLE",
+                        },
+                      ]}
+                      value={reportFormData.bill_of_landing}
+                      onChange={(value) =>
+                        handleSelectChange("bill_of_landing", value)
+                      }
                     />
                   </div>
                 </div>
@@ -4137,10 +4419,9 @@ function MachineryReport() {
                     />
                   </div>
                 </div> */}
-              </div>
 
-              <div className="row">
-                {/* <div className="col-md-3">
+              {/* <div className="row">
+                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="permit_upto">Permit Upto</label>
                     <input
@@ -4211,11 +4492,10 @@ function MachineryReport() {
                       placeholder="New India Assurance"
                     />
                   </div>
-                </div> */}
-              </div>
+                </div> 
+              </div>*/}
 
-              <div className="row">
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="policy_no">Policy No</label>
                     <input
@@ -4229,7 +4509,7 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="insurance_valid_date">
                       Insurance Val. Date
@@ -4246,7 +4526,7 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="insured_value">Insured Value</label>
                     <input
@@ -4260,7 +4540,7 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="insurance_verified">
                       Insurance Verified
@@ -4282,13 +4562,96 @@ function MachineryReport() {
                 </div>
               </div>
 
-              {/* Over All Feed Back Of The Inspected Section */}
+              {canViewSubCategoryOrders && (
+                <div className="row">
+                  <div className="col-12 mb-3">
+                    <h4>Sub Category Orders</h4>
+                    <hr />
+                    <div className="show-x-entries mb-2">
+                      Show &nbsp;
+                      <select
+                        value={entriesToShow}
+                        onChange={(e) => setEntriesToShow(Number(e.target.value))}
+                        className="count-of-page-selector"
+                      >
+                        {[5, 10, 25, 50, 100].map((size) => (
+                          <option key={size} value={size}>
+                            {size}
+                          </option>
+                        ))}
+                      </select>{" "}
+                      &nbsp; Entries of {finalizedReportRows.length} entries
+                    </div>
+                    <div className="table-responsive">
+                      <table className="table table-bordered table-striped">
+                        <thead
+                          style={{
+                            backgroundColor: "rgba(88, 100, 189, 0.7)",
+                            color: "#fff",
+                          }}
+                        >
+                          <tr>
+                            <th style={{ color: "#fff" }}>Order Number</th>
+                            <th style={{ color: "#fff" }}>Asset Make</th>
+                            <th style={{ color: "#fff" }}>Manufacture Year</th>
+                            <th style={{ color: "#fff" }}>Current Invoice Cost</th>
+                            <th style={{ color: "#fff" }}>Depreciation</th>
+                            <th style={{ color: "#fff" }}>Depreciation Value</th>
+                            <th style={{ color: "#fff" }}>Appraiser Value</th>
+                            <th style={{ color: "#fff" }}>Fair Market Value</th>
+                            <th style={{ color: "#fff" }}>View</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {finalizedReportsLoading ? (
+                            <tr>
+                              <td colSpan={9} className="text-center">
+                                Loading finalized reports...
+                              </td>
+                            </tr>
+                          ) : finalizedReportRows.length === 0 ? (
+                            <tr>
+                              <td colSpan={9} className="text-center">
+                                No finalized reports found
+                              </td>
+                            </tr>
+                          ) : (
+                            visibleFinalizedRows.map((row) => (
+                              <tr key={row.id}>
+                                <td>{row.order_number}</td>
+                                <td>{row.asset_make}</td>
+                                <td>{row.manufacture_year}</td>
+                                <td>{row.current_invoice_cost}</td>
+                                <td>{row.depreciation}%</td>
+                                <td>{row.depreciation_value}</td>
+                                <td>{row.appraiser_value}</td>
+                                <td>{row.fair_market_value}</td>
+                                <td>
+                                  <Link
+                                    to={`/orders/${row.id}/details`}
+                                    className=""
+                                    title="View"
+                                  >
+                                    <ViewIcon size={16} color="#fff" />
+                                  </Link>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="row">
                 <div className="col-12">
                   <h4>OVER ALL FEED BACK OF THE INSPECTED</h4>
                   <hr />
                 </div>
-                <div className="col-12">
+
+              <div className="col-12">
                   <div className="form-group">
                     <label htmlFor="overall_feedback_heading">
                       Overall Feedback Heading
@@ -4521,14 +4884,52 @@ function MachineryReport() {
                     <label htmlFor="declaration">
                       Declaration <span class="text-danger">*</span>
                     </label>
-                    <WysiwygTextarea
-                      className="form-field"
-                      id="declaration"
-                      name="declaration"
+                    <p className="mb-0">
+                      The aforesaid{" "}
+                      {order?.category_name || ""}
+                      {order?.sub_category_name
+                        ? ` / ${order.sub_category_name}`
+                        : ""}{" "}
+                      inspected by us & found in{" "}
+                    </p>
+                    <SingleSearchSelect
+                      options={[
+                        {
+                          value: "ROAD WORTHY CONDITION",
+                          label: "ROAD WORTHY CONDITION",
+                        },
+                        {
+                          value: "ACCIDENTAL CONDITION",
+                          label: "ACCIDENTAL CONDITION",
+                        },
+                        { value: "NOT WORKING", label: "NOT WORKING" },
+                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        {
+                          value: "STACKED CONDITION",
+                          label: "STACKED CONDITION",
+                        },
+                        { value: "KNOCK DOWN", label: "KNOCK DOWN" },
+                        { value: "PARKING YARD", label: "PARKING YARD" },
+                        { value: "Dismantled Condition", label: "Dismantled Condition" },
+                        { value: "Normal Working Condition", label: "Normal Working Condition" },
+                        { value: "Total Operational & Functional Condition", label: "Total Operational & Functional Condition" },
+                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
+                        { value: "WORKABLE CONDITION", label: "WORKABLE CONDITION" },
+                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
+                      ]}
                       value={reportFormData.declaration}
-                      onChange={handleFormChange}
-                      rows={2}
+                      onChange={(value) =>
+                        handleSelectChange("declaration", value)
+                      }
+                      required
                     />
+                    <p className="mb-0">
+                      on the date of my inspection. This Report issued for{" "}
+                      {reportFormData.valuation_purpose || ""} of{" "}
+                      {order?.bank_name || ""}, {order?.branch_name || ""},{" "}
+                      {reportFormData.state_name || ""} Only.
+                    </p>
                   </div>
                 </div>
                 <div className="col-md-12">
@@ -4549,9 +4950,47 @@ function MachineryReport() {
                 </div>
               </div>
 
-
-
               {/* Generate Report Buttons - Rough and Production */}
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group">
+                    <label htmlFor="chassis_no_pencil_impression">
+                      Chassis No Pencil Impression (Image)
+                    </label>
+                    <input
+                      type="file"
+                      className="form-field"
+                      id="chassis_no_pencil_impression"
+                      name="chassis_no_pencil_impression"
+                      onChange={handleFileChange}
+                      accept="image/*"
+                    />
+                    {chassisPreviewUrl && (
+                      <div
+                        style={{
+                          marginTop: "12px",
+                          maxWidth: "320px",
+                          border: "1px solid #e5e7eb",
+                          borderRadius: "6px",
+                          padding: "8px",
+                          backgroundColor: "#f9fafb",
+                        }}
+                      >
+                        <img
+                          src={chassisPreviewUrl}
+                          alt="Chassis impression preview"
+                          style={{
+                            width: "100%",
+                            height: "auto",
+                            display: "block",
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="row">
                 <div className="col-12">
                   <div className="form-buttons" style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: "12px" }}>

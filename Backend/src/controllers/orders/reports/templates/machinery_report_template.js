@@ -484,12 +484,22 @@ body.single-page{
             <td>LOCATION OF MACHINERY:</td>
             <td colspan="5">${renderFieldValue(formData.location_of_machinery)}</td>
         </tr>
+        ${formData.supplier_names ? `
+        <tr>
+            <td>OWNER SERIAL NO:</td>
+            <td>${formData.owner_serial_no}</td>
+            <td>MANUFACTURE YEAR:</td>
+            <td>${formData.manufacture_year}</td>
+            <td>SUPPLIER NAME:</td>
+            <td>${formData.supplier_names}</td>
+        </tr>
+        ` : `
         <tr>
             <td>OWNER SERIAL NO:</td>
             <td colspan="2">${formData.owner_serial_no}</td>
             <td>MANUFACTURE YEAR:</td>
             <td colspan="2">${formData.manufacture_year}</td>
-        </tr>
+        </tr>`}
         <tr>
             <td>ASSET MAKE & SUPPLIER:</td>
             <td colspan="2">${formData.asset_make}</td>
@@ -664,9 +674,11 @@ body.single-page{
         </tr>
         <tr>
             <td>${formData.tax_invoice_copy_heading || "INVOICE COPY:"}:</td>
-            <td colspan="2">${formData.tax_invoice_copy ? formData.tax_invoice_copy : "NOT AVAILABLE"}</td>
+            <td>${formData.tax_invoice_copy ? formData.tax_invoice_copy : "NOT AVAILABLE"}</td>
+            <td>QUOTATION COPY:</td>
+            <td>${formData.quotation_copy ? formData.quotation_copy : "NOT AVAILABLE"}</td>
             <td>BILL OF ENTRY:</td>
-            <td colspan="2">${formData.bill_of_entry ? formData.bill_of_entry : "NOT AVAILABLE"}</td>
+            <td>${formData.bill_of_entry ? formData.bill_of_entry : "NOT AVAILABLE"}</td>
             <!-- <td>${formData.tax_upto_title
             ? formData.tax_upto_title
             : "NOT AVAILABLE"
@@ -713,10 +725,12 @@ body.single-page{
             : "NOT AVAILABLE"
         }
             </td> -->
+            <td>BILL OF LANDING:</td>
+            <td>${formData.bill_of_landing ? formData.bill_of_landing : "NOT AVAILABLE"}</td>
             <td>INSURANCE COPY:</td>
-            <td colspan="2">${formData.rc_book_verified ? formData.rc_book_verified : "NOT AVAILABLE"}</td>
+            <td>${formData.rc_book_verified ? formData.rc_book_verified : "NOT AVAILABLE"}</td>
             <td>POLICY NO:</td>
-            <td colspan="2">
+            <td>
                 ${formData.policy_no ? formData.policy_no : "NOT AVAILABLE"}
             </td>
         </tr>
@@ -784,13 +798,24 @@ body.single-page{
         )}
         <tr>
             <td>DECLARATION:</td>
-            <td colspan="5" style="text-align: left;">
-                ${renderFieldValue(formData.declaration)}
+            <td colspan="5" style="text-transform: none;text-align: left;">
+                The aforesaid ${extraData.cat} / ${extraData.subCat
+        } inspected by us & found in ${formData.declaration
+        } on the date of my inspection.This Report issued for ${formData.valuation_purpose
+        } ${formData.valuation_purpose == "REPO PURPOSE" ? "(REPO)" : ""} of ${extraData.bank_name}, ${extraData.branch_name}, ${extraData.state_name
+        } Only.
             </td>
         </tr>
         <tr>
             <td>DISCLAIMER:</td>
             <td colspan="5" style="text-align: left;">${renderFieldValue(formData.disclaimer)}</td>
+        </tr>
+        <tr class="tyre-image-row">
+            <td colspan="6" style="height: 58px; position: relative;">
+                ${formData.tyre_image_base64
+                  ? `<img src="${formData.tyre_image_base64}" style="height: 70px; position: relative; z-index:1;" alt="">`
+                  : ""}
+            </td>
         </tr>
         <tr class="signature-row">
             <td colspan="6" style="height: 48px; position: relative;">

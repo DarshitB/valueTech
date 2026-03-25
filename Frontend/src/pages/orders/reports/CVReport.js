@@ -168,6 +168,10 @@ function CVReport() {
   );
   const allowedPermissions = useSelector(selectPermissions);
   const canEditRefNoId = hasPermission(allowedPermissions, "edit_report_ref_no_id");
+  const canViewSubCategoryOrders = hasPermission(
+    allowedPermissions,
+    "view_finalized_sub_category_orders"
+  );
   const [showOtherAssetMake, setShowOtherAssetMake] = useState(false);
   const [otherAssetMake, setOtherAssetMake] = useState("");
   // Set page title using custom hook
@@ -830,6 +834,12 @@ function CVReport() {
 
   // Fetch finalized orders for current child category and load their CV report summary rows
   useEffect(() => {
+    if (!canViewSubCategoryOrders) {
+      setFinalizedReportRows([]);
+      setFinalizedReportsLoading(false);
+      return;
+    }
+
     const childCategoryId = order?.child_category_id;
     if (!childCategoryId) {
       setFinalizedReportRows([]);
@@ -900,7 +910,7 @@ function CVReport() {
     };
 
     fetchFinalizedRows();
-  }, [order?.child_category_id]);
+  }, [order?.child_category_id, canViewSubCategoryOrders]);
 
   // Track when the initial report fetch completes
   // We need to ensure: (1) fetch has started (reportLoading = true), (2) fetch has completed (reportLoading = false)
@@ -4617,7 +4627,8 @@ function CVReport() {
 
               {/* Over All Feed Back Of The Inspected Section */}
               <div className="row">
-                <div className="col-12 mb-3">
+                {canViewSubCategoryOrders && (
+                  <div className="col-12 mb-3">
                   <h4>Sub Category Orders</h4>
                   <hr />
                   <div className="show-x-entries mb-2">
@@ -4639,7 +4650,7 @@ function CVReport() {
                     <table className="table table-bordered table-striped">
                       <thead
                         style={{
-                          backgroundColor: "rgba(88, 100, 189, 0.5)",
+                          backgroundColor: "rgba(88, 100, 189, 0.7)",
                           color: "#fff",
                         }}
                       >
@@ -4694,7 +4705,8 @@ function CVReport() {
                       </tbody>
                     </table>
                   </div>
-                </div>
+                  </div>
+                )}
 
                 <div className="col-12">
                   <h4>OVER ALL FEED BACK OF THE INSPECTED</h4>
@@ -4961,6 +4973,10 @@ function CVReport() {
                         },
                         { value: "KNOCK DOWN", label: "KNOCK DOWN" },
                         { value: "PARKING YARD", label: "PARKING YARD" },
+                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
+                        { value: "WORKABLE CONDITION", label: "WORKABLE CONDITION" },
+                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.declaration}
                       onChange={(value) =>

@@ -516,7 +516,7 @@ body.single-page{
                 <td colspan="2">${formData.year_of_mfg || ""}</td>
             </tr>
             <tr>
-                <th style="width: 10%;">Invoice No./Purchase Order No.</th>
+                <th style="width: 10%;">Invoice No./Purchase Order No./Quotation No.</th>
                 <td colspan="2">${
                   formData.invoice_purchase_order_no || "NOT AVAILABLE"
                 }</td>
@@ -561,7 +561,7 @@ body.single-page{
             </tr>
             <tr>
                 <th style="width: 10%;">Colour</th>
-                <td colspan="2">${formData.colour || ""}</td>
+                <td colspan="2">${formData.colour || "NOT AVAILABLE"}</td>
             </tr>
             <tr>
                 <th colspan="3">&nbsp;</th>

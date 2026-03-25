@@ -24,7 +24,9 @@ import axios from "axios";
 import { selectPermissions } from "../../../redux/selectors/authSelectors";
 import { hasPermission } from "../../../utils/permissionUtils";
 import "../order.scss";
-import { DeleteIcon } from "../../../components/icons";
+import { DeleteIcon, ViewIcon } from "../../../components/icons";
+import { getFinalizedOrdersByChildCategory } from "../../../api/order.api";
+import { getOrderReport } from "../../../api/orderReport.api";
 
 // WYSIWYG Textarea Component - preserves HTML formatting
 const WysiwygTextarea = ({
@@ -197,9 +199,22 @@ function CEReport() {
   const { setTitle } = usePageTitle();
   const allowedPermissions = useSelector(selectPermissions);
   const canEditRefNoId = hasPermission(allowedPermissions, "edit_report_ref_no_id");
+  const canViewSubCategoryOrders = hasPermission(
+    allowedPermissions,
+    "view_finalized_sub_category_orders"
+  );
 
   // State for report type selection (Rough/Production)
   const [reportTypeSelection, setReportTypeSelection] = useState("Rough");
+
+  // Fetch finalized orders for current child category (table summary at bottom)
+  const [finalizedReportRows, setFinalizedReportRows] = useState([]);
+  const [finalizedReportsLoading, setFinalizedReportsLoading] = useState(false);
+  const [entriesToShow, setEntriesToShow] = useState(5);
+  const visibleFinalizedRows = useMemo(
+    () => finalizedReportRows.slice(0, entriesToShow),
+    [finalizedReportRows, entriesToShow]
+  );
 
   // Clear report data when component mounts or order changes
   useEffect(() => {
@@ -234,6 +249,85 @@ function CEReport() {
       dispatch(fetchAssetMakesForReports("report_ce"));
     }
   }, [dispatch, id]);
+
+  // Fetch finalized orders for current child category and load their CE report summary rows
+  useEffect(() => {
+    if (!canViewSubCategoryOrders) {
+      setFinalizedReportRows([]);
+      setFinalizedReportsLoading(false);
+      return;
+    }
+
+    const childCategoryId = order?.child_category_id;
+    if (!childCategoryId) {
+      setFinalizedReportRows([]);
+      return;
+    }
+
+    const fetchFinalizedRows = async () => {
+      try {
+        setFinalizedReportsLoading(true);
+
+        const finalizedRes = await getFinalizedOrdersByChildCategory(childCategoryId);
+        const finalizedOrders = (finalizedRes?.data?.data?.orders || []).filter(
+          (orderItem) =>
+            String(orderItem?.id) !== String(id) &&
+            String(orderItem?.order_number || "").trim() !==
+              String(order?.order_number || "").trim()
+        );
+
+        if (!Array.isArray(finalizedOrders) || finalizedOrders.length === 0) {
+          setFinalizedReportRows([]);
+          return;
+        }
+
+        const rows = await Promise.all(
+          finalizedOrders.map(async (orderItem) => {
+            try {
+              const reportRes = await getOrderReport(orderItem.id, "report_ce");
+              const report = reportRes?.data?.data?.report || {};
+
+              return {
+                id: orderItem.id,
+                order_number: orderItem.order_number || "-",
+                asset_make:
+                  report.asset_make_name ||
+                  report.new_asset_make ||
+                  report.asset_make ||
+                  "-",
+                manufacture_year: report.manufacture_year || "-",
+                current_invoice_cost: report.invoice_cost || "-",
+                depreciation: report.depreciation || "-",
+                depreciation_value: report.depreciation_value || "-",
+                appraiser_value: report.appraiser_value || "-",
+                fair_market_value: report.fair_market_value || "-",
+              };
+            } catch (_) {
+              return {
+                id: orderItem.id,
+                order_number: orderItem.order_number || "-",
+                asset_make: "-",
+                manufacture_year: "-",
+                current_invoice_cost: "-",
+                depreciation: "-",
+                depreciation_value: "-",
+                appraiser_value: "-",
+                fair_market_value: "-",
+              };
+            }
+          })
+        );
+
+        setFinalizedReportRows(rows);
+      } catch (_) {
+        setFinalizedReportRows([]);
+      } finally {
+        setFinalizedReportsLoading(false);
+      }
+    };
+
+    fetchFinalizedRows();
+  }, [order?.child_category_id, order?.order_number, id, canViewSubCategoryOrders]);
 
   // Reset form data when component mounts or order ID changes
   useEffect(() => {
@@ -348,6 +442,7 @@ function CEReport() {
       fix_but_flex_value_2: "",
       fix_but_flex_heading_3: "",
       fix_but_flex_value_3: "",
+      supplier_names: "",
 
       fix_but_flex_title_1: "",
       fix_but_flex_title_2: "",
@@ -721,6 +816,7 @@ function CEReport() {
     fix_but_flex_value_2: "",
     fix_but_flex_heading_3: "",
     fix_but_flex_value_3: "",
+    supplier_names: "",
 
     fix_but_flex_title_1: "",
     fix_but_flex_title_2: "",
@@ -4172,7 +4268,7 @@ function CEReport() {
                 </div>
               </div>
               <div className="row">
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="owner_serial_no">
                       Owner Serial No <span class="text-danger">*</span>
@@ -4198,7 +4294,7 @@ function CEReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="manufacture_year">
                       Manufacture Year <span class="text-danger">*</span>
@@ -4214,7 +4310,22 @@ function CEReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
+                  <div className="form-group">
+                    <label htmlFor="supplier_names">
+                      Supplier Name
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="supplier_names"
+                      name="supplier_names"
+                      value={reportFormData.supplier_names}
+                      onChange={handleFormChange}
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="asset_make">
                       Asset Make <span class="text-danger">*</span>
@@ -4259,7 +4370,7 @@ function CEReport() {
                     </div>
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="model">
                       Model <span class="text-danger">*</span>
@@ -4276,9 +4387,7 @@ function CEReport() {
                     />
                   </div>
                 </div>
-              </div>
-              <div className="row">
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="engine_no_detail">
                       Engine No./ Detail <span class="text-danger">*</span>
@@ -4324,7 +4433,7 @@ function CEReport() {
                     </div>
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="crane_chassis_no">
                       Crane Chassis No <span class="text-danger">*</span>
@@ -4374,7 +4483,7 @@ function CEReport() {
                     </div>
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="body_type">
                       Body Type <span class="text-danger">*</span>
@@ -4390,7 +4499,7 @@ function CEReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="crane_model_code">
                       Fuel Type <span class="text-danger">*</span>
@@ -5676,12 +5785,12 @@ function CEReport() {
                         <SingleSearchSelect
                           options={[
                             {
-                              value: "Proforma Invoice Verified",
-                              label: "Proforma Invoice Verified",
+                              value: "Proforma Invoice",
+                              label: "Proforma Invoice",
                             },
                             {
-                              value: "Tax Invoice Copy",
-                              label: "Tax Invoice Copy",
+                              value: "Tax Invoice",
+                              label: "Tax Invoice",
                             },
                           ]}
                           value={
@@ -5735,14 +5844,27 @@ function CEReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="bill_of_lading">Bill Of Lading</label>
-                    <input
+                    <SingleSearchSelect
+                      options={[
+                        { value: "COPY VERIFIED", label: "COPY VERIFIED" },
+                        {
+                          value: "COPY NOT AVAILABLE",
+                          label: "COPY NOT AVAILABLE",
+                        },
+                      ]}
+                      value={reportFormData.bill_of_lading}
+                      onChange={(value) =>
+                        handleSelectChange("bill_of_lading", value)
+                      }
+                    />
+                    {/* <input
                       type="text"
                       className="form-field"
                       id="bill_of_lading"
                       name="bill_of_lading"
                       value={reportFormData.bill_of_lading}
                       onChange={handleFormChange}
-                    />
+                    /> */}
                   </div>
                 </div>
               </div>
@@ -5753,7 +5875,20 @@ function CEReport() {
                     <label htmlFor="chartered_engineer_certificate">
                       Chartered Engineer Certificate
                     </label>
-                    <input
+                    <SingleSearchSelect
+                      options={[
+                        { value: "COPY VERIFIED", label: "COPY VERIFIED" },
+                        {
+                          value: "COPY NOT AVAILABLE",
+                          label: "COPY NOT AVAILABLE",
+                        },
+                      ]}
+                      value={reportFormData.chartered_engineer_certificate}
+                      onChange={(value) =>
+                        handleSelectChange("chartered_engineer_certificate", value)
+                      }
+                    />
+                    {/* <input
                       type="text"
                       className="form-field"
                       id="chartered_engineer_certificate"
@@ -5761,7 +5896,7 @@ function CEReport() {
                       value={reportFormData.chartered_engineer_certificate}
                       onChange={handleFormChange}
                       placeholder="All India"
-                    />
+                    /> */}
                   </div>
                 </div>
                 <div className="col-md-3">
@@ -5866,6 +6001,89 @@ function CEReport() {
                   </div>
                 </div>
               </div>
+
+              {canViewSubCategoryOrders && (
+                <div className="row">
+                  <div className="col-12 mb-3">
+                  <h4>Sub Category Orders</h4>
+                  <hr />
+                  <div className="show-x-entries mb-2">
+                    Show &nbsp;
+                    <select
+                      value={entriesToShow}
+                      onChange={(e) => setEntriesToShow(Number(e.target.value))}
+                      className="count-of-page-selector"
+                    >
+                      {[5, 10, 25, 50, 100].map((size) => (
+                        <option key={size} value={size}>
+                          {size}
+                        </option>
+                      ))}
+                    </select>{" "}
+                    &nbsp; Entries of {finalizedReportRows.length} entries
+                  </div>
+                  <div className="table-responsive">
+                    <table className="table table-bordered table-striped">
+                      <thead
+                        style={{
+                          backgroundColor: "rgba(88, 100, 189, 0.7)",
+                          color: "#fff",
+                        }}
+                      >
+                        <tr>
+                          <th style={{ color: "#fff" }}>Order Number</th>
+                          <th style={{ color: "#fff" }}>Asset Make</th>
+                          <th style={{ color: "#fff" }}>Manufacture Year</th>
+                          <th style={{ color: "#fff" }}>Current Invoice Cost</th>
+                          <th style={{ color: "#fff" }}>Depreciation</th>
+                          <th style={{ color: "#fff" }}>Depreciation Value</th>
+                          <th style={{ color: "#fff" }}>Appraiser Value</th>
+                          <th style={{ color: "#fff" }}>Fair Market Value</th>
+                          <th style={{ color: "#fff" }}>View</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {finalizedReportsLoading ? (
+                          <tr>
+                            <td colSpan={9} className="text-center">
+                              Loading finalized reports...
+                            </td>
+                          </tr>
+                        ) : finalizedReportRows.length === 0 ? (
+                          <tr>
+                            <td colSpan={9} className="text-center">
+                              No finalized reports found
+                            </td>
+                          </tr>
+                        ) : (
+                          visibleFinalizedRows.map((row) => (
+                            <tr key={row.id}>
+                              <td>{row.order_number}</td>
+                              <td>{row.asset_make}</td>
+                              <td>{row.manufacture_year}</td>
+                              <td>{row.current_invoice_cost}</td>
+                              <td>{row.depreciation}%</td>
+                              <td>{row.depreciation_value}</td>
+                              <td>{row.appraiser_value}</td>
+                              <td>{row.fair_market_value}</td>
+                              <td>
+                                <Link
+                                  to={`/orders/${row.id}/details`}
+                                  className=""
+                                  title="View"
+                                >
+                                  <ViewIcon size={16} color="#fff" />
+                                </Link>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  </div>
+                </div>
+              )}
 
               {/* Over All Feed Back Of The Inspected Section */}
               <div className="row">
@@ -6165,6 +6383,10 @@ function CEReport() {
                         { value: "Dismantled Condition", label: "Dismantled Condition" },
                         { value: "Normal Working Condition", label: "Normal Working Condition" },
                         { value: "Total Operational & Functional Condition", label: "Total Operational & Functional Condition" },
+                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
+                        { value: "WORKABLE CONDITION", label: "WORKABLE CONDITION" },
+                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.declaration}
                       onChange={(value) =>

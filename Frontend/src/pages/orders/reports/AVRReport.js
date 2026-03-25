@@ -163,7 +163,7 @@ function AVRReport() {
   const canEditRefNoId = hasPermission(allowedPermissions, "edit_report_ref_no_id");
   // Set page title using custom hook
   const { setTitle } = usePageTitle();
-  
+
   // State for report type selection (Rough/Production)
   const [reportTypeSelection, setReportTypeSelection] = useState("Rough");
 
@@ -718,7 +718,7 @@ function AVRReport() {
       initialFormDataRef.current = reportFormData;
       initialFlexibleFieldsRef.current = flexibleFields;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reportLoading, reportFetchCompleted]);
 
   const handleFormChange = (e) => {
@@ -1007,7 +1007,7 @@ function AVRReport() {
 
     // Create FormData for multipart/form-data submission
     const formData = new FormData();
-    
+
     // Add report type selection (Rough/Production)
     formData.append("report_type_selection", reportTypeSelection);
 
@@ -1231,7 +1231,7 @@ function AVRReport() {
       if (isDirtyRef.current) {
         // BLOCK navigation - push state back immediately to stay on current page
         originalPushState(null, "", window.location.href);
-        
+
         // Show alert to inform user
         alert("You have unsaved changes. Please save or discard changes before navigating.");
       }
@@ -1243,7 +1243,7 @@ function AVRReport() {
       window.history.pushState = originalPushState;
       window.removeEventListener("popstate", handlePopState);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, buildSavePayload, dispatch]);
 
   // Shows browser's native "Leave site?" dialog when user tries to refresh,
@@ -1937,7 +1937,7 @@ function AVRReport() {
                 </div>
                 <div className="col-md-12">
                   <div className="form-group">
-                    <label>Invoice No./Purchase Order No.</label>
+                    <label>Invoice No./Purchase Order No./Quotation No.</label>
                     <input
                       type="text"
                       className="form-field"
@@ -2117,14 +2117,16 @@ function AVRReport() {
                           label:
                             "Fully Working Condition & Very Good Functioning",
                         },
+                        { value: "Packed Condition & Very Good Functioning", label: "Packed Condition & Very Good Functioning" },
                         {
                           value: "Not Working Condition",
                           label: "Not Working Condition",
                         },
-                        {
-                          value: "Stacked condition",
-                          label: "Stacked condition",
-                        },
+                        { value: "Stacked condition", label: "Stacked condition" },
+                        { value: "Workable Condition", label: "Workable Condition" },
+                        { value: "Scrap Condition", label: "Scrap Condition" },
+                        { value: "Not Available", label: "Not Available" },
+                        { value: "Not Applicable", label: "Not Applicable" },
                       ]}
                       name="status_of_machine"
                       value={reportFormData.status_of_machine}
@@ -2294,7 +2296,7 @@ function AVRReport() {
                       onClick={() => setReportTypeSelection("Rough")}
                       style={{
                         backgroundColor: generating ? "#9ca3af" : "#f59e0b",
-                        borderColor: generating ? "#9ca3af" : "#f59e0b",  
+                        borderColor: generating ? "#9ca3af" : "#f59e0b",
                         width: "200px",
                       }}
                     >

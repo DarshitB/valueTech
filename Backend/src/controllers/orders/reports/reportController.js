@@ -519,12 +519,14 @@ exports.generateReport = async (req, res, next) => {
     // Add flexible fields back to formData for template rendering
     formData.flexible_fields = flexibleFields;
 
-    // Handle chassis impression image (for CV, CE, and AVR reports)
+    // Handle chassis impression image (for CV, CE, AVR, and Machinery reports)
     let chassisImageRelativePath = null;
     let chassisImageBase64 = null;
 
     if (
-      ["report_cv", "report_ce", "report_avr"].includes(requestedReportType.toLowerCase())
+      ["report_cv", "report_ce", "report_avr", "report_machinery"].includes(
+        requestedReportType.toLowerCase()
+      )
     ) {
       chassisImageRelativePath = resolveChassisRelativePath(
         formData.chassis_no_pencil_impression,
@@ -765,7 +767,9 @@ exports.generateReport = async (req, res, next) => {
     };
 
     if (
-      ["report_cv", "report_ce", "report_avr"].includes(requestedReportType.toLowerCase())
+      ["report_cv", "report_ce", "report_avr", "report_machinery"].includes(
+        requestedReportType.toLowerCase()
+      )
     ) {
       if (chassisImageRelativePath) {
         reportData.chassis_no_pencil_impression = chassisImageRelativePath;
@@ -2526,7 +2530,9 @@ exports.saveReportData = async (req, res, next) => {
     Object.assign(reportData, validFields);
 
     if (
-      ["report_cv", "report_ce", "report_avr"].includes(requestedReportType.toLowerCase())
+      ["report_cv", "report_ce", "report_avr", "report_machinery"].includes(
+        requestedReportType.toLowerCase()
+      )
     ) {
       if (chassisImageRelativePath) {
         reportData.chassis_no_pencil_impression = chassisImageRelativePath;
@@ -2970,6 +2976,7 @@ function filterValidReportFields(formData, reportType) {
       "location_of_machinery",
       "owner_serial_no",
       "manufacture_year",
+      "supplier_names",
       "asset_make",
       "model",
       "control_system",
@@ -3016,8 +3023,10 @@ function filterValidReportFields(formData, reportType) {
       "damages_if_any",
       "rc_book_verified",
       "bill_of_entry",
+      "bill_of_landing",
       "tax_invoice_copy_heading",
       "tax_invoice_copy",
+      "quotation_copy",
       "tax_upto_title",
       "tax_upto",
       "permit_upto",
@@ -3074,6 +3083,7 @@ function filterValidReportFields(formData, reportType) {
       "registered_location",
       "owner_serial_no",
       "manufacture_year",
+      "supplier_names",
       "asset_make",
       "model",
       "engine_no_heading",
