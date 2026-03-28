@@ -800,7 +800,7 @@ body.single-page{
             <td>DECLARATION:</td>
             <td colspan="5" style="text-transform: none;text-align: left;">
                 The aforesaid ${extraData.cat} / ${extraData.subCat
-        } inspected by us & found in ${formData.declaration
+        } ${extraData.childCat} inspected by us & found in ${formData.declaration
         } on the date of my inspection.This Report issued for ${formData.valuation_purpose
         } ${formData.valuation_purpose == "REPO PURPOSE" ? "(REPO)" : ""} of ${extraData.bank_name}, ${extraData.branch_name}, ${extraData.state_name
         } Only.

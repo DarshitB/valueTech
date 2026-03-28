@@ -3895,6 +3895,11 @@ function CVReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
+                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
+
                       ]}
                       value={reportFormData.engine_condition}
                       onChange={(value) =>
@@ -3917,6 +3922,10 @@ function CVReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
+                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.chassis_condition}
                       onChange={(value) =>
@@ -3939,6 +3948,10 @@ function CVReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
+                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.body_condition}
                       onChange={(value) =>
@@ -3961,6 +3974,10 @@ function CVReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
+                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.cabin_condition}
                       onChange={(value) =>
@@ -3984,6 +4001,10 @@ function CVReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
+                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.electrical_condition}
                       onChange={(value) =>
@@ -4006,6 +4027,10 @@ function CVReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
+                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.gear_transmission}
                       onChange={(value) =>
@@ -4237,6 +4262,10 @@ function CVReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
+                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.mechanical_unit_condition}
                       onChange={(value) =>
@@ -4350,6 +4379,10 @@ function CVReport() {
                         { value: "GOOD", label: "GOOD" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
+                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.color_condition}
                       onChange={(value) =>
@@ -4952,7 +4985,7 @@ function CVReport() {
                       {order?.category_name || ""}
                       {order?.sub_category_name
                         ? ` / ${order.sub_category_name}`
-                        : ""}{" "} inspected
+                        : ""}{" "} {order?.child_category_name || ""} inspected
                       by us & found in{" "}
                     </p>
                     <SingleSearchSelect

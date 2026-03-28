@@ -384,6 +384,7 @@ exports.create = async (req, res, next) => {
   try {
     const {
       customer_name,
+      customer_name_2,
       contact,
       alternative_contact,
       supervisor_number,
@@ -516,6 +517,7 @@ exports.create = async (req, res, next) => {
       const orderData = {
         order_number: uniqueOrderNumber,
         customer_name,
+        customer_name_2: customer_name_2 || null,
         contact,
         alternative_contact: alternative_contact || null,
         supervisor_number: supervisor_number || null,
@@ -602,6 +604,7 @@ exports.update = async (req, res, next) => {
     const orderId = req.params.id;
     const {
       customer_name,
+      customer_name_2,
       contact,
       alternative_contact,
       supervisor_number,
@@ -737,6 +740,7 @@ exports.update = async (req, res, next) => {
     // Update order - only update fields that are provided
     const updateData = {
       customer_name,
+      customer_name_2: customer_name_2 || null,
       contact,
       alternative_contact:
         alternative_contact !== undefined
@@ -823,6 +827,7 @@ exports.update = async (req, res, next) => {
     // Check for field changes and build detailed change descriptions
     const fieldsToCheck = [
       "customer_name",
+      "customer_name_2",
       "contact",
       "alternative_contact",
       "supervisor_number",
@@ -866,6 +871,7 @@ exports.update = async (req, res, next) => {
           const formatFieldName = (fieldName) => {
             const fieldMap = {
               customer_name: "CUSTOMER NAME",
+              customer_name_2: "CONTACT PERSON NAME",
               contact: "CONTACT",
               alternative_contact: "ALTERNATIVE CONTACT",
               supervisor_number: "SUPERVISOR NUMBER",

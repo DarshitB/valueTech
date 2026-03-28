@@ -2124,6 +2124,7 @@ function AVRReport() {
                         },
                         { value: "Stacked condition", label: "Stacked condition" },
                         { value: "Workable Condition", label: "Workable Condition" },
+                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
                         { value: "Scrap Condition", label: "Scrap Condition" },
                         { value: "Not Available", label: "Not Available" },
                         { value: "Not Applicable", label: "Not Applicable" },

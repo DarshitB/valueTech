@@ -485,7 +485,8 @@ function OrderDetails() {
         const roleUpper = roleName.toUpperCase();
         return (
           roleUpper.includes("BANK OFFICER") ||
-          roleUpper.includes("BANK AUTHORITY")
+          roleUpper.includes("BANK AUTHORITY") ||
+          roleUpper.includes("CREDIT HEAD")
         );
       })
       .filter((officer) => {

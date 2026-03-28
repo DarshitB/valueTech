@@ -19,6 +19,12 @@
         animation: bellPulse 2s infinite;
         color: yellow;
       }
+
+      // Bird (comment) icon is smaller than the bell
+      &.bird-icon {
+        width: 24px !important;
+        height: 24px !important;
+      }
     }
 
     .notification-badge {

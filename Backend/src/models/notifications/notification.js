@@ -192,23 +192,11 @@ const notification = {
         }
       }
 
-      // STEP 3: Get unique notification IDs (only the oldest one for each activity_id or comment_id)
-      // Group by both activity_id and comment_id to handle both types of notifications
-      const uniqueIdsQuery = db("notifications")
-        .select(db.raw("MIN(notifications.id) as id"))
-        .whereIn("notifications.id", baseNotificationQuery)
-        .groupBy(db.raw("COALESCE(notifications.activity_id, 0), COALESCE(notifications.comment_id, 0)"));
-
-      const uniqueIdsResult = await uniqueIdsQuery;
-      const uniqueIds = uniqueIdsResult.map(row => row.id);
-
-      if (uniqueIds.length === 0) {
-        return [];
-      }
-
-      // STEP 2: Get full notification data for these unique IDs
+      // STEP 2: Fetch full notification data. Each notification event has exactly one row in
+      // the notifications table. Per-user read state is tracked in user_notification_reads —
+      // so we never need to collapse duplicates here any more.
       let query = db("notifications")
-        .whereIn("notifications.id", uniqueIds)
+        .whereIn("notifications.id", baseNotificationQuery)
         .leftJoin("orders", "notifications.order_id", "orders.id")
         .leftJoin("order_status_history", "notifications.activity_id", "order_status_history.id")
         .leftJoin("order_status_master", "order_status_history.status_id", "order_status_master.id")
@@ -234,8 +222,15 @@ const notification = {
           "notifications.notification_type",
           "notifications.title",
           "notifications.description",
-          "notifications.is_read",
-          "notifications.read_at",
+          // Per-user read state: true if this user has a row in user_notification_reads
+          db.raw(
+            "EXISTS(SELECT 1 FROM user_notification_reads WHERE notification_id = notifications.id AND user_id = ?) as is_read",
+            [userId]
+          ),
+          db.raw(
+            "(SELECT read_at FROM user_notification_reads WHERE notification_id = notifications.id AND user_id = ? LIMIT 1) as read_at",
+            [userId]
+          ),
           "notifications.created_at",
           "order_status_history.status_id",
           "order_status_master.name as status_name",
@@ -289,13 +284,20 @@ const notification = {
       roleName.includes(keyword)
     );
 
-    // Build query with order permission filters
+    // Build query with order permission filters.
+    // A notification is "unread for this user" when there is no matching row in
+    // user_notification_reads — we never touch the legacy notifications.is_read column.
     let query = db("notifications")
       .leftJoin("orders", "notifications.order_id", "orders.id")
       .leftJoin("order_status_history", "notifications.activity_id", "order_status_history.id")
       .leftJoin("order_comments", "notifications.comment_id", "order_comments.id")
       .leftJoin("officers", "orders.officer_id", "officers.id")
-      .where("notifications.is_read", false)
+      .whereNotExists(function () {
+        this.select("id")
+          .from("user_notification_reads")
+          .whereRaw("notification_id = notifications.id")
+          .where("user_id", userId);
+      })
       .whereNull("orders.deleted_at");
 
     // Apply order permission filters (same as getAllNotificationsWithFilter)
@@ -414,14 +416,20 @@ const notification = {
         accessibleOrderIds = [...userAssignedOrderIds, ...unassignedOrderIds];
       }
 
-      // STEP 1: Get unique notification IDs
+      // STEP 1: Build the base query for notifications this user can see and has NOT yet read.
+      // "Unread for this user" = no row in user_notification_reads for (notification_id, user_id).
       let baseNotificationQuery = db("notifications")
         .select("notifications.id")
         .leftJoin("orders", "notifications.order_id", "orders.id")
         .leftJoin("order_status_history", "notifications.activity_id", "order_status_history.id")
         .leftJoin("order_comments", "notifications.comment_id", "order_comments.id")
         .leftJoin("officers", "orders.officer_id", "officers.id")
-        .where("notifications.is_read", false)
+        .whereNotExists(function () {
+          this.select("id")
+            .from("user_notification_reads")
+            .whereRaw("notification_id = notifications.id")
+            .where("user_id", userId);
+        })
         .whereNull("orders.deleted_at");
 
       // Apply order permission filters
@@ -459,21 +467,10 @@ const notification = {
         });
       }
 
-      const uniqueIdsQuery = db("notifications")
-        .select(db.raw("MIN(notifications.id) as id"))
-        .whereIn("notifications.id", baseNotificationQuery)
-        .groupBy(db.raw("COALESCE(notifications.activity_id, 0), COALESCE(notifications.comment_id, 0)"));
-
-      const uniqueIdsResult = await uniqueIdsQuery;
-      const uniqueIds = uniqueIdsResult.map(row => row.id);
-
-      if (uniqueIds.length === 0) {
-        return [];
-      }
-
-      // STEP 2: Get full notification data for these unique IDs
+      // STEP 2: Fetch full notification data for all unread (per-user) notifications.
+      // No MIN(id) grouping needed — each event has exactly one notification row.
       let query = db("notifications")
-        .whereIn("notifications.id", uniqueIds)
+        .whereIn("notifications.id", baseNotificationQuery)
         .leftJoin("orders", "notifications.order_id", "orders.id")
         .leftJoin("order_status_history", "notifications.activity_id", "order_status_history.id")
         .leftJoin("order_status_master", "order_status_history.status_id", "order_status_master.id")
@@ -499,8 +496,15 @@ const notification = {
           "notifications.notification_type",
           "notifications.title",
           "notifications.description",
-          "notifications.is_read",
-          "notifications.read_at",
+          // Per-user read state: true if this user has a row in user_notification_reads
+          db.raw(
+            "EXISTS(SELECT 1 FROM user_notification_reads WHERE notification_id = notifications.id AND user_id = ?) as is_read",
+            [userId]
+          ),
+          db.raw(
+            "(SELECT read_at FROM user_notification_reads WHERE notification_id = notifications.id AND user_id = ? LIMIT 1) as read_at",
+            [userId]
+          ),
           "notifications.created_at",
           "order_status_history.status_id",
           "order_status_master.name as status_name",
@@ -627,21 +631,10 @@ const notification = {
       });
     }
 
-    const uniqueIdsQuery = db("notifications")
-      .select(db.raw("MIN(notifications.id) as id"))
-      .whereIn("notifications.id", baseNotificationQuery)
-      .groupBy(db.raw("COALESCE(notifications.activity_id, 0), COALESCE(notifications.comment_id, 0)"));
-
-    const uniqueIdsResult = await uniqueIdsQuery;
-    const uniqueIds = uniqueIdsResult.map(row => row.id);
-
-    if (uniqueIds.length === 0) {
-      return [];
-    }
-
-    // STEP 2: Get full notification data for these unique IDs
+    // STEP 2: Fetch full notification data (read + unread).
+    // Per-user read state comes from user_notification_reads — not the legacy is_read column.
     let query = db("notifications")
-      .whereIn("notifications.id", uniqueIds)
+      .whereIn("notifications.id", baseNotificationQuery)
       .leftJoin("orders", "notifications.order_id", "orders.id")
       .leftJoin("order_status_history", "notifications.activity_id", "order_status_history.id")
       .leftJoin("order_status_master", "order_status_history.status_id", "order_status_master.id")
@@ -662,34 +655,41 @@ const notification = {
         "notification_user.name as user_name",
         "notifications.order_id",
         "orders.order_number",
-          "notifications.activity_id",
-          "notifications.comment_id",
-          "notifications.notification_type",
-          "notifications.title",
-          "notifications.description",
-          "notifications.is_read",
-          "notifications.read_at",
-          "notifications.created_at",
-          "order_status_history.status_id",
-          "order_status_master.name as status_name",
-          "order_status_history.activity_extra",
-          "order_status_history.changed_by",
-          "order_status_history.user_type",
-          db.raw(`
-            COALESCE(
-              CASE 
-                WHEN order_status_history.user_type = 'field_verifier' THEN field_verifiers.name 
-                ELSE changed_by_user.name 
-              END,
-              'System'
-            ) as changed_by_name
-          `),
-          "order_status_history.changed_at",
-          "order_comments.comment as comment_text",
-          "order_comments.user_id as comment_user_id",
-          "comment_user.name as comment_user_name",
-          "order_comments.commented_at"
-        )
+        "notifications.activity_id",
+        "notifications.comment_id",
+        "notifications.notification_type",
+        "notifications.title",
+        "notifications.description",
+        // Per-user read state: true if this user has a row in user_notification_reads
+        db.raw(
+          "EXISTS(SELECT 1 FROM user_notification_reads WHERE notification_id = notifications.id AND user_id = ?) as is_read",
+          [userId]
+        ),
+        db.raw(
+          "(SELECT read_at FROM user_notification_reads WHERE notification_id = notifications.id AND user_id = ? LIMIT 1) as read_at",
+          [userId]
+        ),
+        "notifications.created_at",
+        "order_status_history.status_id",
+        "order_status_master.name as status_name",
+        "order_status_history.activity_extra",
+        "order_status_history.changed_by",
+        "order_status_history.user_type",
+        db.raw(`
+          COALESCE(
+            CASE 
+              WHEN order_status_history.user_type = 'field_verifier' THEN field_verifiers.name 
+              ELSE changed_by_user.name 
+            END,
+            'System'
+          ) as changed_by_name
+        `),
+        "order_status_history.changed_at",
+        "order_comments.comment as comment_text",
+        "order_comments.user_id as comment_user_id",
+        "comment_user.name as comment_user_name",
+        "order_comments.commented_at"
+      )
       .orderBy("notifications.created_at", "desc")
       .limit(limit)
       .offset(offset);
@@ -772,16 +772,19 @@ const notification = {
       return null; // User doesn't have access to this order
     }
 
-    // User has access, mark as read
-    const [updated] = await db("notifications")
-      .where("id", notificationId)
-      .update({
-        is_read: true,
+    // Insert a per-user read record so only THIS user's notification is marked read.
+    // ON CONFLICT DO NOTHING makes this idempotent — safe to call multiple times.
+    await db("user_notification_reads")
+      .insert({
+        notification_id: notificationId,
+        user_id: userId,
         read_at: new Date()
       })
-      .returning("*");
+      .onConflict(["notification_id", "user_id"])
+      .ignore();
 
-    return updated;
+    // Return a truthy object so the controller knows it succeeded
+    return { id: notificationId, user_id: userId, is_read: true };
   },
 
   // Mark all notifications as read for a user
@@ -803,13 +806,19 @@ const notification = {
       roleName.includes(keyword)
     );
 
-    // Build query with order permission filters
+    // Build query to find all notifications this user can see and has NOT yet read.
+    // "Unread for this user" = no row in user_notification_reads for (notification_id, user_id).
     let query = db("notifications")
       .leftJoin("orders", "notifications.order_id", "orders.id")
       .leftJoin("order_status_history", "notifications.activity_id", "order_status_history.id")
       .leftJoin("order_comments", "notifications.comment_id", "order_comments.id")
       .leftJoin("officers", "orders.officer_id", "officers.id")
-      .where("notifications.is_read", false)
+      .whereNotExists(function () {
+        this.select("id")
+          .from("user_notification_reads")
+          .whereRaw("notification_id = notifications.id")
+          .where("user_id", userId);
+      })
       .whereNull("orders.deleted_at");
 
     // Apply order permission filters (same as getAllNotificationsWithFilter)
@@ -879,16 +888,21 @@ const notification = {
       return 0;
     }
 
-    // Update all matching notifications
-    const updatedCount = await db("notifications")
-      .whereIn("id", ids)
-      .where("is_read", false)
-      .update({
-        is_read: true,
-        read_at: new Date()
-      });
+    // Bulk-insert per-user read records — one row per notification for THIS user only.
+    // ON CONFLICT DO NOTHING keeps this idempotent if any were already marked read.
+    const readAt = new Date();
+    const inserts = ids.map((id) => ({
+      notification_id: id,
+      user_id: userId,
+      read_at: readAt,
+    }));
 
-    return updatedCount;
+    await db("user_notification_reads")
+      .insert(inserts)
+      .onConflict(["notification_id", "user_id"])
+      .ignore();
+
+    return ids.length;
   },
 
   // Create a notification

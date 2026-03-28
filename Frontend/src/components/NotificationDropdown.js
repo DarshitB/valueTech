@@ -65,6 +65,13 @@ function NotificationDropdown() {
   const allowedPermissions = useSelector(selectPermissions);
   const currentUser = useSelector(selectUser);
   
+  // Bell shows only non-comment notifications (status changes, etc.)
+  // Comment notifications are shown in the separate CommentNotificationDropdown
+  const displayNotifications = useMemo(
+    () => notifications.filter((n) => n.notification_type !== "comment"),
+    [notifications]
+  );
+
   const [isOpen, setIsOpen] = useState(false);
   const [hasNewNotifications, setHasNewNotifications] = useState(false);
   const [readNotificationIds, setReadNotificationIds] = useState(new Set());
@@ -154,46 +161,34 @@ function NotificationDropdown() {
     };
   }, [currentUser?.id, allowedPermissions, fetchNotificationsData]);
 
-  // Check for new notifications (compare with last check time)
+  // Check for new non-comment notifications (compare with last check time)
   useEffect(() => {
-    if (lastCheckTimeRef.current && notifications.length > 0) {
-      // Check if there are any unread notifications that are new (after last check)
-      const hasNew = notifications.some((notif) => {
-        // Must be unread (not marked as read in backend or locally)
+    if (lastCheckTimeRef.current && displayNotifications.length > 0) {
+      const hasNew = displayNotifications.some((notif) => {
         const isUnread = !notif.is_read && !readNotificationIds.has(notif.id);
         if (!isUnread) return false;
-        
-        // Must be after last check time
         const notifTime = new Date(notif.changed_at || notif.created_at).getTime();
         const lastCheckTime = lastCheckTimeRef.current?.getTime();
         if (!lastCheckTime) return true;
         return notifTime > lastCheckTime;
       });
       setHasNewNotifications(hasNew);
-    } else if (notifications.length > 0) {
-      // Check if there are any unread notifications (regardless of time)
-      const hasUnread = notifications.some((notif) => 
-        !notif.is_read && !readNotificationIds.has(notif.id)
+    } else if (displayNotifications.length > 0) {
+      const hasUnread = displayNotifications.some(
+        (notif) => !notif.is_read && !readNotificationIds.has(notif.id)
       );
       setHasNewNotifications(hasUnread);
     } else {
       setHasNewNotifications(false);
     }
-  }, [notifications, readNotificationIds]);
+  }, [displayNotifications, readNotificationIds]);
 
-  // Calculate local unread count (only count truly unread notifications)
+  // Unread count for bell — only non-comment notifications
   const localUnreadCount = useMemo(() => {
-    // Count notifications that are:
-    // 1. Not marked as read in backend (is_read === false)
-    // 2. Not marked as read locally (not in readNotificationIds)
-    const unreadNotifications = notifications.filter((notif) => {
-      const isReadInBackend = notif.is_read === true;
-      const isReadLocally = readNotificationIds.has(notif.id);
-      return !isReadInBackend && !isReadLocally;
-    });
-    
-    return unreadNotifications.length;
-  }, [notifications, readNotificationIds]);
+    return displayNotifications.filter((notif) => {
+      return notif.is_read !== true && !readNotificationIds.has(notif.id);
+    }).length;
+  }, [displayNotifications, readNotificationIds]);
 
   // Mark notification as read (but keep it visible - don't remove)
   const handleMarkAsRead = useCallback(
@@ -224,8 +219,8 @@ function NotificationDropdown() {
   const handleMarkAllAsRead = useCallback(async () => {
     if (!currentUser?.id) return;
 
-    // Get all notification IDs (both read and unread)
-    const allIds = new Set(notifications.map((n) => n.id));
+    // Mark all non-comment (bell) notification IDs as read locally
+    const allIds = new Set(displayNotifications.map((n) => n.id));
     
     // Optimistically update UI immediately
     setReadNotificationIds(allIds);
@@ -362,20 +357,12 @@ function NotificationDropdown() {
             <div className="notification-item notification-loading">
               <p>Loading notifications...</p>
             </div>
-          ) : notifications.length === 0 ? (
+          ) : displayNotifications.length === 0 ? (
             <div className="notification-item notification-empty">
               <p>No notifications</p>
-             {/*  {process.env.NODE_ENV === 'development' && (
-                <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.5rem', textAlign: 'left' }}>
-                  <p>Debug Info:</p>
-                  <p>• unreadCount: {localUnreadCount}</p>
-                  <p>• notifications.length: {notifications.length}</p>
-                  <p>• Check console for detailed logs</p>
-                </div>
-              )} */}
             </div>
           ) : (
-            notifications.map((notification) => {
+            displayNotifications.map((notification) => {
               // Check if read: use backend is_read field OR local readNotificationIds
               const isRead = notification.is_read === true || readNotificationIds.has(notification.id);
               const orderId = notification.order_id || notification.orderId;

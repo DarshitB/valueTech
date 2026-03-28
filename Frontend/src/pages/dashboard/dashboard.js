@@ -140,7 +140,8 @@ function Dashboard() {
   const bankOfficers = officers.filter(
     (officer) =>
       officer.role_name.toUpperCase().includes("BANK OFFICER") ||
-      officer.role_name.toUpperCase().includes("BANK AUTHORITY")
+      officer.role_name.toUpperCase().includes("BANK AUTHORITY") ||
+      officer.role_name.toUpperCase().includes("CREDIT HEAD")
   );
 
   const managers = users.filter((user) =>
@@ -398,6 +399,7 @@ function Dashboard() {
   // New/Edit Order State
   const [formData, setFormData] = useState({
     customer_name: "",
+    customer_name_2: "",
     contact: "",
     alternative_contact: "",
     supervisor_number: "",
@@ -756,6 +758,7 @@ function Dashboard() {
 
     setFormData({
       customer_name: "",
+      customer_name_2: "",
       contact: "",
       alternative_contact: "",
       supervisor_number: "",
@@ -780,6 +783,7 @@ function Dashboard() {
 
     setFormData({
       customer_name: order.customer_name || "",
+      customer_name_2: order.customer_name_2 || "",
       contact: order.contact || "",
       alternative_contact: order.alternative_contact || "",
       supervisor_number: order.supervisor_number || "",
@@ -1110,6 +1114,13 @@ function Dashboard() {
 
       // Only include other fields if they have changed
       if (
+        formData.customer_name_2 !== (currentOrder.customer_name_2 || "")
+      ) {
+        payload.customer_name_2 =
+          formData.customer_name_2.trim() || null;
+      }
+
+      if (
         formData.alternative_contact !==
         (currentOrder.alternative_contact || "")
       ) {
@@ -1136,7 +1147,7 @@ function Dashboard() {
       if (
         canEditRegistration &&
         formData.registration_number !==
-          (currentOrder.registration_number || "")
+        (currentOrder.registration_number || "")
       ) {
         payload.registration_number =
           formData.registration_number.trim() || null;
@@ -1164,6 +1175,7 @@ function Dashboard() {
       // For add mode, include all fields
       payload = {
         customer_name: formData.customer_name.trim(),
+        customer_name_2: formData.customer_name_2.trim() || null,
         contact: formData.contact.trim(),
         alternative_contact: formData.alternative_contact.trim() || null,
         supervisor_number: formData.supervisor_number.trim() || null,
@@ -2355,10 +2367,16 @@ function Dashboard() {
                             ) && <th style={{ width: "150px" }}>Officer</th>}
                             {hasPermission(
                               allowedPermissions,
+                              "view_order_table_contact_person_name_db"
+                            ) && (
+                                <th style={{ width: "200px" }}>Contact Person Name</th>
+                              )}
+                            {hasPermission(
+                              allowedPermissions,
                               "view_order_table_customer_name_db"
                             ) && (
-                              <th style={{ width: "200px" }}>Customer Name</th>
-                            )}
+                                <th style={{ width: "200px" }}>Customer Name</th>
+                              )}
                             {hasPermission(
                               allowedPermissions,
                               "view_order_table_registration_number_db"
@@ -2613,11 +2631,15 @@ function Dashboard() {
                               {hasPermission(
                                 allowedPermissions,
                                 "view_order_table_Branch_Officer_db"
-                            ) && <td>{order.officer_name || "-"}</td>}
+                              ) && <td>{order.officer_name || "-"}</td>}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_contact_person_name_db"
+                              ) && <td>{order.customer_name || "-"}</td>}
                               {hasPermission(
                                 allowedPermissions,
                                 "view_order_table_customer_name_db"
-                              ) && <td>{order.customer_name || "-"}</td>}
+                              ) && <td>{order.customer_name_2 || "-"}</td>}
                               {hasPermission(
                                 allowedPermissions,
                                 "view_order_table_registration_number_db"
@@ -2786,11 +2808,11 @@ function Dashboard() {
                       allowedPermissions,
                       "show_customer_name_to_telecaller"
                     ) && (
-                      <div className="telecoller-dashboard-order-card-body-item">
-                        <span>Client Name</span>
-                        <p>{order.customer_name || "-----"}</p>
-                      </div>
-                    )}
+                        <div className="telecoller-dashboard-order-card-body-item">
+                          <span>Client Name</span>
+                          <p>{order.customer_name || "-----"}</p>
+                        </div>
+                      )}
                     <div className="telecoller-dashboard-order-card-body-item two-rows">
                       <div className="telecoller-dashboard-order-card-body-item-inner">
                         <span>Contact Number</span>
@@ -2819,27 +2841,27 @@ function Dashboard() {
                         allowedPermissions,
                         "show_officer_to_telecaller"
                       )) && (
-                      <div className="telecoller-dashboard-order-card-body-item two-rows">
-                        {hasPermission(
-                          allowedPermissions,
-                          "show_bank_to_telelcaller"
-                        ) && (
-                          <div className="telecoller-dashboard-order-card-body-item-inner">
-                            <span>Bank</span>
-                            <p>{order.bank_name || "-----"}</p>
-                          </div>
-                        )}
-                        {hasPermission(
-                          allowedPermissions,
-                          "show_officer_to_telecaller"
-                        ) && (
-                          <div className="telecoller-dashboard-order-card-body-item-inner">
-                            <span>Officer</span>
-                            <p>{order.officer_name || "-----"}</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                        <div className="telecoller-dashboard-order-card-body-item two-rows">
+                          {hasPermission(
+                            allowedPermissions,
+                            "show_bank_to_telelcaller"
+                          ) && (
+                              <div className="telecoller-dashboard-order-card-body-item-inner">
+                                <span>Bank</span>
+                                <p>{order.bank_name || "-----"}</p>
+                              </div>
+                            )}
+                          {hasPermission(
+                            allowedPermissions,
+                            "show_officer_to_telecaller"
+                          ) && (
+                              <div className="telecoller-dashboard-order-card-body-item-inner">
+                                <span>Officer</span>
+                                <p>{order.officer_name || "-----"}</p>
+                              </div>
+                            )}
+                        </div>
+                      )}
                   </div>
                 </div>
               ))
@@ -2884,26 +2906,48 @@ function Dashboard() {
               >
                 <div className="body-form-box">
                   {(!isTelecaller || canTelecallerSeeCustomerName) && (
-                    <div className="form-group">
-                      <label htmlFor="nameField">Name *</label>
-                      <input
-                        className="form-field"
-                        id="nameField"
-                        name="nameField"
-                        value={formData.customer_name}
-                        onChange={(e) => {
-                          if (isManagerEditing) return;
-                          // Only allow TELECALLER to change this field if they have permission
-                          if (!isTelecaller) {
-                            const customer_name = e.target.value.toUpperCase();
-                            setFormData({
-                              ...formData,
-                              customer_name,
-                            });
-                          }
-                        }}
-                        disabled={isTelecaller || isManagerEditing}
-                      />
+                    <div className="form-group-row">
+                      <div className="form-group">
+                        <label htmlFor="nameField">Contact Person Name *</label>
+                        <input
+                          className="form-field"
+                          id="nameField"
+                          name="nameField"
+                          value={formData.customer_name}
+                          onChange={(e) => {
+                            if (isManagerEditing) return;
+                            if (!isTelecaller) {
+                              const customer_name = e.target.value.toUpperCase();
+                              setFormData({
+                                ...formData,
+                                customer_name,
+                              });
+                            }
+                          }}
+                          disabled={isTelecaller || isManagerEditing}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="customerName2Field">Customer Name</label>
+                        <input
+                          className="form-field"
+                          id="customerName2Field"
+                          name="customer_name_2"
+                          value={formData.customer_name_2}
+                          onChange={(e) => {
+                            if (isManagerEditing) return;
+                            if (!isTelecaller) {
+                              const customer_name_2 = e.target.value.toUpperCase();
+                              setFormData({
+                                ...formData,
+                                customer_name_2,
+                              });
+                            }
+                          }}
+                          disabled={isTelecaller || isManagerEditing}
+                          placeholder="Optional"
+                        />
+                      </div>
                     </div>
                   )}
                   <div className="form-group-row">
@@ -3151,26 +3195,26 @@ function Dashboard() {
                     allowedPermissions,
                     "view_order_add_edit_telecaller_filed"
                   ) && (
-                    <div className="form-group">
-                      <label htmlFor="telecallerField">Telecaller</label>
-                      <SingleSearchSelect
-                        id="telecallerField"
-                        className="search-selector"
-                        options={telecallers.map((user) => ({
-                          value: user.id,
-                          label: `${user.name} (${user.role_name})`,
-                        }))}
-                        value={formData.telecaller_id}
-                        onChange={(val) => {
-                          setFormData({
-                            ...formData,
-                            telecaller_id: val,
-                          });
-                        }}
-                        placeholder="Select telecaller"
-                      />
-                    </div>
-                  )}
+                      <div className="form-group">
+                        <label htmlFor="telecallerField">Telecaller</label>
+                        <SingleSearchSelect
+                          id="telecallerField"
+                          className="search-selector"
+                          options={telecallers.map((user) => ({
+                            value: user.id,
+                            label: `${user.name} (${user.role_name})`,
+                          }))}
+                          value={formData.telecaller_id}
+                          onChange={(val) => {
+                            setFormData({
+                              ...formData,
+                              telecaller_id: val,
+                            });
+                          }}
+                          placeholder="Select telecaller"
+                        />
+                      </div>
+                    )}
 
                   {/* Officer field - Show based on permission but hidden for Bank Officers */}
                   {hasPermission(
@@ -3286,6 +3330,7 @@ function Dashboard() {
               // Reset form data (will be properly initialized when opening again)
               setFormData({
                 customer_name: "",
+                customer_name_2: "",
                 contact: "",
                 alternative_contact: "",
                 supervisor_number: "",
@@ -3296,7 +3341,7 @@ function Dashboard() {
                 number_of_order_duplication: "",
                 officer_id: null,
                 manager_id: null,
-        telecaller_id: null,
+                telecaller_id: null,
                 field_verifier_id: null,
                 created_at: null,
               });

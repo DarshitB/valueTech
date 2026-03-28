@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { usePageTitle } from "../context/PageTitleContext";
 import NotificationDropdown from "../components/NotificationDropdown";
+import CommentNotificationDropdown from "../components/CommentNotificationDropdown";
 
 function Layout() {
   /* start get location for add active class */
@@ -85,6 +86,7 @@ function Layout() {
           </div>
           <ul className="navbar-nav navbar-right">
             <NotificationDropdown />
+            <CommentNotificationDropdown />
             <li className={`dropdown ${userProfile ? "show" : ""}`}>
               <span
                 data-toggle="dropdown"

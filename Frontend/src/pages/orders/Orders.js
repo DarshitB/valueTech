@@ -74,6 +74,7 @@ function Orders() {
   // New/Edit Order State
   const [formData, setFormData] = useState({
     customer_name: "",
+    customer_name_2: "",
     contact: "",
     alternative_contact: "",
     supervisor_number: "",
@@ -347,7 +348,8 @@ function Orders() {
   const bankOfficers = officers.filter(
     (officer) =>
       officer.role_name.toUpperCase().includes("BANK OFFICER") ||
-      officer.role_name.toUpperCase().includes("BANK AUTHORITY")
+      officer.role_name.toUpperCase().includes("BANK AUTHORITY") ||
+      officer.role_name.toUpperCase().includes("CREDIT HEAD")
   );
 
   const managers = users.filter((user) =>
@@ -416,6 +418,7 @@ function Orders() {
 
     setFormData({
       customer_name: "",
+      customer_name_2: "",
       contact: "",
       alternative_contact: "",
       supervisor_number: "",
@@ -438,6 +441,7 @@ function Orders() {
 
     setFormData({
       customer_name: order.customer_name || "",
+      customer_name_2: order.customer_name_2 || "",
       contact: order.contact || "",
       alternative_contact: order.alternative_contact || "",
       supervisor_number: order.supervisor_number || "",
@@ -480,6 +484,13 @@ function Orders() {
       payload.contact = formData.contact.trim();
 
       // Only include other fields if they have changed
+      if (
+        formData.customer_name_2 !== (currentOrder.customer_name_2 || "")
+      ) {
+        payload.customer_name_2 =
+          formData.customer_name_2.trim() || null;
+      }
+
       if (
         formData.alternative_contact !==
         (currentOrder.alternative_contact || "")
@@ -524,7 +535,7 @@ function Orders() {
       if (hasPermission(allowedPermissions, "edit_order_created_at") && formData.created_at) {
         const currentCreatedAt = currentOrder.created_at ? new Date(currentOrder.created_at) : null;
         const newCreatedAt = formData.created_at;
-        
+
         // Only add if changed
         if (!currentCreatedAt || currentCreatedAt.getTime() !== newCreatedAt.getTime()) {
           payload.created_at = newCreatedAt.toISOString();
@@ -534,6 +545,7 @@ function Orders() {
       // For add mode, include all fields
       payload = {
         customer_name: formData.customer_name.trim(),
+        customer_name_2: formData.customer_name_2.trim() || null,
         contact: formData.contact.trim(),
         alternative_contact: formData.alternative_contact.trim() || null,
         supervisor_number: formData.supervisor_number.trim() || null,
@@ -1185,22 +1197,22 @@ function Orders() {
               allowedPermissions,
               "view_order_priority_filter"
             ) && (
-              <SingleSearchSelect
-                className="search-selector"
-                options={[
-                  { value: "", label: "All Priorities" },
-                  { value: "High", label: "High" },
-                  { value: "Low", label: "Low" },
-                ]}
-                value={selectedPriority || null}
-                onChange={(value) => {
-                  const val = value || "";
-                  setSelectedPriority(val);
-                  localStorage.setItem("filter_orders_priority", val);
-                }}
-                placeholder="All Priorities"
-              />
-            )}
+                <SingleSearchSelect
+                  className="search-selector"
+                  options={[
+                    { value: "", label: "All Priorities" },
+                    { value: "High", label: "High" },
+                    { value: "Low", label: "Low" },
+                  ]}
+                  value={selectedPriority || null}
+                  onChange={(value) => {
+                    const val = value || "";
+                    setSelectedPriority(val);
+                    localStorage.setItem("filter_orders_priority", val);
+                  }}
+                  placeholder="All Priorities"
+                />
+              )}
             {hasPermission(allowedPermissions, "view_status_filter") && (
               <SingleSearchSelect
                 className="search-selector"
@@ -1284,7 +1296,7 @@ function Orders() {
                         endDate={selectedDateRange.end}
                         placeholderText="Start Date"
                         className="form-field search-selector"
-                      dateFormat="d MMM yyyy"
+                        dateFormat="d MMM yyyy"
                         renderCustomHeader={renderDatePickerHeader}
                         showMonthDropdown
                         showYearDropdown
@@ -1322,7 +1334,7 @@ function Orders() {
                         minDate={selectedDateRange.start}
                         placeholderText="End Date"
                         className="form-field search-selector"
-                      dateFormat="d MMM yyyy"
+                        dateFormat="d MMM yyyy"
                         renderCustomHeader={renderDatePickerHeader}
                         showMonthDropdown
                         showYearDropdown
@@ -1348,9 +1360,8 @@ function Orders() {
 
           {/* Advanced Filters Section */}
           <div
-            className={`advanced-filters-section ${
-              isAdvancedFiltersOpen ? "open" : ""
-            }`}
+            className={`advanced-filters-section ${isAdvancedFiltersOpen ? "open" : ""
+              }`}
           >
             <div
               className="advanced-filters-header"
@@ -1358,9 +1369,8 @@ function Orders() {
               style={{ cursor: "pointer" }}
             >
               <span
-                className={`advanced-filters-title ${
-                  isAdvancedFiltersOpen ? "open" : ""
-                }`}
+                className={`advanced-filters-title ${isAdvancedFiltersOpen ? "open" : ""
+                  }`}
               >
                 Advanced Filters
               </span>
@@ -1389,46 +1399,46 @@ function Orders() {
                 allowedPermissions,
                 "view_asset_category_filter"
               ) && (
-                <SingleSearchSelect
-                  className="search-selector"
-                  options={[
-                    { value: "", label: "All Asset Categories" },
-                    ...distinctAssetCategories.map((assetCategory) => ({
-                      value: assetCategory,
-                      label: assetCategory,
-                    })),
-                  ]}
-                  value={selectedAssetCategory || null}
-                  onChange={(value) => {
-                    const val = value || "";
-                    setSelectedAssetCategory(val);
-                    localStorage.setItem("filter_orders_assetCategory", val);
-                  }}
-                  placeholder="All Asset Categories"
-                />
-              )}
+                  <SingleSearchSelect
+                    className="search-selector"
+                    options={[
+                      { value: "", label: "All Asset Categories" },
+                      ...distinctAssetCategories.map((assetCategory) => ({
+                        value: assetCategory,
+                        label: assetCategory,
+                      })),
+                    ]}
+                    value={selectedAssetCategory || null}
+                    onChange={(value) => {
+                      const val = value || "";
+                      setSelectedAssetCategory(val);
+                      localStorage.setItem("filter_orders_assetCategory", val);
+                    }}
+                    placeholder="All Asset Categories"
+                  />
+                )}
               {hasPermission(
                 allowedPermissions,
                 "view_sub_category_filter"
               ) && (
-                <SingleSearchSelect
-                  className="search-selector"
-                  options={[
-                    { value: "", label: "All Sub Categories" },
-                    ...distinctSubCategories.map((subCategory) => ({
-                      value: subCategory,
-                      label: subCategory,
-                    })),
-                  ]}
-                  value={selectedSubCategory || null}
-                  onChange={(value) => {
-                    const val = value || "";
-                    setSelectedSubCategory(val);
-                    localStorage.setItem("filter_orders_subCategory", val);
-                  }}
-                  placeholder="All Sub Categories"
-                />
-              )}
+                  <SingleSearchSelect
+                    className="search-selector"
+                    options={[
+                      { value: "", label: "All Sub Categories" },
+                      ...distinctSubCategories.map((subCategory) => ({
+                        value: subCategory,
+                        label: subCategory,
+                      })),
+                    ]}
+                    value={selectedSubCategory || null}
+                    onChange={(value) => {
+                      const val = value || "";
+                      setSelectedSubCategory(val);
+                      localStorage.setItem("filter_orders_subCategory", val);
+                    }}
+                    placeholder="All Sub Categories"
+                  />
+                )}
 
               {hasPermission(allowedPermissions, "view_valuer_name_filter") && (
                 <SingleSearchSelect
@@ -1511,68 +1521,68 @@ function Orders() {
                 allowedPermissions,
                 "view_branch_officer_filter"
               ) && (
-                <SingleSearchSelect
-                  className="search-selector"
-                  options={[
-                    { value: "", label: "All Officers" },
-                    ...distinctOfficers.map((officer) => ({
-                      value: officer,
-                      label: officer,
-                    })),
-                  ]}
-                  value={selectedOfficer || null}
-                  onChange={(value) => {
-                    const val = value || "";
-                    setSelectedOfficer(val);
-                    localStorage.setItem("filter_orders_officer", val);
-                  }}
-                  placeholder="All Officers"
-                />
-              )}
+                  <SingleSearchSelect
+                    className="search-selector"
+                    options={[
+                      { value: "", label: "All Officers" },
+                      ...distinctOfficers.map((officer) => ({
+                        value: officer,
+                        label: officer,
+                      })),
+                    ]}
+                    value={selectedOfficer || null}
+                    onChange={(value) => {
+                      const val = value || "";
+                      setSelectedOfficer(val);
+                      localStorage.setItem("filter_orders_officer", val);
+                    }}
+                    placeholder="All Officers"
+                  />
+                )}
               {hasPermission(
                 allowedPermissions,
                 "view_field_verifier_filter"
               ) && (
-                <SingleSearchSelect
-                  className="search-selector"
-                  options={[
-                    { value: "", label: "All Field Verifiers" },
-                    ...distinctFieldVerifiers.map((fieldVerifier) => ({
-                      value: fieldVerifier,
-                      label: fieldVerifier,
-                    })),
-                  ]}
-                  value={selectedFieldVerifier || null}
-                  onChange={(value) => {
-                    const val = value || "";
-                    setSelectedFieldVerifier(val);
-                    localStorage.setItem("filter_orders_fieldVerifier", val);
-                  }}
-                  placeholder="All Field Verifiers"
-                />
-              )}
+                  <SingleSearchSelect
+                    className="search-selector"
+                    options={[
+                      { value: "", label: "All Field Verifiers" },
+                      ...distinctFieldVerifiers.map((fieldVerifier) => ({
+                        value: fieldVerifier,
+                        label: fieldVerifier,
+                      })),
+                    ]}
+                    value={selectedFieldVerifier || null}
+                    onChange={(value) => {
+                      const val = value || "";
+                      setSelectedFieldVerifier(val);
+                      localStorage.setItem("filter_orders_fieldVerifier", val);
+                    }}
+                    placeholder="All Field Verifiers"
+                  />
+                )}
               {hasPermission(
                 allowedPermissions,
                 "view_payment_status_filter"
               ) && (
-                <SingleSearchSelect
-                  className="search-selector"
-                  options={[
-                    { value: "", label: "All Payment Statuses" },
-                    ...distinctPaymentStatuses.map((paymentStatus) => ({
-                      value: paymentStatus,
-                      label: paymentStatus,
-                    })),
-                  ]}
-                  value={selectedPaymentStatus || null}
-                  onChange={(value) => {
-                    const val = value || "";
-                    setSelectedPaymentStatus(val);
-                    localStorage.setItem("filter_orders_paymentStatus", val);
-                  }}
-                  placeholder="All Payment Statuses"
-                />
-              )}
+                  <SingleSearchSelect
+                    className="search-selector"
+                    options={[
+                      { value: "", label: "All Payment Statuses" },
+                      ...distinctPaymentStatuses.map((paymentStatus) => ({
+                        value: paymentStatus,
+                        label: paymentStatus,
+                      })),
+                    ]}
+                    value={selectedPaymentStatus || null}
+                    onChange={(value) => {
+                      const val = value || "";
+                      setSelectedPaymentStatus(val);
+                      localStorage.setItem("filter_orders_paymentStatus", val);
+                    }}
+                    placeholder="All Payment Statuses"
+                  />
+                )}
               {hasPermission(allowedPermissions, "view_created_by_filter") && (
                 <SingleSearchSelect
                   className="search-selector"
@@ -1691,6 +1701,10 @@ function Orders() {
                   ) && <th style={{ width: "150px" }}>Officer</th>}
                   {hasPermission(
                     allowedPermissions,
+                    "view_order_table_contact_person_name"
+                  ) && <th style={{ width: "200px" }}>Contact Person Name</th>}
+                  {hasPermission(
+                    allowedPermissions,
                     "view_order_table_customer_name"
                   ) && <th style={{ width: "200px" }}>Customer Name</th>}
                   {hasPermission(
@@ -1729,10 +1743,10 @@ function Orders() {
                     allowedPermissions,
                     "view_order_table_action"
                   ) && (
-                    <th style={{ textAlign: "center", width: "200px" }}>
-                      Action
-                    </th>
-                  )}
+                      <th style={{ textAlign: "center", width: "200px" }}>
+                        Action
+                      </th>
+                    )}
                 </tr>
               ),
               rows: reversedFilteredOrders.map((order) => (
@@ -1768,16 +1782,16 @@ function Orders() {
                     allowedPermissions,
                     "view_order_table_order_number"
                   ) && (
-                    <td
-                      className={
-                        hasPermission(allowedPermissions, "view_order_details")
-                          ? "get-me-inside"
-                          : ""
-                      }
-                    >
-                      {order.order_number}
-                    </td>
-                  )}
+                      <td
+                        className={
+                          hasPermission(allowedPermissions, "view_order_details")
+                            ? "get-me-inside"
+                            : ""
+                        }
+                      >
+                        {order.order_number}
+                      </td>
+                    )}
                   {hasPermission(
                     allowedPermissions,
                     "view_order_table_ref_id"
@@ -1816,8 +1830,12 @@ function Orders() {
                   ) && <td>{order.officer_name || "-"}</td>}
                   {hasPermission(
                     allowedPermissions,
-                    "view_order_table_customer_name"
+                    "view_order_table_contact_person_name"
                   ) && <td>{order.customer_name || "-"}</td>}
+                  {hasPermission(
+                    allowedPermissions,
+                    "view_order_table_customer_name"
+                  ) && <td>{order.customer_name_2 || "-"}</td>}
                   {hasPermission(
                     allowedPermissions,
                     "view_order_table_registration_number"
@@ -1838,16 +1856,15 @@ function Orders() {
                     allowedPermissions,
                     "view_order_table_priority"
                   ) && (
-                    <td>
-                      <span
-                        className={`priority-badge priority-${
-                          order.order_priority?.toLowerCase() || "none"
-                        }`}
-                      >
-                        {order.order_priority || "-"}
-                      </span>
-                    </td>
-                  )}
+                      <td>
+                        <span
+                          className={`priority-badge priority-${order.order_priority?.toLowerCase() || "none"
+                            }`}
+                        >
+                          {order.order_priority || "-"}
+                        </span>
+                      </td>
+                    )}
                   {hasPermission(
                     allowedPermissions,
                     "view_order_table_type"
@@ -1860,60 +1877,60 @@ function Orders() {
                     allowedPermissions,
                     "view_order_table_status"
                   ) && (
-                    <td>
-                      <p className="status-state order-state">
-                        {order.current_status_name}
-                      </p>
-                    </td>
-                  )}
+                      <td>
+                        <p className="status-state order-state">
+                          {order.current_status_name}
+                        </p>
+                      </td>
+                    )}
                   {hasPermission(
                     allowedPermissions,
                     "view_order_table_action"
                   ) && (
-                    <td style={{ textAlign: "center" }}>
-                      {hasPermission(allowedPermissions, "edit_order") && (
-                        <button
-                          className="action-icons"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditModal(order);
-                          }}
-                        >
-                          <EditIcon />
-                        </button>
-                      )}
-                      {hasPermission(allowedPermissions, "delete_order") && (
-                        <button
-                          className="action-icons"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            confirmDelete(order.id, order.customer_name);
-                          }}
-                        >
-                          <DeleteIcon />
-                        </button>
-                      )}
-                      {(hasPermission(
-                        allowedPermissions,
-                        "edit_order_priority"
-                      ) ||
-                        hasPermission(allowedPermissions, "edit_order_type") ||
-                        hasPermission(
+                      <td style={{ textAlign: "center" }}>
+                        {hasPermission(allowedPermissions, "edit_order") && (
+                          <button
+                            className="action-icons"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditModal(order);
+                            }}
+                          >
+                            <EditIcon />
+                          </button>
+                        )}
+                        {hasPermission(allowedPermissions, "delete_order") && (
+                          <button
+                            className="action-icons"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              confirmDelete(order.id, order.customer_name);
+                            }}
+                          >
+                            <DeleteIcon />
+                          </button>
+                        )}
+                        {(hasPermission(
                           allowedPermissions,
-                          "edit_valuer_name_to_order"
-                        )) && (
-                        <button
-                          className="action-icons"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openAttributesModal(order);
-                          }}
-                        >
-                          <MoreIcon />
-                        </button>
-                      )}
-                    </td>
-                  )}
+                          "edit_order_priority"
+                        ) ||
+                          hasPermission(allowedPermissions, "edit_order_type") ||
+                          hasPermission(
+                            allowedPermissions,
+                            "edit_valuer_name_to_order"
+                          )) && (
+                            <button
+                              className="action-icons"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openAttributesModal(order);
+                              }}
+                            >
+                              <MoreIcon />
+                            </button>
+                          )}
+                      </td>
+                    )}
                 </tr>
               )),
             }}
@@ -1926,10 +1943,9 @@ function Orders() {
         <FormModel>
           {{
             title: isEdit
-              ? `Edit Order - ${
-                  orders.find((order) => order.id === editOrderId)
-                    ?.order_number || "N/A"
-                }`
+              ? `Edit Order - ${orders.find((order) => order.id === editOrderId)
+                ?.order_number || "N/A"
+              }`
               : "Add Order",
             body: (
               <form
@@ -1940,25 +1956,47 @@ function Orders() {
                 }}
               >
                 <div className="body-form-box">
-                  <div className="form-group">
-                    <label htmlFor="nameField">Name *</label>
-                    <input
-                      className="form-field"
-                      id="nameField"
-                      name="nameField"
-                      value={formData.customer_name}
-                      onChange={(e) => {
-                        // Only allow TELECALLER to change this field if they have permission
-                        if (!isTelecaller) {
-                          const customer_name = e.target.value.toUpperCase();
-                          setFormData({
-                            ...formData,
-                            customer_name,
-                          });
-                        }
-                      }}
-                      disabled={isTelecaller}
-                    />
+                  <div className="form-group-row">
+                    <div className="form-group">
+                      <label htmlFor="nameField">Contact Person Name *</label>
+                      <input
+                        className="form-field"
+                        id="nameField"
+                        name="nameField"
+                        value={formData.customer_name}
+                        onChange={(e) => {
+                          // Only allow TELECALLER to change this field if they have permission
+                          if (!isTelecaller) {
+                            const customer_name = e.target.value.toUpperCase();
+                            setFormData({
+                              ...formData,
+                              customer_name,
+                            });
+                          }
+                        }}
+                        disabled={isTelecaller}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="customerName2Field">Customer Name</label>
+                      <input
+                        className="form-field"
+                        id="customerName2Field"
+                        name="customer_name_2"
+                        value={formData.customer_name_2}
+                        onChange={(e) => {
+                          if (!isTelecaller) {
+                            const customer_name_2 = e.target.value.toUpperCase();
+                            setFormData({
+                              ...formData,
+                              customer_name_2,
+                            });
+                          }
+                        }}
+                        disabled={isTelecaller}
+                        placeholder="Optional"
+                      />
+                    </div>
                   </div>
                   <div className="form-group-row">
                     <div className="form-group">
@@ -2103,55 +2141,55 @@ function Orders() {
                   {/* Created At field - Show based on permission */}
                   {((isEdit && hasPermission(allowedPermissions, "edit_order_created_at")) ||
                     (!isEdit && hasPermission(allowedPermissions, "add_order_created_at"))) && (
-                    <div className="form-group">
-                      <label htmlFor="createdAt">Created At</label>
-                      <DatePicker
-                        id="createdAt"
-                        selected={formData.created_at}
-                        onChange={(date) => setFormData({ ...formData, created_at: date })}
-                        showTimeSelect
-                        timeFormat="HH:mm"
-                        timeIntervals={15}
-                        dateFormat="d MMM yyyy h:mm aa"
-                        placeholderText="Select date and time (optional)"
-                        className="form-field"
-                        renderCustomHeader={renderDatePickerHeader}
-                        isClearable
-                      />
-                    </div>
-                  )}
+                      <div className="form-group">
+                        <label htmlFor="createdAt">Created At</label>
+                        <DatePicker
+                          id="createdAt"
+                          selected={formData.created_at}
+                          onChange={(date) => setFormData({ ...formData, created_at: date })}
+                          showTimeSelect
+                          timeFormat="HH:mm"
+                          timeIntervals={15}
+                          dateFormat="d MMM yyyy h:mm aa"
+                          placeholderText="Select date and time (optional)"
+                          className="form-field"
+                          renderCustomHeader={renderDatePickerHeader}
+                          isClearable
+                        />
+                      </div>
+                    )}
 
                   {/* Subcategory field - Show based on permission */}
                   {hasPermission(
                     allowedPermissions,
                     "view_order_add_edit_subcategory_filed"
                   ) && (
-                    <div className="form-group">
-                      <label htmlFor="Subcategory">Subcategory</label>
-                      <SingleSearchSelect
-                        id="Subcategory"
-                        className="search-selector"
-                        options={filteredChildCategories.map(
-                          (childCategory) => ({
-                            value: childCategory.id,
-                            label: `${childCategory.name}`,
-                          })
-                        )}
-                        value={formData.child_category_id}
-                        onChange={(val) => {
-                          // Only allow TELECALLER to change this field if they have permission
-                          if (!isTelecaller) {
-                            setFormData({
-                              ...formData,
-                              child_category_id: val,
-                            });
-                          }
-                        }}
-                        placeholder="Select Subcategory"
-                        disabled={isTelecaller}
-                      />
-                    </div>
-                  )}
+                      <div className="form-group">
+                        <label htmlFor="Subcategory">Subcategory</label>
+                        <SingleSearchSelect
+                          id="Subcategory"
+                          className="search-selector"
+                          options={filteredChildCategories.map(
+                            (childCategory) => ({
+                              value: childCategory.id,
+                              label: `${childCategory.name}`,
+                            })
+                          )}
+                          value={formData.child_category_id}
+                          onChange={(val) => {
+                            // Only allow TELECALLER to change this field if they have permission
+                            if (!isTelecaller) {
+                              setFormData({
+                                ...formData,
+                                child_category_id: val,
+                              });
+                            }
+                          }}
+                          placeholder="Select Subcategory"
+                          disabled={isTelecaller}
+                        />
+                      </div>
+                    )}
                   {/* Officer field - Show based on permission but hidden for Bank Officers */}
                   {hasPermission(
                     allowedPermissions,
@@ -2266,6 +2304,7 @@ function Orders() {
               // Reset form data (will be properly initialized when opening again)
               setFormData({
                 customer_name: "",
+                customer_name_2: "",
                 contact: "",
                 alternative_contact: "",
                 supervisor_number: "",
@@ -2314,11 +2353,10 @@ function Orders() {
                         {["Low", "High"].map((priority) => (
                           <label
                             key={priority}
-                            className={`radio-label ${priority.toLowerCase()} ${
-                              attributesFormData.order_priority === priority
+                            className={`radio-label ${priority.toLowerCase()} ${attributesFormData.order_priority === priority
                                 ? "selected"
                                 : ""
-                            }`}
+                              }`}
                           >
                             <input
                               type="radio"
@@ -2348,11 +2386,10 @@ function Orders() {
                         {["VKA1", "VKA2", "VKA3"].map((type) => (
                           <label
                             key={type}
-                            className={`radio-label ${
-                              attributesFormData.order_type === type
+                            className={`radio-label ${attributesFormData.order_type === type
                                 ? "selected"
                                 : ""
-                            }`}
+                              }`}
                           >
                             <input
                               type="radio"
@@ -2377,57 +2414,57 @@ function Orders() {
                     allowedPermissions,
                     "edit_valuer_name_to_order"
                   ) && (
-                    <div className="form-group">
-                      <label>Valuer Name</label>
-                      <SingleSearchSelect
-                        className="search-selector"
-                        options={[
-                          {
-                            value: "V.K. ASSOCIATES",
-                            label: "V.K. ASSOCIATES",
-                          },
-                          {
-                            value: "VALUETECH SOLUTIONS",
-                            label: "VALUETECH SOLUTIONS",
-                          },
-                          {
-                            value: "VISHAL D. KOTHARI",
-                            label: "VISHAL D. KOTHARI",
-                          },
-                        ]}
-                        value={attributesFormData.valuer_name}
-                        onChange={(value) =>
-                          setAttributesFormData({
-                            ...attributesFormData,
-                            valuer_name: value,
-                          })
-                        }
-                        placeholder="Select valuer name"
-                      />
-                    </div>
-                  )}
+                      <div className="form-group">
+                        <label>Valuer Name</label>
+                        <SingleSearchSelect
+                          className="search-selector"
+                          options={[
+                            {
+                              value: "V.K. ASSOCIATES",
+                              label: "V.K. ASSOCIATES",
+                            },
+                            {
+                              value: "VALUETECH SOLUTIONS",
+                              label: "VALUETECH SOLUTIONS",
+                            },
+                            {
+                              value: "VISHAL D. KOTHARI",
+                              label: "VISHAL D. KOTHARI",
+                            },
+                          ]}
+                          value={attributesFormData.valuer_name}
+                          onChange={(value) =>
+                            setAttributesFormData({
+                              ...attributesFormData,
+                              valuer_name: value,
+                            })
+                          }
+                          placeholder="Select valuer name"
+                        />
+                      </div>
+                    )}
 
                   {hasPermission(
                     allowedPermissions,
                     "assign_user_to_order"
                   ) && (
-                    <div className="form-group">
-                      <label>Users assigned</label>
-                      <SingleSearchSelect
-                        className="search-selector"
-                        options={adminUsersOptions}
-                        value={attributesFormData.admin_user_ids}
-                        onChange={(values) =>
-                          setAttributesFormData({
-                            ...attributesFormData,
-                            admin_user_ids: values || [],
-                          })
-                        }
-                        placeholder="Select users..."
-                        isMulti={true}
-                      />
-                    </div>
-                  )}
+                      <div className="form-group">
+                        <label>Users assigned</label>
+                        <SingleSearchSelect
+                          className="search-selector"
+                          options={adminUsersOptions}
+                          value={attributesFormData.admin_user_ids}
+                          onChange={(values) =>
+                            setAttributesFormData({
+                              ...attributesFormData,
+                              admin_user_ids: values || [],
+                            })
+                          }
+                          placeholder="Select users..."
+                          isMulti={true}
+                        />
+                      </div>
+                    )}
                   <div className="form-buttons">
                     <button className="submit-button" type="submit">
                       Update Attributes

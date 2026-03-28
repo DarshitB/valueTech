@@ -38,4 +38,5 @@ export {
   ShareIcon,
   SendIcon,
   TrashIcon,
+  CommentBirdIcon,
 } from "./Icons";

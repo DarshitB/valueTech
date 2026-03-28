@@ -4551,6 +4551,10 @@ function CEReport() {
                             value: "Proforma Invoice no. and date",
                             label: "Proforma Invoice no. and date",
                           },
+                          {
+                            value: "Quotation no. and date",
+                            label: "Quotation no. and date",
+                          },
                         ]}
                         value={
                           reportFormData.invoice_no_heading ||
@@ -4734,6 +4738,9 @@ function CEReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
+                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
                         { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.engine_condition}
@@ -4757,6 +4764,9 @@ function CEReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
+                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
                         { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.chassis_condition}
@@ -4780,6 +4790,9 @@ function CEReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
+                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
                         { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.body_condition}
@@ -4803,6 +4816,9 @@ function CEReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
+                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
                         { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.cabin_condition}
@@ -4826,6 +4842,9 @@ function CEReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
+                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
                         { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.electrical_condition}
@@ -4849,6 +4868,9 @@ function CEReport() {
                         { value: "AVERAGE", label: "AVERAGE" },
                         { value: "FAIR", label: "FAIR" },
                         { value: "POOR", label: "POOR" },
+                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
+                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
                         { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.gear_transmission}
@@ -6359,7 +6381,7 @@ function CEReport() {
                       {order?.category_name || ""}
                       {order?.sub_category_name
                         ? ` / ${order.sub_category_name}`
-                        : ""}{" "}
+                        : ""}{" "} {order?.child_category_name || ""} {" "}
                       inspected by us & found in{" "}
                     </p>
                     <SingleSearchSelect
