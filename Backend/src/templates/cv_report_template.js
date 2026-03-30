@@ -327,7 +327,7 @@ function generateCVReportHTML(formData, extraData, bgPath) {
             <td>DISCLAIMER:</td>
             <td colspan="5" style="text-transform: none;">${formData.valuer_name} will not be held liable for any direct, indirect consequential or exemplary
 damages for any loss resulting from use of this report. The above valuation given based on submitted R.C. Book. We are not responsible for
-the genuineness of the vehicle documents. To give loan to the applicant is the responsiiblity of the finance company/bank. We are not
+the genuineness of the vehicle documents. To give loan to the applicant is the responsibility of the finance company/bank. We are not
 responsible or concerned for the same.</td>
         </tr>
         <tr>

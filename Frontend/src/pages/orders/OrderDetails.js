@@ -1556,46 +1556,46 @@ function OrderDetails() {
 
             {/* AVR Report - Categories containing AVR */}
             {((order?.category_name && order.category_name.toUpperCase().includes("AVR")) || order?.category_report_type === "report_avr") && (
-                <>
-                  {order?.valuer_name &&
-                    order.valuer_name.trim() !== "" ? (
-                    order?.current_status_id === 10 &&
-                      !isExemptAdmin ? (
-                      <span
-                        title="AVR Report (Disabled)"
-                        className="tooltip-link disabled"
-                        style={{ cursor: "not-allowed" }}
-                      >
-                        <ReportIcon />
-                      </span>
-                    ) : (
-                      <Link
-                        to={`/orders/${id}/details/avr-report`}
-                        title="AVR Report"
-                        className="tooltip-link"
-                      >
-                        <ReportIcon />
-                      </Link>
-                    )
-                  ) : (
-                    <button
-                      title="AVR Report"
-                      className="tooltip-link"
-                      onClick={() => showValuerNameError("AVR")}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        padding: 0,
-                        cursor: "pointer",
-                        outline: "none",
-                        boxShadow: "none",
-                      }}
+              <>
+                {order?.valuer_name &&
+                  order.valuer_name.trim() !== "" ? (
+                  order?.current_status_id === 10 &&
+                    !isExemptAdmin ? (
+                    <span
+                      title="AVR Report (Disabled)"
+                      className="tooltip-link disabled"
+                      style={{ cursor: "not-allowed" }}
                     >
                       <ReportIcon />
-                    </button>
-                  )}
-                </>
-              )}
+                    </span>
+                  ) : (
+                    <Link
+                      to={`/orders/${id}/details/avr-report`}
+                      title="AVR Report"
+                      className="tooltip-link"
+                    >
+                      <ReportIcon />
+                    </Link>
+                  )
+                ) : (
+                  <button
+                    title="AVR Report"
+                    className="tooltip-link"
+                    onClick={() => showValuerNameError("AVR")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      cursor: "pointer",
+                      outline: "none",
+                      boxShadow: "none",
+                    }}
+                  >
+                    <ReportIcon />
+                  </button>
+                )}
+              </>
+            )}
 
             {/* Machinery Report */}
             {(order?.category_name === "MACHINERY" || order?.category_report_type === "report_machinery") && (
@@ -2227,7 +2227,18 @@ function OrderDetails() {
                     <div className="order-details-info-set">
                       <div className="order-details-info-set-heading">
                         <p>
-                          <span>Client Name</span>
+                          <span>Customer Name</span>
+                          <span>:</span>
+                        </p>
+                      </div>
+                      <div className="order-details-info-set-details">
+                        <p>{showValue(order?.customer_name_2)}</p>
+                      </div>
+                    </div>
+                    <div className="order-details-info-set">
+                      <div className="order-details-info-set-heading">
+                        <p>
+                          <span>Contact Person Name</span>
                           <span>:</span>
                         </p>
                       </div>
@@ -2235,6 +2246,7 @@ function OrderDetails() {
                         <p>{showValue(order?.customer_name)}</p>
                       </div>
                     </div>
+
                     <div className="order-details-info-set">
                       <div className="order-details-info-set-heading">
                         <p>
