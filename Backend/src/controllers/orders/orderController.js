@@ -739,9 +739,13 @@ exports.update = async (req, res, next) => {
 
     // Update order - only update fields that are provided
     const updateData = {
-      customer_name,
-      customer_name_2: customer_name_2 || null,
-      contact,
+      customer_name:
+        customer_name !== undefined ? customer_name : existingOrder.customer_name,
+      customer_name_2:
+        customer_name_2 !== undefined
+          ? customer_name_2 || null
+          : existingOrder.customer_name_2,
+      contact: contact !== undefined ? contact : existingOrder.contact,
       alternative_contact:
         alternative_contact !== undefined
           ? alternative_contact
