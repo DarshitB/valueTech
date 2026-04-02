@@ -1182,6 +1182,30 @@ function CVReport() {
     }, 300);
   }, [currentReport, id, reportFetchCompleted, reportLoading, buildValuationReportHeading]);
 
+  // Prefill proposed_owner_name from order.customer_name_2 only when
+  // API/report didn't provide it (null/empty) after all loading completes.
+  // This prevents overwriting user input or saved API values.
+  useEffect(() => {
+    if (!reportFetchCompleted || reportLoading || externalApiLoading) return;
+
+    const customerName2 = order?.customer_name_2;
+    if (!customerName2 || String(customerName2).trim() === "") return;
+
+    const currentValue = reportFormData.proposed_owner_name;
+    if (currentValue && String(currentValue).trim() !== "") return;
+
+    setReportFormData((prev) => ({
+      ...prev,
+      proposed_owner_name: customerName2,
+    }));
+  }, [
+    reportFetchCompleted,
+    reportLoading,
+    externalApiLoading,
+    order?.customer_name_2,
+    reportFormData.proposed_owner_name,
+  ]);
+
   // Set page title with breadcrumb navigation
   useLayoutEffect(() => {
     setTitle(
@@ -3897,6 +3921,8 @@ function CVReport() {
                         { value: "POOR", label: "POOR" },
                         { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
                         { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "STACKED", label: "STACKED" },
+                        { value: "USABLE", label: "USABLE" },
                         { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
                         { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
 
@@ -3924,6 +3950,8 @@ function CVReport() {
                         { value: "POOR", label: "POOR" },
                         { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
                         { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "STACKED", label: "STACKED" },
+                        { value: "USABLE", label: "USABLE" },
                         { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
                         { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
@@ -3950,6 +3978,8 @@ function CVReport() {
                         { value: "POOR", label: "POOR" },
                         { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
                         { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "STACKED", label: "STACKED" },
+                        { value: "USABLE", label: "USABLE" },
                         { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
                         { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
@@ -3976,6 +4006,8 @@ function CVReport() {
                         { value: "POOR", label: "POOR" },
                         { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
                         { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "STACKED", label: "STACKED" },
+                        { value: "USABLE", label: "USABLE" },
                         { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
                         { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
@@ -4003,6 +4035,8 @@ function CVReport() {
                         { value: "POOR", label: "POOR" },
                         { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
                         { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "STACKED", label: "STACKED" },
+                        { value: "USABLE", label: "USABLE" },
                         { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
                         { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
@@ -4029,6 +4063,8 @@ function CVReport() {
                         { value: "POOR", label: "POOR" },
                         { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
                         { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "STACKED", label: "STACKED" },
+                        { value: "USABLE", label: "USABLE" },
                         { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
                         { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
@@ -4264,6 +4300,8 @@ function CVReport() {
                         { value: "POOR", label: "POOR" },
                         { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
                         { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "STACKED", label: "STACKED" },
+                        { value: "USABLE", label: "USABLE" },
                         { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
                         { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
@@ -4381,6 +4419,8 @@ function CVReport() {
                         { value: "POOR", label: "POOR" },
                         { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
                         { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "STACKED", label: "STACKED" },
+                        { value: "USABLE", label: "USABLE" },
                         { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
                         { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
@@ -5008,6 +5048,8 @@ function CVReport() {
                         { value: "PARKING YARD", label: "PARKING YARD" },
                         { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
                         { value: "WORKABLE CONDITION", label: "WORKABLE CONDITION" },
+                        { value: "STACKED", label: "STACKED" },
+                        { value: "USABLE", label: "USABLE" },
                         { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
                         { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}

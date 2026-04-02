@@ -888,41 +888,42 @@ body.single-page{
             <th colspan="6">${formData.rc_permit_tax_fitness_insurance_heading}</th>
         </tr>
         <tr>
+            <td>RC BOOK VERIFIED:</td>
+            <td>${formData.rc_book_verified}</td>
             <td>BILL OF ENTRY:</td>
             <td>${formData.bill_of_entry}</td>
-            <td>${formData.proforma_invoice_heading || "PROFORMA INVOICE VERIFIED"}:</td>
-            <td>${formData.proforma_invoice_verified}</td>
-            <td>TAX UPTO:</td>
-            <td>
-                ${formData.tax_upto
-            ? formData.tax_upto === "00-00-0000"
-                ? "LTT"
-                : formData.tax_upto
-            : "NOT AVAILABLE"
-        }
-            </td>
-        </tr>
-        <tr>
             <td>BILL OF LADING:</td>
             <td>
                 ${formData.bill_of_lading
-            ? formData.bill_of_lading
-            : "NOT AVAILABLE"
-        }
+                    ? formData.bill_of_lading
+                    : "NOT AVAILABLE"}
             </td>
-            <td>CHARTED ENGINEER CERTIFICATE:</td>
-            <td>
+        </tr>
+        <tr>
+            <td rowspan="2">${formData.proforma_invoice_heading || "PROFORMA INVOICE VERIFIED"}:</td>
+            <td rowspan="2">${formData.proforma_invoice_verified}</td>
+            <td rowspan="2">CHARTED ENGINEER CERTIFICATE:</td>
+            <td rowspan="2">
                 ${formData.chartered_engineer_certificate
-            ? formData.chartered_engineer_certificate
-            : "NOT AVAILABLE"
-        }
+                    ? formData.chartered_engineer_certificate
+                    : "NOT AVAILABLE"}
             </td>
+            <td>TAX UPTO:</td>
+            <td>
+                ${formData.tax_upto
+                    ? formData.tax_upto === "00-00-0000"
+                        ? "LTT"
+                        : formData.tax_upto
+                    : "NOT AVAILABLE"}
+            </td>
+        </tr>
+        <tr>
+            
             <td>FITNESS UPTO:</td>
             <td>
                 ${formData.fitness_upto
-            ? formData.fitness_upto
-            : "NOT AVAILABLE"
-        }
+                    ? formData.fitness_upto
+                    : "NOT AVAILABLE"}
             </td>
         </tr>
         <tr>

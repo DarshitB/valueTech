@@ -3165,6 +3165,7 @@ function filterValidReportFields(formData, reportType) {
       "fix_but_flex_heading_25",
       "fix_but_flex_value_25",
       "damages_if_any",
+      "rc_book_verified",
       "bill_of_entry",
       "proforma_invoice_heading",
       "proforma_invoice_verified",

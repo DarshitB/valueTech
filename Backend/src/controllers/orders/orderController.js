@@ -1559,6 +1559,7 @@ exports.sendMail = async (req, res, next) => {
     const { sendEmail } = require("../../utils/emailService");
     const orderMediaDocument = require("../../models/orders/orderMediaDocument");
     const orderMediaPortal = require("../../models/orders/orderMediaPortal");
+    const fs = require("fs");
     const path = require("path");
     const { 
       isPdfFile,
@@ -1655,6 +1656,9 @@ exports.sendMail = async (req, res, next) => {
     const documentAttachments = [];
     const documentLinkGroups = new Map();
     let documentLinkCount = 0;
+    const mergeableReports = [];
+    const mergeableCollages = [];
+    const tempMergedPdfPaths = [];
 
     if (document_ids && document_ids.length > 0) {
       const documentPromises = document_ids.map((docId) =>
@@ -1684,40 +1688,53 @@ exports.sendMail = async (req, res, next) => {
         if (document_as_attachment) {
           // Get the full file path for checking
           const fullPath = path.join(process.cwd(), mediaPath);
-          
-          // Check if document is a collage PDF that should be compressed
-          const isCollagePdf = 
-            isPdfFile(fullPath) && 
-            document.document_type === 'collage';
-          
-          if (isCollagePdf) {
-            // Compress collage PDF to ~1MB for email (only if > 1MB)
-            // Works directly on PDF without needing source JPG
-            try {
-              const result = await compressPdfForEmail(fullPath, 1);
-              documentAttachments.push({
-                path: result.path,
+
+          const isMergeable = 
+            document.document_type === "report" || document.document_type === "collage";
+
+          if (isMergeable) {
+            // For merging we always use the absolute path.
+            // Collage PDFs are compressed (best-effort) to keep email size reasonable.
+            let sourcePdfPath = fullPath;
+
+            const isCollagePdf =
+              isPdfFile(fullPath) && document.document_type === "collage";
+
+            if (isCollagePdf) {
+              try {
+                const result = await compressPdfForEmail(fullPath, 1);
+                sourcePdfPath = result.path;
+              } catch (compressionError) {
+                console.error(
+                  `Failed to compress collage ${filename}:`,
+                  compressionError.message
+                );
+                sourcePdfPath = fullPath;
+              }
+            }
+
+            if (document.document_type === "report") {
+              mergeableReports.push({
+                docId,
+                sourcePdfPath,
                 filename,
-                isTemporary: result.path !== fullPath, // Mark as temp if compressed
               });
-            } catch (compressionError) {
-              console.error(`Failed to compress ${filename}:`, compressionError.message);
-              // Fall back to original if compression fails
-              documentAttachments.push({
-                path: mediaPath,
+            } else {
+              mergeableCollages.push({
+                docId,
+                sourcePdfPath,
                 filename,
-                isTemporary: false,
               });
             }
           } else {
-            // Reports and other documents: send as-is
+            // Other documents: send as-is
             documentAttachments.push({
               path: mediaPath,
               filename,
               isTemporary: false,
             });
+            documentAttachmentCount++;
           }
-          documentAttachmentCount++;
         } else {
           const relativeUrl = document.media_url.startsWith("/")
             ? document.media_url
@@ -1731,6 +1748,69 @@ exports.sendMail = async (req, res, next) => {
 
           documentLinkGroups.get(category).push({ filename, url: fullUrl });
           documentLinkCount++;
+        }
+      }
+    }
+
+    // If user requested attachments, merge selected report + collage PDFs into one PDF.
+    // Order: (all selected reports sorted by id desc) first, then (all selected collages sorted by id desc).
+    if (
+      document_as_attachment &&
+      (mergeableReports.length > 0 || mergeableCollages.length > 0)
+    ) {
+      mergeableReports.sort((a, b) => b.docId - a.docId);
+      mergeableCollages.sort((a, b) => b.docId - a.docId);
+
+      const mergeSources = [...mergeableReports, ...mergeableCollages];
+
+      try {
+        const { PDFDocument } = require("pdf-lib");
+        const mergedPdf = await PDFDocument.create();
+
+        for (const src of mergeSources) {
+          const pdfBytes = fs.readFileSync(src.sourcePdfPath);
+          const pdfDoc = await PDFDocument.load(pdfBytes, {
+            ignoreEncryption: true,
+          });
+          const pageIndices = pdfDoc.getPageIndices();
+          const copiedPages = await mergedPdf.copyPages(pdfDoc, pageIndices);
+          copiedPages.forEach((p) => mergedPdf.addPage(p));
+        }
+
+        const mergedBytes = await mergedPdf.save();
+
+        const tempDir = path.join(process.cwd(), "uploads", "temp_email");
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        const mergedFilename = `merged_order_${order.order_number || orderId}_${Date.now()}.pdf`;
+        const mergedPath = path.join(tempDir, mergedFilename);
+
+        fs.writeFileSync(mergedPath, mergedBytes);
+
+        tempMergedPdfPaths.push(mergedPath);
+
+        documentAttachments.push({
+          path: mergedPath,
+          filename: mergedFilename,
+          isTemporary: true,
+        });
+        documentAttachmentCount++;
+      } catch (mergeError) {
+        console.error(
+          "Failed to merge report/collage PDFs, falling back to individual attachments:",
+          mergeError.message
+        );
+
+        // Fallback: attach the individual PDFs (no merging), best-effort.
+        for (const src of mergeSources) {
+          documentAttachments.push({
+            path: src.sourcePdfPath,
+            filename: src.filename,
+            isTemporary: true,
+          });
+          documentAttachmentCount++;
         }
       }
     }
@@ -1831,18 +1911,28 @@ exports.sendMail = async (req, res, next) => {
       ? process.env.EMAIL_PASS
       : process.env.VIRAJ_EMAIL_PASS || process.env.EMAIL_PASS;
 
-    const emailResult = await sendEmail({
-      to: to,
-      cc: cc || [],
-      bcc: bcc || [],
-      subject: subject,
-      text: emailBody,
-      html: htmlEmailBody,
-      attachments: attachments.length > 0 ? attachments : undefined,
-      smtpUser,
-      smtpPass,
-      from: smtpUser,
-    });
+    let emailResult;
+    try {
+      emailResult = await sendEmail({
+        to: to,
+        cc: cc || [],
+        bcc: bcc || [],
+        subject: subject,
+        text: emailBody,
+        html: htmlEmailBody,
+        attachments: attachments.length > 0 ? attachments : undefined,
+        smtpUser,
+        smtpPass,
+        from: smtpUser,
+      });
+    } finally {
+      // Do not store merged PDF on disk permanently.
+      // (Only merge-artifact temp files are cleaned up here; original PDFs remain unchanged.)
+      for (const mergedPath of tempMergedPdfPaths) {
+        // fs.unlink from `fs` (callback API) requires a callback, so use promises here.
+        fs.promises.unlink(mergedPath).catch(() => {});
+      }
+    }
 
     await Order.updateOrder(
       parseInt(orderId),

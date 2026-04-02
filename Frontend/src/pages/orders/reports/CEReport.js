@@ -385,6 +385,8 @@ function CEReport() {
       inspected_equipment_heading: "",
       comments_on_equipment_heading: "",
       rc_permit_tax_fitness_insurance_heading: "",
+      // Needed so RC Book Verified is always part of state/payload.
+      rc_book_verified: "",
       overall_feedback_heading: "",
       valuation_purpose: "FINANCIAL USAGE",
       initiated_by: "",
@@ -878,6 +880,7 @@ function CEReport() {
     damages_if_any: "",
 
     // RC, PERMIT, TAX, FITNESS & INSURANCE DETAILS
+    rc_book_verified: "",
     bill_of_entry: "",
     proforma_invoice_heading: "Proforma Invoice Verified",
     proforma_invoice_verified: "",
@@ -1522,6 +1525,7 @@ function CEReport() {
           "chassis_no_heading",
           "no_of_cylinder",
           "machine_weight_heading",
+          "rc_book_verified",
           "fix_but_flex_heading_1",
           "fix_but_flex_heading_2",
           "fix_but_flex_heading_3",
@@ -1766,6 +1770,30 @@ function CEReport() {
       // If registration number exists, RC API will be called and will remove loading
     }
   }, [reportLoading, reportFetchCompleted, currentReport, order]);
+
+  // Prefill proposed_owner_name from order.customer_name_2 only when the
+  // API/report didn't provide it (null/empty) after all loading is complete.
+  // This prevents overwriting saved API values or user input.
+  useEffect(() => {
+    if (isInitialLoading) return;
+    if (!reportFetchCompleted) return;
+
+    const customerName2 = order?.customer_name_2;
+    if (!customerName2 || String(customerName2).trim() === "") return;
+
+    const currentValue = reportFormData.proposed_owner_name;
+    if (currentValue && String(currentValue).trim() !== "") return;
+
+    setReportFormData((prev) => ({
+      ...prev,
+      proposed_owner_name: customerName2,
+    }));
+  }, [
+    isInitialLoading,
+    reportFetchCompleted,
+    order?.customer_name_2,
+    reportFormData.proposed_owner_name,
+  ]);
 
   // Capture a clean snapshot the first time initial loading finishes.
   // Any change after this point is considered "dirty".
@@ -4740,6 +4768,8 @@ function CEReport() {
                         { value: "POOR", label: "POOR" },
                         { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
                         { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "STACKED", label: "STACKED" },
+                        { value: "USABLE", label: "USABLE" },
                         { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
                         { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
@@ -4766,6 +4796,8 @@ function CEReport() {
                         { value: "POOR", label: "POOR" },
                         { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
                         { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "STACKED", label: "STACKED" },
+                        { value: "USABLE", label: "USABLE" },
                         { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
                         { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
@@ -4792,6 +4824,8 @@ function CEReport() {
                         { value: "POOR", label: "POOR" },
                         { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
                         { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "STACKED", label: "STACKED" },
+                        { value: "USABLE", label: "USABLE" },
                         { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
                         { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
@@ -4818,6 +4852,8 @@ function CEReport() {
                         { value: "POOR", label: "POOR" },
                         { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
                         { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "STACKED", label: "STACKED" },
+                        { value: "USABLE", label: "USABLE" },
                         { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
                         { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
@@ -4844,6 +4880,8 @@ function CEReport() {
                         { value: "POOR", label: "POOR" },
                         { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
                         { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "STACKED", label: "STACKED" },
+                        { value: "USABLE", label: "USABLE" },
                         { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
                         { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
@@ -4870,6 +4908,8 @@ function CEReport() {
                         { value: "POOR", label: "POOR" },
                         { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
                         { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+                        { value: "STACKED", label: "STACKED" },
+                        { value: "USABLE", label: "USABLE" },
                         { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
                         { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
@@ -5774,6 +5814,29 @@ function CEReport() {
                 </div>
                 <div className="col-md-3">
                   <div className="form-group">
+                    <label htmlFor="rc_book_verified">
+                      RC Book Verified <span class="text-danger">*</span>
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        { value: "COPY VERIFIED", label: "COPY VERIFIED" },
+                        {
+                          value: "COPY NOT AVAILABLE",
+                          label: "COPY NOT AVAILABLE",
+                        },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
+                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
+                      ]}
+                      value={reportFormData.rc_book_verified}
+                      onChange={(value) =>
+                        handleSelectChange("rc_book_verified", value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="form-group">
                     <label htmlFor="bill_of_entry">
                       Bill Of Entry <span class="text-danger">*</span>
                     </label>
@@ -6407,6 +6470,8 @@ function CEReport() {
                         { value: "Total Operational & Functional Condition", label: "Total Operational & Functional Condition" },
                         { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
                         { value: "WORKABLE CONDITION", label: "WORKABLE CONDITION" },
+                        { value: "STACKED", label: "STACKED" },
+                        { value: "USABLE", label: "USABLE" },
                         { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
                         { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
