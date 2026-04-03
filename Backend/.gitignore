@@ -1,6 +1,7 @@
 # Ignore node modules
 node_modules/
 ./package-lock.json
+package-lock.json
 
 # Ignore environment config
 .env
@@ -16,6 +17,7 @@ step_to_depoye_to_vps_production.md
 LOCAL_UPLOAD_SETUP.md
 PUPPETEER_SETUP.md
 marine_report_template.html
+.DS_Store
 
 # Optional: ignore coverage reports
 coverage/

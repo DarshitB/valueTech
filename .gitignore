@@ -6,6 +6,8 @@ steps_add_data_from_sendbox_to_prod.md
 
 Untitled-5.html
 
+.DS_Store
+
 Backend/package-lock.json
 Backend/node_modules/
 Frontend/node_modules/
