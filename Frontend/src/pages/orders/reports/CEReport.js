@@ -157,6 +157,21 @@ const WysiwygTextarea = ({
   );
 };
 
+const VEHICLE_CONDITION_OPTIONS = [
+  { value: "EXCELLENT", label: "EXCELLENT" },
+  { value: "VERY GOOD", label: "VERY GOOD" },
+  { value: "GOOD", label: "GOOD" },
+  { value: "AVERAGE", label: "AVERAGE" },
+  { value: "FAIR", label: "FAIR" },
+  { value: "POOR", label: "POOR" },
+  { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
+  { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+  { value: "STACKED", label: "STACKED" },
+  { value: "USABLE", label: "USABLE" },
+  { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
+  { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
+];
+
 function CEReport() {
   // Extract order ID from route parameters
   const { id } = useParams();
@@ -4759,20 +4774,7 @@ function CEReport() {
                       Engine Condition <span class="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
-                      options={[
-                        { value: "EXCELLENT", label: "EXCELLENT" },
-                        { value: "VERY GOOD", label: "VERY GOOD" },
-                        { value: "GOOD", label: "GOOD" },
-                        { value: "AVERAGE", label: "AVERAGE" },
-                        { value: "FAIR", label: "FAIR" },
-                        { value: "POOR", label: "POOR" },
-                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
-                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
-                        { value: "STACKED", label: "STACKED" },
-                        { value: "USABLE", label: "USABLE" },
-                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
-                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
-                      ]}
+                      options={VEHICLE_CONDITION_OPTIONS}
                       value={reportFormData.engine_condition}
                       onChange={(value) =>
                         handleSelectChange("engine_condition", value)
@@ -4787,20 +4789,7 @@ function CEReport() {
                       Chassis Condition <span class="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
-                      options={[
-                        { value: "EXCELLENT", label: "EXCELLENT" },
-                        { value: "VERY GOOD", label: "VERY GOOD" },
-                        { value: "GOOD", label: "GOOD" },
-                        { value: "AVERAGE", label: "AVERAGE" },
-                        { value: "FAIR", label: "FAIR" },
-                        { value: "POOR", label: "POOR" },
-                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
-                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
-                        { value: "STACKED", label: "STACKED" },
-                        { value: "USABLE", label: "USABLE" },
-                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
-                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
-                      ]}
+                      options={VEHICLE_CONDITION_OPTIONS}
                       value={reportFormData.chassis_condition}
                       onChange={(value) =>
                         handleSelectChange("chassis_condition", value)
@@ -4815,20 +4804,7 @@ function CEReport() {
                       Body Condition <span class="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
-                      options={[
-                        { value: "EXCELLENT", label: "EXCELLENT" },
-                        { value: "VERY GOOD", label: "VERY GOOD" },
-                        { value: "GOOD", label: "GOOD" },
-                        { value: "AVERAGE", label: "AVERAGE" },
-                        { value: "FAIR", label: "FAIR" },
-                        { value: "POOR", label: "POOR" },
-                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
-                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
-                        { value: "STACKED", label: "STACKED" },
-                        { value: "USABLE", label: "USABLE" },
-                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
-                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
-                      ]}
+                      options={VEHICLE_CONDITION_OPTIONS}
                       value={reportFormData.body_condition}
                       onChange={(value) =>
                         handleSelectChange("body_condition", value)
@@ -4843,20 +4819,7 @@ function CEReport() {
                       Cabin Condition <span class="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
-                      options={[
-                        { value: "EXCELLENT", label: "EXCELLENT" },
-                        { value: "VERY GOOD", label: "VERY GOOD" },
-                        { value: "GOOD", label: "GOOD" },
-                        { value: "AVERAGE", label: "AVERAGE" },
-                        { value: "FAIR", label: "FAIR" },
-                        { value: "POOR", label: "POOR" },
-                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
-                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
-                        { value: "STACKED", label: "STACKED" },
-                        { value: "USABLE", label: "USABLE" },
-                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
-                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
-                      ]}
+                      options={VEHICLE_CONDITION_OPTIONS}
                       value={reportFormData.cabin_condition}
                       onChange={(value) =>
                         handleSelectChange("cabin_condition", value)
@@ -4871,20 +4834,7 @@ function CEReport() {
                       Electrical Condition <span class="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
-                      options={[
-                        { value: "EXCELLENT", label: "EXCELLENT" },
-                        { value: "VERY GOOD", label: "VERY GOOD" },
-                        { value: "GOOD", label: "GOOD" },
-                        { value: "AVERAGE", label: "AVERAGE" },
-                        { value: "FAIR", label: "FAIR" },
-                        { value: "POOR", label: "POOR" },
-                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
-                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
-                        { value: "STACKED", label: "STACKED" },
-                        { value: "USABLE", label: "USABLE" },
-                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
-                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
-                      ]}
+                      options={VEHICLE_CONDITION_OPTIONS}
                       value={reportFormData.electrical_condition}
                       onChange={(value) =>
                         handleSelectChange("electrical_condition", value)
@@ -4899,20 +4849,7 @@ function CEReport() {
                       Gear Transmission <span class="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
-                      options={[
-                        { value: "EXCELLENT", label: "EXCELLENT" },
-                        { value: "VERY GOOD", label: "VERY GOOD" },
-                        { value: "GOOD", label: "GOOD" },
-                        { value: "AVERAGE", label: "AVERAGE" },
-                        { value: "FAIR", label: "FAIR" },
-                        { value: "POOR", label: "POOR" },
-                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
-                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
-                        { value: "STACKED", label: "STACKED" },
-                        { value: "USABLE", label: "USABLE" },
-                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
-                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
-                      ]}
+                      options={VEHICLE_CONDITION_OPTIONS}
                       value={reportFormData.gear_transmission}
                       onChange={(value) =>
                         handleSelectChange("gear_transmission", value)

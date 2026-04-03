@@ -173,6 +173,21 @@ const WysiwygTextarea = ({
   );
 };
 
+const MACHINERY_CONDITION_OPTIONS = [
+  { value: "EXCELLENT", label: "EXCELLENT" },
+  { value: "VERY GOOD", label: "VERY GOOD" },
+  { value: "GOOD", label: "GOOD" },
+  { value: "AVERAGE", label: "AVERAGE" },
+  { value: "FAIR", label: "FAIR" },
+  { value: "POOR", label: "POOR" },
+  { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
+  { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+  { value: "STACKED", label: "STACKED" },
+  { value: "USABLE", label: "USABLE" },
+  { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
+  { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
+];
+
 function MachineryReport() {
   // Extract order ID from route parameters
   const { id } = useParams();
@@ -3750,15 +3765,7 @@ function MachineryReport() {
                       Control Panel Unit <span class="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
-                      options={[
-                        { value: "EXCELLENT", label: "EXCELLENT" },
-                        { value: "VERY GOOD", label: "VERY GOOD" },
-                        { value: "GOOD", label: "GOOD" },
-                        { value: "AVERAGE", label: "AVERAGE" },
-                        { value: "FAIR", label: "FAIR" },
-                        { value: "POOR", label: "POOR" },
-                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
-                      ]}
+                      options={MACHINERY_CONDITION_OPTIONS}
                       value={reportFormData.control_panel_unit}
                       onChange={(value) =>
                         handleSelectChange("control_panel_unit", value)
@@ -3773,20 +3780,7 @@ function MachineryReport() {
                       Machine Condition <span class="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
-                      options={[
-                        { value: "EXCELLENT", label: "EXCELLENT" },
-                        { value: "VERY GOOD", label: "VERY GOOD" },
-                        { value: "GOOD", label: "GOOD" },
-                        { value: "AVERAGE", label: "AVERAGE" },
-                        { value: "FAIR", label: "FAIR" },
-                        { value: "POOR", label: "POOR" },
-                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
-                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
-                        { value: "STACKED", label: "STACKED" },
-                        { value: "USABLE", label: "USABLE" },
-                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
-                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
-                      ]}
+                      options={MACHINERY_CONDITION_OPTIONS}
                       value={reportFormData.machine_condition}
                       onChange={(value) =>
                         handleSelectChange("machine_condition", value)
@@ -3801,20 +3795,7 @@ function MachineryReport() {
                       Electrical Condition <span class="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
-                      options={[
-                        { value: "EXCELLENT", label: "EXCELLENT" },
-                        { value: "VERY GOOD", label: "VERY GOOD" },
-                        { value: "GOOD", label: "GOOD" },
-                        { value: "AVERAGE", label: "AVERAGE" },
-                        { value: "FAIR", label: "FAIR" },
-                        { value: "POOR", label: "POOR" },
-                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
-                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
-                        { value: "STACKED", label: "STACKED" },
-                        { value: "USABLE", label: "USABLE" },
-                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
-                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
-                      ]}
+                      options={MACHINERY_CONDITION_OPTIONS}
                       value={reportFormData.electrical_condition}
                       onChange={(value) =>
                         handleSelectChange("electrical_condition", value)
@@ -3829,20 +3810,7 @@ function MachineryReport() {
                       Mechanical Condition <span class="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
-                      options={[
-                        { value: "EXCELLENT", label: "EXCELLENT" },
-                        { value: "VERY GOOD", label: "VERY GOOD" },
-                        { value: "GOOD", label: "GOOD" },
-                        { value: "AVERAGE", label: "AVERAGE" },
-                        { value: "FAIR", label: "FAIR" },
-                        { value: "POOR", label: "POOR" },
-                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
-                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
-                        { value: "STACKED", label: "STACKED" },
-                        { value: "USABLE", label: "USABLE" },
-                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
-                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
-                      ]}
+                      options={MACHINERY_CONDITION_OPTIONS}
                       value={reportFormData.mechanical_condition}
                       onChange={(value) =>
                         handleSelectChange("mechanical_condition", value)
@@ -4205,17 +4173,7 @@ function MachineryReport() {
                       Color Condition <span class="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
-                      options={[
-                        { value: "GOOD", label: "GOOD" },
-                        { value: "FAIR", label: "FAIR" },
-                        { value: "POOR", label: "POOR" },
-                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
-                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
-                        { value: "STACKED", label: "STACKED" },
-                        { value: "USABLE", label: "USABLE" },
-                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
-                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
-                      ]}
+                      options={MACHINERY_CONDITION_OPTIONS}
                       value={reportFormData.color_condition}
                       onChange={(value) =>
                         handleSelectChange("color_condition", value)

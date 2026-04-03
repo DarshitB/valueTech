@@ -146,6 +146,21 @@ const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "
   );
 };
 
+const VEHICLE_CONDITION_OPTIONS = [
+  { value: "EXCELLENT", label: "EXCELLENT" },
+  { value: "VERY GOOD", label: "VERY GOOD" },
+  { value: "GOOD", label: "GOOD" },
+  { value: "AVERAGE", label: "AVERAGE" },
+  { value: "FAIR", label: "FAIR" },
+  { value: "POOR", label: "POOR" },
+  { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
+  { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
+  { value: "STACKED", label: "STACKED" },
+  { value: "USABLE", label: "USABLE" },
+  { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
+  { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
+];
+
 function CVReport() {
   // Extract order ID from route parameters
   const { id } = useParams();
@@ -3884,6 +3899,7 @@ function CVReport() {
                     </label>
                     <SingleSearchSelect
                       options={[
+                        { value: "0 (ZERO)", label: "0 (ZERO)" },
                         { value: "1 (ONE)", label: "1 (ONE)" },
                         { value: "2 (TWO)", label: "2 (TWO)" },
                         { value: "3 (THREE)", label: "3 (THREE)" },
@@ -3894,6 +3910,7 @@ function CVReport() {
                         { value: "8 (EIGHT)", label: "8 (EIGHT)" },
                         { value: "9 (NINE)", label: "9 (NINE)" },
                         { value: "10 (TEN)", label: "10 (TEN)" },
+                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
                       ]}
                       value={reportFormData.no_of_cylinder}
                       onChange={(value) =>
@@ -3912,21 +3929,7 @@ function CVReport() {
                       Engine Condition <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
-                      options={[
-                        { value: "EXCELLENT", label: "EXCELLENT" },
-                        { value: "VERY GOOD", label: "VERY GOOD" },
-                        { value: "GOOD", label: "GOOD" },
-                        { value: "AVERAGE", label: "AVERAGE" },
-                        { value: "FAIR", label: "FAIR" },
-                        { value: "POOR", label: "POOR" },
-                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
-                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
-                        { value: "STACKED", label: "STACKED" },
-                        { value: "USABLE", label: "USABLE" },
-                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
-                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
-
-                      ]}
+                      options={VEHICLE_CONDITION_OPTIONS}
                       value={reportFormData.engine_condition}
                       onChange={(value) =>
                         handleSelectChange("engine_condition", value)
@@ -3941,20 +3944,7 @@ function CVReport() {
                       Chassis Condition <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
-                      options={[
-                        { value: "EXCELLENT", label: "EXCELLENT" },
-                        { value: "VERY GOOD", label: "VERY GOOD" },
-                        { value: "GOOD", label: "GOOD" },
-                        { value: "AVERAGE", label: "AVERAGE" },
-                        { value: "FAIR", label: "FAIR" },
-                        { value: "POOR", label: "POOR" },
-                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
-                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
-                        { value: "STACKED", label: "STACKED" },
-                        { value: "USABLE", label: "USABLE" },
-                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
-                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
-                      ]}
+                      options={VEHICLE_CONDITION_OPTIONS}
                       value={reportFormData.chassis_condition}
                       onChange={(value) =>
                         handleSelectChange("chassis_condition", value)
@@ -3969,20 +3959,7 @@ function CVReport() {
                       Body Condition <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
-                      options={[
-                        { value: "EXCELLENT", label: "EXCELLENT" },
-                        { value: "VERY GOOD", label: "VERY GOOD" },
-                        { value: "GOOD", label: "GOOD" },
-                        { value: "AVERAGE", label: "AVERAGE" },
-                        { value: "FAIR", label: "FAIR" },
-                        { value: "POOR", label: "POOR" },
-                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
-                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
-                        { value: "STACKED", label: "STACKED" },
-                        { value: "USABLE", label: "USABLE" },
-                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
-                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
-                      ]}
+                      options={VEHICLE_CONDITION_OPTIONS}
                       value={reportFormData.body_condition}
                       onChange={(value) =>
                         handleSelectChange("body_condition", value)
@@ -3997,20 +3974,7 @@ function CVReport() {
                       Cabin Condition <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
-                      options={[
-                        { value: "EXCELLENT", label: "EXCELLENT" },
-                        { value: "VERY GOOD", label: "VERY GOOD" },
-                        { value: "GOOD", label: "GOOD" },
-                        { value: "AVERAGE", label: "AVERAGE" },
-                        { value: "FAIR", label: "FAIR" },
-                        { value: "POOR", label: "POOR" },
-                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
-                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
-                        { value: "STACKED", label: "STACKED" },
-                        { value: "USABLE", label: "USABLE" },
-                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
-                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
-                      ]}
+                      options={VEHICLE_CONDITION_OPTIONS}
                       value={reportFormData.cabin_condition}
                       onChange={(value) =>
                         handleSelectChange("cabin_condition", value)
@@ -4026,20 +3990,7 @@ function CVReport() {
                       <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
-                      options={[
-                        { value: "EXCELLENT", label: "EXCELLENT" },
-                        { value: "VERY GOOD", label: "VERY GOOD" },
-                        { value: "GOOD", label: "GOOD" },
-                        { value: "AVERAGE", label: "AVERAGE" },
-                        { value: "FAIR", label: "FAIR" },
-                        { value: "POOR", label: "POOR" },
-                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
-                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
-                        { value: "STACKED", label: "STACKED" },
-                        { value: "USABLE", label: "USABLE" },
-                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
-                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
-                      ]}
+                      options={VEHICLE_CONDITION_OPTIONS}
                       value={reportFormData.electrical_condition}
                       onChange={(value) =>
                         handleSelectChange("electrical_condition", value)
@@ -4054,20 +4005,7 @@ function CVReport() {
                       Gear Transmission <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
-                      options={[
-                        { value: "EXCELLENT", label: "EXCELLENT" },
-                        { value: "VERY GOOD", label: "VERY GOOD" },
-                        { value: "GOOD", label: "GOOD" },
-                        { value: "AVERAGE", label: "AVERAGE" },
-                        { value: "FAIR", label: "FAIR" },
-                        { value: "POOR", label: "POOR" },
-                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
-                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
-                        { value: "STACKED", label: "STACKED" },
-                        { value: "USABLE", label: "USABLE" },
-                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
-                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
-                      ]}
+                      options={VEHICLE_CONDITION_OPTIONS}
                       value={reportFormData.gear_transmission}
                       onChange={(value) =>
                         handleSelectChange("gear_transmission", value)
@@ -4291,20 +4229,7 @@ function CVReport() {
                       <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
-                      options={[
-                        { value: "EXCELLENT", label: "EXCELLENT" },
-                        { value: "VERY GOOD", label: "VERY GOOD" },
-                        { value: "GOOD", label: "GOOD" },
-                        { value: "AVERAGE", label: "AVERAGE" },
-                        { value: "FAIR", label: "FAIR" },
-                        { value: "POOR", label: "POOR" },
-                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
-                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
-                        { value: "STACKED", label: "STACKED" },
-                        { value: "USABLE", label: "USABLE" },
-                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
-                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
-                      ]}
+                      options={VEHICLE_CONDITION_OPTIONS}
                       value={reportFormData.mechanical_unit_condition}
                       onChange={(value) =>
                         handleSelectChange("mechanical_unit_condition", value)
@@ -4338,14 +4263,7 @@ function CVReport() {
                       Suspension <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
-                      options={[
-                        { value: "EXCELLENT", label: "EXCELLENT" },
-                        { value: "VERY GOOD", label: "VERY GOOD" },
-                        { value: "GOOD", label: "GOOD" },
-                        { value: "AVERAGE", label: "AVERAGE" },
-                        { value: "FAIR", label: "FAIR" },
-                        { value: "POOR", label: "POOR" },
-                      ]}
+                      options={VEHICLE_CONDITION_OPTIONS}
                       value={reportFormData.suspension}
                       onChange={(value) =>
                         handleSelectChange("suspension", value)
@@ -4413,17 +4331,7 @@ function CVReport() {
                       Color Condition <span className="text-danger">*</span>
                     </label>
                     <SingleSearchSelect
-                      options={[
-                        { value: "GOOD", label: "GOOD" },
-                        { value: "FAIR", label: "FAIR" },
-                        { value: "POOR", label: "POOR" },
-                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
-                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
-                        { value: "STACKED", label: "STACKED" },
-                        { value: "USABLE", label: "USABLE" },
-                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
-                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
-                      ]}
+                      options={VEHICLE_CONDITION_OPTIONS}
                       value={reportFormData.color_condition}
                       onChange={(value) =>
                         handleSelectChange("color_condition", value)
