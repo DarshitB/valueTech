@@ -6,7 +6,7 @@ import ProtectedRoute from "./ProtectedRoute";
 import Login from "../pages/auth/Login";
 import OTPPage from "../pages/auth/OTPPage";
 import Dashboard from "../pages/dashboard/dashboard";
-import RootLayoutGate from "../layout/RootLayoutGate";
+import RootLayoutGate from "./RootLayoutGate";
 import Orders from "../pages/orders/Orders";
 import OrderHistory from "../pages/orders/order-history/OrderHistory";
 import FieldVerifier from "../pages/field-verifier/FieldVerifier";
