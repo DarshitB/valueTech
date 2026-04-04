@@ -149,7 +149,7 @@ export default function OTPPage() {
   // Redirect after successful OTP verification
   useEffect(() => {
     if (otpVerified && token) {
-      navigate("/");
+      navigate("/dashboard");
     }
   }, [otpVerified, token, navigate]);
 
@@ -166,7 +166,7 @@ export default function OTPPage() {
 
   // If user doesn't need OTP or is already verified, redirect to dashboard
   if (!needsOtp || otpVerified) {
-    return <Navigate to="/" />;
+    return <Navigate to="/dashboard" />;
   }
 
   return (

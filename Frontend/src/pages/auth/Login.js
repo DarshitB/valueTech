@@ -35,7 +35,7 @@ export default function Login() {
     if (needsOtp) {
       return <Navigate to="/otp-verify" replace />;
     }
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return (

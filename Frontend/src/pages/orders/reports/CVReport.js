@@ -1225,7 +1225,7 @@ function CVReport() {
   useLayoutEffect(() => {
     setTitle(
       <>
-        <Link to="/" className="text-blue-600 hover:underline">
+        <Link to="/dashboard" className="text-blue-600 hover:underline">
           Orders
         </Link>{" "}
         &gt;{" "}

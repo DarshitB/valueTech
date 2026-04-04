@@ -128,16 +128,16 @@ function Layout() {
         >
           <aside id="sidebar-wrapper">
             <div className="sidebar-brand">
-              <Link to="/" className="sidebar-brand-link">Valuetech Solutions</Link>
+              <Link to="/dashboard" className="sidebar-brand-link">Valuetech Solutions</Link>
             </div>
             <ul className="sidebar-menu">
               <li className="menu-header">&nbsp;</li>
               <li
                 className={`${
-                  location.pathname === "/" ? "active" : ""
+                  location.pathname === "/dashboard" ? "active" : ""
                 } dropdown`}
               >
-                <Link to="/" onClick={() => setSidebarOpen(false)}>
+                <Link to="/dashboard" onClick={() => setSidebarOpen(false)}>
                   <DashboardIcon className="feather feather-monitor" />
                   Dashboard
                 </Link>

@@ -37,7 +37,7 @@ const ProtectedRoute = ({ permission, children }) => {
 
   // Logged in but lacks required permission → redirect to home/dashboard
   if (permission && !user?.permissions?.includes(permission)) {
-    return <Navigate to="/" />;
+    return <Navigate to="/dashboard" />;
   }
 
   // All good → render child component

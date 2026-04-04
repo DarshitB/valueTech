@@ -2034,7 +2034,7 @@ function CEReport() {
   useLayoutEffect(() => {
     setTitle(
       <>
-        <Link to="/" className="text-blue-600 hover:underline">
+        <Link to="/dashboard" className="text-blue-600 hover:underline">
           Orders
         </Link>{" "}
         &gt;{" "}
@@ -5749,7 +5749,7 @@ function CEReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="rc_book_verified">
                       RC Book Verified <span class="text-danger">*</span>
@@ -5772,7 +5772,7 @@ function CEReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="bill_of_entry">
                       Bill Of Entry <span class="text-danger">*</span>
@@ -5793,7 +5793,7 @@ function CEReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="proforma_invoice_verified">
                       Proforma / Tax Invoice{" "}
@@ -5848,7 +5848,7 @@ function CEReport() {
                     </div>
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="tax_upto">Tax Upto</label>
                     <input
@@ -5863,7 +5863,7 @@ function CEReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="bill_of_lading">Bill Of Lading</label>
                     <SingleSearchSelect
@@ -5889,10 +5889,7 @@ function CEReport() {
                     /> */}
                   </div>
                 </div>
-              </div>
-
-              <div className="row">
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="chartered_engineer_certificate">
                       Chartered Engineer Certificate
@@ -5921,7 +5918,7 @@ function CEReport() {
                     /> */}
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="fitness_upto">Fitness Upto</label>
                     <input
@@ -5936,7 +5933,7 @@ function CEReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="insurance_co_name">Insurance Co.name</label>
                     <input
@@ -5950,7 +5947,7 @@ function CEReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="policy_no">Policy No</label>
                     <input
