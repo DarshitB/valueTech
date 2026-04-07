@@ -44,6 +44,7 @@ import {
   PaymentIcon,
   ReportIcon,
   RevalidateIcon,
+  ShareIcon,
   SelectedIcon,
   UploadImageIcon,
   UploadReportIcon,
@@ -207,6 +208,7 @@ function OrderDetails() {
   const [showOnHoldConfirmation, setShowOnHoldConfirmation] = useState(false);
   const [isCompletingOrder, setIsCompletingOrder] = useState(false);
   const [isPuttingOnHold, setIsPuttingOnHold] = useState(false);
+  const [isMovingToStatus9, setIsMovingToStatus9] = useState(false);
 
   // Complete order (status 13) via direct status update
   const handleCompleteOrder = async () => {
@@ -226,6 +228,27 @@ function OrderDetails() {
       // errors are toasted in reducer
     } finally {
       setIsCompletingOrder(false);
+    }
+  };
+
+  // Move order to status 9 via direct status update
+  const handleMoveToStatus9 = async () => {
+    if (!id) return;
+    setIsMovingToStatus9(true);
+    try {
+      await dispatch(
+        updateOrderStatusDirect({
+          id,
+          data: {
+            status_id: 9,
+            note: "Manually moved to status 9 by admin",
+          },
+        })
+      ).unwrap();
+    } catch (err) {
+      // errors are toasted in reducer
+    } finally {
+      setIsMovingToStatus9(false);
     }
   };
 
@@ -1409,7 +1432,34 @@ function OrderDetails() {
           alignItems: "center",
         }}
       >
-        {hasPermission(allowedPermissions, "view_complete_order_button") && (
+        {hasPermission(allowedPermissions, "view_order_document_under_processing_button") &&
+          (order?.current_status_id === 13 ||
+            order?.current_status_id === 14) && (
+          <button
+            title="move order to status document under processing"
+            className={`tooltip-link${
+              isMovingToStatus9 || ordersLoading ? " disabled" : ""
+            }`}
+            onClick={handleMoveToStatus9}
+            disabled={isMovingToStatus9 || ordersLoading}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              cursor:
+                isMovingToStatus9 || ordersLoading ? "not-allowed" : "pointer",
+              outline: "none",
+              boxShadow: "none",
+            }}
+          >
+            <ShareIcon
+              style={{ width: "40px", height: "40px", transform: "scaleX(-1)" }}
+            />
+          </button>
+        )}
+        {hasPermission(allowedPermissions, "view_complete_order_button") &&
+          order?.current_status_id !== 13 &&
+          order?.current_status_id !== 14 && (
           <button
             title="complete order"
             className={`tooltip-link${isCompletingOrder || ordersLoading ? " disabled" : ""}`}
@@ -1846,9 +1896,11 @@ function OrderDetails() {
     );
   }, [
     isDeveloperAdmin,
+    isMovingToStatus9,
     isCompletingOrder,
     isPuttingOnHold,
     ordersLoading,
+    handleMoveToStatus9,
     handleCompleteOrder,
     setShowOnHoldConfirmation,
     allowedPermissions,
