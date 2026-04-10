@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const {
   ensureOrderFolders,
@@ -13,6 +14,7 @@ const Order = require('../../models/orders/order');
 const OrderStatusHistory = require('../../models/orders/orderStatusHistory');
 const { BadRequestError, NotFoundError } = require('../../utils/customErrors');
 const { generateAndSaveThumbnail } = require('../../utils/thumbnailHelper');
+const { burnTextOnVideo, normalizeVideoExt } = require('../../utils/videoOverlayHelper');
 const db = require("../../../db");
 
 /**
@@ -83,7 +85,7 @@ async function uploadMultipart(req, res, next) {
   let tempPaths = [];
   let finalUploadedPaths = [];
   try {
-    const { order_number, image_count, video_count } = req.body;
+    const { order_number, image_count, video_count, overlay_text } = req.body;
     const files = req.files;
     const { id } = req.verifier;
 
@@ -156,26 +158,33 @@ async function uploadMultipart(req, res, next) {
 
     // Prepare all files for parallel upload
     const filesToUpload = [];
+    const shouldOverlay = overlay_text && overlay_text.trim().length > 0;
 
     for (const f of files) {
-      // Generate filename: orderNumber_fileType_randomNumber.extension
       const fileType = f.mimetype.startsWith('video') ? 'video' : 'image';
       const randomNumber = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
       const extension = f.originalname.split('.').pop() || 'bin';
       const generatedFilename = `${order_number}_${fileType}_${randomNumber}.${extension}`;
-
-      // Choose target folder path
       const targetFolderPath = f.mimetype && f.mimetype.startsWith('video') ? videosPath : imagesPath;
 
+      // Always track the original multer temp file for cleanup
+      tempPaths.push(f.path);
+
+      // For videos with overlay_text: burn the text in before copying to final folder
+      let sourcePath = f.path;
+      if (fileType === 'video' && shouldOverlay) {
+        const overlayPath = await burnTextOnVideo(f.path, overlay_text.trim(), extension);
+        tempPaths.push(overlayPath); // track overlay temp for cleanup too
+        sourcePath = overlayPath;
+      }
+
       filesToUpload.push({
-        path: f.path,
+        path: sourcePath,
         name: generatedFilename,
         mimeType: f.mimetype,
         targetFolderPath: targetFolderPath,
-        fileType: f.mimetype.startsWith('video') ? 'video' : 'image',
+        fileType,
       });
-
-      tempPaths.push(f.path);
     }
 
     // Copy all files to target folders in parallel for maximum performance
@@ -266,7 +275,7 @@ async function uploadBase64(req, res, next) {
   let tempPaths = [];
   let finalUploadedPaths = [];
   try {
-    const { order_number, files, image_count, video_count } = req.body;
+    const { order_number, files, image_count, video_count, overlay_text } = req.body;
     const { id } = req.verifier;
 
     if (!order_number) throw new BadRequestError('order_number is required');
@@ -290,7 +299,27 @@ async function uploadBase64(req, res, next) {
     }
 
     /* console.log("files", files); */
-    
+
+    // Validate counts against the raw files array BEFORE deduplication so that
+    // image_count/video_count always reflects what the client says it is sending.
+    const rawImageCount = files.filter(
+      (f) => f.data && /^data:image\//.test(f.data)
+    ).length;
+    const rawVideoCount = files.filter(
+      (f) => f.data && /^data:video\//.test(f.data)
+    ).length;
+
+    if (
+      rawImageCount !== expectedImageCount ||
+      rawVideoCount !== expectedVideoCount
+    ) {
+      throw new BadRequestError(
+        `Uploaded files count does not match expected image_count/video_count. ` +
+          `image_count_from_api=${expectedImageCount}, actual_images=${rawImageCount}, ` +
+          `video_count_from_api=${expectedVideoCount}, actual_videos=${rawVideoCount}`
+      );
+    }
+
     const orderRow = await getOrderByNumber(order_number);
     if (!orderRow) throw new BadRequestError('Order not found with provided order_number');
 
@@ -311,51 +340,58 @@ async function uploadBase64(req, res, next) {
     const { orderPath } = await ensureOrderFolders(order_number);
     const { imagesPath, videosPath } = await ensureMediaSubfolders(orderPath);
 
-    // Prepare all files for parallel upload
+    // Prepare all files for parallel upload — skip exact duplicates within this request.
+    // Two files are considered identical when their raw base64 payload (after the
+    // "data:<mime>;base64," prefix) produces the same SHA-256 hash.
     const filesToUpload = [];
+    const seenHashes = new Set();
+    let duplicatesSkipped = 0;
+    const shouldOverlay = overlay_text && overlay_text.trim().length > 0;
 
     for (const item of files) {
       if (!item.data) continue;
-      
-      // Generate filename: orderNumber_fileType_randomNumber.extension
-      const { tmpPath, filename, mime } = writeBase64ToTemp(item.data);
+
+      // Extract just the base64 payload for hashing (ignore mime prefix)
+      const hashMatch = item.data.match(/^data:.+;base64,(.+)$/);
+      if (!hashMatch) continue;
+
+      const contentHash = crypto
+        .createHash('sha256')
+        .update(hashMatch[1])
+        .digest('hex');
+
+      if (seenHashes.has(contentHash)) {
+        duplicatesSkipped++;
+        continue; // identical file already queued — skip
+      }
+      seenHashes.add(contentHash);
+
+      const { tmpPath, mime } = writeBase64ToTemp(item.data);
       const fileType = mime.startsWith('video') ? 'video' : 'image';
       const randomNumber = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-      const extension = mime.split('/')[1] || 'bin';
+      const rawExt = mime.split('/')[1] || 'bin';
+      const extension = fileType === 'video' ? normalizeVideoExt(rawExt) : rawExt;
       const generatedFilename = `${order_number}_${fileType}_${randomNumber}.${extension}`;
+      const targetFolderPath = mime && mime.startsWith('video') ? videosPath : imagesPath;
 
-      // Choose target folder path
-      const targetFolderPath =
-        mime && mime.startsWith('video') ? videosPath : imagesPath;
+      // Always track the base64-decoded temp file for cleanup
+      tempPaths.push(tmpPath);
+
+      // For videos with overlay_text: burn the text in before copying to final folder
+      let sourcePath = tmpPath;
+      if (fileType === 'video' && shouldOverlay) {
+        const overlayPath = await burnTextOnVideo(tmpPath, overlay_text.trim(), extension);
+        tempPaths.push(overlayPath); // track overlay temp for cleanup too
+        sourcePath = overlayPath;
+      }
 
       filesToUpload.push({
-        path: tmpPath,
+        path: sourcePath,
         name: generatedFilename,
         mimeType: mime,
-        targetFolderPath: targetFolderPath,
-        fileType: mime.startsWith('video') ? 'video' : 'image',
+        targetFolderPath,
+        fileType,
       });
-
-      tempPaths.push(tmpPath);
-    }
-
-    // Validate actual vs expected counts based on prepared files
-    const actualImageCount = filesToUpload.filter(
-      (f) => f.fileType === 'image'
-    ).length;
-    const actualVideoCount = filesToUpload.filter(
-      (f) => f.fileType === 'video'
-    ).length;
-
-    if (
-      actualImageCount !== expectedImageCount ||
-      actualVideoCount !== expectedVideoCount
-    ) {
-      throw new BadRequestError(
-        `Uploaded files count does not match expected image_count/video_count. ` +
-          `image_count_from_api=${expectedImageCount}, actual_images=${actualImageCount}, ` +
-          `video_count_from_api=${expectedVideoCount}, actual_videos=${actualVideoCount}`
-      );
     }
 
     // Copy all files to target folders in parallel for maximum performance
@@ -412,7 +448,12 @@ async function uploadBase64(req, res, next) {
     // Update order status to 7 (Assets Submitted) after successful upload
     await updateOrderStatusToAssetsSubmitted(orderRow.id, id, filesToUpload.length);
 
-    res.json({ state: 1, message: 'successfully uploaded the images', files: saved });
+    res.json({
+      state: 1,
+      message: 'successfully uploaded the images',
+      files: saved,
+      duplicates_skipped: duplicatesSkipped,
+    });
   } catch (err) {
     // If there's an error, still try to cleanup temp files and any copied files
     console.error('uploadBase64 error:', err);

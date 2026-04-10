@@ -3724,6 +3724,7 @@ function CVReport() {
                     <SingleSearchSelect
                       options={[
                         { value: "ORIGINAL", label: "ORIGINAL" },
+                        { value: "NOT ORIGINAL / REPUNCHED", label: "NOT ORIGINAL / REPUNCHED" },
                         { value: "NOT PUNCHED", label: "NOT PUNCHED" },
                         { value: "NOT BEDING IN CHASSIS", label: "NOT BEDING IN CHASSIS" },
                       ]}
