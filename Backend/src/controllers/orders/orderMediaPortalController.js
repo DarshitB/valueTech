@@ -21,6 +21,7 @@ const {
 } = require("../../utils/customErrors");
 const {
   generateAndSaveThumbnail,
+  getThumbnailUrl,
   getThumbnailUrlIfExists,
 } = require("../../utils/thumbnailHelper");
 
@@ -74,6 +75,26 @@ async function updateOrderStatusToAssetsSubmittedOnReject(orderId, userId) {
   } catch (error) {
     console.error("Error updating order status to 7 on media reject:", error);
   }
+}
+
+/**
+ * Delete local storage file from media_url (/uploads/...)
+ * Returns true only when a file actually existed and was removed.
+ */
+function deleteLocalFileByMediaUrl(mediaUrl) {
+  if (!mediaUrl || typeof mediaUrl !== "string") return false;
+
+  const uploadsPrefix = "/uploads/";
+  const idx = mediaUrl.indexOf(uploadsPrefix);
+  if (idx === -1) return false;
+
+  const relativeUploadPath = mediaUrl.slice(idx + 1); // remove leading slash
+  const absolutePath = path.join(process.cwd(), relativeUploadPath.replace(/\//g, path.sep));
+
+  if (!fs.existsSync(absolutePath)) return false;
+
+  fs.unlinkSync(absolutePath);
+  return true;
 }
 
 /**
@@ -229,6 +250,66 @@ async function softDeleteMedia(req, res, next) {
       data: {
         deleted_count: deletedIds.length,
         deleted_ids: deletedIds,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * DELETE /api/order-media/permanent-delete-soft-deleted
+ * Permanently remove already soft-deleted media rows + their storage files.
+ */
+async function permanentDeleteSoftDeletedMedia(req, res, next) {
+  try {
+    const softDeletedRows = await orderMediaPortal.findSoftDeletedWithMediaUrl();
+
+    if (!softDeletedRows || softDeletedRows.length === 0) {
+      return res.json({
+        success: true,
+        message: "No soft-deleted media records found",
+        data: {
+          records_deleted_count: 0,
+          files_removed_count: 0,
+          thumbnails_removed_count: 0,
+          total_rows_matched: 0,
+        },
+      });
+    }
+
+    let filesRemovedCount = 0;
+    let thumbnailsRemovedCount = 0;
+    for (const row of softDeletedRows) {
+      try {
+        if (deleteLocalFileByMediaUrl(row.media_url)) {
+          filesRemovedCount += 1;
+        }
+
+        // Image thumbnails are stored separately under /thumbs; remove per-record thumbnail too.
+        if (row.media_type === "image") {
+          const thumbnailUrl = getThumbnailUrl(row.media_url);
+          if (thumbnailUrl && deleteLocalFileByMediaUrl(thumbnailUrl)) {
+            thumbnailsRemovedCount += 1;
+          }
+        }
+      } catch (error) {
+        // Continue with next file; DB cleanup should still proceed.
+        console.warn(`Failed to remove media file for record ${row.id}:`, error.message);
+      }
+    }
+
+    const ids = softDeletedRows.map((row) => row.id);
+    const deletedCount = await orderMediaPortal.hardDeleteByIds(ids);
+
+    res.json({
+      success: true,
+      message: `Permanently deleted ${deletedCount} media record(s)`,
+      data: {
+        total_rows_matched: softDeletedRows.length,
+        records_deleted_count: deletedCount,
+        files_removed_count: filesRemovedCount,
+        thumbnails_removed_count: thumbnailsRemovedCount,
       },
     });
   } catch (error) {
@@ -681,6 +762,7 @@ module.exports = {
   getOrderMedia,
   updateMediaStatus,
   softDeleteMedia,
+  permanentDeleteSoftDeletedMedia,
   getOrderMediaCount,
   uploadZip,
   getApprovedOrderMediaPublic,

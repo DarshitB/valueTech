@@ -86,6 +86,27 @@ const orderMediaPortal = {
   },
 
   /**
+   * Get all soft-deleted media records that can be permanently deleted.
+   * Only rows with deleted_at + deleted_by + media_url are included.
+   */
+  findSoftDeletedWithMediaUrl: () =>
+    db("order_media_image_video")
+      .select("id", "media_url", "media_type")
+      .whereNotNull("deleted_at")
+      .whereNotNull("deleted_by")
+      .whereNotNull("media_url"),
+
+  /**
+   * Hard delete media rows by id.
+   * @param {number[]} ids
+   * @returns {Promise<number>} Number of deleted rows
+   */
+  hardDeleteByIds: (ids) => {
+    if (!Array.isArray(ids) || ids.length === 0) return Promise.resolve(0);
+    return db("order_media_image_video").whereIn("id", ids).del();
+  },
+
+  /**
    * Get media record by ID
    * Returns: Single media record or undefined
    */

@@ -105,6 +105,24 @@ const orderMediaDocument = {
     return result > 0;
   },
 
+  // Find soft-deleted documents eligible for permanent deletion
+  findSoftDeletedWithMediaUrl: async () => {
+    const rows = await db("order_media_documents")
+      .select("id", "media_url", "media_type")
+      .whereNotNull("deleted_at")
+      .whereNotNull("deleted_by")
+      .whereNotNull("media_url");
+
+    return rows;
+  },
+
+  // Hard delete documents by ids
+  hardDeleteByIds: async (ids) => {
+    if (!Array.isArray(ids) || ids.length === 0) return 0;
+    const deleted = await db("order_media_documents").whereIn("id", ids).del();
+    return deleted;
+  },
+
   // Approve documents by IDs for a given order
   approveByIdsForOrder: async (orderId, documentIds, approvedBy) => {
     if (!Array.isArray(documentIds) || documentIds.length === 0) {

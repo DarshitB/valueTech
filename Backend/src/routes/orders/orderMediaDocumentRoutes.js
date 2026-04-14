@@ -20,6 +20,18 @@ router.post(
   orderMediaDocumentController.upload
 );
 
+// Permanently delete all already soft-deleted records + files
+router.delete(
+  "/permanent-delete-soft-deleted",
+  checkPermission("delete_order_media_documents"),
+  activityLogger(
+    "order_media_documents",
+    () => null,
+    "Permanent Delete Soft Deleted Media Documents"
+  ),
+  orderMediaDocumentController.permanentDeleteSoftDeleted
+);
+
 // Get documents by order ID (more specific route first)
 router.get(
   "/:orderId",

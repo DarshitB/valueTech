@@ -13,6 +13,26 @@ const { ensureDirectoryExists } = require("../../utils/localFileHelper");
 // Import custom error classes
 const { NotFoundError, BadRequestError } = require("../../utils/customErrors");
 
+/**
+ * Delete local storage file from media_url (/uploads/...)
+ * Returns true only when a file actually existed and was removed.
+ */
+function deleteLocalFileByMediaUrl(mediaUrl) {
+  if (!mediaUrl || typeof mediaUrl !== "string") return false;
+
+  const uploadsPrefix = "/uploads/";
+  const idx = mediaUrl.indexOf(uploadsPrefix);
+  if (idx === -1) return false;
+
+  const relativeUploadPath = mediaUrl.slice(idx + 1); // remove leading slash
+  const absolutePath = path.join(process.cwd(), relativeUploadPath.replace(/\//g, path.sep));
+
+  if (!fs.existsSync(absolutePath)) return false;
+
+  fs.unlinkSync(absolutePath);
+  return true;
+}
+
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -575,6 +595,55 @@ exports.removeApprovalByOrderId = async (req, res, next) => {
       success: true,
       message: `${updated} document(s) approval removed`,
       data: { updated },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Permanently delete all already soft-deleted order-media documents.
+ * DELETE /api/order-media-document/permanent-delete-soft-deleted
+ */
+exports.permanentDeleteSoftDeleted = async (req, res, next) => {
+  try {
+    const softDeletedRows = await orderMediaDocument.findSoftDeletedWithMediaUrl();
+
+    if (!softDeletedRows || softDeletedRows.length === 0) {
+      return res.json({
+        success: true,
+        message: "No soft-deleted media document records found",
+        data: {
+          records_deleted_count: 0,
+          files_removed_count: 0,
+          total_rows_matched: 0,
+        },
+      });
+    }
+
+    let filesRemovedCount = 0;
+    for (const row of softDeletedRows) {
+      try {
+        if (deleteLocalFileByMediaUrl(row.media_url)) {
+          filesRemovedCount += 1;
+        }
+      } catch (error) {
+        // Continue with next file; DB cleanup should still proceed.
+        console.warn(`Failed to remove document file for record ${row.id}:`, error.message);
+      }
+    }
+
+    const ids = softDeletedRows.map((row) => row.id);
+    const deletedCount = await orderMediaDocument.hardDeleteByIds(ids);
+
+    res.json({
+      success: true,
+      message: `Permanently deleted ${deletedCount} media document record(s)`,
+      data: {
+        total_rows_matched: softDeletedRows.length,
+        records_deleted_count: deletedCount,
+        files_removed_count: filesRemovedCount,
+      },
     });
   } catch (err) {
     next(err);

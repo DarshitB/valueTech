@@ -43,6 +43,21 @@ router.use(auth);
 // router.use(permission);
 
 /**
+ * DELETE /api/order-media/permanent-delete-soft-deleted
+ * Hard delete all already soft-deleted media rows + files.
+ */
+router.delete(
+  "/permanent-delete-soft-deleted",
+  checkPermission("delete_order_media_files"),
+  activityLogger(
+    "order_media_image_video",
+    () => null,
+    "Permanent Delete Soft Deleted Order Media"
+  ),
+  orderMediaPortalController.permanentDeleteSoftDeletedMedia
+);
+
+/**
  * GET /api/order-media/:orderId
  * Get all media records for a specific order
  */
