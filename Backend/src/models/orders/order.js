@@ -84,6 +84,131 @@ async function getUserDepartmentCategoryIds(userId) {
   return [...new Set(ids)];
 }
 
+/**
+ * Non-privileged users: orders assigned to them OR orders with no active
+ * order_users rows. Uses NOT EXISTS instead of loading every distinct
+ * order_id from order_users (very expensive when that table is large).
+ */
+async function applyNonPrivilegedOrderAssignmentFilter(baseQuery, userId) {
+  const assignedOrderIds = await db("order_users")
+    .pluck("order_id")
+    .where("user_id", userId)
+    .whereNull("deleted_at");
+
+  baseQuery.where(function () {
+    const noActiveAssignmentSubquery = function () {
+      this.select(db.raw("1"))
+        .from("order_users")
+        .whereRaw("order_users.order_id = orders.id")
+        .whereNull("order_users.deleted_at");
+    };
+
+    if (assignedOrderIds.length > 0) {
+      this.whereIn("orders.id", assignedOrderIds).orWhereNotExists(
+        noActiveAssignmentSubquery
+      );
+    } else {
+      this.whereNotExists(noActiveAssignmentSubquery);
+    }
+  });
+}
+
+/**
+ * Same enrichment as before: assigned_users + ref_no_id per order (response shape unchanged).
+ */
+async function enrichOrdersWithAssignedUsersAndRefNo(orders) {
+  const orderIds = orders.map((o) => o.id);
+  if (orderIds.length === 0) {
+    return [];
+  }
+
+  const assignedUsers = await db("order_users")
+    .leftJoin("users", "order_users.user_id", "users.id")
+    .leftJoin("roles", "users.role_id", "roles.id")
+    .select(
+      "order_users.order_id",
+      "users.id",
+      "users.name",
+      "users.email",
+      "users.mobile",
+      "roles.name as role_name"
+    )
+    .whereIn("order_users.order_id", orderIds)
+    .whereNull("order_users.deleted_at");
+
+  const assignedUsersMap = assignedUsers.reduce((acc, user) => {
+    if (!acc[user.order_id]) {
+      acc[user.order_id] = [];
+    }
+    acc[user.order_id].push({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      mobile: user.mobile,
+      role_name: user.role_name,
+    });
+    return acc;
+  }, {});
+
+  const refNoIdMap = {};
+
+  const [
+    cvReports,
+    avrReports,
+    machineryReports,
+    ceReports,
+    marineReports,
+    customReports,
+  ] = await Promise.all([
+    db("report_cv")
+      .select("order_id", "ref_no_id")
+      .whereIn("order_id", orderIds)
+      .whereNotNull("ref_no_id"),
+    db("report_avr")
+      .select("order_id", "ref_no_id")
+      .whereIn("order_id", orderIds)
+      .whereNotNull("ref_no_id"),
+    db("report_machinery")
+      .select("order_id", "ref_no_id")
+      .whereIn("order_id", orderIds)
+      .whereNotNull("ref_no_id"),
+    db("report_ce")
+      .select("order_id", "ref_no_id")
+      .whereIn("order_id", orderIds)
+      .whereNotNull("ref_no_id"),
+    db("report_marine")
+      .select("order_id", "ref_no_id")
+      .whereIn("order_id", orderIds)
+      .whereNotNull("ref_no_id"),
+    db("report_custom")
+      .select("order_id", "content")
+      .whereIn("order_id", orderIds)
+      .whereNotNull("content"),
+  ]);
+
+  [...cvReports, ...avrReports, ...machineryReports, ...ceReports, ...marineReports].forEach(
+    (report) => {
+      if (report.ref_no_id) {
+        refNoIdMap[report.order_id] = report.ref_no_id;
+      }
+    }
+  );
+
+  customReports.forEach((report) => {
+    if (report.content && typeof report.content === "object") {
+      if (report.content.ref_no_id) {
+        refNoIdMap[report.order_id] = report.content.ref_no_id;
+      }
+    }
+  });
+
+  return orders.map((order) => ({
+    ...order,
+    assigned_users: assignedUsersMap[order.id] || [],
+    ref_no_id: refNoIdMap[order.id] || null,
+  }));
+}
+
 const order = {
   // Get all orders (excludes status 13 finalized and 14 on hold - those are fetched via getAllOrdersWithWoStatus / finalized-and-on-hold-orders)
   getAllOrders: async (user) => {
@@ -197,33 +322,7 @@ const order = {
 
     // If user doesn't have a privileged role, apply order assignment filtering
     if (!hasPrivilegedRole) {
-      // Get orders that are assigned to this user
-      const assignedOrderIds = await db("order_users")
-        .select("order_id")
-        .where("user_id", user.id)
-        .whereNull("deleted_at");
-
-      const userAssignedOrderIds = assignedOrderIds.map((o) => o.order_id);
-
-      // Get all orders that have ANY user assignments
-      const ordersWithAssignments = await db("order_users")
-        .select("order_id")
-        .whereNull("deleted_at")
-        .distinct();
-
-      const ordersWithAnyAssignment = ordersWithAssignments.map(
-        (o) => o.order_id
-      );
-
-      // Show orders that:
-      // 1. Are assigned to this user, OR
-      // 2. Have NO user assignments at all (available to everyone)
-      baseQuery.where(function () {
-        this.whereIn("orders.id", userAssignedOrderIds).orWhereNotIn(
-          "orders.id",
-          ordersWithAnyAssignment
-        );
-      });
+      await applyNonPrivilegedOrderAssignmentFilter(baseQuery, user.id);
     }
 
     // Additional role-specific filters (these work alongside assigned orders)
@@ -282,99 +381,7 @@ const order = {
 
     const orders = await baseQuery;
 
-    // Get assigned users for each order
-    const orderIds = orders.map((order) => order.id);
-    let assignedUsersMap = {};
-
-    if (orderIds.length > 0) {
-      const assignedUsers = await db("order_users")
-        .leftJoin("users", "order_users.user_id", "users.id")
-        .leftJoin("roles", "users.role_id", "roles.id")
-        .select(
-          "order_users.order_id",
-          "users.id",
-          "users.name",
-          "users.email",
-          "users.mobile",
-          "roles.name as role_name"
-        )
-        .whereIn("order_users.order_id", orderIds)
-        .whereNull("order_users.deleted_at");
-
-      // Group assigned users by order_id
-      assignedUsersMap = assignedUsers.reduce((acc, user) => {
-        if (!acc[user.order_id]) {
-          acc[user.order_id] = [];
-        }
-        acc[user.order_id].push({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          mobile: user.mobile,
-          role_name: user.role_name,
-        });
-        return acc;
-      }, {});
-    }
-
-    // Get ref_no_id from reports for each order
-    let refNoIdMap = {};
-    
-    if (orderIds.length > 0) {
-      // Query all report tables to get ref_no_id
-      const [cvReports, avrReports, machineryReports, ceReports, marineReports, customReports] = await Promise.all([
-        db("report_cv")
-          .select("order_id", "ref_no_id")
-          .whereIn("order_id", orderIds)
-          .whereNotNull("ref_no_id"),
-        db("report_avr")
-          .select("order_id", "ref_no_id")
-          .whereIn("order_id", orderIds)
-          .whereNotNull("ref_no_id"),
-        db("report_machinery")
-          .select("order_id", "ref_no_id")
-          .whereIn("order_id", orderIds)
-          .whereNotNull("ref_no_id"),
-        db("report_ce")
-          .select("order_id", "ref_no_id")
-          .whereIn("order_id", orderIds)
-          .whereNotNull("ref_no_id"),
-        db("report_marine")
-          .select("order_id", "ref_no_id")
-          .whereIn("order_id", orderIds)
-          .whereNotNull("ref_no_id"),
-        db("report_custom")
-          .select("order_id", "content")
-          .whereIn("order_id", orderIds)
-          .whereNotNull("content")
-      ]);
-
-      // Process standard reports (cv, avr, machinery, ce, marine)
-      [...cvReports, ...avrReports, ...machineryReports, ...ceReports, ...marineReports].forEach((report) => {
-        if (report.ref_no_id) {
-          refNoIdMap[report.order_id] = report.ref_no_id;
-        }
-      });
-
-      // Process custom reports (ref_no_id might be in content JSONB)
-      customReports.forEach((report) => {
-        if (report.content && typeof report.content === 'object') {
-          // Check if ref_no_id exists in the content object
-          if (report.content.ref_no_id) {
-            refNoIdMap[report.order_id] = report.content.ref_no_id;
-          }
-        }
-      });
-    }
-
-    // Add assigned_users and ref_no_id to each order
-    const ordersWithAssignedUsers = orders.map((order) => ({
-      ...order,
-      assigned_users: assignedUsersMap[order.id] || [],
-      ref_no_id: refNoIdMap[order.id] || null,
-    }));
-
-    return ordersWithAssignedUsers;
+    return enrichOrdersWithAssignedUsersAndRefNo(orders);
   },
 
   // Get all orders that are finalized (status 13) or on hold (status 14) - same logic as getAllOrders but only these statuses
@@ -489,33 +496,7 @@ const order = {
 
     // If user doesn't have a privileged role, apply order assignment filtering
     if (!hasPrivilegedRole) {
-      // Get orders that are assigned to this user
-      const assignedOrderIds = await db("order_users")
-        .select("order_id")
-        .where("user_id", user.id)
-        .whereNull("deleted_at");
-
-      const userAssignedOrderIds = assignedOrderIds.map((o) => o.order_id);
-
-      // Get all orders that have ANY user assignments
-      const ordersWithAssignments = await db("order_users")
-        .select("order_id")
-        .whereNull("deleted_at")
-        .distinct();
-
-      const ordersWithAnyAssignment = ordersWithAssignments.map(
-        (o) => o.order_id
-      );
-
-      // Show orders that:
-      // 1. Are assigned to this user, OR
-      // 2. Have NO user assignments at all (available to everyone)
-      baseQuery.where(function () {
-        this.whereIn("orders.id", userAssignedOrderIds).orWhereNotIn(
-          "orders.id",
-          ordersWithAnyAssignment
-        );
-      });
+      await applyNonPrivilegedOrderAssignmentFilter(baseQuery, user.id);
     }
 
     // Additional role-specific filters (these work alongside assigned orders)
@@ -574,99 +555,7 @@ const order = {
 
     const orders = await baseQuery;
 
-    // Get assigned users for each order
-    const orderIds = orders.map((order) => order.id);
-    let assignedUsersMap = {};
-
-    if (orderIds.length > 0) {
-      const assignedUsers = await db("order_users")
-        .leftJoin("users", "order_users.user_id", "users.id")
-        .leftJoin("roles", "users.role_id", "roles.id")
-        .select(
-          "order_users.order_id",
-          "users.id",
-          "users.name",
-          "users.email",
-          "users.mobile",
-          "roles.name as role_name"
-        )
-        .whereIn("order_users.order_id", orderIds)
-        .whereNull("order_users.deleted_at");
-
-      // Group assigned users by order_id
-      assignedUsersMap = assignedUsers.reduce((acc, user) => {
-        if (!acc[user.order_id]) {
-          acc[user.order_id] = [];
-        }
-        acc[user.order_id].push({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          mobile: user.mobile,
-          role_name: user.role_name,
-        });
-        return acc;
-      }, {});
-    }
-
-    // Get ref_no_id from reports for each order
-    let refNoIdMap = {};
-    
-    if (orderIds.length > 0) {
-      // Query all report tables to get ref_no_id
-      const [cvReports, avrReports, machineryReports, ceReports, marineReports, customReports] = await Promise.all([
-        db("report_cv")
-          .select("order_id", "ref_no_id")
-          .whereIn("order_id", orderIds)
-          .whereNotNull("ref_no_id"),
-        db("report_avr")
-          .select("order_id", "ref_no_id")
-          .whereIn("order_id", orderIds)
-          .whereNotNull("ref_no_id"),
-        db("report_machinery")
-          .select("order_id", "ref_no_id")
-          .whereIn("order_id", orderIds)
-          .whereNotNull("ref_no_id"),
-        db("report_ce")
-          .select("order_id", "ref_no_id")
-          .whereIn("order_id", orderIds)
-          .whereNotNull("ref_no_id"),
-        db("report_marine")
-          .select("order_id", "ref_no_id")
-          .whereIn("order_id", orderIds)
-          .whereNotNull("ref_no_id"),
-        db("report_custom")
-          .select("order_id", "content")
-          .whereIn("order_id", orderIds)
-          .whereNotNull("content")
-      ]);
-
-      // Process standard reports (cv, avr, machinery, ce, marine)
-      [...cvReports, ...avrReports, ...machineryReports, ...ceReports, ...marineReports].forEach((report) => {
-        if (report.ref_no_id) {
-          refNoIdMap[report.order_id] = report.ref_no_id;
-        }
-      });
-
-      // Process custom reports (ref_no_id might be in content JSONB)
-      customReports.forEach((report) => {
-        if (report.content && typeof report.content === 'object') {
-          // Check if ref_no_id exists in the content object
-          if (report.content.ref_no_id) {
-            refNoIdMap[report.order_id] = report.content.ref_no_id;
-          }
-        }
-      });
-    }
-
-    // Add assigned_users and ref_no_id to each order
-    const ordersWithAssignedUsers = orders.map((order) => ({
-      ...order,
-      assigned_users: assignedUsersMap[order.id] || [],
-      ref_no_id: refNoIdMap[order.id] || null,
-    }));
-
-    return ordersWithAssignedUsers;
+    return enrichOrdersWithAssignedUsersAndRefNo(orders);
   },
 
   // Get orders for mobile app filtered by field verifier ID (excludes finalized 13 and on hold 14)
