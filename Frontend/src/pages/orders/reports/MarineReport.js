@@ -2568,6 +2568,7 @@ function MarineReport() {
                         { value: "Dumb Barge (DB)", label: "Dumb Barge (DB)" },
                         { value: "Oil Tanker ", label: "Oil Tanker" },
                         { value: "Chemical Tanker", label: "Chemical Tanker" },
+                        { value: "Accommodation Work Barge (AWB)", label: "Accommodation Work Barge (AWB)" },
                       ]}
                       value={
                         reportFormData.report_title || "Offshore Supply Vessel"
