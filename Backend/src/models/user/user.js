@@ -29,7 +29,7 @@ const user = {
         "states.name as state_name"
       )
       .whereNull("users.deleted_at")
-      .whereNotIn("roles.name", ["BANK AUTHORITY", "BANK OFFICER"])
+      .whereNotIn("roles.name", ["BANK AUTHORITY", "BANK OFFICER", "CREDIT HEAD"])
       .where("roles.name", "!=", PROTECTED_ROLE); // Get all users excluding protected roles and soft-deleted ones
 
     if (!users.length) {
