@@ -140,14 +140,23 @@ function buildLogicalPath(orderNumber, fileType, fileName) {
 function cleanupTempFiles(filePaths) {
   filePaths.forEach(filePath => {
     try {
+      if (!filePath) return;
+
       if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-        /* console.log(`✅ Cleaned up temp file: ${filePath}`); */
+        const stats = fs.lstatSync(filePath);
+
+        if (stats.isDirectory()) {
+          // ZIP extraction paths are directories; remove them recursively.
+          fs.rmSync(filePath, { recursive: true, force: true });
+        } else {
+          fs.unlinkSync(filePath);
+        }
+        /* console.log(`✅ Cleaned up temp path: ${filePath}`); */
       } else {
-        console.log(`⚠️ Temp file already removed: ${filePath}`);
+        console.log(`⚠️ Temp path already removed: ${filePath}`);
       }
     } catch (error) {
-      console.warn(`❌ Failed to cleanup temp file ${filePath}:`, error.message);
+      console.warn(`❌ Failed to cleanup temp path ${filePath}:`, error.message);
     }
   });
 }

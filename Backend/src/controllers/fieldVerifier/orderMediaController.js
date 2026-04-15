@@ -157,35 +157,36 @@ async function uploadMultipart(req, res, next) {
     const { imagesPath, videosPath } = await ensureMediaSubfolders(orderPath);
 
     // Prepare all files for parallel upload
-    const filesToUpload = [];
     const shouldOverlay = overlay_text && overlay_text.trim().length > 0;
+    const filesToUpload = await Promise.all(
+      files.map(async (f) => {
+        const fileType = f.mimetype.startsWith('video') ? 'video' : 'image';
+        const randomNumber = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+        const extension = f.originalname.split('.').pop() || 'bin';
+        const generatedFilename = `${order_number}_${fileType}_${randomNumber}.${extension}`;
+        const targetFolderPath =
+          f.mimetype && f.mimetype.startsWith('video') ? videosPath : imagesPath;
 
-    for (const f of files) {
-      const fileType = f.mimetype.startsWith('video') ? 'video' : 'image';
-      const randomNumber = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-      const extension = f.originalname.split('.').pop() || 'bin';
-      const generatedFilename = `${order_number}_${fileType}_${randomNumber}.${extension}`;
-      const targetFolderPath = f.mimetype && f.mimetype.startsWith('video') ? videosPath : imagesPath;
+        // Always track the original multer temp file for cleanup
+        tempPaths.push(f.path);
 
-      // Always track the original multer temp file for cleanup
-      tempPaths.push(f.path);
+        // For videos with overlay_text: burn the text in before copying to final folder
+        let sourcePath = f.path;
+        if (fileType === 'video' && shouldOverlay) {
+          const overlayPath = await burnTextOnVideo(f.path, overlay_text.trim(), extension);
+          tempPaths.push(overlayPath); // track overlay temp for cleanup too
+          sourcePath = overlayPath;
+        }
 
-      // For videos with overlay_text: burn the text in before copying to final folder
-      let sourcePath = f.path;
-      if (fileType === 'video' && shouldOverlay) {
-        const overlayPath = await burnTextOnVideo(f.path, overlay_text.trim(), extension);
-        tempPaths.push(overlayPath); // track overlay temp for cleanup too
-        sourcePath = overlayPath;
-      }
-
-      filesToUpload.push({
-        path: sourcePath,
-        name: generatedFilename,
-        mimeType: f.mimetype,
-        targetFolderPath: targetFolderPath,
-        fileType,
-      });
-    }
+        return {
+          path: sourcePath,
+          name: generatedFilename,
+          mimeType: f.mimetype,
+          targetFolderPath,
+          fileType,
+        };
+      })
+    );
 
     // Copy all files to target folders in parallel for maximum performance
     const uploadedFiles = await copyMultipleFilesToFolder(filesToUpload);
@@ -213,16 +214,17 @@ async function uploadMultipart(req, res, next) {
     });
 
     // Insert all media records
-    const saved = [];
-    for (let i = 0; i < mediaRecords.length; i++) {
-      const mediaId = await insertMedia(mediaRecords[i]);
-      saved.push({
-        id: mediaId,
-        localFileId: uploadedFiles[i].id,
-        link: uploadedFiles[i].webContentLink, // Use local file path for media access
-        filename: filesToUpload[i].name,
-      });
-    }
+    const saved = await Promise.all(
+      mediaRecords.map(async (record, i) => {
+        const mediaId = await insertMedia(record);
+        return {
+          id: mediaId,
+          localFileId: uploadedFiles[i].id,
+          link: uploadedFiles[i].webContentLink, // Use local file path for media access
+          filename: filesToUpload[i].name,
+        };
+      })
+    );
 
     // Final safety check: ensure we saved exactly as many as expected
     if (
