@@ -302,6 +302,120 @@ function resolveAbsoluteUploadPath(storedPath) {
   return path.join(process.cwd(), "uploads", relative);
 }
 
+/**
+ * Convert an image URL / relative path to an inline base64 data URI so that
+ * Puppeteer does not need to make any network round-trip to render it.
+ *
+ * The function is deliberately defensive: if anything goes wrong (file not
+ * found, unsupported scheme, unreadable buffer, etc.) we simply return the
+ * original value unchanged so the existing template behaviour is preserved.
+ *
+ * Recognised inputs:
+ *   - data:...            => returned as-is (already inline)
+ *   - http(s)://host/...  => we only try to resolve the pathname against the
+ *                            local uploads directory; if not found we return
+ *                            the original URL so the template can still try it
+ *   - /uploads/...        => resolved against <cwd>/uploads/
+ *   - uploads/...         => resolved against <cwd>/uploads/
+ *
+ * Any other scheme (blob:, etc.) is returned unchanged.
+ */
+function inlineImageAsDataUri(value) {
+  if (!value || typeof value !== "string") return value;
+  const trimmed = value.trim();
+  if (!trimmed) return value;
+
+  // Already an inline data URI - nothing to do
+  if (trimmed.startsWith("data:")) return trimmed;
+
+  // We cannot fetch blob: URLs from the backend; leave as-is
+  if (trimmed.startsWith("blob:")) return trimmed;
+
+  // Candidate path on disk (relative to the project root uploads dir)
+  let candidatePath = null;
+  try {
+    if (/^https?:\/\//i.test(trimmed)) {
+      // Extract only the pathname from the URL, e.g. /uploads/2025/Oct/123/foo.jpg
+      const parsed = new URL(trimmed);
+      candidatePath = resolveAbsoluteUploadPath(parsed.pathname);
+    } else {
+      candidatePath = resolveAbsoluteUploadPath(trimmed);
+    }
+  } catch (err) {
+    // Malformed URL - keep original value
+    return value;
+  }
+
+  if (!candidatePath) return value;
+
+  try {
+    if (!fs.existsSync(candidatePath)) return value;
+    const buffer = fs.readFileSync(candidatePath);
+    if (!buffer || !buffer.length) return value;
+
+    const ext = path.extname(candidatePath).toLowerCase();
+    let mime = "image/png";
+    if (ext === ".jpg" || ext === ".jpeg") mime = "image/jpeg";
+    else if (ext === ".webp") mime = "image/webp";
+    else if (ext === ".gif") mime = "image/gif";
+    else if (ext === ".svg") mime = "image/svg+xml";
+    else if (ext === ".bmp") mime = "image/bmp";
+
+    return `data:${mime};base64,${buffer.toString("base64")}`;
+  } catch (err) {
+    // Any IO failure - fall back to original value so rendering still tries
+    return value;
+  }
+}
+
+/**
+ * Produce a shallow clone of the marine report formData with any image fields
+ * replaced by inline data URIs. This avoids Puppeteer having to hit the
+ * backend for each `<img>` while rendering the PDF, which is what currently
+ * causes the "Navigation timeout of 30000 ms exceeded" error.
+ *
+ * Only the fields known to contain images are touched:
+ *   - formData.vessel_photo
+ *   - formData.vessel_photo_preview
+ *   - formData.vessel_photo_for_template
+ *   - flexible_fields[*].field_3 where the section name contains
+ *     "HEADING_DESCRIPTION_IMAGE" (the only section type that renders images)
+ *
+ * Any field that cannot be resolved to a file on disk is left untouched so
+ * the existing rendering path (absolute HTTP URL) still works.
+ */
+function inlineMarineReportImages(formData) {
+  if (!formData || typeof formData !== "object") return formData;
+
+  const cloned = { ...formData };
+
+  if (cloned.vessel_photo) {
+    cloned.vessel_photo = inlineImageAsDataUri(cloned.vessel_photo);
+  }
+  if (cloned.vessel_photo_preview) {
+    cloned.vessel_photo_preview = inlineImageAsDataUri(
+      cloned.vessel_photo_preview
+    );
+  }
+  if (cloned.vessel_photo_for_template) {
+    cloned.vessel_photo_for_template = inlineImageAsDataUri(
+      cloned.vessel_photo_for_template
+    );
+  }
+
+  if (Array.isArray(cloned.flexible_fields)) {
+    cloned.flexible_fields = cloned.flexible_fields.map((field) => {
+      if (!field || typeof field !== "object") return field;
+      const sectionName = (field.section_name || "").toString();
+      if (!sectionName.includes("HEADING_DESCRIPTION_IMAGE")) return field;
+      if (!field.field_3) return field;
+      return { ...field, field_3: inlineImageAsDataUri(field.field_3) };
+    });
+  }
+
+  return cloned;
+}
+
 function saveChassisImage(
   buffer,
   mimeType,
@@ -1044,14 +1158,25 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
     // Continue without background image rather than failing
   }
   /* console.log(formData); */
+
+  // For marine reports only: inline vessel + section images as base64 data URIs
+  // so Puppeteer does not need any network round-trip to render them. This
+  // prevents the `networkidle0` wait from timing out when an image URL is slow
+  // or unreachable from inside the headless Chromium. Other report types are
+  // intentionally left untouched.
+  let templateFormData = formData;
+  if (reportType.toLowerCase() === "report_marine") {
+    templateFormData = inlineMarineReportImages(formData);
+  }
+
   // Generate HTML content based on report type
   const htmlContent = generateReportHTML(
     reportType,
-    formData,
+    templateFormData,
     extraData,
     bgImageBase64,
     stampImageBase64,
-    formData.report_type_selection
+    templateFormData.report_type_selection
   );
 
   // Launch Puppeteer with optimized settings
@@ -1092,20 +1217,52 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
 
     const startTime = Date.now();
 
-    // Set content with appropriate loading strategy
-    // For marine reports, wait for networkidle to ensure JavaScript executes
-    const waitStrategy =
-      reportType.toLowerCase() === "report_marine"
-        ? "networkidle0"
-        : "domcontentloaded";
+    // Set content with appropriate loading strategy.
+    //
+    // For marine reports we deliberately do NOT use `networkidle0`: the marine
+    // template can reference remote `<img>` URLs (vessel photo, per-section
+    // images) and if ANY of them is slow/unreachable the navigation used to
+    // hang until the 30s timeout and crash the whole PDF generation. Images
+    // are now inlined as base64 via `inlineMarineReportImages`, but we keep a
+    // safety net here by waiting for image load explicitly below with a
+    // per-image cap. Non-marine reports keep their previous behaviour.
+    const isMarineReport = reportType.toLowerCase() === "report_marine";
+    const waitStrategy = "domcontentloaded";
 
     await page.setContent(htmlContent, {
       waitUntil: waitStrategy,
-      timeout: reportType.toLowerCase() === "report_marine" ? 30000 : 10000, // More time for marine reports
+      timeout: isMarineReport ? 60000 : 10000,
     });
 
     // For marine reports, add additional wait to ensure JavaScript pagination completes
-    if (reportType.toLowerCase() === "report_marine") {
+    if (isMarineReport) {
+      // Wait for any remaining <img> tags to finish loading (or erroring). A
+      // per-image hard cap protects us from a single bad URL holding up the
+      // render forever, which is what used to cause the timeout crash.
+      try {
+        await page.evaluate(async () => {
+          const images = Array.from(document.images || []);
+          await Promise.all(
+            images.map((img) => {
+              if (img.complete) return Promise.resolve();
+              return new Promise((resolve) => {
+                const done = () => resolve();
+                img.addEventListener("load", done, { once: true });
+                img.addEventListener("error", done, { once: true });
+                // Per-image cap: 8s is plenty for any reasonable image and
+                // ensures a broken src never blocks rendering.
+                setTimeout(done, 8000);
+              });
+            })
+          );
+        });
+      } catch (imgWaitErr) {
+        console.warn(
+          "Image wait completed with warning:",
+          imgWaitErr.message
+        );
+      }
+
       // Wait for JavaScript to execute using waitForFunction
       try {
         await page
@@ -1355,7 +1512,15 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
             const isLastPage = p === splitPoints.length - 1;
 
             const table = document.createElement("table");
-            table.style.cssText = "width:100%; border-collapse:collapse; margin-top:-30px; margin-bottom:0;";
+            // Page 1 needs margin-top:-30px to cancel .content-wrapper's 30px
+            // top padding so the 225px spacer-row lands the content at 225px
+            // from the top of the page. Pages 2+ start at the top of a fresh
+            // physical page (no wrapper padding is re-applied there), so the
+            // -30px would pull their spacer ABOVE the letterhead area and
+            // cause the header/content to overlap. Keep margin-top:0 on those
+            // pages so every page uses the same top offset (225px spacer).
+            const pageTopMargin = isFirstPage ? "-30px" : "0";
+            table.style.cssText = `width:100%; border-collapse:collapse; margin-top:${pageTopMargin}; margin-bottom:0;`;
             if (!isLastPage) table.style.pageBreakAfter = "always";
 
             const newThead = document.createElement("thead");
@@ -1763,8 +1928,15 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
           const isLastPage = p === splitPoints.length - 1;
 
           const table = document.createElement("table");
-          table.style.cssText =
-            "width:100%; border-collapse:collapse; margin-top:-30px; margin-bottom:0;";
+          // Page 1 needs margin-top:-30px to cancel .content-wrapper's 30px
+          // top padding so the 225px spacer-row lands the content at 225px
+          // from the top of the page. Pages 2+ start at the top of a fresh
+          // physical page (no wrapper padding is re-applied there), so the
+          // -30px would pull their spacer ABOVE the letterhead area and
+          // cause the header/content to overlap. Keep margin-top:0 on those
+          // pages so every page uses the same top offset (225px spacer).
+          const pageTopMargin = isFirstPage ? "-30px" : "0";
+          table.style.cssText = `width:100%; border-collapse:collapse; margin-top:${pageTopMargin}; margin-bottom:0;`;
 
           if (!isLastPage) {
             table.style.pageBreakAfter = "always";
