@@ -36,4 +36,23 @@ router.post(
   orderMediaController.uploadBase64
 );
 
+// Combined endpoint: accepts multipart files, base64 files, or BOTH in the
+// same request. Content-Type decides how the body is parsed so multer does
+// not run on JSON payloads and express.json does not run on multipart
+// payloads. In multipart mode, a body field named `files` may additionally
+// carry a JSON string array of base64 items.
+const combinedParser = (req, res, next) => {
+  const contentType = (req.headers["content-type"] || "").toLowerCase();
+  if (contentType.startsWith("multipart/form-data")) {
+    return upload.any()(req, res, next);
+  }
+  return express.json({ limit: "200mb" })(req, res, next);
+};
+
+router.post(
+  "/upload-combined",
+  combinedParser,
+  orderMediaController.uploadCombined
+);
+
 module.exports = router;

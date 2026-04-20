@@ -470,7 +470,328 @@ async function uploadBase64(req, res, next) {
   }
 }
 
+/**
+ * POST /api/media/upload-combined
+ *
+ * Accepts EITHER:
+ *   - multipart/form-data with files in any field name + body fields
+ *     (order_number, image_count, video_count, overlay_text) and optionally
+ *     a body field named `files` containing a JSON array of base64 items
+ *     `[{ "data": "data:<mime>;base64,..." }, ...]` — this is how you send
+ *     a MIX of multipart files AND base64 files in the same request.
+ *   - application/json with a pure base64 payload identical to `/upload-base64`:
+ *     { order_number, image_count, video_count, overlay_text,
+ *       files: [{ data: "data:<mime>;base64,..." }, ...] }
+ *
+ * Count check (image_count / video_count) is validated against the TOTAL of
+ * multipart + base64 files combined. Dedup is applied across ALL files in the
+ * request (multipart + base64) by SHA-256 of the raw bytes so the same photo
+ * sent in both channels is saved only once.
+ */
+async function uploadCombined(req, res, next) {
+  let tempPaths = [];
+  let finalUploadedPaths = [];
+  try {
+    const { order_number, image_count, video_count, overlay_text } = req.body || {};
+    const { id } = req.verifier;
+
+    // Collect multipart files (populated by multer when Content-Type is
+    // multipart/form-data; empty array when payload is pure JSON).
+    const multipartFiles = Array.isArray(req.files) ? req.files : [];
+
+    // Collect base64 entries. Two accepted body field names so the caller can
+    // avoid a naming collision with multipart file parts in Postman etc.:
+    //   - `files_base64` (preferred when multipart files are also named `files`)
+    //   - `files` (kept for backward compatibility; in pure JSON payloads this
+    //     is the natural key because there are no multipart parts)
+    // In multipart the value arrives as a JSON string; in pure JSON it arrives
+    // as an array directly.
+    let base64Files = [];
+    const base64Source =
+      req.body && req.body.files_base64 !== undefined && req.body.files_base64 !== null
+        ? req.body.files_base64
+        : req.body && req.body.files !== undefined && req.body.files !== null
+        ? req.body.files
+        : null;
+    if (base64Source !== null) {
+      if (Array.isArray(base64Source)) {
+        base64Files = base64Source;
+      } else if (typeof base64Source === 'string' && base64Source.trim().length > 0) {
+        try {
+          const parsed = JSON.parse(base64Source);
+          base64Files = Array.isArray(parsed) ? parsed : [];
+        } catch (_) {
+          throw new BadRequestError(
+            'files / files_base64 field must be a valid JSON array of { data: "data:<mime>;base64,..." } items'
+          );
+        }
+      }
+    }
+
+    if (!order_number) throw new BadRequestError('order_number is required');
+    if (multipartFiles.length === 0 && base64Files.length === 0) {
+      throw new BadRequestError(
+        'No files uploaded (provide multipart files, base64 files, or both)'
+      );
+    }
+
+    // Enforce "all or nothing" count check against the COMBINED totals.
+    const expectedImageCount = parseInt(image_count ?? 0, 10);
+    const expectedVideoCount = parseInt(video_count ?? 0, 10);
+
+    if (
+      Number.isNaN(expectedImageCount) ||
+      Number.isNaN(expectedVideoCount) ||
+      expectedImageCount < 0 ||
+      expectedVideoCount < 0
+    ) {
+      throw new BadRequestError(
+        'image_count and video_count must be non-negative integers'
+      );
+    }
+
+    const multipartImageCount = multipartFiles.filter(
+      (f) => f.mimetype && f.mimetype.startsWith('image/')
+    ).length;
+    const multipartVideoCount = multipartFiles.filter(
+      (f) => f.mimetype && f.mimetype.startsWith('video/')
+    ).length;
+    const base64ImageCount = base64Files.filter(
+      (f) => f && f.data && /^data:image\//.test(f.data)
+    ).length;
+    const base64VideoCount = base64Files.filter(
+      (f) => f && f.data && /^data:video\//.test(f.data)
+    ).length;
+
+    const actualImageCount = multipartImageCount + base64ImageCount;
+    const actualVideoCount = multipartVideoCount + base64VideoCount;
+
+    if (
+      actualImageCount !== expectedImageCount ||
+      actualVideoCount !== expectedVideoCount
+    ) {
+      throw new BadRequestError(
+        `Uploaded files count does not match expected image_count/video_count. ` +
+          `image_count_from_api=${expectedImageCount}, actual_images=${actualImageCount} ` +
+          `(multipart=${multipartImageCount}, base64=${base64ImageCount}), ` +
+          `video_count_from_api=${expectedVideoCount}, actual_videos=${actualVideoCount} ` +
+          `(multipart=${multipartVideoCount}, base64=${base64VideoCount})`
+      );
+    }
+
+    const orderRow = await getOrderByNumber(order_number);
+    if (!orderRow) throw new BadRequestError('Order not found with provided order_number');
+
+    // Existing rejected-media status transition (2 -> 3) — same as other endpoints.
+    const existingMedia = await db('order_media_image_video')
+      .where('order_id', orderRow.id)
+      .where('status', 2);
+
+    if (existingMedia.length > 0) {
+      await db('order_media_image_video')
+        .where('order_id', orderRow.id)
+        .where('status', 2)
+        .update({ status: 3 });
+    }
+
+    const { orderPath } = await ensureOrderFolders(order_number);
+    const { imagesPath, videosPath } = await ensureMediaSubfolders(orderPath);
+
+    const shouldOverlay =
+      overlay_text && String(overlay_text).trim().length > 0;
+
+    // Unified processing pipeline. Dedup is applied across BOTH multipart and
+    // base64 files so the same photo sent in both channels is kept only once.
+    const filesToUpload = [];
+    const seenHashes = new Set();
+    let duplicatesSkipped = 0;
+
+    // 1) Multipart files — hash file bytes on disk to detect duplicates.
+    for (const f of multipartFiles) {
+      if (!f || !f.mimetype || !f.path) continue;
+
+      let contentHash = null;
+      try {
+        const fileBuffer = fs.readFileSync(f.path);
+        contentHash = crypto
+          .createHash('sha256')
+          .update(fileBuffer)
+          .digest('hex');
+      } catch (_) {
+        contentHash = null;
+      }
+
+      if (contentHash && seenHashes.has(contentHash)) {
+        tempPaths.push(f.path); // still cleanup the multer temp file
+        duplicatesSkipped++;
+        continue;
+      }
+      if (contentHash) seenHashes.add(contentHash);
+
+      const fileType = f.mimetype.startsWith('video') ? 'video' : 'image';
+      const randomNumber = Math.floor(Math.random() * 10000)
+        .toString()
+        .padStart(4, '0');
+      const rawExt =
+        (f.originalname && f.originalname.split('.').pop()) ||
+        (f.mimetype.split('/')[1] || 'bin');
+      const extension =
+        fileType === 'video' ? normalizeVideoExt(rawExt) : rawExt;
+      const generatedFilename = `${order_number}_${fileType}_${randomNumber}.${extension}`;
+      const targetFolderPath = fileType === 'video' ? videosPath : imagesPath;
+
+      tempPaths.push(f.path);
+
+      let sourcePath = f.path;
+      if (fileType === 'video' && shouldOverlay) {
+        const overlayPath = await burnTextOnVideo(
+          f.path,
+          String(overlay_text).trim(),
+          extension
+        );
+        tempPaths.push(overlayPath);
+        sourcePath = overlayPath;
+      }
+
+      filesToUpload.push({
+        path: sourcePath,
+        name: generatedFilename,
+        mimeType: f.mimetype,
+        targetFolderPath,
+        fileType,
+      });
+    }
+
+    // 2) Base64 files — same dedup logic as /upload-base64.
+    for (const item of base64Files) {
+      if (!item || !item.data) continue;
+
+      const hashMatch = item.data.match(/^data:.+;base64,(.+)$/);
+      if (!hashMatch) continue;
+
+      const contentHash = crypto
+        .createHash('sha256')
+        .update(hashMatch[1])
+        .digest('hex');
+
+      if (seenHashes.has(contentHash)) {
+        duplicatesSkipped++;
+        continue;
+      }
+      seenHashes.add(contentHash);
+
+      const { tmpPath, mime } = writeBase64ToTemp(item.data);
+      const fileType = mime.startsWith('video') ? 'video' : 'image';
+      const randomNumber = Math.floor(Math.random() * 10000)
+        .toString()
+        .padStart(4, '0');
+      const rawExt = mime.split('/')[1] || 'bin';
+      const extension =
+        fileType === 'video' ? normalizeVideoExt(rawExt) : rawExt;
+      const generatedFilename = `${order_number}_${fileType}_${randomNumber}.${extension}`;
+      const targetFolderPath = mime.startsWith('video') ? videosPath : imagesPath;
+
+      tempPaths.push(tmpPath);
+
+      let sourcePath = tmpPath;
+      if (fileType === 'video' && shouldOverlay) {
+        const overlayPath = await burnTextOnVideo(
+          tmpPath,
+          String(overlay_text).trim(),
+          extension
+        );
+        tempPaths.push(overlayPath);
+        sourcePath = overlayPath;
+      }
+
+      filesToUpload.push({
+        path: sourcePath,
+        name: generatedFilename,
+        mimeType: mime,
+        targetFolderPath,
+        fileType,
+      });
+    }
+
+    if (filesToUpload.length === 0) {
+      throw new BadRequestError(
+        'All provided files were duplicates or invalid; nothing to upload'
+      );
+    }
+
+    // Copy everything to its final folder in parallel.
+    const uploadedFiles = await copyMultipleFilesToFolder(filesToUpload);
+    finalUploadedPaths = uploadedFiles.map((u) => u.path);
+
+    // Thumbnails for images (same behaviour as other endpoints).
+    const thumbnailPromises = filesToUpload
+      .map((f, i) => (f.fileType === 'image' ? uploadedFiles[i].path : null))
+      .filter(Boolean)
+      .map((p) => generateAndSaveThumbnail(p));
+    await Promise.all(thumbnailPromises);
+
+    const mediaRecords = uploadedFiles.map((uploaded, index) => ({
+      order_id: orderRow.id,
+      uploader_type: 'field_verifiers',
+      uploader_id: id,
+      media_url: uploaded.webContentLink,
+      media_type: filesToUpload[index].fileType,
+      status: 0,
+    }));
+
+    const saved = [];
+    for (let i = 0; i < mediaRecords.length; i++) {
+      const mediaId = await insertMedia(mediaRecords[i]);
+      saved.push({
+        id: mediaId,
+        localFileId: uploadedFiles[i].id,
+        link: uploadedFiles[i].webContentLink,
+        filename: filesToUpload[i].name,
+      });
+    }
+
+    if (
+      uploadedFiles.length !== filesToUpload.length ||
+      saved.length !== filesToUpload.length
+    ) {
+      throw new Error(
+        'Mismatch between expected and saved media records; rolling back this upload'
+      );
+    }
+
+    cleanupTempFiles(tempPaths);
+
+    await updateOrderStatusToAssetsSubmitted(
+      orderRow.id,
+      id,
+      filesToUpload.length
+    );
+
+    res.json({
+      state: 1,
+      message: 'successfully uploaded the images',
+      files: saved,
+      duplicates_skipped: duplicatesSkipped,
+      sources: {
+        multipart: multipartFiles.length,
+        base64: base64Files.length,
+      },
+    });
+  } catch (err) {
+    console.error('uploadCombined error:', err);
+    const allPathsToCleanup = [
+      ...(tempPaths || []),
+      ...(finalUploadedPaths || []),
+    ];
+    if (allPathsToCleanup.length > 0) {
+      cleanupTempFiles(allPathsToCleanup);
+    }
+    next(err);
+  }
+}
+
 module.exports = {
   uploadMultipart,
   uploadBase64,
+  uploadCombined,
 };
