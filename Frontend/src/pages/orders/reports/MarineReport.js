@@ -19,6 +19,7 @@ import {
   clearCurrentReport,
 } from "../../../redux/reducers/orderReportReducer";
 import { usePageTitle } from "../../../context/PageTitleContext";
+import { resolveAssetUrl } from "../../../utils/urlUtils";
 import SingleSearchSelect from "../../../components/SingleSearchSelect";
 import { toast } from "react-toastify";
 import { selectPermissions } from "../../../redux/selectors/authSelectors";
@@ -687,23 +688,17 @@ function MarineReport() {
 
       // Regenerate vessel photo preview if vessel_photo exists
       if (report.vessel_photo && !updated.vessel_photo_preview) {
-        const baseUrl =
-          process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
         try {
           const parsed = JSON.parse(report.vessel_photo);
           if (parsed.path) {
-            updated.vessel_photo_preview = `${baseUrl}/${parsed.path}`;
+            updated.vessel_photo_preview = resolveAssetUrl(parsed.path);
           } else if (parsed.link) {
-            updated.vessel_photo_preview = parsed.link;
+            updated.vessel_photo_preview = resolveAssetUrl(parsed.link);
           } else {
             updated.vessel_photo_preview = report.vessel_photo;
           }
         } catch (error) {
-          if (report.vessel_photo.startsWith("/")) {
-            updated.vessel_photo_preview = `${baseUrl}${report.vessel_photo}`;
-          } else {
-            updated.vessel_photo_preview = report.vessel_photo;
-          }
+          updated.vessel_photo_preview = resolveAssetUrl(report.vessel_photo);
         }
       }
 
@@ -712,8 +707,6 @@ function MarineReport() {
 
     if (Array.isArray(report.flexible_fields)) {
       // Process flexible fields to regenerate image previews from generic field_3 (image path)
-      const baseUrl =
-        process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
       const processedFields = report.flexible_fields.map((field) => {
         // If field has image path (field_3) but no image_preview, regenerate preview from path
         if (field.field_3 && !field.image_preview) {
@@ -721,18 +714,14 @@ function MarineReport() {
           try {
             const parsed = JSON.parse(field.field_3);
             if (parsed.path) {
-              imageUrl = `${baseUrl}/${parsed.path}`;
+              imageUrl = resolveAssetUrl(parsed.path);
             } else if (parsed.link) {
-              imageUrl = parsed.link;
+              imageUrl = resolveAssetUrl(parsed.link);
             } else {
               imageUrl = field.field_3;
             }
           } catch (error) {
-            if (field.field_3.startsWith("/")) {
-              imageUrl = `${baseUrl}${field.field_3}`;
-            } else {
-              imageUrl = field.field_3;
-            }
+            imageUrl = resolveAssetUrl(field.field_3);
           }
           return {
             ...field,
@@ -1147,22 +1136,17 @@ function MarineReport() {
 
   // Parse media URL to get the actual image link (same as OrderImages)
   const getImageUrl = useCallback((mediaUrl) => {
-    const baseUrl =
-      process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
     try {
       const parsed = JSON.parse(mediaUrl);
       if (parsed.path) {
-        return `${baseUrl}/${parsed.path}`;
+        return resolveAssetUrl(parsed.path);
       }
       if (parsed.link) {
-        return parsed.link;
+        return resolveAssetUrl(parsed.link);
       }
       return mediaUrl;
     } catch (error) {
-      if (mediaUrl.startsWith("/")) {
-        return `${baseUrl}${mediaUrl}`;
-      }
-      return mediaUrl;
+      return resolveAssetUrl(mediaUrl);
     }
   }, []);
 
@@ -2130,9 +2114,7 @@ function MarineReport() {
       if (result.meta.requestStatus === "fulfilled") {
         // Open PDF in the pre-opened tab
         const downloadUrl = result.payload.data.download_url;
-        const baseUrl =
-          process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
-        const fullUrl = `${baseUrl}${downloadUrl}`;
+        const fullUrl = resolveAssetUrl(downloadUrl);
         if (preOpenedTab && !preOpenedTab.closed) {
           preOpenedTab.location.href = fullUrl;
         } else {

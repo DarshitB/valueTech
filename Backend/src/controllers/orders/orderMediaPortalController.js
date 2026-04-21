@@ -8,6 +8,7 @@ const os = require("os");
 const yauzl = require("yauzl");
 const { v4: uuidv4 } = require("uuid");
 const db = require("../../../db");
+const { PROTECTED_ROLE } = require("../../constants/protectedRoles");
 const {
   ensureOrderFolders,
   ensureMediaSubfolders,
@@ -24,6 +25,24 @@ const {
   getThumbnailUrl,
   getThumbnailUrlIfExists,
 } = require("../../utils/thumbnailHelper");
+
+const VIEW_ALL_MEDIA_PERMISSION = "view_all_order_media_files";
+
+async function hasPermission(roleId, roleName, permissionName) {
+  if (!roleId || !permissionName) return false;
+  if (roleName === PROTECTED_ROLE) return true;
+
+  const permission = await db("permissions")
+    .join("role_permissions", "permissions.id", "role_permissions.permission_id")
+    .where({
+      "permissions.name": permissionName,
+      "role_permissions.role_id": roleId,
+    })
+    .whereNull("role_permissions.deleted_at")
+    .first();
+
+  return !!permission;
+}
 
 /**
  * Helper: Update order status to 8 (Assets Approved) when images are approved
@@ -121,8 +140,17 @@ async function getOrderMedia(req, res, next) {
       throw new NotFoundError("Order not found");
     }
 
-    // Get all media for the order
-    const mediaRecords = await orderMediaPortal.getMediaByOrderId(orderIdNum);
+    // Permission-based visibility:
+    // - with `view_all_order_media_files` => all media
+    // - without it => status 1 and status 4 only
+    const canViewAllMedia = await hasPermission(
+      req.user?.role_id,
+      req.user?.role_name,
+      VIEW_ALL_MEDIA_PERMISSION
+    );
+    const mediaRecords = canViewAllMedia
+      ? await orderMediaPortal.getMediaByOrderId(orderIdNum)
+      : await orderMediaPortal.getApprovedAndTextMediaByOrderId(orderIdNum);
     const mediaWithThumbnails = mediaRecords.map((record) => ({
       ...record,
       thumbnail_url:

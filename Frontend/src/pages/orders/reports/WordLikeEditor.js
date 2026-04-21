@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import { generateCustomReport } from "../../../redux/reducers/orderReportReducer";
 import { fetchOrderById } from "../../../redux/reducers/orderReducer";
 import { selectCustomReportGenerating, selectCustomReportError, selectCustomReportData } from "../../../redux/selectors/orderSelectors";
+import { resolveAssetUrl } from "../../../utils/urlUtils";
 import "./CustomReport.scss";
 
 // Page size constants with default margins (in inches)
@@ -1582,9 +1583,7 @@ function WordLikeEditor() {
         if (result.meta.requestStatus === "fulfilled") {
           // Open PDF in the pre-opened tab
           const downloadUrl = result.payload.data.download_url;
-          const baseUrl =
-            process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
-          const fullUrl = `${baseUrl}${downloadUrl}`;
+          const fullUrl = resolveAssetUrl(downloadUrl);
           if (preOpenedTab && !preOpenedTab.closed) {
             preOpenedTab.location.href = fullUrl;
           } else {

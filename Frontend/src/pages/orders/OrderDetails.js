@@ -55,6 +55,7 @@ import { Link } from "react-router-dom";
 import { usePageTitle } from "../../context/PageTitleContext";
 import { hasPermission } from "../../utils/permissionUtils";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
+import { resolveAssetUrl } from "../../utils/urlUtils";
 import FormModel from "../../components/FormModel";
 import SingleSearchSelect from "../../components/SingleSearchSelect";
 import { toast } from "react-toastify";
@@ -840,34 +841,19 @@ function OrderDetails() {
   const parseMediaUrl = (mediaUrl) => {
     if (!mediaUrl || typeof mediaUrl !== "string") return null;
 
-    const baseUrl =
-      process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
-
     try {
       // Try to parse as JSON first
       const parsed = JSON.parse(mediaUrl);
       if (parsed.path && typeof parsed.path === "string") {
-        const cleanPath = parsed.path.startsWith("/")
-          ? parsed.path
-          : `/${parsed.path}`;
-        return `${baseUrl}${cleanPath}`;
+        return resolveAssetUrl(parsed.path);
       }
       if (parsed.link && typeof parsed.link === "string") {
-        return parsed.link;
+        return resolveAssetUrl(parsed.link);
       }
       return null;
     } catch {
       // If not JSON, treat as direct path
-      if (typeof mediaUrl === "string") {
-        if (mediaUrl.startsWith("http://") || mediaUrl.startsWith("https://")) {
-          return mediaUrl;
-        }
-        if (mediaUrl.startsWith("/")) {
-          return `${baseUrl}${mediaUrl}`;
-        }
-        return `${baseUrl}/${mediaUrl}`;
-      }
-      return null;
+      return resolveAssetUrl(mediaUrl);
     }
   };
 

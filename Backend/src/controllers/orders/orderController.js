@@ -11,6 +11,7 @@ const {
   ConflictError,
   BadRequestError,
 } = require("../../utils/customErrors");
+const { triggerR2SyncIfNeeded } = require("../../utils/r2Helper");
 
 // Helper functions to get names by IDs
 async function getUserName(userId) {
@@ -1414,6 +1415,8 @@ exports.updateOrderStatusAfterUnderReview = async (req, res, next) => {
 
     await OrderStatusHistory.createStatusHistory(statusHistoryData);
 
+    triggerR2SyncIfNeeded(orderId, statusIdNum);
+
     res.status(200).json({
       success: true,
       message: `Order status updated to ${statusIdNum} successfully`,
@@ -1476,6 +1479,8 @@ exports.updateOrderStatusDirect = async (req, res, next) => {
       changed_at: new Date(),
       activity_extra: note || null,
     });
+
+    triggerR2SyncIfNeeded(orderId, statusIdNum);
 
     res.status(200).json({
       success: true,
@@ -1953,6 +1958,8 @@ exports.sendMail = async (req, res, next) => {
     };
 
     await OrderStatusHistory.createStatusHistory(statusHistoryData);
+
+    triggerR2SyncIfNeeded(parseInt(orderId), 13);
 
     // Store last-mail data for prefill (do not store document_ids or video_ids)
     // Ensure to/cc/bcc are plain arrays of strings so jsonb gets valid JSON (e.g. ["a@b.com"])

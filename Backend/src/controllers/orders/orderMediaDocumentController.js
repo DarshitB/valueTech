@@ -13,6 +13,34 @@ const { ensureDirectoryExists } = require("../../utils/localFileHelper");
 // Import custom error classes
 const { NotFoundError, BadRequestError } = require("../../utils/customErrors");
 
+function getFilenameFromMediaUrl(mediaUrl) {
+  if (!mediaUrl || typeof mediaUrl !== "string") return "document";
+  try {
+    const parsed = JSON.parse(mediaUrl);
+    if (parsed && typeof parsed === "object") {
+      const candidate = parsed.path || parsed.filename || parsed.name || parsed.link;
+      if (typeof candidate === "string" && candidate.trim()) {
+        const clean = candidate.split("?")[0].split("#")[0];
+        return path.basename(clean) || "document";
+      }
+    }
+  } catch (_) {
+    // Not JSON, handled below
+  }
+
+  const clean = mediaUrl.split("?")[0].split("#")[0];
+  return path.basename(clean) || "document";
+}
+
+function resolveAbsolutePathFromMediaUrl(mediaUrl) {
+  if (!mediaUrl || typeof mediaUrl !== "string") return null;
+  const uploadsPrefix = "/uploads/";
+  const idx = mediaUrl.indexOf(uploadsPrefix);
+  if (idx === -1) return null;
+  const relativeUploadPath = mediaUrl.slice(idx + 1); // remove leading slash
+  return path.join(process.cwd(), relativeUploadPath.replace(/\//g, path.sep));
+}
+
 /**
  * Delete local storage file from media_url (/uploads/...)
  * Returns true only when a file actually existed and was removed.
@@ -504,6 +532,48 @@ exports.getApprovedByOrderId = async (req, res, next) => {
       success: true,
       data: result,
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Force-download a single order media document by id.
+ * GET /api/order-media-document/:id/download
+ */
+exports.downloadById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const document = await orderMediaDocument.findById(parseInt(id, 10));
+
+    if (!document) {
+      throw new NotFoundError("Document not found");
+    }
+
+    const filename = getFilenameFromMediaUrl(document.media_url);
+    res.setHeader("Content-Disposition", `attachment; filename=\"${filename}\"`);
+    res.setHeader("Cache-Control", "no-store");
+
+    const mediaUrl = document.media_url || "";
+    if (typeof mediaUrl === "string" && /^https?:\/\//i.test(mediaUrl)) {
+      const upstream = await fetch(mediaUrl);
+      if (!upstream.ok) {
+        throw new BadRequestError(
+          `Unable to fetch document from source (HTTP ${upstream.status})`
+        );
+      }
+      const contentType = upstream.headers.get("content-type");
+      if (contentType) res.setHeader("Content-Type", contentType);
+      const arrayBuffer = await upstream.arrayBuffer();
+      return res.send(Buffer.from(arrayBuffer));
+    }
+
+    const absolutePath = resolveAbsolutePathFromMediaUrl(mediaUrl);
+    if (!absolutePath || !fs.existsSync(absolutePath)) {
+      throw new NotFoundError("Document file not found on storage");
+    }
+
+    return res.download(absolutePath, filename);
   } catch (err) {
     next(err);
   }

@@ -45,6 +45,7 @@ import "yet-another-react-lightbox/styles.css";
 import { toast } from "react-toastify";
 import { hasPermission } from "../../utils/permissionUtils";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
+import { resolveAssetUrl } from "../../utils/urlUtils";
 import ZipUploadModal from "../../components/ZipUploadModal";
 import ConfirmationModal from "../../components/ConfirmationModal";
 
@@ -155,23 +156,18 @@ function OrderImages() {
   // Parse media URL to get the actual image link (full resolution)
   const getImageUrl = (mediaUrl) => {
     if (mediaUrl == null || typeof mediaUrl !== "string" || String(mediaUrl).trim() === "") return "";
-    const baseUrl =
-      process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
 
     try {
       const parsed = JSON.parse(mediaUrl);
       if (parsed.path) {
-        return `${baseUrl}/${parsed.path}`;
+        return resolveAssetUrl(parsed.path);
       }
       if (parsed.link) {
-        return parsed.link;
+        return resolveAssetUrl(parsed.link);
       }
       return mediaUrl;
     } catch {
-      if (typeof mediaUrl === "string" && mediaUrl.startsWith("/")) {
-        return `${baseUrl}${mediaUrl}`;
-      }
-      return typeof mediaUrl === "string" ? mediaUrl : "";
+      return resolveAssetUrl(mediaUrl);
     }
   };
 
@@ -583,8 +579,7 @@ function OrderImages() {
       if (result.meta.requestStatus === "fulfilled") {
         const downloadUrl = result.payload?.data?.download_url;
         if (downloadUrl) {
-          const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
-          const fullUrl = downloadUrl.startsWith("http") ? downloadUrl : `${baseUrl}${downloadUrl.startsWith("/") ? "" : "/"}${downloadUrl}`;
+          const fullUrl = resolveAssetUrl(downloadUrl);
           window.open(fullUrl, "_blank");
         }
         setSelectedImageSequence([]);

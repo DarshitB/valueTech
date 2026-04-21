@@ -46,6 +46,29 @@ const orderMediaPortal = {
       .whereNull("deleted_at"),
 
   /**
+   * Get media records with status 1 or 4 for a specific order ID
+   * (excludes soft-deleted)
+   */
+  getApprovedAndTextMediaByOrderId: (orderId) =>
+    db("order_media_image_video")
+      .select(
+        "id",
+        "order_id",
+        "uploader_type",
+        "uploader_id",
+        "media_url",
+        "media_type",
+        "status",
+        "orientation",
+        "created_at",
+        "updated_at",
+        "updated_by"
+      )
+      .where({ order_id: orderId })
+      .whereIn("status", [1, 4])
+      .whereNull("deleted_at"),
+
+  /**
    * Update status for multiple media records
    * payload: Array of objects with id and status
    * Returns: Promise that resolves to updated records

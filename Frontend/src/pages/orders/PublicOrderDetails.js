@@ -17,6 +17,7 @@ import { FileText, Eye } from "lucide-react";
 import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
 import "./PublicOrderImages.scss";
+import { resolveAssetUrl } from "../../utils/urlUtils";
 
 function PublicOrderDetails() {
   const { id } = useParams();
@@ -35,23 +36,17 @@ function PublicOrderDetails() {
 
   // Parse media URL to get the actual link
   const getImageUrl = (mediaUrl) => {
-    const baseUrl =
-      process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
-
     try {
       const parsed = JSON.parse(mediaUrl);
       if (parsed.path) {
-        return `${baseUrl}/${parsed.path}`;
+        return resolveAssetUrl(parsed.path);
       }
       if (parsed.link) {
-        return parsed.link;
+        return resolveAssetUrl(parsed.link);
       }
-      return mediaUrl;
-    } catch (error) {
-      if (mediaUrl.startsWith("/")) {
-        return `${baseUrl}${mediaUrl}`;
-      }
-      return mediaUrl;
+      return resolveAssetUrl(mediaUrl);
+    } catch {
+      return resolveAssetUrl(mediaUrl);
     }
   };
 

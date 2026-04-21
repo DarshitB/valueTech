@@ -25,3 +25,7 @@ export const approveOrderMediaDocuments = (orderId, payload) =>
 // Remove approval from order media documents
 export const removeApproveOrderMediaDocuments = (orderId, payload) =>
   axios.post(`${ENDPOINT}/${orderId}/remove-approve`, payload);
+
+// Force download document by id (backend streams as attachment)
+export const downloadOrderMediaDocument = (documentId) =>
+  axios.get(`${ENDPOINT}/${documentId}/download`, { responseType: "blob" });

@@ -20,6 +20,13 @@ router.post(
   orderMediaDocumentController.upload
 );
 
+// Force download document by id
+router.get(
+  "/:id/download",
+  checkPermission("download_order_media_documents"),
+  orderMediaDocumentController.downloadById
+);
+
 // Permanently delete all already soft-deleted records + files
 router.delete(
   "/permanent-delete-soft-deleted",

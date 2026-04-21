@@ -17,6 +17,7 @@ import {
 } from "../../../redux/reducers/orderReportReducer";
 import { fetchAssetMakesForReports } from "../../../redux/reducers/assetMakesReducer";
 import { usePageTitle } from "../../../context/PageTitleContext";
+import { resolveAssetUrl } from "../../../utils/urlUtils";
 import SingleSearchSelect from "../../../components/SingleSearchSelect";
 import { toast } from "react-toastify";
 import { selectPermissions } from "../../../redux/selectors/authSelectors";
@@ -1755,17 +1756,11 @@ function MachineryReport() {
   const resolveChassisImageUrl = useCallback((value) => {
     if (!value || typeof value !== "string") return "";
 
-    const baseUrl =
-      process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
-
     // Attempt to parse JSON structure first
     try {
       const parsed = JSON.parse(value);
       if (parsed && typeof parsed === "object" && parsed.path) {
-        const cleanPath = parsed.path.startsWith("/")
-          ? parsed.path
-          : `/${parsed.path}`;
-        return `${baseUrl}${cleanPath}`;
+        return resolveAssetUrl(parsed.path);
       }
     } catch (err) {
       // Ignore JSON parse errors, fall back to raw string
@@ -1780,8 +1775,7 @@ function MachineryReport() {
       return value;
     }
 
-    const cleanPath = value.startsWith("/") ? value : `/${value}`;
-    return `${baseUrl}${cleanPath}`;
+    return resolveAssetUrl(value);
   }, []);
 
   // Show either the newly selected image OR the stored image path preview
@@ -2144,9 +2138,7 @@ function MachineryReport() {
         if (result.meta.requestStatus === "fulfilled") {
           // Open PDF in the pre-opened tab
           const downloadUrl = result.payload.data.download_url;
-          const baseUrl =
-            process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
-          const fullUrl = `${baseUrl}${downloadUrl}`;
+          const fullUrl = resolveAssetUrl(downloadUrl);
           if (preOpenedTab && !preOpenedTab.closed) {
             preOpenedTab.location.href = fullUrl;
           } else {

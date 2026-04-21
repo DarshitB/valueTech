@@ -1,5 +1,37 @@
 const Notification = require("../../models/notifications/notification");
 const { BadRequestError, NotFoundError } = require("../../utils/customErrors");
+const db = require("../../../db");
+const { PROTECTED_ROLE } = require("../../constants/protectedRoles");
+
+const VIEW_ALL_MEDIA_PERMISSION = "view_all_order_media_files";
+
+async function hasPermission(roleId, roleName, permissionName) {
+  if (!roleId || !permissionName) return false;
+  if (roleName === PROTECTED_ROLE) return true;
+
+  const permission = await db("permissions")
+    .join("role_permissions", "permissions.id", "role_permissions.permission_id")
+    .where({
+      "permissions.name": permissionName,
+      "role_permissions.role_id": roleId,
+    })
+    .whereNull("role_permissions.deleted_at")
+    .first();
+
+  return !!permission;
+}
+
+function isFieldVerifierUploadNotification(notif) {
+  const statusIdNum = Number(notif?.status_id);
+  const userType = String(notif?.user_type || "").toLowerCase();
+  const activityExtra = String(notif?.activity_extra || "");
+
+  return (
+    statusIdNum === 7 &&
+    userType === "field_verifier" &&
+    /uploaded/i.test(activityExtra)
+  );
+}
 
 /**
  * Get notifications for the current user
@@ -33,6 +65,12 @@ exports.getNotifications = async (req, res, next) => {
       }
     }
 
+    const canViewAllMediaFiles = await hasPermission(
+      req.user?.role_id,
+      req.user?.role_name,
+      VIEW_ALL_MEDIA_PERMISSION
+    );
+
     // Get total unread count (all time, not filtered by last_check)
     // Pass user object to apply order permission logic
     const unreadCount = await Notification.getUnreadCount(userId, userRole, req.user);
@@ -52,6 +90,14 @@ exports.getNotifications = async (req, res, next) => {
         limit: limitNum,
         offset: offsetNum
       });
+    }
+
+    // Hide field-verifier upload notifications for users without
+    // `view_all_order_media_files` permission.
+    if (!canViewAllMediaFiles) {
+      notifications = (notifications || []).filter(
+        (notif) => !isFieldVerifierUploadNotification(notif)
+      );
     }
 
     // Format notifications for response - match exact frontend format
@@ -197,12 +243,24 @@ exports.getAllNotifications = async (req, res, next) => {
       throw new BadRequestError("Offset must be a non-negative integer");
     }
 
+    const canViewAllMediaFiles = await hasPermission(
+      req.user?.role_id,
+      req.user?.role_name,
+      VIEW_ALL_MEDIA_PERMISSION
+    );
+
     // Get all notifications
     // Pass user object to apply order permission logic
-    const notifications = await Notification.getAllNotifications(userId, userRole, req.user, {
+    let notifications = await Notification.getAllNotifications(userId, userRole, req.user, {
       limit: limitNum,
       offset: offsetNum
     });
+
+    if (!canViewAllMediaFiles) {
+      notifications = (notifications || []).filter(
+        (notif) => !isFieldVerifierUploadNotification(notif)
+      );
+    }
 
     // Get unread count
     // Pass user object to apply order permission logic

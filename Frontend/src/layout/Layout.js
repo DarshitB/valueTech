@@ -85,8 +85,12 @@ function Layout() {
             <h1 className="page-title-heading">{title || pageTitle}</h1>
           </div>
           <ul className="navbar-nav navbar-right">
-            <NotificationDropdown />
-            <CommentNotificationDropdown />
+            {hasPermission(allowedPermissions, "view_notification") && (
+              <>
+                <NotificationDropdown />
+                <CommentNotificationDropdown />
+              </>
+            )}
             <li className={`dropdown ${userProfile ? "show" : ""}`}>
               <span
                 data-toggle="dropdown"

@@ -19,6 +19,7 @@ import {
   uploadOrderReportCollage,
   uploadMultipleOrderReportsCollages,
 } from "../../redux/reducers/orderMediaDocumentsReducer";
+import { downloadOrderMediaDocument } from "../../api/orderMediaDocuments.api";
 import CustomDataTable from "../../components/CustomDataTable";
 import {
   DeleteIcon,
@@ -32,6 +33,7 @@ import ConfirmationModal from "../../components/ConfirmationModal";
 import { toast } from "react-toastify";
 import { hasPermission } from "../../utils/permissionUtils";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
+import { resolveAssetUrl } from "../../utils/urlUtils";
 
 // Constants for security and configuration
 const ALLOWED_FILE_TYPES = [
@@ -127,7 +129,8 @@ function OrderDocuments() {
     currentUser?.role?.name.toUpperCase().includes("SUPER ADMIN") ||
     currentUser?.role?.name === "developer_admin";
   const userRole = currentUser?.role?.name?.toUpperCase();
-  const isBankUser = userRole === "BANK OFFICER" || userRole === "BANK AUTHORITY";
+  const isBankUser =
+    userRole === "BANK OFFICER" || userRole === "BANK AUTHORITY";
   const { setTitle } = usePageTitle();
   const abortControllerRef = useRef(null);
 
@@ -142,8 +145,15 @@ function OrderDocuments() {
   }, [id]);
 
   const order = useSelector((state) => state.orders.selected);
-  const { documents, loading, uploadLoading, approveLoading, removeApproveLoading, error, reportCollageUploadLoading } =
-    useSelector((state) => state.orderMediaDocuments);
+  const {
+    documents,
+    loading,
+    uploadLoading,
+    approveLoading,
+    removeApproveLoading,
+    error,
+    reportCollageUploadLoading,
+  } = useSelector((state) => state.orderMediaDocuments);
 
   // Refs for file inputs
   const reportFileInputRef = useRef(null);
@@ -151,6 +161,8 @@ function OrderDocuments() {
 
   // State to track which type is being uploaded
   const [uploadingType, setUploadingType] = useState(null);
+  const [downloadingDocIds, setDownloadingDocIds] = useState([]);
+  const [bulkDownloadingType, setBulkDownloadingType] = useState(null);
 
   const documentState = useDocumentState();
 
@@ -183,7 +195,7 @@ function OrderDocuments() {
       collage: filterDocuments(documentsArray, "collage"),
       report: filterDocuments(documentsArray, "report"),
       documents: documentsArray.filter(
-        (doc) => doc?.document_type === "documents"
+        (doc) => doc?.document_type === "documents",
       ),
     };
   }, [documents, isBankUser, order?.current_status_id]);
@@ -192,26 +204,19 @@ function OrderDocuments() {
   const parseMediaUrl = useCallback((mediaUrl) => {
     if (!mediaUrl) return null;
 
-    const baseUrl =
-      process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
-
     try {
       // Try to parse as JSON first
       const parsed = JSON.parse(mediaUrl);
       if (parsed.path && typeof parsed.path === "string") {
-        const cleanPath = parsed.path.startsWith("/")
-          ? parsed.path
-          : `/${parsed.path}`;
-        return `${baseUrl}${cleanPath}`;
+        return resolveAssetUrl(parsed.path);
       }
       if (parsed.link && validateUrl(parsed.link)) {
-        return parsed.link;
+        return resolveAssetUrl(parsed.link);
       }
     } catch {
       // If not JSON, treat as direct path
       if (typeof mediaUrl === "string") {
-        const cleanPath = mediaUrl.startsWith("/") ? mediaUrl : `/${mediaUrl}`;
-        return `${baseUrl}${cleanPath}`;
+        return resolveAssetUrl(mediaUrl);
       }
     }
 
@@ -311,11 +316,11 @@ function OrderDocuments() {
         setter((prev) =>
           prev.includes(documentId)
             ? prev.filter((id) => id !== documentId)
-            : [...prev, documentId]
+            : [...prev, documentId],
         );
       }
     },
-    [documentState]
+    [documentState],
   );
 
   // Secure document viewing
@@ -341,7 +346,7 @@ function OrderDocuments() {
         toast.error("Popup blocked. Please allow popups for this site.");
       }
     },
-    [parseMediaUrl]
+    [parseMediaUrl],
   );
 
   // Enhanced download with better error handling
@@ -361,40 +366,38 @@ function OrderDocuments() {
       const filename = getFilenameFromMediaUrl(doc.media_url);
 
       try {
-        const response = await fetch(downloadUrl, {
-          method: "GET",
-          headers: {
-            "Cache-Control": "no-cache",
-          },
+        setDownloadingDocIds((prev) =>
+          prev.includes(doc.id) ? prev : [...prev, doc.id],
+        );
+
+        // Strict forced download (never open inline):
+        // use authenticated backend endpoint that sends attachment headers.
+        const response = await downloadOrderMediaDocument(doc.id);
+        const blob = new Blob([response.data], {
+          type:
+            response.headers?.["content-type"] || "application/octet-stream",
         });
+        const objectUrl = URL.createObjectURL(blob);
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const blob = await response.blob();
-
-        // Create secure download
         const link = document.createElement("a");
-        const url = URL.createObjectURL(blob);
-        link.href = url;
+        link.href = objectUrl;
         link.download = filename;
         link.style.display = "none";
 
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-
-        // Cleanup
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 
         toast.success("Download started");
       } catch (error) {
         console.error("Download failed:", error);
-        toast.error(`Download failed: ${error.message}`);
+        toast.error("Download failed");
+      } finally {
+        setDownloadingDocIds((prev) => prev.filter((id) => id !== doc.id));
       }
     },
-    [parseMediaUrl, getFilenameFromMediaUrl]
+    [parseMediaUrl, getFilenameFromMediaUrl],
   );
 
   // Enhanced delete with proper validation
@@ -409,7 +412,7 @@ function OrderDocuments() {
       documentState.setConfirmDeleteId(doc.id);
       documentState.setConfirmDeleteName(filename);
     },
-    [getFilenameFromMediaUrl, documentState]
+    [getFilenameFromMediaUrl, documentState],
   );
 
   const handleConfirmDelete = useCallback(async () => {
@@ -417,7 +420,7 @@ function OrderDocuments() {
 
     try {
       await dispatch(
-        deleteOrderMediaDocuments(documentState.confirmDeleteId)
+        deleteOrderMediaDocuments(documentState.confirmDeleteId),
       ).unwrap();
       await dispatch(fetchOrderMediaDocuments(orderId));
       toast.success("Document deleted successfully");
@@ -443,13 +446,15 @@ function OrderDocuments() {
         return;
       }
 
+      setBulkDownloadingType(documentType);
+
       try {
         const JSZip = await import("jszip");
         const zip = new JSZip.default();
 
         const documentsArray = documents?.documents || documents || [];
         const selectedDocs = documentsArray.filter(
-          (doc) => selectedIds.includes(doc.id) && doc.media_url
+          (doc) => selectedIds.includes(doc.id) && doc.media_url,
         );
 
         if (!selectedDocs.length) {
@@ -461,13 +466,14 @@ function OrderDocuments() {
 
         for (const doc of selectedDocs) {
           try {
-            const fileUrl = parseMediaUrl(doc.media_url);
-            if (!fileUrl || !validateUrl(fileUrl)) continue;
-
-            const response = await fetch(fileUrl);
-            if (!response.ok) continue;
-
-            const blob = await response.blob();
+            // Always fetch via backend forced-download endpoint so both
+            // local and R2 URLs work consistently (no browser CORS issues).
+            const response = await downloadOrderMediaDocument(doc.id);
+            const blob = new Blob([response.data], {
+              type:
+                response.headers?.["content-type"] ||
+                "application/octet-stream",
+            });
             const filename = getFilenameFromMediaUrl(doc.media_url);
 
             zip.file(filename, blob);
@@ -487,8 +493,9 @@ function OrderDocuments() {
         const url = URL.createObjectURL(zipBlob);
 
         link.href = url;
-        link.download = `${order?.order_number || "order"}_${documentType}_${new Date().toISOString().split("T")[0]
-          }.zip`;
+        link.download = `${order?.order_number || "order"}_${documentType}_${
+          new Date().toISOString().split("T")[0]
+        }.zip`;
         link.style.display = "none";
 
         document.body.appendChild(link);
@@ -501,9 +508,11 @@ function OrderDocuments() {
       } catch (error) {
         console.error("ZIP creation failed:", error);
         toast.error("Failed to create download archive");
+      } finally {
+        setBulkDownloadingType(null);
       }
     },
-    [documents, parseMediaUrl, getFilenameFromMediaUrl, order]
+    [documents, getFilenameFromMediaUrl, order],
   );
 
   // Enhanced verification with proper error handling
@@ -535,7 +544,7 @@ function OrderDocuments() {
           approveOrderMediaDocuments({
             orderId,
             documentIds: selectedIds,
-          })
+          }),
         ).unwrap();
 
         await dispatch(fetchOrderMediaDocuments(orderId));
@@ -548,7 +557,7 @@ function OrderDocuments() {
         }
 
         toast.success(
-          `${selectedIds.length} document(s) verified successfully`
+          `${selectedIds.length} document(s) verified successfully`,
         );
       } catch (error) {
         // Only show error if it's not a permission error
@@ -558,7 +567,7 @@ function OrderDocuments() {
         }
       }
     },
-    [dispatch, orderId, documentState, allowedPermissions]
+    [dispatch, orderId, documentState, allowedPermissions],
   );
 
   // Enhanced remove approval with proper error handling
@@ -590,7 +599,7 @@ function OrderDocuments() {
           removeApproveOrderMediaDocuments({
             orderId,
             documentIds: selectedIds,
-          })
+          }),
         ).unwrap();
 
         await dispatch(fetchOrderMediaDocuments(orderId));
@@ -603,7 +612,7 @@ function OrderDocuments() {
         }
 
         toast.success(
-          `${selectedIds.length} document(s) approval removed successfully`
+          `${selectedIds.length} document(s) approval removed successfully`,
         );
       } catch (error) {
         // Only show error if it's not a permission error
@@ -613,7 +622,7 @@ function OrderDocuments() {
         }
       }
     },
-    [dispatch, orderId, documentState, allowedPermissions]
+    [dispatch, orderId, documentState, allowedPermissions],
   );
 
   // Helper function to check if any selected documents are approved
@@ -626,12 +635,12 @@ function OrderDocuments() {
 
       const filteredDocs = documentsArray.filter(
         (doc) =>
-          doc?.document_type === documentType && selectedIds.includes(doc.id)
+          doc?.document_type === documentType && selectedIds.includes(doc.id),
       );
 
       return filteredDocs.some((doc) => doc?.status === "approved");
     },
-    [documents]
+    [documents],
   );
 
   // Enhanced file upload with validation
@@ -683,7 +692,7 @@ function OrderDocuments() {
           documentState.setUploadProgress(0);
         });
     },
-    [dispatch, orderId, documentState]
+    [dispatch, orderId, documentState],
   );
 
   const handleFileInputChange = useCallback(
@@ -691,20 +700,17 @@ function OrderDocuments() {
       handleFileUpload(e.target.files);
       e.target.value = ""; // Reset input
     },
-    [handleFileUpload]
+    [handleFileUpload],
   );
 
   // Handle upload report/collage button click
-  const handleUploadReportCollageClick = useCallback(
-    (type) => {
-      if (type === "report") {
-        reportFileInputRef.current?.click();
-      } else if (type === "collage") {
-        collageFileInputRef.current?.click();
-      }
-    },
-    []
-  );
+  const handleUploadReportCollageClick = useCallback((type) => {
+    if (type === "report") {
+      reportFileInputRef.current?.click();
+    } else if (type === "collage") {
+      collageFileInputRef.current?.click();
+    }
+  }, []);
 
   // Handle file selection for report/collage upload
   const handleReportCollageFileChange = useCallback(
@@ -718,11 +724,15 @@ function OrderDocuments() {
       // Validate files are PDF
       const pdfFiles = Array.from(files).filter((file) => {
         if (file.type !== "application/pdf") {
-          toast.error(`${file.name} is not a PDF file. Only PDF files are allowed.`);
+          toast.error(
+            `${file.name} is not a PDF file. Only PDF files are allowed.`,
+          );
           return false;
         }
         if (file.size > MAX_FILE_SIZE) {
-          toast.error(`${file.name} exceeds maximum file size of ${MAX_FILE_SIZE / (1024 * 1024)}MB`);
+          toast.error(
+            `${file.name} exceeds maximum file size of ${MAX_FILE_SIZE / (1024 * 1024)}MB`,
+          );
           return false;
         }
         return true;
@@ -769,13 +779,13 @@ function OrderDocuments() {
         e.target.value = ""; // Reset input
       }
     },
-    [dispatch, orderId]
+    [dispatch, orderId],
   );
 
   // Helper function to show toast error for missing valuer name
   const showValuerNameError = useCallback((reportType) => {
     toast.error(
-      `Please set a valuer name for this order before accessing the ${reportType} report.`
+      `Please set a valuer name for this order before accessing the ${reportType} report.`,
     );
   }, []);
 
@@ -836,7 +846,13 @@ function OrderDocuments() {
     } else {
       toast.error("No report type available for this order category");
     }
-  }, [order, isExemptAdmin, getReportUrl, getReportTypeName, showValuerNameError]);
+  }, [
+    order,
+    isExemptAdmin,
+    getReportUrl,
+    getReportTypeName,
+    showValuerNameError,
+  ]);
 
   // Drag and drop handlers
   const handleDragOver = useCallback((e) => {
@@ -860,7 +876,7 @@ function OrderDocuments() {
       e.stopPropagation();
       handleFileUpload(e.dataTransfer.files);
     },
-    [handleFileUpload]
+    [handleFileUpload],
   );
 
   // Memoized approval badge component
@@ -889,7 +905,7 @@ function OrderDocuments() {
           </span>
         );
       },
-    []
+    [],
   );
 
   // Enhanced document table rendering
@@ -919,12 +935,10 @@ function OrderDocuments() {
               <th width="200px" scope="col">
                 Name
               </th>
-              {type === "collage" && (
-                <th scope="col">Image Count</th>
-              )}
+              {type === "collage" && <th scope="col">Image Count</th>}
               {hasPermission(
                 allowedPermissions,
-                "view_order_media_documents_created_by"
+                "view_order_media_documents_created_by",
               ) && <th scope="col">Created By</th>}
               <th scope="col">Created At</th>
               <th width="150px" style={{ textAlign: "center" }} scope="col">
@@ -943,7 +957,7 @@ function OrderDocuments() {
                       checked={selectedItems.includes(doc.id)}
                       onChange={() => handleCheckboxChange(doc.id, type)}
                       aria-label={`Select ${getFilenameFromMediaUrl(
-                        doc.media_url
+                        doc.media_url,
                       )}`}
                     />
                   </div>
@@ -967,7 +981,7 @@ function OrderDocuments() {
                 )}
                 {hasPermission(
                   allowedPermissions,
-                  "view_order_media_documents_created_by"
+                  "view_order_media_documents_created_by",
                 ) && <td>{doc.created_by_name || "-"}</td>}
                 <td>{formatDate(doc.created_at)}</td>
                 <td style={{ textAlign: "center" }}>
@@ -985,38 +999,72 @@ function OrderDocuments() {
                   </button>
                   {hasPermission(
                     allowedPermissions,
-                    "download_order_media_documents"
+                    "download_order_media_documents",
                   ) && (
-                      <button
-                        onClick={() => handleDownloadDocument(doc)}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                        }}
-                        aria-label="Download document"
-                        title="Download document"
-                      >
+                    <button
+                      onClick={() => handleDownloadDocument(doc)}
+                      disabled={downloadingDocIds.includes(doc.id)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: downloadingDocIds.includes(doc.id)
+                          ? "not-allowed"
+                          : "pointer",
+                      }}
+                      aria-label="Download document"
+                      title={
+                        downloadingDocIds.includes(doc.id)
+                          ? "Downloading..."
+                          : "Download document"
+                      }
+                    >
+                      {downloadingDocIds.includes(doc.id) ? (
+                        <span
+                          style={{
+                            width: "28px",
+                            height: "28px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: "#28a745",
+                            padding: "4px",
+                            borderRadius: "50%",
+                          }}
+                        >
+                          <span
+                            className="spinner-border spinner-border-sm"
+                            role="status"
+                            aria-hidden="true"
+                            style={{
+                              width: "24px",
+                              height: "24px",
+                              borderWidth: "2px",
+                              color: "#fff",
+                            }}
+                          />
+                        </span>
+                      ) : (
                         <DownloadDocumentIcon />
-                      </button>
-                    )}
+                      )}
+                    </button>
+                  )}
                   {hasPermission(
                     allowedPermissions,
-                    "delete_order_media_documents"
+                    "delete_order_media_documents",
                   ) && (
-                      <button
-                        onClick={() => handleDeleteDocument(doc)}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                        }}
-                        aria-label="Delete document"
-                        title="Delete document"
-                      >
-                        <DeleteIcon />
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleDeleteDocument(doc)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                      }}
+                      aria-label="Delete document"
+                      title="Delete document"
+                    >
+                      <DeleteIcon />
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -1033,8 +1081,9 @@ function OrderDocuments() {
       handleViewDocument,
       handleDownloadDocument,
       handleDeleteDocument,
+      downloadingDocIds,
       allowedPermissions,
-    ]
+    ],
   );
 
   // Enhanced uploaded documents table
@@ -1067,7 +1116,7 @@ function OrderDocuments() {
               <th scope="col">Type</th>
               {hasPermission(
                 allowedPermissions,
-                "view_order_media_documents_created_by"
+                "view_order_media_documents_created_by",
               ) && <th scope="col">Uploaded By</th>}
               <th scope="col">Uploaded At</th>
               <th width="150px" style={{ textAlign: "center" }} scope="col">
@@ -1086,7 +1135,7 @@ function OrderDocuments() {
                       checked={selectedItems.includes(doc.id)}
                       onChange={() => handleCheckboxChange(doc.id, type)}
                       aria-label={`Select ${getFilenameFromMediaUrl(
-                        doc.media_url
+                        doc.media_url,
                       )}`}
                     />
                   </div>
@@ -1108,7 +1157,7 @@ function OrderDocuments() {
                 <td>{doc.media_type || doc.file_type || "-"}</td>
                 {hasPermission(
                   allowedPermissions,
-                  "view_order_media_documents_created_by"
+                  "view_order_media_documents_created_by",
                 ) && (
                   <td>{doc.created_by_name || doc.uploaded_by_name || "-"}</td>
                 )}
@@ -1128,38 +1177,59 @@ function OrderDocuments() {
                   </button>
                   {hasPermission(
                     allowedPermissions,
-                    "download_order_media_documents"
+                    "download_order_media_documents",
                   ) && (
-                      <button
-                        onClick={() => handleDownloadDocument(doc)}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                        }}
-                        aria-label="Download document"
-                        title="Download document"
-                      >
+                    <button
+                      onClick={() => handleDownloadDocument(doc)}
+                      disabled={downloadingDocIds.includes(doc.id)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: downloadingDocIds.includes(doc.id)
+                          ? "not-allowed"
+                          : "pointer",
+                      }}
+                      aria-label="Download document"
+                      title={
+                        downloadingDocIds.includes(doc.id)
+                          ? "Downloading..."
+                          : "Download document"
+                      }
+                    >
+                      {downloadingDocIds.includes(doc.id) ? (
+                        <span
+                          className="spinner-border spinner-border-sm"
+                          role="status"
+                          aria-hidden="true"
+                          style={{
+                            width: "16px",
+                            height: "16px",
+                            borderWidth: "2px",
+                            color: "#28a745",
+                          }}
+                        />
+                      ) : (
                         <DownloadDocumentIcon />
-                      </button>
-                    )}
+                      )}
+                    </button>
+                  )}
                   {hasPermission(
                     allowedPermissions,
-                    "delete_order_media_documents"
+                    "delete_order_media_documents",
                   ) && (
-                      <button
-                        onClick={() => handleDeleteDocument(doc)}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                        }}
-                        aria-label="Delete document"
-                        title="Delete document"
-                      >
-                        <DeleteIcon />
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleDeleteDocument(doc)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                      }}
+                      aria-label="Delete document"
+                      title="Delete document"
+                    >
+                      <DeleteIcon />
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -1176,8 +1246,9 @@ function OrderDocuments() {
       handleViewDocument,
       handleDownloadDocument,
       handleDeleteDocument,
+      downloadingDocIds,
       allowedPermissions,
-    ]
+    ],
   );
 
   // Set page title with breadcrumb navigation
@@ -1195,7 +1266,7 @@ function OrderDocuments() {
           {order?.order_number || "-"}
         </Link>{" "}
         &gt; Documents
-      </>
+      </>,
     );
   }, [id, order, setTitle]);
 
@@ -1277,11 +1348,11 @@ function OrderDocuments() {
                     <div style={{ display: "flex", gap: "10px" }}>
                       {hasPermission(
                         allowedPermissions,
-                        "view_order_media_files"
+                        "view_order_media_files",
                       ) &&
                         hasPermission(
                           allowedPermissions,
-                          "generate_order_collage"
+                          "generate_order_collage",
                         ) && (
                           <Link
                             to={`/orders/${id}/details/images`}
@@ -1292,16 +1363,21 @@ function OrderDocuments() {
                         )}
                       {hasPermission(
                         allowedPermissions,
-                        "add_order_reports_collages"
+                        "add_order_reports_collages",
                       ) && (
-                          <button
-                            className="btn primary"
-                            onClick={() => handleUploadReportCollageClick("collage")}
-                            disabled={reportCollageUploadLoading || loading}
-                          >
-                            {reportCollageUploadLoading && uploadingType === "collage" ? "Uploading..." : "Upload Collage"}
-                          </button>
-                        )}
+                        <button
+                          className="btn primary"
+                          onClick={() =>
+                            handleUploadReportCollageClick("collage")
+                          }
+                          disabled={reportCollageUploadLoading || loading}
+                        >
+                          {reportCollageUploadLoading &&
+                          uploadingType === "collage"
+                            ? "Uploading..."
+                            : "Upload Collage"}
+                        </button>
+                      )}
                     </div>
                   </div>
                   {/* Hidden file input for collage upload */}
@@ -1311,14 +1387,16 @@ function OrderDocuments() {
                     style={{ display: "none" }}
                     accept="application/pdf"
                     multiple
-                    onChange={(e) => handleReportCollageFileChange(e, "collage")}
+                    onChange={(e) =>
+                      handleReportCollageFileChange(e, "collage")
+                    }
                   />
                   <div className="order-document-table">
                     {renderDocumentTable(
                       segregatedDocuments.collage,
                       "collage",
                       documentState.selectedCollages,
-                      "No collages generated yet"
+                      "No collages generated yet",
                     )}
                     {documentState.selectedCollages.length > 0 && (
                       <div style={{ display: "flex", gap: "10px" }}>
@@ -1327,46 +1405,66 @@ function OrderDocuments() {
                           onClick={() =>
                             handleDownloadSelected(
                               documentState.selectedCollages,
-                              "collage"
+                              "collage",
                             )
                           }
-                          disabled={loading}
+                          disabled={
+                            loading || bulkDownloadingType === "collage"
+                          }
                         >
-                          Download selected collages
+                          {bulkDownloadingType === "collage" ? (
+                            <span
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "4px",
+                              }}
+                            >
+                              <span
+                                className="spinner-border spinner-border-sm me-2"
+                                role="status"
+                                aria-hidden="true"
+                              />
+                              Downloading...
+                            </span>
+                          ) : (
+                            "Download selected collages"
+                          )}
                         </button>
                         {hasPermission(
                           allowedPermissions,
-                          "approve_order_collage"
+                          "approve_order_collage",
                         ) && (
-                            <button
-                              className="btn approve-report"
-                              onClick={() =>
-                                handleVerifySelected(
-                                  documentState.selectedCollages,
-                                  "collage"
-                                )
-                              }
-                              disabled={approveLoading || loading}
-                            >
-                              {approveLoading
-                                ? "Verifying..."
-                                : "Verify selected collages"}
-                            </button>
-                          )}
+                          <button
+                            className="btn approve-report"
+                            onClick={() =>
+                              handleVerifySelected(
+                                documentState.selectedCollages,
+                                "collage",
+                              )
+                            }
+                            disabled={approveLoading || loading}
+                          >
+                            {approveLoading
+                              ? "Verifying..."
+                              : "Verify selected collages"}
+                          </button>
+                        )}
                         {hasPermission(
                           allowedPermissions,
-                          "remove_approve_order_collage"
+                          "remove_approve_order_collage",
                         ) &&
                           hasApprovedDocuments(
                             documentState.selectedCollages,
-                            "collage"
+                            "collage",
                           ) && (
                             <button
                               className="btn remove-approve-report"
                               onClick={() =>
                                 handleRemoveApproveSelected(
                                   documentState.selectedCollages,
-                                  "collage"
+                                  "collage",
                                 )
                               }
                               disabled={removeApproveLoading || loading}
@@ -1386,10 +1484,15 @@ function OrderDocuments() {
                   <div className="order-report-header">
                     <h3>Reports</h3>
                     <div style={{ display: "flex", gap: "10px" }}>
-                      {hasPermission(allowedPermissions, "generate_order_report") && (
+                      {hasPermission(
+                        allowedPermissions,
+                        "generate_order_report",
+                      ) && (
                         <>
-                          {order?.valuer_name && order.valuer_name.trim() !== "" ? (
-                            order?.current_status_id === 10 && !isExemptAdmin ? (
+                          {order?.valuer_name &&
+                          order.valuer_name.trim() !== "" ? (
+                            order?.current_status_id === 10 &&
+                            !isExemptAdmin ? (
                               <button
                                 className="btn primary"
                                 disabled
@@ -1404,7 +1507,9 @@ function OrderDocuments() {
                                 onClick={(e) => {
                                   if (!getReportUrl()) {
                                     e.preventDefault();
-                                    toast.error("No report type available for this order category");
+                                    toast.error(
+                                      "No report type available for this order category",
+                                    );
                                   }
                                 }}
                               >
@@ -1423,16 +1528,21 @@ function OrderDocuments() {
                       )}
                       {hasPermission(
                         allowedPermissions,
-                        "add_order_reports_collages"
+                        "add_order_reports_collages",
                       ) && (
-                          <button
-                            className="btn primary"
-                            onClick={() => handleUploadReportCollageClick("report")}
-                            disabled={reportCollageUploadLoading || loading}
-                          >
-                            {reportCollageUploadLoading && uploadingType === "report" ? "Uploading..." : "Upload Report"}
-                          </button>
-                        )}
+                        <button
+                          className="btn primary"
+                          onClick={() =>
+                            handleUploadReportCollageClick("report")
+                          }
+                          disabled={reportCollageUploadLoading || loading}
+                        >
+                          {reportCollageUploadLoading &&
+                          uploadingType === "report"
+                            ? "Uploading..."
+                            : "Upload Report"}
+                        </button>
+                      )}
                     </div>
                   </div>
                   {/* Hidden file input for report upload */}
@@ -1449,7 +1559,7 @@ function OrderDocuments() {
                       segregatedDocuments.report,
                       "report",
                       documentState.selectedReports,
-                      "No reports generated yet"
+                      "No reports generated yet",
                     )}
                     {documentState.selectedReports.length > 0 && (
                       <div
@@ -1463,46 +1573,57 @@ function OrderDocuments() {
                           onClick={() =>
                             handleDownloadSelected(
                               documentState.selectedReports,
-                              "report"
+                              "report",
                             )
                           }
-                          disabled={loading}
+                          disabled={loading || bulkDownloadingType === "report"}
                         >
-                          Download selected reports
+                          {bulkDownloadingType === "report" ? (
+                            <>
+                              <span
+                                className="spinner-border spinner-border-sm me-2"
+                                role="status"
+                                aria-hidden="true"
+                              />
+                              Downloading...
+                            </>
+                          ) : (
+                            "Download selected reports"
+                          )}
                         </button>
                         {hasPermission(
                           allowedPermissions,
-                          "approve_order_report"
+                          "approve_order_report",
                         ) && (
-                            <button
-                              className="btn approve-report"
-                              onClick={() =>
-                                handleVerifySelected(
-                                  documentState.selectedReports,
-                                  "report"
-                                )
-                              }
-                              disabled={approveLoading || loading}
-                            >
-                              {approveLoading
-                                ? "Verifying..."
-                                : "Verify selected reports"}
-                            </button>
-                          )}
+                          <button
+                            className="btn approve-report"
+                            onClick={() =>
+                              handleVerifySelected(
+                                documentState.selectedReports,
+                                "report",
+                              )
+                            }
+                            disabled={approveLoading || loading}
+                          >
+                            {approveLoading
+                              ? "Verifying..."
+                              : "Verify selected reports"}
+                          </button>
+                        )}
                         {hasPermission(
                           allowedPermissions,
-                          "remove_approve_order_report"
+                          "remove_approve_order_report",
                         ) &&
                           hasApprovedDocuments(
                             documentState.selectedReports,
-                            "report"
+                            "report",
                           ) && (
                             <button
                               className="btn remove-approve-report"
                               onClick={() =>
                                 handleRemoveApproveSelected(
                                   documentState.selectedReports,
-                                  "report"
+                                  "report",
                                 )
                               }
                               disabled={removeApproveLoading || loading}
@@ -1529,56 +1650,56 @@ function OrderDocuments() {
                 </div>
                 {hasPermission(
                   allowedPermissions,
-                  "add_order_media_documents"
+                  "add_order_media_documents",
                 ) && (
-                    <div className="order-upload-documents">
-                      <input
-                        type="file"
-                        id="fileInput"
-                        multiple
-                        hidden
-                        onChange={handleFileInputChange}
-                        accept={[...ALLOWED_FILE_TYPES, ".zip"].join(",")}
-                      />
-                      <label
-                        htmlFor="fileInput"
-                        className="upload-box"
-                        onDragOver={handleDragOver}
-                        onDragEnter={handleDragEnter}
-                        onDragLeave={handleDragLeave}
-                        onDrop={handleDrop}
-                      >
-                        <div className="upload-icon">
-                          <PlusIcon />
-                        </div>
-                        <p>
-                          Drop documents here or <span>click to browse</span>
-                        </p>
-                        <small>
-                          Max file size: {MAX_FILE_SIZE / (1024 * 1024)}MB, Max
-                          files: {MAX_FILES_COUNT}
-                        </small>
-                      </label>
-                      {documentState.isUploading && (
-                        <div className="upload-progress-container">
-                          <div className="progress">
-                            <div
-                              className="progress-bar"
-                              role="progressbar"
-                              style={{
-                                width: `${documentState.uploadProgress}%`,
-                              }}
-                              aria-valuenow={documentState.uploadProgress}
-                              aria-valuemin="0"
-                              aria-valuemax="100"
-                            >
-                              Uploading... {documentState.uploadProgress}%
-                            </div>
+                  <div className="order-upload-documents">
+                    <input
+                      type="file"
+                      id="fileInput"
+                      multiple
+                      hidden
+                      onChange={handleFileInputChange}
+                      accept={[...ALLOWED_FILE_TYPES, ".zip"].join(",")}
+                    />
+                    <label
+                      htmlFor="fileInput"
+                      className="upload-box"
+                      onDragOver={handleDragOver}
+                      onDragEnter={handleDragEnter}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                    >
+                      <div className="upload-icon">
+                        <PlusIcon />
+                      </div>
+                      <p>
+                        Drop documents here or <span>click to browse</span>
+                      </p>
+                      <small>
+                        Max file size: {MAX_FILE_SIZE / (1024 * 1024)}MB, Max
+                        files: {MAX_FILES_COUNT}
+                      </small>
+                    </label>
+                    {documentState.isUploading && (
+                      <div className="upload-progress-container">
+                        <div className="progress">
+                          <div
+                            className="progress-bar"
+                            role="progressbar"
+                            style={{
+                              width: `${documentState.uploadProgress}%`,
+                            }}
+                            aria-valuenow={documentState.uploadProgress}
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                          >
+                            Uploading... {documentState.uploadProgress}%
                           </div>
                         </div>
-                      )}
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12">
                 <div className="order-document-table">
@@ -1586,7 +1707,7 @@ function OrderDocuments() {
                     segregatedDocuments.documents,
                     "documents",
                     documentState.selectedDocuments,
-                    "No documents uploaded yet"
+                    "No documents uploaded yet",
                   )}
                   {documentState.selectedDocuments.length > 0 && (
                     <button
@@ -1594,12 +1715,23 @@ function OrderDocuments() {
                       onClick={() =>
                         handleDownloadSelected(
                           documentState.selectedDocuments,
-                          "documents"
+                          "documents",
                         )
                       }
-                      disabled={loading}
+                      disabled={loading || bulkDownloadingType === "documents"}
                     >
-                      Download selected documents
+                      {bulkDownloadingType === "documents" ? (
+                        <>
+                          <span
+                            className="spinner-border spinner-border-sm me-2"
+                            role="status"
+                            aria-hidden="true"
+                          />
+                          Downloading...
+                        </>
+                      ) : (
+                        "Download selected documents"
+                      )}
                     </button>
                   )}
                 </div>
