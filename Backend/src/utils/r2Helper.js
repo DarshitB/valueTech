@@ -28,6 +28,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const mime = require("mime-types");
 const {
   S3Client,
@@ -52,11 +53,115 @@ const {
 } = process.env;
 
 const STATUSES_THAT_TRIGGER_SYNC = [13, 14];
+const R2_SYNC_STATUS_TABLE = "order_r2_sync_status";
 
 // In-memory per-order mutex. Prevents two concurrent syncs for the same
 // order from racing. Process-local only — if the app is clustered, upgrade
 // this to a row-level lock in the DB.
 const syncInFlight = new Set();
+
+function isMissingStatusTableError(err) {
+  if (!err || !err.message) return false;
+  return String(err.message).toLowerCase().includes("order_r2_sync_status");
+}
+
+function isPostgresClient() {
+  const clientName = db?.client?.config?.client || "";
+  return String(clientName).toLowerCase().includes("pg");
+}
+
+function extractRawRow(rawRes) {
+  if (!rawRes) return null;
+  if (Array.isArray(rawRes.rows) && rawRes.rows.length > 0) return rawRes.rows[0];
+  if (Array.isArray(rawRes) && rawRes.length > 0) return rawRes[0];
+  return null;
+}
+
+async function tryAcquireDistributedOrderLock(orderId) {
+  if (!isPostgresClient()) return true;
+  const raw = await db.raw("SELECT pg_try_advisory_lock(?) AS locked", [
+    Number(orderId),
+  ]);
+  const row = extractRawRow(raw);
+  return Boolean(row?.locked);
+}
+
+async function releaseDistributedOrderLock(orderId) {
+  if (!isPostgresClient()) return;
+  try {
+    await db.raw("SELECT pg_advisory_unlock(?)", [Number(orderId)]);
+  } catch (err) {
+    console.warn(`[r2] failed to release distributed lock for order=${orderId}:`, err.message);
+  }
+}
+
+async function ensureStatusRow(orderId) {
+  const existing = await db(R2_SYNC_STATUS_TABLE).where("order_id", Number(orderId)).first();
+  if (existing) return existing;
+
+  await db(R2_SYNC_STATUS_TABLE).insert({
+    order_id: Number(orderId),
+    status: "idle",
+    message: "Waiting to start",
+    uploaded_count: 0,
+    skipped_count: 0,
+    failed_count: 0,
+    deleted_count: 0,
+  });
+
+  return db(R2_SYNC_STATUS_TABLE).where("order_id", Number(orderId)).first();
+}
+
+async function updateSyncStatus(orderId, patch = {}) {
+  try {
+    await ensureStatusRow(orderId);
+    const now = new Date();
+    await db(R2_SYNC_STATUS_TABLE)
+      .where("order_id", Number(orderId))
+      .update({
+        ...patch,
+        heartbeat_at: now,
+        updated_at: now,
+      });
+  } catch (err) {
+    if (!isMissingStatusTableError(err)) throw err;
+  }
+}
+
+async function markSyncQueued(orderId) {
+  await updateSyncStatus(orderId, {
+    status: "queued",
+    message: "Queued for R2 transfer",
+    completed_at: null,
+  });
+}
+
+async function getOrderR2SyncStatus(orderId) {
+  let row = null;
+  try {
+    row = await db(R2_SYNC_STATUS_TABLE).where("order_id", Number(orderId)).first();
+  } catch (err) {
+    if (!isMissingStatusTableError(err)) throw err;
+  }
+
+  if (!row) {
+    return {
+      order_id: Number(orderId),
+      status: "idle",
+      message: "No transfer started yet",
+      uploaded_count: 0,
+      skipped_count: 0,
+      failed_count: 0,
+      deleted_count: 0,
+      started_at: null,
+      completed_at: null,
+      heartbeat_at: null,
+      updated_at: null,
+    };
+  }
+
+  return row;
+}
 
 function isSyncEnabled() {
   if (String(R2_SYNC_ENABLED).toLowerCase() === "false") return false;
@@ -180,18 +285,28 @@ function findOrderFolders(orderNumber) {
   return matches;
 }
 
-/**
- * HEAD an object and return its ContentLength. null if not present or error.
- */
-async function getRemoteSize(bucket, key) {
+async function getRemoteObjectInfo(bucket, key) {
   try {
     const res = await getClient().send(
       new HeadObjectCommand({ Bucket: bucket, Key: key })
     );
-    return typeof res.ContentLength === "number" ? res.ContentLength : null;
+    return {
+      size: typeof res.ContentLength === "number" ? res.ContentLength : null,
+      sha256: res?.Metadata?.sha256 || null,
+    };
   } catch (_) {
-    return null;
+    return { size: null, sha256: null };
   }
+}
+
+async function computeFileSha256(filePath) {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash("sha256");
+    const stream = fs.createReadStream(filePath);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("error", reject);
+    stream.on("end", () => resolve(hash.digest("hex")));
+  });
 }
 
 /**
@@ -204,19 +319,24 @@ async function getRemoteSize(bucket, key) {
  * changed between the pre-upload stat and the post-upload stat, the
  * upload is treated as failed (local is kept, next sync will retry).
  *
- * Returns { outcome: 'uploaded'|'skipped', size, mtimeMs }.
+ * Returns { outcome: 'uploaded'|'skipped', size, mtimeMs, sha256 }.
  * Throws if all attempts fail.
  */
 async function uploadFileVerified(bucket, key, filePath, attempts = 3) {
   const statBefore = fs.statSync(filePath);
   const localSize = statBefore.size;
   const localMtime = statBefore.mtimeMs;
+  const localSha256 = await computeFileSha256(filePath);
 
-  // If the remote already has a byte-identical object, skip the PUT
-  // but still return size/mtime so Phase 4 can confirm.
-  const existingSize = await getRemoteSize(bucket, key);
-  if (existingSize === localSize) {
-    return { outcome: "skipped", size: localSize, mtimeMs: localMtime };
+  // Strict skip check: both size and checksum must match.
+  const existing = await getRemoteObjectInfo(bucket, key);
+  if (existing.size === localSize && existing.sha256 === localSha256) {
+    return {
+      outcome: "skipped",
+      size: localSize,
+      mtimeMs: localMtime,
+      sha256: localSha256,
+    };
   }
 
   const contentType = mime.lookup(filePath) || "application/octet-stream";
@@ -232,14 +352,17 @@ async function uploadFileVerified(bucket, key, filePath, attempts = 3) {
           Body: body,
           ContentType: contentType,
           ContentLength: localSize,
+          Metadata: {
+            sha256: localSha256,
+          },
         })
       );
 
       // Post-upload remote check
-      const remoteSize = await getRemoteSize(bucket, key);
-      if (remoteSize !== localSize) {
+      const remote = await getRemoteObjectInfo(bucket, key);
+      if (remote.size !== localSize || remote.sha256 !== localSha256) {
         lastErr = new Error(
-          `size mismatch after upload (local=${localSize}, remote=${remoteSize})`
+          `integrity mismatch after upload (localSize=${localSize}, remoteSize=${remote.size}, localSha=${localSha256}, remoteSha=${remote.sha256})`
         );
         continue;
       }
@@ -258,7 +381,12 @@ async function uploadFileVerified(bucket, key, filePath, attempts = 3) {
         continue;
       }
 
-      return { outcome: "uploaded", size: localSize, mtimeMs: localMtime };
+      return {
+        outcome: "uploaded",
+        size: localSize,
+        mtimeMs: localMtime,
+        sha256: localSha256,
+      };
     } catch (err) {
       lastErr = err;
     }
@@ -273,7 +401,7 @@ async function uploadFileVerified(bucket, key, filePath, attempts = 3) {
 /**
  * Upload every file in the folder. Returns:
  *   { uploaded, skipped, failed: [{key,error}],
- *     candidates: [{filePath, size, mtimeMs}...] }
+ *     candidates: [{filePath, size, mtimeMs, sha256}...] }
  * `candidates` is the list of files that succeeded (uploaded or skipped),
  * snapshotted at upload time. These are the ONLY deletion candidates, and
  * each must still match its snapshot at delete time.
@@ -295,6 +423,7 @@ async function uploadFolderToR2(folderAbsPath) {
         filePath,
         size: res.size,
         mtimeMs: res.mtimeMs,
+        sha256: res.sha256,
       });
     } catch (err) {
       results.failed.push({ key, error: err.message });
@@ -502,14 +631,16 @@ async function verifyFilesOnR2(candidates) {
       continue;
     }
 
-    // Remote side: must match snapshotted size.
-    const remoteSize = await getRemoteSize(bucket, key);
-    if (remoteSize !== c.size) {
+    // Remote side: must match snapshotted size and checksum.
+    const remote = await getRemoteObjectInfo(bucket, key);
+    if (remote.size !== c.size || remote.sha256 !== c.sha256) {
       missing.push({
         key,
-        reason: "remote size mismatch",
+        reason: "remote integrity mismatch",
         expectedSize: c.size,
-        remoteSize,
+        remoteSize: remote.size,
+        expectedSha256: c.sha256,
+        remoteSha256: remote.sha256,
       });
     }
   }
@@ -550,11 +681,11 @@ async function deleteLocalFilesAfterConfirm(candidates, folderRoots) {
       }
 
       const key = toR2Key(filePath);
-      const remoteSize = await getRemoteSize(bucket, key);
-      if (remoteSize !== c.size) {
+      const remote = await getRemoteObjectInfo(bucket, key);
+      if (remote.size !== c.size || remote.sha256 !== c.sha256) {
         keptFiles.push({
           file: filePath,
-          reason: `final HEAD mismatch (expected=${c.size}, remote=${remoteSize})`,
+          reason: `final integrity mismatch (expectedSize=${c.size}, remoteSize=${remote.size}, expectedSha=${c.sha256}, remoteSha=${remote.sha256})`,
         });
         continue;
       }
@@ -614,16 +745,48 @@ async function syncOrderToR2(orderId) {
     error: null,
   };
 
+  let hasDistributedLock = false;
   if (syncInFlight.has(Number(orderId))) {
     summary.skipped_reason = "another sync already in flight for this order";
     console.warn(`[r2] ${summary.skipped_reason} (order_id=${orderId})`);
+    await updateSyncStatus(orderId, {
+      status: "running",
+      message: "R2 transfer already running for this order",
+    });
     return summary;
   }
   syncInFlight.add(Number(orderId));
 
   try {
+    hasDistributedLock = await tryAcquireDistributedOrderLock(orderId);
+    if (!hasDistributedLock) {
+      summary.skipped_reason =
+        "another sync already running on another server instance";
+      await updateSyncStatus(orderId, {
+        status: "running",
+        message: summary.skipped_reason,
+      });
+      return summary;
+    }
+
+    await updateSyncStatus(orderId, {
+      status: "running",
+      message: "R2 transfer started",
+      started_at: new Date(),
+      completed_at: null,
+      uploaded_count: 0,
+      skipped_count: 0,
+      failed_count: 0,
+      deleted_count: 0,
+    });
+
     if (!isSyncEnabled()) {
       summary.skipped_reason = "R2 sync disabled or misconfigured";
+      await updateSyncStatus(orderId, {
+        status: "stopped",
+        message: summary.skipped_reason,
+        completed_at: new Date(),
+      });
       return summary;
     }
 
@@ -634,6 +797,11 @@ async function syncOrderToR2(orderId) {
 
     if (!order) {
       summary.error = "order not found";
+      await updateSyncStatus(orderId, {
+        status: "failed",
+        message: summary.error,
+        completed_at: new Date(),
+      });
       return summary;
     }
 
@@ -642,6 +810,11 @@ async function syncOrderToR2(orderId) {
     if (folders.length === 0) {
       summary.ran = true;
       summary.skipped_reason = "no local folder found for this order";
+      await updateSyncStatus(orderId, {
+        status: "completed",
+        message: "No local files found, nothing to transfer",
+        completed_at: new Date(),
+      });
       return summary;
     }
 
@@ -653,6 +826,14 @@ async function syncOrderToR2(orderId) {
       summary.skipped += res.skipped;
       summary.failed += res.failed.length;
       allCandidates.push(...res.candidates);
+
+      await updateSyncStatus(orderId, {
+        status: "running",
+        message: "Uploading files to R2",
+        uploaded_count: summary.uploaded,
+        skipped_count: summary.skipped,
+        failed_count: summary.failed,
+      });
     }
 
     if (summary.failed > 0) {
@@ -660,6 +841,14 @@ async function syncOrderToR2(orderId) {
       console.warn(
         `[r2] order=${order.order_number} had ${summary.failed} upload failure(s); local kept, DB not rewritten`
       );
+      await updateSyncStatus(orderId, {
+        status: "failed",
+        message: `${summary.failed} file(s) failed during upload`,
+        uploaded_count: summary.uploaded,
+        skipped_count: summary.skipped,
+        failed_count: summary.failed,
+        completed_at: new Date(),
+      });
       return summary;
     }
 
@@ -672,22 +861,46 @@ async function syncOrderToR2(orderId) {
         `[r2] verification failed for order=${order.order_number}, missing:`,
         verify.missing
       );
+      await updateSyncStatus(orderId, {
+        status: "failed",
+        message: "Verification failed after upload",
+        uploaded_count: summary.uploaded,
+        skipped_count: summary.skipped,
+        failed_count: summary.failed,
+        completed_at: new Date(),
+      });
       return summary;
     }
 
     // ---------- Phase 3: DB rewrite (transactional) ----------
     try {
+      await updateSyncStatus(orderId, {
+        status: "running",
+        message: "Updating database URLs to R2",
+      });
       const dbRes = await rewriteMediaUrlsForOrder(orderId);
       summary.db_urls_updated = dbRes.updated;
     } catch (err) {
       summary.error = `db rewrite failed: ${err.message}`;
       console.error(`[r2] DB rewrite failed for order=${order.order_number}:`, err);
       summary.ran = true;
+      await updateSyncStatus(orderId, {
+        status: "failed",
+        message: summary.error,
+        uploaded_count: summary.uploaded,
+        skipped_count: summary.skipped,
+        failed_count: summary.failed,
+        completed_at: new Date(),
+      });
       return summary; // DO NOT delete local if DB rewrite didn't succeed
     }
 
     // ---------- Phase 4: Per-file final confirm + delete ----------
     if (String(R2_DELETE_LOCAL_AFTER_UPLOAD).toLowerCase() === "true") {
+      await updateSyncStatus(orderId, {
+        status: "running",
+        message: "Cleaning local files after final verification",
+      });
       const del = await deleteLocalFilesAfterConfirm(allCandidates, folders);
       summary.files_deleted = del.deletedFiles.length;
       summary.files_kept = del.keptFiles;
@@ -700,13 +913,34 @@ async function syncOrderToR2(orderId) {
     }
 
     summary.ran = true;
+    await updateSyncStatus(orderId, {
+      status: "completed",
+      message: "R2 transfer completed",
+      uploaded_count: summary.uploaded,
+      skipped_count: summary.skipped,
+      failed_count: summary.failed,
+      deleted_count: summary.files_deleted,
+      completed_at: new Date(),
+    });
     console.log(
       `[r2] sync done order=${order.order_number} uploaded=${summary.uploaded} skipped=${summary.skipped} db_urls_updated=${summary.db_urls_updated} files_deleted=${summary.files_deleted} files_kept=${summary.files_kept.length}`
     );
   } catch (err) {
     summary.error = err.message;
     console.error(`[r2] sync error order=${orderId}:`, err);
+    await updateSyncStatus(orderId, {
+      status: "failed",
+      message: summary.error || "Unexpected sync error",
+      uploaded_count: summary.uploaded,
+      skipped_count: summary.skipped,
+      failed_count: summary.failed,
+      deleted_count: summary.files_deleted,
+      completed_at: new Date(),
+    });
   } finally {
+    if (hasDistributedLock) {
+      await releaseDistributedOrderLock(orderId);
+    }
     syncInFlight.delete(Number(orderId));
   }
 
@@ -722,11 +956,38 @@ function triggerR2SyncIfNeeded(orderId, newStatusId) {
   if (!STATUSES_THAT_TRIGGER_SYNC.includes(statusId)) return;
   if (!orderId) return;
 
-  setImmediate(() => {
-    syncOrderToR2(orderId).catch((err) => {
+  setImmediate(async () => {
+    try {
+      await markSyncQueued(orderId);
+      await syncOrderToR2(orderId);
+    } catch (err) {
       console.error(`[r2] unexpected sync failure for order ${orderId}:`, err);
-    });
+    }
   });
+}
+
+async function resumePendingR2SyncJobs() {
+  if (!isSyncEnabled()) return;
+
+  let resumable = [];
+  try {
+    resumable = await db(R2_SYNC_STATUS_TABLE)
+      .select("order_id")
+      .whereIn("status", ["queued", "running"])
+      .orderBy("updated_at", "asc");
+  } catch (err) {
+    if (!isMissingStatusTableError(err)) throw err;
+  }
+
+  for (const row of resumable) {
+    const orderId = Number(row.order_id);
+    if (!orderId) continue;
+    setImmediate(() => {
+      syncOrderToR2(orderId).catch((err) => {
+        console.error(`[r2] failed resuming order ${orderId}:`, err);
+      });
+    });
+  }
 }
 
 module.exports = {
@@ -734,6 +995,8 @@ module.exports = {
   isSyncEnabled,
   syncOrderToR2,
   triggerR2SyncIfNeeded,
+  getOrderR2SyncStatus,
+  resumePendingR2SyncJobs,
   uploadFolderToR2,
   rewriteMediaUrlsForOrder,
   findOrderFolders,

@@ -497,7 +497,7 @@ async function uploadCombined(req, res, next) {
 
     // Initial debug: run before any parsing/validation conditions so we can
     // inspect incoming payload even when request fails early.
-    console.log("[upload-combined] initial payload debug", {
+    /* console.log("[upload-combined] initial payload debug", {
       content_type: req.headers?.["content-type"] || null,
       body_keys: req.body ? Object.keys(req.body) : [],
       has_files_base64_key:
@@ -513,7 +513,7 @@ async function uploadCombined(req, res, next) {
           ? req.body.files_base64.slice(0, 120)
           : null,
       multipart_files_count: Array.isArray(req.files) ? req.files.length : 0,
-    });
+    }); */
 
     // Collect multipart files (populated by multer when Content-Type is
     // multipart/form-data; empty array when payload is pure JSON).
@@ -550,7 +550,7 @@ async function uploadCombined(req, res, next) {
 
     // Debug: inspect files_base64 payload shape for upload-combined endpoint.
     // Keeps logs compact (does not print full base64 content).
-    console.log("[upload-combined] files_base64 debug", {
+    /* console.log("[upload-combined] files_base64 debug", {
       has_files_base64_key:
         !!(req.body && req.body.files_base64 !== undefined && req.body.files_base64 !== null),
       files_base64_source_type: base64Source === null ? "null" : Array.isArray(base64Source) ? "array" : typeof base64Source,
@@ -565,7 +565,7 @@ async function uploadCombined(req, res, next) {
         typeof base64Files[0].data === "string"
           ? base64Files[0].data.slice(0, 48)
           : null,
-    });
+    }); */
 
     if (!order_number) throw new BadRequestError('order_number is required');
     if (multipartFiles.length === 0 && base64Files.length === 0) {

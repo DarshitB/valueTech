@@ -11,7 +11,10 @@ const {
   ConflictError,
   BadRequestError,
 } = require("../../utils/customErrors");
-const { triggerR2SyncIfNeeded } = require("../../utils/r2Helper");
+const {
+  triggerR2SyncIfNeeded,
+  getOrderR2SyncStatus,
+} = require("../../utils/r2Helper");
 
 // Helper functions to get names by IDs
 async function getUserName(userId) {
@@ -374,6 +377,23 @@ exports.getById = async (req, res, next) => {
     if (!order) throw new NotFoundError("Order not found");
 
     res.json(order);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getR2SyncStatus = async (req, res, next) => {
+  try {
+    const orderId = Number(req.params.id);
+    if (!orderId) {
+      throw new BadRequestError("Invalid order ID");
+    }
+
+    const status = await getOrderR2SyncStatus(orderId);
+    res.json({
+      success: true,
+      data: status,
+    });
   } catch (err) {
     next(err);
   }

@@ -27,7 +27,11 @@ import {
 } from "../../redux/reducers/orderReportReducer";
 import { fetchOfficers } from "../../redux/reducers/officerReducer";
 import { getUsers } from "../../api/user.api";
-import { sendOrderMail, getOrderLastMail } from "../../api/order.api";
+import {
+  sendOrderMail,
+  getOrderLastMail,
+  getOrderR2SyncStatus,
+} from "../../api/order.api";
 import { MentionsInput, Mention } from "react-mentions";
 import mentionsStyle from "./mentionsStyle";
 import "./order.scss";
@@ -210,6 +214,10 @@ function OrderDetails() {
   const [isCompletingOrder, setIsCompletingOrder] = useState(false);
   const [isPuttingOnHold, setIsPuttingOnHold] = useState(false);
   const [isMovingToStatus9, setIsMovingToStatus9] = useState(false);
+  const [r2SyncStatus, setR2SyncStatus] = useState(null);
+  const [r2SyncLoading, setR2SyncLoading] = useState(false);
+  const currentStatusId = Number(order?.current_status_id);
+  const shouldShowR2Status = currentStatusId === 13 || currentStatusId === 14;
 
   // Complete order (status 13) via direct status update
   const handleCompleteOrder = async () => {
@@ -332,6 +340,56 @@ function OrderDetails() {
       }
     }
   }, [dispatch, id, showMailModal, order?.category_name]);
+
+  useEffect(() => {
+    if (!shouldShowR2Status || !id) {
+      setR2SyncStatus(null);
+      setR2SyncLoading(false);
+      return undefined;
+    }
+
+    let timer = null;
+    let cancelled = false;
+
+    const fetchR2Status = async () => {
+      if (!id || !shouldShowR2Status) return;
+      try {
+        if (!cancelled && !r2SyncStatus) {
+          setR2SyncLoading(true);
+        }
+        const res = await getOrderR2SyncStatus(id);
+        const status = res?.data?.data || null;
+        if (!cancelled) {
+          setR2SyncStatus(status);
+        }
+
+        const statusValue = String(status?.status || "").toLowerCase();
+        const isTerminal =
+          statusValue === "completed" ||
+          statusValue === "failed" ||
+          statusValue === "stopped";
+        if (!isTerminal) {
+          timer = setTimeout(fetchR2Status, 3000);
+        }
+      } catch (_) {
+        if (!cancelled) {
+          setR2SyncStatus((prev) => prev || null);
+          timer = setTimeout(fetchR2Status, 3000);
+        }
+      } finally {
+        if (!cancelled) {
+          setR2SyncLoading(false);
+        }
+      }
+    };
+
+    fetchR2Status();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [id, shouldShowR2Status]);
 
   // Prefill mail form from last-sent mail when modal opens
   useEffect(() => {
@@ -1409,6 +1467,31 @@ function OrderDetails() {
 
   // Reusable function to render action buttons
   const renderActionButtons = useCallback(() => {
+    const statusValue = String(r2SyncStatus?.status || "idle").toLowerCase();
+    const statusLabel =
+      statusValue === "running"
+        ? "R2 Running"
+        : statusValue === "queued"
+          ? "R2 Queued"
+          : statusValue === "completed"
+            ? "R2 Complete"
+            : statusValue === "failed"
+              ? "R2 Failed"
+              : statusValue === "stopped"
+                ? "R2 Stopped"
+                : r2SyncLoading
+                  ? "R2 Loading..."
+                  : "R2 Idle";
+
+    const statusColor =
+      statusValue === "running" || statusValue === "queued"
+        ? "#f59e0b"
+        : statusValue === "completed"
+          ? "#16a34a"
+          : statusValue === "failed" || statusValue === "stopped"
+            ? "#dc2626"
+            : "#6b7280";
+
     return (
       <div
         className="recent-activity-buttons"
@@ -1878,6 +1961,25 @@ function OrderDetails() {
               <MailIcon />
             </Link>
           )}
+        {shouldShowR2Status && (
+          <span
+            title={r2SyncStatus?.message || "R2 transfer status"}
+            className="tooltip-link"
+            style={{
+              minWidth: "96px",
+              textAlign: "center",
+              fontSize: "12px",
+              fontWeight: 600,
+              color: statusColor,
+              border: `1px solid ${statusColor}`,
+              borderRadius: "999px",
+              padding: "6px 10px",
+              lineHeight: 1.2,
+            }}
+          >
+            {statusLabel}
+          </span>
+        )}
       </div>
     );
   }, [
@@ -1905,6 +2007,9 @@ function OrderDetails() {
     setShowRevisionConfirmation,
     OpenPaymentModal,
     OpenMailModal,
+    r2SyncStatus,
+    r2SyncLoading,
+    shouldShowR2Status,
   ]);
 
   // Handle mail form submission with enhanced validation

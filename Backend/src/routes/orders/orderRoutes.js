@@ -22,6 +22,7 @@ router.get(
   orderController.getByChildCategoryWithFinalizedStatus
 );
 router.get("/:orderId/last-mail", orderController.getLastMail);
+router.get("/:id/r2-sync-status", orderController.getR2SyncStatus);
 router.get("/:id", orderController.getById);
 router.post(
   "/",
