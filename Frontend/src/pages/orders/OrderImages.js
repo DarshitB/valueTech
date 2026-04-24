@@ -16,7 +16,7 @@
  * - 2: Rejected
  * - 3: Terminated
  */
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link, useParams } from "react-router-dom";
 import { usePageTitle } from "../../context/PageTitleContext";
@@ -46,7 +46,6 @@ import { toast } from "react-toastify";
 import { hasPermission } from "../../utils/permissionUtils";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
 import { resolveAssetUrl } from "../../utils/urlUtils";
-import RetryImage from "../../components/RetryImage";
 import ZipUploadModal from "../../components/ZipUploadModal";
 import ConfirmationModal from "../../components/ConfirmationModal";
 
@@ -74,6 +73,61 @@ const STATUS_INFO = {
   3: { text: "Terminated", color: "text-info" },
   4: { text: "Text Image", color: "text-secondary" },
 };
+
+const IMAGE_RETRY_MAX = 3;
+const IMAGE_RETRY_BASE_DELAY = 2000;
+
+function RetryImage({ src, alt, style }) {
+  const [displaySrc, setDisplaySrc] = useState(src);
+  const [failed, setFailed] = useState(false);
+  const retryCountRef = useRef(0);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    retryCountRef.current = 0;
+    setFailed(false);
+    setDisplaySrc(src);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [src]);
+
+  const handleError = useCallback(() => {
+    const isRemote = typeof src === "string" && /^https?:\/\//i.test(src);
+    if (isRemote && retryCountRef.current < IMAGE_RETRY_MAX) {
+      retryCountRef.current += 1;
+      const delay = IMAGE_RETRY_BASE_DELAY * retryCountRef.current;
+      timerRef.current = setTimeout(() => {
+        const sep = src.includes("?") ? "&" : "?";
+        setDisplaySrc(`${src}${sep}_cb=${Date.now()}`);
+      }, delay);
+      return;
+    }
+    setFailed(true);
+  }, [src]);
+
+  if (failed) {
+    return (
+      <div
+        role="img"
+        aria-label={alt || "Image unavailable"}
+        style={{
+          ...style,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f3f4f6",
+          color: "#9ca3af",
+          fontSize: "11px",
+        }}
+      >
+        Unavailable
+      </div>
+    );
+  }
+
+  return <img src={displaySrc} alt={alt} style={style} onError={handleError} />;
+}
 function getStatusInfo(status) {
   return STATUS_INFO[status] ?? { text: "Unknown", color: "text-muted" };
 }
