@@ -1,6 +1,8 @@
 const path = require("path");
 const fs = require("fs");
 const sharp = require("sharp");
+const http = require("http");
+const https = require("https");
 const { ensureDirectoryExists, UPLOADS_BASE_DIR } = require("./localFileHelper");
 
 const THUMB_MAX_SIZE = 400;
@@ -64,8 +66,68 @@ function getThumbnailUrlIfExists(mediaUrl) {
   return fs.existsSync(thumbPath) ? thumbUrl : null;
 }
 
+/**
+ * Check whether a remote URL exists (HTTP 2xx/3xx) using a fast HEAD request.
+ * Returns false on network errors/timeouts.
+ * @param {string} url
+ * @returns {Promise<boolean>}
+ */
+function checkRemoteUrlExists(url) {
+  return new Promise((resolve) => {
+    try {
+      const parsed = new URL(url);
+      const client = parsed.protocol === "https:" ? https : http;
+      const req = client.request(
+        parsed,
+        { method: "HEAD", timeout: 2500 },
+        (res) => {
+          const statusCode = Number(res.statusCode || 0);
+          resolve(statusCode >= 200 && statusCode < 400);
+        }
+      );
+      req.on("timeout", () => {
+        req.destroy();
+        resolve(false);
+      });
+      req.on("error", () => resolve(false));
+      req.end();
+    } catch (_) {
+      resolve(false);
+    }
+  });
+}
+
+/**
+ * Universal thumbnail resolver:
+ * - local `/uploads/...` URLs => check local disk
+ * - remote `http(s)://...` URLs (e.g. R2/public CDN) => check remote object with HEAD
+ * Returns null when thumbnail does not exist.
+ * @param {string} mediaUrl
+ * @returns {Promise<string|null>}
+ */
+async function getThumbnailUrlIfExistsUniversal(mediaUrl) {
+  const thumbUrl = getThumbnailUrl(mediaUrl);
+  if (!thumbUrl) return null;
+
+  // Local upload path behavior stays exactly the same.
+  if (thumbUrl.startsWith("/uploads/")) {
+    const relative = thumbUrl.replace(/^\/uploads\/?/, "").replace(/\//g, path.sep);
+    const thumbPath = path.join(UPLOADS_BASE_DIR, relative);
+    return fs.existsSync(thumbPath) ? thumbUrl : null;
+  }
+
+  // Remote path (R2/CDN absolute URL): return only if object exists.
+  if (/^https?:\/\//i.test(thumbUrl)) {
+    const exists = await checkRemoteUrlExists(thumbUrl);
+    return exists ? thumbUrl : null;
+  }
+
+  return null;
+}
+
 module.exports = {
   generateAndSaveThumbnail,
   getThumbnailUrl,
   getThumbnailUrlIfExists,
+  getThumbnailUrlIfExistsUniversal,
 };

@@ -1,5 +1,8 @@
 const fs = require("fs");
 const path = require("path");
+const os = require("os");
+const https = require("https");
+const http = require("http");
 const { v4: uuidv4 } = require("uuid");
 const sharp = require("sharp");
 const PDFDocument = require("pdfkit");
@@ -30,6 +33,72 @@ const {
   NotFoundError,
   BadRequestError,
 } = require("../../utils/customErrors");
+
+/**
+ * Download a remote URL (http/https) to a temp file.
+ * Returns the local temp file path.
+ * Caller is responsible for deleting the temp file after use.
+ */
+function downloadToTempFile(url) {
+  return new Promise((resolve, reject) => {
+    const ext = path.extname(url.split("?")[0]) || ".tmp";
+    const tmpPath = path.join(os.tmpdir(), `r2_collage_${uuidv4()}${ext}`);
+    const file = fs.createWriteStream(tmpPath);
+    const protocol = url.startsWith("https://") ? https : http;
+
+    protocol
+      .get(url, (res) => {
+        if (res.statusCode !== 200) {
+          file.close();
+          fs.unlink(tmpPath, () => {});
+          reject(
+            new Error(
+              `Failed to download ${url}: HTTP ${res.statusCode}`
+            )
+          );
+          return;
+        }
+        res.pipe(file);
+        file.on("finish", () => file.close(() => resolve(tmpPath)));
+        file.on("error", (err) => {
+          fs.unlink(tmpPath, () => {});
+          reject(err);
+        });
+      })
+      .on("error", (err) => {
+        fs.unlink(tmpPath, () => {});
+        reject(err);
+      });
+  });
+}
+
+/**
+ * Given a media_url (either "/uploads/..." local path or "https://..." R2/CDN URL),
+ * return the absolute local file path. For R2 URLs, download to a temp file.
+ * Also returns a boolean indicating whether the file is temporary (needs cleanup).
+ */
+async function resolveMediaUrlToLocalPath(mediaUrl) {
+  if (!mediaUrl || typeof mediaUrl !== "string") {
+    throw new Error(`Invalid media_url: ${mediaUrl}`);
+  }
+
+  if (/^https?:\/\//i.test(mediaUrl)) {
+    const tmpPath = await downloadToTempFile(mediaUrl);
+    return { localPath: tmpPath, isTemp: true };
+  }
+
+  const uploadsIdx = mediaUrl.indexOf("/uploads/");
+  if (uploadsIdx !== -1) {
+    const relPath = mediaUrl.slice(uploadsIdx + 1);
+    const absPath = path.join(
+      process.cwd(),
+      relPath.replace(/\//g, path.sep)
+    );
+    return { localPath: absPath, isTemp: false };
+  }
+
+  throw new Error(`Cannot resolve media_url to a local path: ${mediaUrl}`);
+}
 
 // Configurable styling variables
 // 🎨 EASY TO CUSTOMIZE: Change these values anytime to modify text appearance
@@ -124,12 +193,23 @@ exports.generateCollage = async (req, res, next) => {
       throw new BadRequestError("No valid media files found after sorting");
     }
 
-    // Extract image paths from sorted media files
-    const imagePaths = sortedMediaFiles.map((media) => {
-      // Convert web URL to local file path
-      const relativePath = media.media_url.replace("/uploads/", "");
-      return path.join(process.cwd(), "uploads", relativePath);
-    });
+    // Resolve each media URL to a local path (downloading from R2 if needed)
+    const resolvedImages = await Promise.all(
+      sortedMediaFiles.map(async (media) => {
+        try {
+          return await resolveMediaUrlToLocalPath(media.media_url);
+        } catch (err) {
+          throw new BadRequestError(
+            `Image not accessible: ${media.media_url} — ${err.message}`
+          );
+        }
+      })
+    );
+
+    const imagePaths = resolvedImages.map((r) => r.localPath);
+    const tempImagePaths = resolvedImages
+      .filter((r) => r.isTemp)
+      .map((r) => r.localPath);
 
     // Validate image files exist
     for (const imagePath of imagePaths) {
@@ -209,7 +289,14 @@ exports.generateCollage = async (req, res, next) => {
       ? orientations.map((o) => (o && String(o).toLowerCase()) || "default")
       : image_ids.map(() => "default");
 
-    await generateCollageImage(imagePaths, collageImagePath, text, stampBuffer, stampOffset, orientationsList);
+    try {
+      await generateCollageImage(imagePaths, collageImagePath, text, stampBuffer, stampOffset, orientationsList);
+    } finally {
+      // Clean up any temp files downloaded from R2
+      for (const tmpPath of tempImagePaths) {
+        try { fs.unlinkSync(tmpPath); } catch (_) {}
+      }
+    }
 
     // Save orientation for each image to order_media_image_video
     await orderMediaPortal.updateOrientationsByIds(

@@ -162,6 +162,7 @@ function OrderDocuments() {
   // State to track which type is being uploaded
   const [uploadingType, setUploadingType] = useState(null);
   const [downloadingDocIds, setDownloadingDocIds] = useState([]);
+  const [viewingDocIds, setViewingDocIds] = useState([]);
   const [bulkDownloadingType, setBulkDownloadingType] = useState(null);
 
   const documentState = useDocumentState();
@@ -323,31 +324,91 @@ function OrderDocuments() {
     [documentState],
   );
 
-  // Secure document viewing
-  const handleViewDocument = useCallback(
-    (document) => {
-      if (!document?.media_url) {
-        toast.error("Document URL not available");
+  // Secure document viewing.
+  // Strategy: open a blank tab SYNCHRONOUSLY with the user's click (so the
+  // browser never treats it as a pop-up), show a loading spinner inside that
+  // tab, then fetch the document through the authenticated backend proxy and
+  // navigate the already-open tab to the blob URL when ready.
+  // This gives instant visual feedback (tab opens immediately) and avoids
+  // direct R2 CDN URLs, preventing intermittent 500 errors.
+  const handleViewDocument = useCallback(async (document) => {
+    if (!document?.media_url) {
+      toast.error("Document URL not available");
+      return;
+    }
+
+    // Open the new tab immediately — must be synchronous with the user gesture
+    // or some browsers will block it as a popup.
+    const newWindow = window.open("about:blank", "_blank");
+    if (!newWindow) {
+      toast.error(
+        "Popup blocked. Please allow popups for this site and try again.",
+      );
+      return;
+    }
+
+    // Write a loading page into the new tab so the user sees activity right away.
+    try {
+      newWindow.document.write(
+        "<!DOCTYPE html><html><head><title>Opening\u2026</title>" +
+          "<style>" +
+          "body{margin:0;height:100vh;display:flex;align-items:center;" +
+          "justify-content:center;background:#f8f9fa;" +
+          "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}" +
+          ".sp{width:36px;height:36px;border:3px solid #dee2e6;" +
+          "border-top-color:#495057;border-radius:50%;" +
+          "animation:spin .7s linear infinite;margin:0 auto 14px;}" +
+          "@keyframes spin{to{transform:rotate(360deg)}}" +
+          "p{margin:0;font-size:14px;color:#6c757d;}" +
+          "</style></head><body>" +
+          "<div style='text-align:center'>" +
+          "<div class='sp'></div><p>Opening document\u2026</p>" +
+          "</div></body></html>",
+      );
+      newWindow.document.close();
+    } catch (_) {
+      // Some browsers with strict CSP may not allow document.write on a
+      // blank tab — the tab will just show blank while loading, which is fine.
+    }
+
+    // Mark button as loading.
+    setViewingDocIds((prev) =>
+      prev.includes(document.id) ? prev : [...prev, document.id],
+    );
+
+    try {
+      const response = await downloadOrderMediaDocument(document.id);
+      const contentType =
+        response.headers?.["content-type"] || "application/octet-stream";
+      // response.data is already a Blob (responseType: "blob")
+      const blob =
+        response.data instanceof Blob
+          ? response.data
+          : new Blob([response.data], { type: contentType });
+      const objectUrl = URL.createObjectURL(blob);
+
+      // Navigate the already-open tab to the document content.
+      try {
+        newWindow.location.href = objectUrl;
+      } catch (_) {
+        // User closed the tab before the fetch finished — just clean up.
+        URL.revokeObjectURL(objectUrl);
         return;
       }
 
-      const fileUrl = parseMediaUrl(document.media_url);
-      if (!fileUrl || !validateUrl(fileUrl)) {
-        toast.error("Invalid document URL");
-        return;
-      }
-
-      // Open in new tab with security measures
-      const newWindow = window.open();
-      if (newWindow) {
-        newWindow.opener = null; // Security: prevent access to parent window
-        newWindow.location = fileUrl;
-      } else {
-        toast.error("Popup blocked. Please allow popups for this site.");
-      }
-    },
-    [parseMediaUrl],
-  );
+      // Keep the object URL alive long enough for the browser to load it,
+      // then release the memory.
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 90_000);
+    } catch (err) {
+      // Fetch failed — close the loading tab and show an error message.
+      try {
+        newWindow.close();
+      } catch (_) {}
+      toast.error("Unable to open document. Please try again.");
+    } finally {
+      setViewingDocIds((prev) => prev.filter((id) => id !== document.id));
+    }
+  }, []);
 
   // Enhanced download with better error handling
   const handleDownloadDocument = useCallback(
@@ -987,15 +1048,36 @@ function OrderDocuments() {
                 <td style={{ textAlign: "center" }}>
                   <button
                     onClick={() => handleViewDocument(doc)}
+                    disabled={viewingDocIds.includes(doc.id)}
                     style={{
                       background: "none",
                       border: "none",
-                      cursor: "pointer",
+                      cursor: viewingDocIds.includes(doc.id)
+                        ? "not-allowed"
+                        : "pointer",
                     }}
                     aria-label="View document"
-                    title="View document"
+                    title={
+                      viewingDocIds.includes(doc.id)
+                        ? "Opening…"
+                        : "View document"
+                    }
                   >
-                    <ViewIcon />
+                    {viewingDocIds.includes(doc.id) ? (
+                      <span
+                        className="spinner-border spinner-border-sm"
+                        role="status"
+                        aria-hidden="true"
+                        style={{
+                          width: "16px",
+                          height: "16px",
+                          borderWidth: "2px",
+                          color: "#0d6efd",
+                        }}
+                      />
+                    ) : (
+                      <ViewIcon />
+                    )}
                   </button>
                   {hasPermission(
                     allowedPermissions,
@@ -1082,6 +1164,7 @@ function OrderDocuments() {
       handleDownloadDocument,
       handleDeleteDocument,
       downloadingDocIds,
+      viewingDocIds,
       allowedPermissions,
     ],
   );
@@ -1165,15 +1248,36 @@ function OrderDocuments() {
                 <td style={{ textAlign: "center" }}>
                   <button
                     onClick={() => handleViewDocument(doc)}
+                    disabled={viewingDocIds.includes(doc.id)}
                     style={{
                       background: "none",
                       border: "none",
-                      cursor: "pointer",
+                      cursor: viewingDocIds.includes(doc.id)
+                        ? "not-allowed"
+                        : "pointer",
                     }}
                     aria-label="View document"
-                    title="View document"
+                    title={
+                      viewingDocIds.includes(doc.id)
+                        ? "Opening…"
+                        : "View document"
+                    }
                   >
-                    <ViewIcon />
+                    {viewingDocIds.includes(doc.id) ? (
+                      <span
+                        className="spinner-border spinner-border-sm"
+                        role="status"
+                        aria-hidden="true"
+                        style={{
+                          width: "16px",
+                          height: "16px",
+                          borderWidth: "2px",
+                          color: "#0d6efd",
+                        }}
+                      />
+                    ) : (
+                      <ViewIcon />
+                    )}
                   </button>
                   {hasPermission(
                     allowedPermissions,
@@ -1247,6 +1351,7 @@ function OrderDocuments() {
       handleDownloadDocument,
       handleDeleteDocument,
       downloadingDocIds,
+      viewingDocIds,
       allowedPermissions,
     ],
   );

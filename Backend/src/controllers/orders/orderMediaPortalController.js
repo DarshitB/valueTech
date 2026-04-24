@@ -23,7 +23,7 @@ const {
 const {
   generateAndSaveThumbnail,
   getThumbnailUrl,
-  getThumbnailUrlIfExists,
+  getThumbnailUrlIfExistsUniversal,
 } = require("../../utils/thumbnailHelper");
 
 const VIEW_ALL_MEDIA_PERMISSION = "view_all_order_media_files";
@@ -151,11 +151,15 @@ async function getOrderMedia(req, res, next) {
     const mediaRecords = canViewAllMedia
       ? await orderMediaPortal.getMediaByOrderId(orderIdNum)
       : await orderMediaPortal.getApprovedAndTextMediaByOrderId(orderIdNum);
-    const mediaWithThumbnails = mediaRecords.map((record) => ({
-      ...record,
-      thumbnail_url:
-        record.media_type === "image" ? getThumbnailUrlIfExists(record.media_url) : null,
-    }));
+    const mediaWithThumbnails = await Promise.all(
+      mediaRecords.map(async (record) => ({
+        ...record,
+        thumbnail_url:
+          record.media_type === "image"
+            ? await getThumbnailUrlIfExistsUniversal(record.media_url)
+            : null,
+      }))
+    );
 
     res.json({
       success: true,
@@ -729,11 +733,15 @@ async function getApprovedOrderMediaPublic(req, res, next) {
 
     // Get approved images and videos (status = 1)
     const approvedMediaRecords = await orderMediaPortal.getApprovedMediaByOrderId(orderIdNum);
-    const approvedWithThumbnails = approvedMediaRecords.map((record) => ({
-      ...record,
-      thumbnail_url:
-        record.media_type === "image" ? getThumbnailUrlIfExists(record.media_url) : null,
-    }));
+    const approvedWithThumbnails = await Promise.all(
+      approvedMediaRecords.map(async (record) => ({
+        ...record,
+        thumbnail_url:
+          record.media_type === "image"
+            ? await getThumbnailUrlIfExistsUniversal(record.media_url)
+            : null,
+      }))
+    );
 
     // Get approved reports and collages (status = "approved")
     const approvedDocuments = await orderMediaDocument.findApprovedByOrderId(orderIdNum);

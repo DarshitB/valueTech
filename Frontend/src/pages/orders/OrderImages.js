@@ -46,6 +46,7 @@ import { toast } from "react-toastify";
 import { hasPermission } from "../../utils/permissionUtils";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
 import { resolveAssetUrl } from "../../utils/urlUtils";
+import RetryImage from "../../components/RetryImage";
 import ZipUploadModal from "../../components/ZipUploadModal";
 import ConfirmationModal from "../../components/ConfirmationModal";
 
@@ -1034,7 +1035,7 @@ function OrderImages() {
                                   <div
                                     className={`order-image-box-img-wrap ${imageOrientations[image.id] && imageOrientations[image.id] !== "default" ? "is-rotated" : ""}`}
                                   >
-                                    <img
+                                    <RetryImage
                                       src={gridImageUrl}
                                       alt={`Order Image ${image.id}`}
                                       style={{
@@ -1044,10 +1045,6 @@ function OrderImages() {
                                             : imageOrientations[image.id] === "right"
                                               ? "rotate(90deg)"
                                               : undefined,
-                                      }}
-                                      onError={(e) => {
-                                        e.target.src =
-                                          "https://via.placeholder.com/200x200?text=Image+Not+Found";
                                       }}
                                     />
                                   </div>
