@@ -3089,9 +3089,13 @@ function OrderDetails() {
                         type="checkbox"
                         checked={mailFormData.mail_attachment || false}
                         onChange={(e) => {
+                          const isChecked = e.target.checked;
                           setMailFormData((prev) => ({
                             ...prev,
-                            mail_attachment: e.target.checked,
+                            mail_attachment: isChecked,
+                            all_documents_in_one: isChecked
+                              ? prev.all_documents_in_one
+                              : false,
                           }));
                         }}
                         disabled={isSendingMail}
@@ -3104,26 +3108,28 @@ function OrderDetails() {
                     </label>
                   </div>
 
-                  <div className="form-group">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={mailFormData.all_documents_in_one || false}
-                        onChange={(e) => {
-                          setMailFormData((prev) => ({
-                            ...prev,
-                            all_documents_in_one: e.target.checked,
-                          }));
-                        }}
-                        disabled={isSendingMail}
-                        style={{
-                          marginRight: "8px",
-                          cursor: isSendingMail ? "not-allowed" : "pointer",
-                        }}
-                      />
-                      All documents in one
-                    </label>
-                  </div>
+                  {mailFormData.mail_attachment && (
+                    <div className="form-group">
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={mailFormData.all_documents_in_one || false}
+                          onChange={(e) => {
+                            setMailFormData((prev) => ({
+                              ...prev,
+                              all_documents_in_one: e.target.checked,
+                            }));
+                          }}
+                          disabled={isSendingMail}
+                          style={{
+                            marginRight: "8px",
+                            cursor: isSendingMail ? "not-allowed" : "pointer",
+                          }}
+                        />
+                        All documents in one
+                      </label>
+                    </div>
+                  )}
 
 
                   {hasPermission(allowedPermissions, "public_link_with_image_checkbox_mail_send") && (

@@ -1,21 +1,19 @@
 /**
  * PublicOrderDetails Component
  *
- * Public view that displays order details WITHOUT images but WITH videos.
+ * Public view that displays order details WITHOUT images and WITHOUT videos.
  * This component does not require authentication.
  *
  * Features:
- * - Displays videos, reports, and collages
+ * - Displays reports and collages
  * - NO images shown (only photos are excluded)
  * - Clean, simple view with navbar
  */
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchPublicOrderMedia } from "../../redux/reducers/orderReducer";
 import { FileText, Eye } from "lucide-react";
-import Lightbox from "yet-another-react-lightbox";
-import "yet-another-react-lightbox/styles.css";
 import "./PublicOrderImages.scss";
 import { resolveAssetUrl } from "../../utils/urlUtils";
 
@@ -30,9 +28,6 @@ function PublicOrderDetails() {
   
   // Get order number from media response
   const orderNumber = media?.order?.order_number || null;
-
-  const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   // Parse media URL to get the actual link
   const getImageUrl = (mediaUrl) => {
@@ -119,23 +114,6 @@ function PublicOrderDetails() {
     }
   };
 
-  // Check if media is a video
-  const isVideo = (mediaUrl) => {
-    try {
-      const parsed = JSON.parse(mediaUrl);
-      const path = parsed.path || "";
-      return path.toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|webm|mkv)$/);
-    } catch (error) {
-      return mediaUrl.toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|webm|mkv)$/);
-    }
-  };
-
-  // Filter videos from media
-  const approvedVideos = React.useMemo(() => {
-    if (!media?.media) return [];
-    return media.media.filter((item) => isVideo(item.media_url));
-  }, [media]);
-
   // Filter reports from media response using media_type
   const approvedReports = React.useMemo(() => {
     if (!media?.media) return [];
@@ -147,41 +125,6 @@ function PublicOrderDetails() {
     if (!media?.media) return [];
     return media.media.filter((item) => item.media_type === "collage");
   }, [media]);
-
-  // Prepare lightbox slides array for videos
-  const lightboxSlides = React.useMemo(() => {
-    return approvedVideos.map((item) => {
-      const url = getImageUrl(item.media_url);
-      return {
-        src: url,
-        alt: `Video ${item.id}`,
-        type: "video",
-        mediaId: item.id,
-      };
-    });
-  }, [approvedVideos]);
-
-  // Handle lightbox open
-  const handleLightboxOpen = (videoItem) => {
-    const slideIndex = lightboxSlides.findIndex(
-      (slide) => slide.src === getImageUrl(videoItem.media_url)
-    );
-
-    if (slideIndex !== -1) {
-      setLightboxIndex(slideIndex);
-      setLightboxOpen(true);
-    }
-  };
-
-  // Handle lightbox close
-  const handleLightboxClose = () => {
-    setLightboxOpen(false);
-  };
-
-  // Handle slide transitions
-  const handleSlideTransition = ({ index }) => {
-    setLightboxIndex(index);
-  };
 
   // Fetch order media using Redux action (public endpoint - no authentication required)
   useEffect(() => {
@@ -266,7 +209,7 @@ function PublicOrderDetails() {
               <div className="col-12">
                 <div className="public-order-images-container">
                   <div className="public-order-images-content">
-                    {approvedVideos.length > 0 || approvedReports.length > 0 || approvedCollages.length > 0 ? (
+                    {approvedReports.length > 0 || approvedCollages.length > 0 ? (
                       <>
                         {/* Reports Section */}
                         {approvedReports.length > 0 && (
@@ -398,66 +341,6 @@ function PublicOrderDetails() {
                           </div>
                         )}
 
-                        {/* Videos Section */}
-                        {approvedVideos.length > 0 && (
-                          <div style={{ marginBottom: "40px" }}>
-                            <h2 className="section-heading" style={{ marginBottom: "20px", fontSize: "24px", fontWeight: "600" }}>
-                              Videos ({approvedVideos.length})
-                            </h2>
-                            <div className="public-order-images-grid">
-                              {approvedVideos.map((item) => {
-                                const mediaUrl = getImageUrl(item.media_url);
-
-                                return (
-                                  <div key={item.id} className="public-order-image-card">
-                                    <div
-                                      className="public-order-image-box"
-                                      onClick={() => handleLightboxOpen(item)}
-                                    >
-                                      <video
-                                        src={mediaUrl}
-                                        preload="metadata"
-                                        style={{
-                                          width: "100%",
-                                          height: "100%",
-                                          objectFit: "cover",
-                                        }}
-                                      >
-                                        Your browser does not support the video tag.
-                                      </video>
-                                      <div className="public-order-image-overlay">
-                                        <button
-                                          className="lightbox-btn"
-                                          title="View in lightbox"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleLightboxOpen(item);
-                                          }}
-                                        >
-                                          <Eye size={20} />
-                                        </button>
-                                        <span
-                                          style={{
-                                            position: "absolute",
-                                            top: "10px",
-                                            right: "10px",
-                                            background: "rgba(0,0,0,0.7)",
-                                            color: "white",
-                                            padding: "4px 8px",
-                                            borderRadius: "4px",
-                                            fontSize: "12px",
-                                          }}
-                                        >
-                                          Video
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
                       </>
                     ) : (
                       <div className="text-center text-muted" style={{ padding: "50px" }}>
@@ -471,76 +354,6 @@ function PublicOrderDetails() {
           </div>
         </section>
 
-        {/* Lightbox for videos */}
-        <Lightbox
-          open={lightboxOpen}
-          close={handleLightboxClose}
-          index={lightboxIndex}
-          slides={lightboxSlides}
-          carousel={{
-            finite: true,
-            preload: 1,
-            padding: 0,
-          }}
-          render={{
-            iconNext: () => (
-              <span style={{ fontSize: "24px", color: "white" }}>›</span>
-            ),
-            iconPrev: () => (
-              <span style={{ fontSize: "24px", color: "white" }}>‹</span>
-            ),
-            iconClose: () => (
-              <span style={{ fontSize: "20px", color: "white" }}>×</span>
-            ),
-            slide: ({ slide }) => {
-              return (
-                <div
-                  style={{
-                    position: "relative",
-                    width: "100%",
-                    height: "100%",
-                  }}
-                >
-                  <video
-                    src={slide.src}
-                    controls
-                    autoPlay
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "contain",
-                    }}
-                  />
-                </div>
-              );
-            },
-          }}
-          animation={{
-            fade: 150,
-            swipe: 150,
-          }}
-          controller={{
-            closeOnBackdropClick: true,
-            closeOnPullDown: true,
-            closeOnPinch: true,
-            closeOnEscape: true,
-          }}
-          zoom={{
-            maxZoomPixelRatio: 3,
-            zoomInMultiplier: 2,
-            doubleTapDelay: 300,
-            doubleClickDelay: 300,
-            doubleClickMaxStops: 2,
-            keyboardMoveDistance: 50,
-            wheelZoomDistanceFactor: 100,
-            pinchZoomDistanceFactor: 100,
-            scrollToZoom: true,
-          }}
-          plugins={[]}
-          on={{
-            view: handleSlideTransition,
-          }}
-        />
       </div>
     </div>
   );
