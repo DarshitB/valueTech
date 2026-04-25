@@ -1635,6 +1635,8 @@ exports.sendMail = async (req, res, next) => {
     const orderMediaPortal = require("../../models/orders/orderMediaPortal");
     const fs = require("fs");
     const path = require("path");
+    const os = require("os");
+    const { v4: uuidv4 } = require("uuid");
     const { 
       isPdfFile,
       compressPdfForEmail 
@@ -1689,6 +1691,54 @@ exports.sendMail = async (req, res, next) => {
 
       const token = await getOrCreatePublicShareToken(targetOrderId);
       return `${frontendBaseUrl}/public/share/${token}/${pageType}`;
+    };
+
+    const tempAttachmentPaths = [];
+
+    const toExternalMediaUrl = (mediaUrl) => {
+      if (!mediaUrl || typeof mediaUrl !== "string") return null;
+      if (/^https?:\/\//i.test(mediaUrl)) return mediaUrl;
+      const relativeUrl = mediaUrl.startsWith("/") ? mediaUrl : `/${mediaUrl}`;
+      return `${baseUrl}${relativeUrl}`;
+    };
+
+    const prepareAttachmentPath = async (mediaUrl, fallbackFilename = "file.bin") => {
+      if (!mediaUrl || typeof mediaUrl !== "string") {
+        throw new BadRequestError("Invalid media_url for attachment");
+      }
+
+      // Remote source (R2/public URL) -> download to temp file first.
+      if (/^https?:\/\//i.test(mediaUrl)) {
+        const response = await fetch(mediaUrl);
+        if (!response.ok) {
+          throw new BadRequestError(
+            `Unable to fetch attachment source (HTTP ${response.status})`
+          );
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const extFromUrl = path.extname(mediaUrl.split("?")[0]) || "";
+        const extFromFallback = path.extname(fallbackFilename) || "";
+        const finalExt = extFromFallback || extFromUrl || ".bin";
+        const tempDir = path.join(process.cwd(), "uploads", "temp_email");
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+        const tempPath = path.join(
+          tempDir,
+          `remote_${uuidv4()}${finalExt}`
+        );
+        fs.writeFileSync(tempPath, buffer);
+        tempAttachmentPaths.push(tempPath);
+        return { path: tempPath, isTemporary: true };
+      }
+
+      // Local source (/uploads/...) -> absolute path on disk.
+      const mediaPath = mediaUrl.startsWith("/") ? mediaUrl.substring(1) : mediaUrl;
+      const absolutePath = path.isAbsolute(mediaPath)
+        ? mediaPath
+        : path.join(process.cwd(), mediaPath);
+      return { path: absolutePath, isTemporary: false };
     };
 
     // Normalize boolean-ish inputs
@@ -1756,22 +1806,17 @@ exports.sendMail = async (req, res, next) => {
           throw new BadRequestError(`Media with ID ${videoId} is not a video`);
         }
 
-        const mediaPath = video.media_url.startsWith("/")
-          ? video.media_url.substring(1)
-          : video.media_url;
         const filename = path.basename(video.media_url);
-
-        const relativeUrl = video.media_url.startsWith("/")
-          ? video.media_url
-          : `/${video.media_url}`;
-        const fullUrl = `${baseUrl}${relativeUrl}`;
+        const fullUrl = toExternalMediaUrl(video.media_url);
 
         videoLinks.push({ filename, url: fullUrl });
 
         if (video_as_attachment) {
+          const prepared = await prepareAttachmentPath(video.media_url, filename);
           attachments.push({
-            path: mediaPath,
+            path: prepared.path,
             filename,
+            isTemporary: prepared.isTemporary,
           });
         }
       }
@@ -1804,14 +1849,11 @@ exports.sendMail = async (req, res, next) => {
           );
         }
 
-        const mediaPath = document.media_url.startsWith("/")
-          ? document.media_url.substring(1)
-          : document.media_url;
         const filename = path.basename(document.media_url);
 
         if (document_as_attachment) {
-          // Get the full file path for checking
-          const fullPath = path.join(process.cwd(), mediaPath);
+          const prepared = await prepareAttachmentPath(document.media_url, filename);
+          const fullPath = prepared.path;
 
           const isMergeable = 
             document.document_type === "report" || document.document_type === "collage";
@@ -1842,29 +1884,28 @@ exports.sendMail = async (req, res, next) => {
                 docId,
                 sourcePdfPath,
                 filename,
+                isTemporary: prepared.isTemporary || sourcePdfPath !== fullPath,
               });
             } else {
               mergeableCollages.push({
                 docId,
                 sourcePdfPath,
                 filename,
+                isTemporary: prepared.isTemporary || sourcePdfPath !== fullPath,
               });
             }
           } else {
             // Send as individual attachment (default behavior when
             // `all_documents_in_one` is false, and for non-mergeable docs).
             documentAttachments.push({
-              path: mediaPath,
+              path: fullPath,
               filename,
-              isTemporary: false,
+              isTemporary: prepared.isTemporary,
             });
             documentAttachmentCount++;
           }
         } else {
-          const relativeUrl = document.media_url.startsWith("/")
-            ? document.media_url
-            : `/${document.media_url}`;
-          const fullUrl = `${baseUrl}${relativeUrl}`;
+          const fullUrl = toExternalMediaUrl(document.media_url);
           const category = titleCase(document.document_type || "Documents");
 
           if (!documentLinkGroups.has(category)) {
@@ -1934,7 +1975,7 @@ exports.sendMail = async (req, res, next) => {
           documentAttachments.push({
             path: src.sourcePdfPath,
             filename: src.filename,
-            isTemporary: true,
+            isTemporary: src.isTemporary === true,
           });
           documentAttachmentCount++;
         }
@@ -2061,6 +2102,9 @@ exports.sendMail = async (req, res, next) => {
       for (const mergedPath of tempMergedPdfPaths) {
         // fs.unlink from `fs` (callback API) requires a callback, so use promises here.
         fs.promises.unlink(mergedPath).catch(() => {});
+      }
+      for (const tempPath of tempAttachmentPaths) {
+        fs.promises.unlink(tempPath).catch(() => {});
       }
     }
 
