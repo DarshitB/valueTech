@@ -535,6 +535,7 @@ const ORIENTATION_DEGREES = {
   default: 0,
   right: 90,
   left: 270,
+  up: 180,
   down: 180,
 };
 
@@ -545,7 +546,7 @@ const ORIENTATION_DEGREES = {
  * @param {string} text - Optional text to overlay on collage
  * @param {Buffer|null} stampBuffer - Optional PNG buffer to overlay as centered stamp
  * @param {{x:number,y:number}} stampOffset - Optional pixel offsets from center (x: right+, y: down+)
- * @param {string[]} [orientations] - Optional array, same order as imagePaths: "default" | "right" | "left" | "down"
+ * @param {string[]} [orientations] - Optional array, same order as imagePaths: "default" | "right" | "left" | "up" | "down"
  */
 async function generateCollageImage(imagePaths, outputPath, text = "", stampBuffer = null, stampOffset = { x: 0, y: 0 }, orientations = []) {
   const imageCount = imagePaths.length;

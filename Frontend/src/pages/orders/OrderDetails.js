@@ -307,6 +307,7 @@ function OrderDetails() {
     regards: "",
     mail_attachment: false,
     public_link_with_image: false,
+    all_documents_in_one: false,
   });
 
   // Track removed documents (by ID) - documents user removes from mail attachments
@@ -413,6 +414,7 @@ function OrderDetails() {
             regards: row.regards != null ? String(row.regards) : "",
             mail_attachment: Boolean(row.mail_attachment),
             public_link_with_image: Boolean(row.public_link_with_image),
+            all_documents_in_one: Boolean(row.all_documents_in_one),
           });
         }
       })
@@ -1268,6 +1270,7 @@ function OrderDetails() {
     setMailFormData((prev) => ({
       ...prev,
       mail_attachment: false,
+      all_documents_in_one: false,
     }));
   };
 
@@ -2177,6 +2180,7 @@ function OrderDetails() {
       regards: mailFormData.regards?.trim() || "",
       mail_attachment: mailFormData.mail_attachment || false, // Boolean: true if checkbox is checked, false otherwise
       public_link_with_image: mailFormData.public_link_with_image || false, // Boolean: true if checkbox is checked, false otherwise
+      all_documents_in_one: mailFormData.all_documents_in_one || false, // Boolean: true if checkbox is checked, false otherwise
       public_url: mailFormData.public_link_with_image
         ? `${window.location.origin}/public/orders/${id}/images` // URL with images (reports/collages/videos + images)
         : `${window.location.origin}/public/orders/${id}/documents`, // URL without images (reports/collages/videos only)
@@ -2218,6 +2222,7 @@ function OrderDetails() {
           regards: "",
           mail_attachment: false,
           public_link_with_image: false,
+          all_documents_in_one: false,
         });
       }
     } catch (error) {
@@ -3096,6 +3101,27 @@ function OrderDetails() {
                         }}
                       />
                       Document as Attachment
+                    </label>
+                  </div>
+
+                  <div className="form-group">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={mailFormData.all_documents_in_one || false}
+                        onChange={(e) => {
+                          setMailFormData((prev) => ({
+                            ...prev,
+                            all_documents_in_one: e.target.checked,
+                          }));
+                        }}
+                        disabled={isSendingMail}
+                        style={{
+                          marginRight: "8px",
+                          cursor: isSendingMail ? "not-allowed" : "pointer",
+                        }}
+                      />
+                      All documents in one
                     </label>
                   </div>
 

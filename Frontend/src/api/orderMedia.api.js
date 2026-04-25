@@ -7,6 +7,8 @@ export const getOrderMedia = (orderId) => axios.get(`${ENDPOINT}/${orderId}`);
 
 // Get public order media by order ID
 export const getPublicOrderMedia = (orderId) => axios.get(`${ENDPOINT}/public/${orderId}`);
+export const getPublicOrderMediaByToken = (token) =>
+  axios.get(`${ENDPOINT}/public/share/${token}`);
 
 // Update order media status
 export const updateOrderMediaStatus = (payload) => axios.patch(`${ENDPOINT}/status`, payload);

@@ -46,7 +46,15 @@ const AppRoutes = () => {
         element={<PublicOrderImages />}
       />
       <Route
+        path="/public/share/:token/images"
+        element={<PublicOrderImages />}
+      />
+      <Route
         path="/public/orders/:id/documents"
+        element={<PublicOrderDetails />}
+      />
+      <Route
+        path="/public/share/:token/documents"
         element={<PublicOrderDetails />}
       />
       <Route path="/" element={<RootLayoutGate />}>

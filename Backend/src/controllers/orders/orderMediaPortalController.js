@@ -5,6 +5,7 @@ const OrderStatusHistory = require("../../models/orders/orderStatusHistory");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
+const crypto = require("crypto");
 const yauzl = require("yauzl");
 const { v4: uuidv4 } = require("uuid");
 const db = require("../../../db");
@@ -725,70 +726,238 @@ async function getApprovedOrderMediaPublic(req, res, next) {
       throw new BadRequestError("Invalid Order ID format");
     }
 
-    // Check if order exists (basic check without user context)
-    const order = await orderMediaPortal.getOrderById(orderIdNum);
-    if (!order) {
-      throw new NotFoundError("Order not found");
+    const payload = await buildApprovedPublicMediaPayload(orderIdNum, {
+      shareToken: null,
+    });
+    res.json({ success: true, data: payload });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getOrCreatePublicShareToken(orderId) {
+  const existing = await db("order_public_share_links")
+    .select("token")
+    .where({ order_id: orderId, is_active: true })
+    .first();
+  if (existing?.token) return existing.token;
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const token = crypto.randomBytes(24).toString("hex");
+    try {
+      await db("order_public_share_links").insert({
+        order_id: orderId,
+        token,
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+      return token;
+    } catch (err) {
+      if (err && err.code === "23505") continue; // unique conflict, retry token
+      throw err;
+    }
+  }
+  throw new AppError("Unable to generate public share token", 500);
+}
+
+async function resolveOrderIdFromShareToken(token) {
+  const row = await db("order_public_share_links")
+    .select("order_id")
+    .where({ token, is_active: true })
+    .first();
+  return row?.order_id || null;
+}
+
+async function buildApprovedPublicMediaPayload(orderIdNum, { shareToken = null } = {}) {
+  const order = await orderMediaPortal.getOrderById(orderIdNum);
+  if (!order) {
+    throw new NotFoundError("Order not found");
+  }
+
+  const effectiveToken = shareToken || (await getOrCreatePublicShareToken(orderIdNum));
+
+  const approvedMediaRecords = await orderMediaPortal.getApprovedMediaByOrderId(orderIdNum);
+  const approvedWithThumbnails = await Promise.all(
+    approvedMediaRecords.map(async (record) => ({
+      ...record,
+      view_url: `/api/order-media/public/share/${effectiveToken}/media/${record.id}/view`,
+      thumbnail_url:
+        record.media_type === "image"
+          ? await getThumbnailUrlIfExistsUniversal(record.media_url)
+          : null,
+    }))
+  );
+
+  const approvedDocuments = await orderMediaDocument.findApprovedByOrderId(orderIdNum);
+  const reportsAndCollages = approvedDocuments.filter(
+    (doc) => doc.document_type === "report" || doc.document_type === "collage"
+  );
+
+  const formattedDocuments = reportsAndCollages.map((doc) => ({
+    id: doc.id,
+    order_id: doc.order_id,
+    uploader_type: doc.created_type || "system",
+    uploader_id: doc.created_by,
+    media_url: doc.media_url,
+    view_url: `/api/order-media/public/share/${effectiveToken}/document/${doc.id}/view`,
+    media_type: doc.document_type,
+    status: doc.status,
+    created_at: doc.created_at,
+    updated_at: doc.updated_at,
+    updated_by: doc.updated_by,
+    thumbnail_url: null,
+  }));
+
+  const allApprovedMedia = [...approvedWithThumbnails, ...formattedDocuments];
+  allApprovedMedia.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  return {
+    order: {
+      id: order.id,
+      order_number: order.order_number,
+    },
+    share_token: effectiveToken,
+    share_documents_url: `/public/share/${effectiveToken}/documents`,
+    share_images_url: `/public/share/${effectiveToken}/images`,
+    media: allApprovedMedia,
+    total_count: allApprovedMedia.length,
+    summary: {
+      images: approvedMediaRecords.filter((m) => m.media_type === "image").length,
+      videos: approvedMediaRecords.filter((m) => m.media_type === "video").length,
+      reports: formattedDocuments.filter((d) => d.media_type === "report").length,
+      collages: formattedDocuments.filter((d) => d.media_type === "collage").length,
+    },
+  };
+}
+
+/**
+ * GET /api/order-media/public/share/:token
+ * Public API using masked token instead of order id.
+ */
+async function getApprovedOrderMediaPublicByToken(req, res, next) {
+  try {
+    const token = String(req.params.token || "").trim();
+    if (!token) throw new BadRequestError("Token is required");
+
+    const orderIdNum = await resolveOrderIdFromShareToken(token);
+    if (!orderIdNum) throw new NotFoundError("Public share link not found");
+
+    const payload = await buildApprovedPublicMediaPayload(orderIdNum, {
+      shareToken: token,
+    });
+    res.json({ success: true, data: payload });
+  } catch (error) {
+    next(error);
+  }
+}
+
+function resolveAbsolutePathFromMediaUrl(mediaUrl) {
+  if (!mediaUrl || typeof mediaUrl !== "string") return null;
+  const uploadsPrefix = "/uploads/";
+  const idx = mediaUrl.indexOf(uploadsPrefix);
+  if (idx === -1) return null;
+  const relativeUploadPath = mediaUrl.slice(idx + 1); // remove leading slash
+  return path.join(process.cwd(), relativeUploadPath.replace(/\//g, path.sep));
+}
+
+function inferContentTypeFromUrl(mediaUrl) {
+  const clean = String(mediaUrl || "").split("?")[0].toLowerCase();
+  if (clean.endsWith(".pdf")) return "application/pdf";
+  if (clean.endsWith(".jpg") || clean.endsWith(".jpeg")) return "image/jpeg";
+  if (clean.endsWith(".png")) return "image/png";
+  if (clean.endsWith(".webp")) return "image/webp";
+  if (clean.endsWith(".gif")) return "image/gif";
+  if (clean.endsWith(".mp4")) return "video/mp4";
+  if (clean.endsWith(".mov")) return "video/quicktime";
+  if (clean.endsWith(".avi")) return "video/x-msvideo";
+  if (clean.endsWith(".webm")) return "video/webm";
+  return "application/octet-stream";
+}
+
+/**
+ * GET /api/order-media/public/:orderId/:kind/:id/view
+ * Public proxy stream for approved media/document.
+ */
+async function viewApprovedMediaPublic(req, res, next) {
+  try {
+    const orderIdNum = parseInt(req.params.orderId, 10);
+    const fileIdNum = parseInt(req.params.id, 10);
+    const kind = String(req.params.kind || "").toLowerCase();
+
+    if (Number.isNaN(orderIdNum) || Number.isNaN(fileIdNum)) {
+      throw new BadRequestError("Invalid orderId or file id");
+    }
+    if (!["media", "document"].includes(kind)) {
+      throw new BadRequestError("kind must be 'media' or 'document'");
     }
 
-    // Get approved images and videos (status = 1)
-    const approvedMediaRecords = await orderMediaPortal.getApprovedMediaByOrderId(orderIdNum);
-    const approvedWithThumbnails = await Promise.all(
-      approvedMediaRecords.map(async (record) => ({
-        ...record,
-        thumbnail_url:
-          record.media_type === "image"
-            ? await getThumbnailUrlIfExistsUniversal(record.media_url)
-            : null,
-      }))
-    );
+    const order = await orderMediaPortal.getOrderById(orderIdNum);
+    if (!order) throw new NotFoundError("Order not found");
 
-    // Get approved reports and collages (status = "approved")
-    const approvedDocuments = await orderMediaDocument.findApprovedByOrderId(orderIdNum);
-    
-    // Filter only reports and collages
-    const reportsAndCollages = approvedDocuments.filter(
-      doc => doc.document_type === 'report' || doc.document_type === 'collage'
-    );
+    let mediaUrl = null;
+    if (kind === "media") {
+      const media = await orderMediaPortal.findById(fileIdNum);
+      if (!media || media.order_id !== orderIdNum || Number(media.status) !== 1) {
+        throw new NotFoundError("Approved media not found");
+      }
+      mediaUrl = media.media_url;
+    } else {
+      const doc = await orderMediaDocument.findById(fileIdNum);
+      const isApproved = String(doc?.status || "").toLowerCase() === "approved";
+      const isAllowedType =
+        doc?.document_type === "report" || doc?.document_type === "collage";
+      if (!doc || doc.order_id !== orderIdNum || !isApproved || !isAllowedType) {
+        throw new NotFoundError("Approved document not found");
+      }
+      mediaUrl = doc.media_url;
+    }
 
-    // Format documents to match media structure for consistency
-    const formattedDocuments = reportsAndCollages.map(doc => ({
-      id: doc.id,
-      order_id: doc.order_id,
-      uploader_type: doc.created_type || 'system',
-      uploader_id: doc.created_by,
-      media_url: doc.media_url,
-      media_type: doc.document_type, // 'report' or 'collage'
-      status: doc.status,
-      created_at: doc.created_at,
-      updated_at: doc.updated_at,
-      updated_by: doc.updated_by,
-      thumbnail_url: null,
-    }));
+    if (!mediaUrl || typeof mediaUrl !== "string") {
+      throw new NotFoundError("Media URL not available");
+    }
 
-    // Combine all approved media (images, videos, reports, collages)
-    const allApprovedMedia = [...approvedWithThumbnails, ...formattedDocuments];
+    res.setHeader("Content-Disposition", "inline");
+    res.setHeader("Cache-Control", "public, max-age=300");
 
-    // Sort by created_at (newest first)
-    allApprovedMedia.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    if (/^https?:\/\//i.test(mediaUrl)) {
+      const upstream = await fetch(mediaUrl);
+      if (!upstream.ok) {
+        throw new BadRequestError(
+          `Unable to fetch source file (HTTP ${upstream.status})`
+        );
+      }
+      const contentType =
+        upstream.headers.get("content-type") || inferContentTypeFromUrl(mediaUrl);
+      res.setHeader("Content-Type", contentType);
+      const arrayBuffer = await upstream.arrayBuffer();
+      return res.send(Buffer.from(arrayBuffer));
+    }
 
-    res.json({
-      success: true,
-      data: {
-        order: {
-          id: order.id,
-          order_number: order.order_number,
-        },
-        media: allApprovedMedia,
-        total_count: allApprovedMedia.length,
-        summary: {
-          images: approvedMediaRecords.filter(m => m.media_type === 'image').length,
-          videos: approvedMediaRecords.filter(m => m.media_type === 'video').length,
-          reports: formattedDocuments.filter(d => d.media_type === 'report').length,
-          collages: formattedDocuments.filter(d => d.media_type === 'collage').length,
-        },
-      },
-    });
+    const absolutePath = resolveAbsolutePathFromMediaUrl(mediaUrl);
+    if (!absolutePath || !fs.existsSync(absolutePath)) {
+      throw new NotFoundError("File not found on storage");
+    }
+    res.setHeader("Content-Type", inferContentTypeFromUrl(mediaUrl));
+    return fs.createReadStream(absolutePath).pipe(res);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * GET /api/order-media/public/share/:token/:kind/:id/view
+ * Public proxy stream using masked share token.
+ */
+async function viewApprovedMediaPublicByToken(req, res, next) {
+  try {
+    const token = String(req.params.token || "").trim();
+    if (!token) throw new BadRequestError("Token is required");
+    const orderIdNum = await resolveOrderIdFromShareToken(token);
+    if (!orderIdNum) throw new NotFoundError("Public share link not found");
+
+    req.params.orderId = String(orderIdNum);
+    return viewApprovedMediaPublic(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -802,4 +971,8 @@ module.exports = {
   getOrderMediaCount,
   uploadZip,
   getApprovedOrderMediaPublic,
+  getApprovedOrderMediaPublicByToken,
+  viewApprovedMediaPublic,
+  viewApprovedMediaPublicByToken,
+  getOrCreatePublicShareToken,
 };

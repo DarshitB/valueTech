@@ -104,9 +104,15 @@ export const fetchOrderMedia = createAsyncThunk(
 // Async action: Fetch public order media (no authentication required, returns only approved media)
 export const fetchPublicOrderMedia = createAsyncThunk(
   "orders/fetchPublicMedia",
-  async (orderId, { rejectWithValue }) => {
+  async (payload, { rejectWithValue }) => {
     try {
-      const res = await orderMediaApi.getPublicOrderMedia(orderId);
+      const token =
+        payload && typeof payload === "object" ? payload.token : null;
+      const orderId =
+        payload && typeof payload === "object" ? payload.orderId : payload;
+      const res = token
+        ? await orderMediaApi.getPublicOrderMediaByToken(token)
+        : await orderMediaApi.getPublicOrderMedia(orderId);
       return res.data;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || err.message);

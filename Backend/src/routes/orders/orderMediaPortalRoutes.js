@@ -35,6 +35,18 @@ router.get(
   "/public/:orderId",
   orderMediaPortalController.getApprovedOrderMediaPublic
 );
+router.get(
+  "/public/share/:token",
+  orderMediaPortalController.getApprovedOrderMediaPublicByToken
+);
+router.get(
+  "/public/:orderId/:kind/:id/view",
+  orderMediaPortalController.viewApprovedMediaPublic
+);
+router.get(
+  "/public/share/:token/:kind/:id/view",
+  orderMediaPortalController.viewApprovedMediaPublicByToken
+);
 
 // Apply authentication middleware to all routes below
 router.use(auth);

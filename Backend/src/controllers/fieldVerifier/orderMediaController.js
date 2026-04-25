@@ -15,6 +15,7 @@ const OrderStatusHistory = require('../../models/orders/orderStatusHistory');
 const { BadRequestError, NotFoundError } = require('../../utils/customErrors');
 const { generateAndSaveThumbnail } = require('../../utils/thumbnailHelper');
 const { burnTextOnVideo, normalizeVideoExt } = require('../../utils/videoOverlayHelper');
+const { createNotificationsForComment } = require('../../utils/notificationHelper');
 const db = require("../../../db");
 
 /**
@@ -78,6 +79,43 @@ async function updateOrderStatusToAssetsSubmitted(orderId, verifierId, imageCoun
 }
 
 /**
+ * Helper: save optional upload comment to order_comments.
+ * Non-blocking by design so a comment write issue does not fail a successful upload.
+ */
+async function saveUploadCommentIfProvided(orderId, verifierId, comments) {
+  if (comments === undefined || comments === null) return;
+  const text = String(comments).trim();
+  if (!text) return;
+
+  try {
+    const [newComment] = await db("order_comments")
+      .insert({
+      order_id: orderId,
+      user_id: verifierId,
+      comment: text,
+      commented_at: new Date(),
+      user_type: "filed_verifier",
+      })
+      .returning(["id"]);
+
+    // Keep parity with regular comment flow: create one notification row linked
+    // to this comment so it appears in notification APIs.
+    if (newComment?.id) {
+      createNotificationsForComment(orderId, newComment.id, verifierId).catch(
+        (notifyErr) => {
+          console.error(
+            "Failed to create notification for upload comment:",
+            notifyErr.message
+          );
+        }
+      );
+    }
+  } catch (error) {
+    console.error("Failed to save upload comment:", error.message);
+  }
+}
+
+/**
  * POST /api/media/upload-multipart
  * Accepts multipart form data with files and order_number
  */
@@ -85,7 +123,7 @@ async function uploadMultipart(req, res, next) {
   let tempPaths = [];
   let finalUploadedPaths = [];
   try {
-    const { order_number, image_count, video_count, overlay_text } = req.body;
+    const { order_number, image_count, video_count, overlay_text, comments } = req.body;
     const files = req.files;
     const { id } = req.verifier;
 
@@ -242,6 +280,7 @@ async function uploadMultipart(req, res, next) {
 
     // Update order status to 7 (Assets Submitted) after successful upload
     await updateOrderStatusToAssetsSubmitted(orderRow.id, id, filesToUpload.length);
+    await saveUploadCommentIfProvided(orderRow.id, id, comments);
 
     res.json({
       state: 1,
@@ -277,7 +316,7 @@ async function uploadBase64(req, res, next) {
   let tempPaths = [];
   let finalUploadedPaths = [];
   try {
-    const { order_number, files, image_count, video_count, overlay_text } = req.body;
+    const { order_number, files, image_count, video_count, overlay_text, comments } = req.body;
     const { id } = req.verifier;
 
     if (!order_number) throw new BadRequestError('order_number is required');
@@ -449,6 +488,7 @@ async function uploadBase64(req, res, next) {
 
     // Update order status to 7 (Assets Submitted) after successful upload
     await updateOrderStatusToAssetsSubmitted(orderRow.id, id, filesToUpload.length);
+    await saveUploadCommentIfProvided(orderRow.id, id, comments);
 
     res.json({
       state: 1,
@@ -492,7 +532,7 @@ async function uploadCombined(req, res, next) {
   let tempPaths = [];
   let finalUploadedPaths = [];
   try {
-    const { order_number, image_count, video_count, overlay_text } = req.body || {};
+    const { order_number, image_count, video_count, overlay_text, comments } = req.body || {};
     const { id } = req.verifier;
 
     // Initial debug: run before any parsing/validation conditions so we can
@@ -805,6 +845,7 @@ async function uploadCombined(req, res, next) {
       id,
       filesToUpload.length
     );
+    await saveUploadCommentIfProvided(orderRow.id, id, comments);
 
     res.json({
       state: 1,

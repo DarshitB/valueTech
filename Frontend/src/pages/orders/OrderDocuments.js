@@ -1302,16 +1302,29 @@ function OrderDocuments() {
                     >
                       {downloadingDocIds.includes(doc.id) ? (
                         <span
-                          className="spinner-border spinner-border-sm"
-                          role="status"
-                          aria-hidden="true"
                           style={{
-                            width: "16px",
-                            height: "16px",
-                            borderWidth: "2px",
-                            color: "#28a745",
+                            width: "28px",
+                            height: "28px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: "#28a745",
+                            padding: "4px",
+                            borderRadius: "50%",
                           }}
-                        />
+                        >
+                          <span
+                            className="spinner-border spinner-border-sm"
+                            role="status"
+                            aria-hidden="true"
+                            style={{
+                              width: "24px",
+                              height: "24px",
+                              borderWidth: "2px",
+                              color: "#fff",
+                            }}
+                          />
+                        </span>
                       ) : (
                         <DownloadDocumentIcon />
                       )}

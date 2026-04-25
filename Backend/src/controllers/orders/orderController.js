@@ -143,10 +143,62 @@ exports.getForMobile = async (req, res, next) => {
     const orders = await Order.getForMobile(fieldVerifierId);
 
     if (orders && orders.length > 0) {
+      const orderIds = orders.map((order) => order.id);
+
+      // Batch media counts per order (images/videos/rejected) to avoid N+1 queries.
+      const mediaCountRows = await db("order_media_image_video")
+        .select("order_id")
+        .select(
+          db.raw("SUM(CASE WHEN media_type = 'image' THEN 1 ELSE 0 END) AS image_count")
+        )
+        .select(
+          db.raw("SUM(CASE WHEN media_type = 'video' THEN 1 ELSE 0 END) AS video_count")
+        )
+        .select(
+          db.raw("SUM(CASE WHEN status = 2 THEN 1 ELSE 0 END) AS rejected_count")
+        )
+        .whereIn("order_id", orderIds)
+        .whereNull("deleted_at")
+        .groupBy("order_id");
+
+      const mediaCountByOrderId = new Map(
+        mediaCountRows.map((row) => [
+          Number(row.order_id),
+          {
+            image_count: Number(row.image_count || 0),
+            video_count: Number(row.video_count || 0),
+            rejected_count: Number(row.rejected_count || 0),
+          },
+        ])
+      );
+
+      // Batch comments per order for mobile response.
+      const commentRows = await db("order_comments")
+        .select("order_id", "comment", "commented_at")
+        .whereIn("order_id", orderIds)
+        .where("user_id", fieldVerifierId)
+        .whereIn("user_type", ["field_verifier", "filed_verifier", "filed_varifier"])
+        .orderBy("commented_at", "desc");
+
+      const commentsByOrderId = new Map();
+      for (const row of commentRows) {
+        const key = Number(row.order_id);
+        if (!commentsByOrderId.has(key)) commentsByOrderId.set(key, []);
+        commentsByOrderId.get(key).push({
+          comment_text: row.comment,
+          commented_at: row.commented_at,
+        });
+      }
+
       // Add mobile_job_status to each order
       const ordersWithStatus = await Promise.all(
         orders.map(async (order) => {
           let mobile_job_status = 0; // Default: Pending
+          const counts = mediaCountByOrderId.get(Number(order.id)) || {
+            image_count: 0,
+            video_count: 0,
+            rejected_count: 0,
+          };
 
           // Check if job is started (job_started_at is not null)
           if (order.job_started_at) {
@@ -163,14 +215,7 @@ exports.getForMobile = async (req, res, next) => {
             mobile_job_status = 3; // Images Verified
           }
 
-          // Check if any media is rejected (status = 2 in order_media_image_video)
-          const rejectedResult = await db("order_media_image_video")
-            .where("order_id", order.id)
-            .where("status", 2)
-            .count("id as count")
-            .first();
-
-          const num_of_rejected_img = parseInt(rejectedResult?.count ?? 0, 10);
+          const num_of_rejected_img = counts.rejected_count;
 
           if (num_of_rejected_img > 0) {
             mobile_job_status = 4; // Images Rejected
@@ -179,7 +224,10 @@ exports.getForMobile = async (req, res, next) => {
           return {
             ...order,
             mobile_job_status,
+            image_count: counts.image_count,
+            video_count: counts.video_count,
             num_of_rejected_img,
+            comments: commentsByOrderId.get(Number(order.id)) || [],
           };
         })
       );
@@ -1535,6 +1583,7 @@ exports.sendMail = async (req, res, next) => {
       document_ids,
       video_ids,
       mail_attachment,
+      all_documents_in_one,
       public_url,
       public_link_with_image,
     } =
@@ -1595,9 +1644,55 @@ exports.sendMail = async (req, res, next) => {
       process.env.APP_BASE_URL ||
       process.env.FRONTEND_URL ||
       `${req.protocol}://${req.get("host")}`;
+    const frontendBaseUrl =
+      process.env.PUBLIC_SHARE_BASE_URL ||
+      process.env.FRONTEND_URL ||
+      baseUrl;
+
+    const getOrCreatePublicShareToken = async (targetOrderId) => {
+      const existing = await db("order_public_share_links")
+        .select("token")
+        .where({ order_id: targetOrderId, is_active: true })
+        .first();
+      if (existing?.token) return existing.token;
+
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const token = require("crypto").randomBytes(24).toString("hex");
+        try {
+          await db("order_public_share_links").insert({
+            order_id: targetOrderId,
+            token,
+            is_active: true,
+            created_at: new Date(),
+            updated_at: new Date(),
+          });
+          return token;
+        } catch (err) {
+          if (err && err.code === "23505") continue; // unique conflict, retry
+          throw err;
+        }
+      }
+      throw new BadRequestError("Unable to generate public share link");
+    };
+
+    const toMaskedPublicUrl = async (rawPublicUrl) => {
+      if (typeof rawPublicUrl !== "string" || !rawPublicUrl.trim()) return null;
+      const value = rawPublicUrl.trim();
+      const match = value.match(/\/public\/orders\/(\d+)\/(documents|images)(?:$|[/?#])/i);
+      if (!match) return value; // keep caller-provided non-standard URL unchanged
+
+      const targetOrderId = parseInt(match[1], 10);
+      const pageType = String(match[2]).toLowerCase();
+      if (Number.isNaN(targetOrderId) || targetOrderId !== parseInt(orderId, 10)) {
+        throw new BadRequestError("public_url order id does not match request orderId");
+      }
+
+      const token = await getOrCreatePublicShareToken(targetOrderId);
+      return `${frontendBaseUrl}/public/share/${token}/${pageType}`;
+    };
 
     // Normalize boolean-ish inputs
-    const normalizeBool = (val) => {
+    const normalizeBool = (val, fieldName = "value") => {
       if (val === undefined || val === null) return null;
       if (typeof val === "boolean") return val;
       if (typeof val === "string") {
@@ -1605,7 +1700,7 @@ exports.sendMail = async (req, res, next) => {
         if (["true", "1", "yes", "y"].includes(v)) return true;
         if (["false", "0", "no", "n"].includes(v)) return false;
       }
-      throw new BadRequestError("mail_attachment must be boolean (true/false)");
+      throw new BadRequestError(`${fieldName} must be boolean (true/false)`);
     };
 
     const video_as_attachment =
@@ -1613,7 +1708,11 @@ exports.sendMail = async (req, res, next) => {
       "true";
 
     // Request-level override for document attachment behavior
-    const mailAttachmentOverride = normalizeBool(mail_attachment);
+    const mailAttachmentOverride = normalizeBool(mail_attachment, "mail_attachment");
+    const allDocumentsInOne = normalizeBool(
+      all_documents_in_one,
+      "all_documents_in_one"
+    ) === true;
     const document_as_attachment =
       mailAttachmentOverride !== null
         ? mailAttachmentOverride
@@ -1717,7 +1816,7 @@ exports.sendMail = async (req, res, next) => {
           const isMergeable = 
             document.document_type === "report" || document.document_type === "collage";
 
-          if (isMergeable) {
+          if (isMergeable && allDocumentsInOne) {
             // For merging we always use the absolute path.
             // Collage PDFs are compressed (best-effort) to keep email size reasonable.
             let sourcePdfPath = fullPath;
@@ -1752,7 +1851,8 @@ exports.sendMail = async (req, res, next) => {
               });
             }
           } else {
-            // Other documents: send as-is
+            // Send as individual attachment (default behavior when
+            // `all_documents_in_one` is false, and for non-mergeable docs).
             documentAttachments.push({
               path: mediaPath,
               filename,
@@ -1781,6 +1881,7 @@ exports.sendMail = async (req, res, next) => {
     // Order: (all selected reports sorted by id desc) first, then (all selected collages sorted by id desc).
     if (
       document_as_attachment &&
+      allDocumentsInOne &&
       (mergeableReports.length > 0 || mergeableCollages.length > 0)
     ) {
       mergeableReports.sort((a, b) => b.docId - a.docId);
@@ -1844,12 +1945,16 @@ exports.sendMail = async (req, res, next) => {
 
     let emailBody = comments ? `${comments.trim()}` : "";
 
+    const resolvedPublicUrl = await toMaskedPublicUrl(public_url);
     // Check if public_url is provided and not null
-    const hasPublicUrl = public_url && typeof public_url === "string" && public_url.trim() !== "";
+    const hasPublicUrl =
+      resolvedPublicUrl &&
+      typeof resolvedPublicUrl === "string" &&
+      resolvedPublicUrl.trim() !== "";
 
     if (hasPublicUrl) {
       // If public_url exists, add only public_url to email body
-      emailBody += `${emailBody ? "\n\n" : ""}${public_url.trim()}`;
+      emailBody += `${emailBody ? "\n\n" : ""}${resolvedPublicUrl.trim()}`;
     } else {
       // If no public_url, use existing behavior (document links and video links)
       if (!document_as_attachment && documentLinkGroups.size > 0) {
@@ -1883,7 +1988,7 @@ exports.sendMail = async (req, res, next) => {
 
     if (hasPublicUrl) {
       // If public_url exists, add only public_url to HTML email body
-      const safePublicUrl = public_url.trim();
+      const safePublicUrl = resolvedPublicUrl.trim();
       htmlEmailBody += `${htmlEmailBody ? "<br><br>" : ""
         }Documents: <a href="${safePublicUrl}" target="_blank" rel="noopener noreferrer">Click here to view</a>`;
     } else {
@@ -2037,7 +2142,7 @@ exports.sendMail = async (req, res, next) => {
         cc: cc || [],
         bcc: bcc || [],
         subject: subject,
-        public_url: hasPublicUrl ? public_url : null,
+        public_url: hasPublicUrl ? resolvedPublicUrl : null,
         videosCount: videoLinks.length,
         documentsCount: document_as_attachment
           ? documentAttachmentCount

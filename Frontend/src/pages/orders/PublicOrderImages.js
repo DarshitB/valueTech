@@ -21,7 +21,7 @@ import "./PublicOrderImages.scss";
 import { resolveAssetUrl } from "../../utils/urlUtils";
 
 function PublicOrderImages() {
-  const { id } = useParams();
+  const { id, token } = useParams();
   const dispatch = useDispatch();
   
   // Get media data from Redux store
@@ -48,6 +48,50 @@ function PublicOrderImages() {
       return resolveAssetUrl(mediaUrl);
     } catch {
       return resolveAssetUrl(mediaUrl);
+    }
+  };
+
+  // Open public document/collage via blob so source URL is not exposed
+  // in browser address bar (same UX pattern as authenticated documents page).
+  const openPublicFileInNewTab = async (url) => {
+    const newWindow = window.open("about:blank", "_blank");
+    if (!newWindow) return;
+
+    try {
+      newWindow.document.write(
+        "<!DOCTYPE html><html><head><title>Opening\u2026</title>" +
+          "<style>" +
+          "body{margin:0;height:100vh;display:flex;align-items:center;" +
+          "justify-content:center;background:#f8f9fa;" +
+          "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}" +
+          ".sp{width:36px;height:36px;border:3px solid #dee2e6;" +
+          "border-top-color:#495057;border-radius:50%;" +
+          "animation:spin .7s linear infinite;margin:0 auto 14px;}" +
+          "@keyframes spin{to{transform:rotate(360deg)}}" +
+          "p{margin:0;font-size:14px;color:#6c757d;}" +
+          "</style></head><body>" +
+          "<div style='text-align:center'>" +
+          "<div class='sp'></div><p>Opening document\u2026</p>" +
+          "</div></body></html>"
+      );
+      newWindow.document.close();
+    } catch (_) {
+      // Ignore document.write issues due to browser/csp restrictions.
+    }
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      newWindow.location.href = objectUrl;
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 90_000);
+    } catch (_) {
+      try {
+        newWindow.close();
+      } catch (closeErr) {}
     }
   };
 
@@ -157,10 +201,14 @@ function PublicOrderImages() {
   // Fetch order media using Redux action (public endpoint - no authentication required)
   // The API response includes order information with order_number
   useEffect(() => {
-    if (id) {
-      dispatch(fetchPublicOrderMedia(id));
+    if (token) {
+      dispatch(fetchPublicOrderMedia({ token }));
+      return;
     }
-  }, [dispatch, id]);
+    if (id) {
+      dispatch(fetchPublicOrderMedia({ orderId: id }));
+    }
+  }, [dispatch, id, token]);
 
   // Handle lightbox open
   const handleLightboxOpen = (imageItem) => {
@@ -266,14 +314,14 @@ function PublicOrderImages() {
                             </h2>
                             <div className="public-order-images-grid">
                               {approvedReports.map((item) => {
-                                const documentUrl = getImageUrl(item.media_url);
+                                const documentUrl = getImageUrl(item.view_url || item.media_url);
                                 const fileName = item.file_name || item.name || getFilenameFromMediaUrl(item.media_url) || `Report ${item.id}`;
 
                                 return (
                                   <div key={item.id} className="public-order-image-card">
                                     <div
                                       className="public-order-image-box"
-                                      onClick={() => window.open(documentUrl, "_blank", "noopener,noreferrer")}
+                                      onClick={() => openPublicFileInNewTab(documentUrl)}
                                       style={{
                                         backgroundColor: "#f8f9fa",
                                         display: "flex",
@@ -308,7 +356,7 @@ function PublicOrderImages() {
                                           title="Open report in new tab"
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            window.open(documentUrl, "_blank", "noopener,noreferrer");
+                                            openPublicFileInNewTab(documentUrl);
                                           }}
                                         >
                                           <Eye size={20} />
@@ -330,14 +378,14 @@ function PublicOrderImages() {
                             </h2>
                             <div className="public-order-images-grid">
                               {approvedCollages.map((item) => {
-                                const mediaUrl = getImageUrl(item.media_url);
+                                const mediaUrl = getImageUrl(item.view_url || item.media_url);
                                 const fileName = item.file_name || item.name || getFilenameFromMediaUrl(item.media_url) || `Collage ${item.id}`;
 
                                 return (
                                   <div key={item.id} className="public-order-image-card">
                                     <div
                                       className="public-order-image-box"
-                                      onClick={() => window.open(mediaUrl, "_blank", "noopener,noreferrer")}
+                                      onClick={() => openPublicFileInNewTab(mediaUrl)}
                                       style={{
                                         backgroundColor: "#f8f9fa",
                                         display: "flex",
@@ -372,7 +420,7 @@ function PublicOrderImages() {
                                           title="Open collage in new tab"
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            window.open(mediaUrl, "_blank", "noopener,noreferrer");
+                                            openPublicFileInNewTab(mediaUrl);
                                           }}
                                         >
                                           <Eye size={20} />

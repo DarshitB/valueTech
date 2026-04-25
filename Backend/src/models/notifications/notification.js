@@ -211,6 +211,11 @@ const notification = {
               .andOn("order_status_history.user_type", "=", db.raw("'field_verifier'"));
         })
         .leftJoin("users as comment_user", "order_comments.user_id", "comment_user.id")
+        .leftJoin(
+          "field_verifiers as comment_field_verifier",
+          "order_comments.user_id",
+          "comment_field_verifier.id"
+        )
         .select(
           "notifications.id",
           "notifications.user_id",
@@ -249,7 +254,18 @@ const notification = {
           "order_status_history.changed_at",
           "order_comments.comment as comment_text",
           "order_comments.user_id as comment_user_id",
-          "comment_user.name as comment_user_name",
+          "order_comments.user_type as comment_user_type",
+          db.raw(`
+            COALESCE(
+              CASE
+                WHEN order_comments.user_type IN ('field_verifier', 'filed_verifier', 'filed_varifier')
+                  THEN comment_field_verifier.name
+                ELSE comment_user.name
+              END,
+              comment_user.name,
+              comment_field_verifier.name
+            ) as comment_user_name
+          `),
           "order_comments.commented_at"
         )
         .orderBy("notifications.created_at", "desc")
@@ -485,6 +501,11 @@ const notification = {
               .andOn("order_status_history.user_type", "=", db.raw("'field_verifier'"));
         })
         .leftJoin("users as comment_user", "order_comments.user_id", "comment_user.id")
+        .leftJoin(
+          "field_verifiers as comment_field_verifier",
+          "order_comments.user_id",
+          "comment_field_verifier.id"
+        )
         .select(
           "notifications.id",
           "notifications.user_id",
@@ -523,7 +544,18 @@ const notification = {
           "order_status_history.changed_at",
           "order_comments.comment as comment_text",
           "order_comments.user_id as comment_user_id",
-          "comment_user.name as comment_user_name",
+          "order_comments.user_type as comment_user_type",
+          db.raw(`
+            COALESCE(
+              CASE
+                WHEN order_comments.user_type IN ('field_verifier', 'filed_verifier', 'filed_varifier')
+                  THEN comment_field_verifier.name
+                ELSE comment_user.name
+              END,
+              comment_user.name,
+              comment_field_verifier.name
+            ) as comment_user_name
+          `),
           "order_comments.commented_at"
         )
         .orderBy("notifications.created_at", "desc")
@@ -649,6 +681,11 @@ const notification = {
             .andOn("order_status_history.user_type", "=", db.raw("'field_verifier'"));
       })
       .leftJoin("users as comment_user", "order_comments.user_id", "comment_user.id")
+      .leftJoin(
+        "field_verifiers as comment_field_verifier",
+        "order_comments.user_id",
+        "comment_field_verifier.id"
+      )
       .select(
         "notifications.id",
         "notifications.user_id",
@@ -687,7 +724,18 @@ const notification = {
         "order_status_history.changed_at",
         "order_comments.comment as comment_text",
         "order_comments.user_id as comment_user_id",
-        "comment_user.name as comment_user_name",
+        "order_comments.user_type as comment_user_type",
+        db.raw(`
+          COALESCE(
+            CASE
+              WHEN order_comments.user_type IN ('field_verifier', 'filed_verifier', 'filed_varifier')
+                THEN comment_field_verifier.name
+              ELSE comment_user.name
+            END,
+            comment_user.name,
+            comment_field_verifier.name
+          ) as comment_user_name
+        `),
         "order_comments.commented_at"
       )
       .orderBy("notifications.created_at", "desc")

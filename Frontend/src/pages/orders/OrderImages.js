@@ -160,7 +160,7 @@ function OrderImages() {
   const [remarks, setRemarks] = useState("");
   const [zipUploadModalOpen, setZipUploadModalOpen] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
-  // Per-image orientation for collage: "default" | "left" | "right" (cycle on button click)
+  // Per-image orientation for collage: "default" | "left" | "right" | "up" (cycle on button click)
   const [imageOrientations, setImageOrientations] = useState({});
 
   // Global ResizeObserver error suppression - runs once when component mounts
@@ -481,21 +481,28 @@ function OrderImages() {
     );
   }, [id, order, setTitle]);
 
-  // Cycle orientation for an image: default → left → right → default (for collage)
+  // Cycle orientation for an image: default -> left -> right -> up -> default (for collage)
   const cycleImageOrientation = (imageId, e) => {
     e?.stopPropagation?.();
     setImageOrientations((prev) => {
       const current = prev[imageId] || "default";
-      const next = current === "default" ? "left" : current === "left" ? "right" : "default";
+      const next =
+        current === "default"
+          ? "left"
+          : current === "left"
+            ? "right"
+            : current === "right"
+              ? "up"
+              : "default";
       return { ...prev, [imageId]: next };
     });
   };
 
-  // Normalize orientation from DB: null/undefined/"default" → "default"; "left"/"right" as-is
+  // Normalize orientation from DB: null/undefined/"default" -> "default"; valid values pass through
   const getDbOrientation = (mediaItem) => {
     if (!mediaItem) return "default";
     const raw = mediaItem.orientation;
-    return raw === "left" || raw === "right" ? raw : "default";
+    return raw === "left" || raw === "right" || raw === "up" ? raw : "default";
   };
 
   // Handle image selection with sequence tracking (status 4 can be selected for collage only)
@@ -759,6 +766,8 @@ function OrderImages() {
         ? "rotate(-90deg)"
         : orientation === "right"
           ? "rotate(90deg)"
+          : orientation === "up"
+            ? "rotate(180deg)"
           : undefined;
     const paddedVh = `calc(100vh - ${2 * LIGHTBOX_PADDING_PX}px)`;
     const paddedVw = `calc(100vw - ${2 * LIGHTBOX_PADDING_PX}px)`;
@@ -1098,6 +1107,8 @@ function OrderImages() {
                                             ? "rotate(-90deg)"
                                             : imageOrientations[image.id] === "right"
                                               ? "rotate(90deg)"
+                                              : imageOrientations[image.id] === "up"
+                                                ? "rotate(180deg)"
                                               : undefined,
                                       }}
                                     />

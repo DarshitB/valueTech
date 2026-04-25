@@ -138,6 +138,7 @@ exports.getNotifications = async (req, res, next) => {
       if (notif.comment_id) {
         formatted.comment_text = notif.comment_text || null;
         formatted.comment_user_id = notif.comment_user_id || null;
+        formatted.comment_user_type = notif.comment_user_type || null;
         formatted.comment_user_name = notif.comment_user_name || null;
         formatted.commented_at = notif.commented_at || null;
       }
@@ -292,6 +293,7 @@ exports.getAllNotifications = async (req, res, next) => {
       if (notif.comment_id) {
         formatted.comment_text = notif.comment_text || null;
         formatted.comment_user_id = notif.comment_user_id || null;
+        formatted.comment_user_type = notif.comment_user_type || null;
         formatted.comment_user_name = notif.comment_user_name || null;
         formatted.commented_at = notif.commented_at || null;
       }
