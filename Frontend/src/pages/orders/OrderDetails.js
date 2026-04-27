@@ -24,6 +24,7 @@ import {
 } from "../../redux/reducers/orderMediaDocumentsReducer";
 import {
   fetchOrderReport,
+  clearCurrentReport,
 } from "../../redux/reducers/orderReportReducer";
 import { fetchOfficers } from "../../redux/reducers/officerReducer";
 import { getUsers } from "../../api/user.api";
@@ -333,14 +334,36 @@ function OrderDetails() {
     if (showMailModal && id) {
       dispatch(fetchApprovedOrderMediaDocuments(id));
       dispatch(fetchOrderMedia(id)); // Fetch media like OrderImages does
-      // Fetch CV report if category is COMMERCIAL VEHICLE
-      if (order?.category_name === "COMMERCIAL VEHICLE") {
+      // Prevent stale report data from another category/order
+      dispatch(clearCurrentReport());
+
+      // Fetch report data for subject prefill based on category/report type
+      let reportType = "";
+      if (
+        order?.category_name === "COMMERCIAL VEHICLE" ||
+        order?.category_report_type === "report_cv"
+      ) {
+        reportType = "report_cv";
+      } else if (
+        order?.category_name === "CONSTRUCTION EQUIPMENT" ||
+        order?.category_name === "CONSTRUCTION EQUIPMENTS" ||
+        order?.category_report_type === "report_ce"
+      ) {
+        reportType = "report_ce";
+      } else if (
+        order?.category_name === "MACHINERY" ||
+        order?.category_report_type === "report_machinery"
+      ) {
+        reportType = "report_machinery";
+      }
+
+      if (reportType) {
         dispatch(
-          fetchOrderReport({ orderId: id, reportType: "report_cv", silent: true })
+          fetchOrderReport({ orderId: id, reportType, silent: true })
         );
       }
     }
-  }, [dispatch, id, showMailModal, order?.category_name]);
+  }, [dispatch, id, showMailModal, order?.category_name, order?.category_report_type]);
 
   useEffect(() => {
     if (!shouldShowR2Status || !id) {
@@ -476,41 +499,87 @@ function OrderDetails() {
     return cleaned;
   }, []);
 
-  // Prefill email subject for COMMERCIAL VEHICLE orders
+  // Prefill email subject for COMMERCIAL VEHICLE / CONSTRUCTION EQUIPMENT orders
   useEffect(() => {
     if (
       showMailModal &&
-      order?.category_name === "COMMERCIAL VEHICLE" &&
+      currentReport?.order_id === Number(id) &&
       currentReport?.report &&
       !mailFormData.subject // Only prefill if subject is empty
     ) {
       const report = currentReport.report;
-      const registeredOwnerName = report.registered_owner_name || "";
       const subCategoryName = order.sub_category_name || "";
       const childCategoryName = order.child_category_name || "";
-      const registrationNo = report.registration_no || "";
-      const bankName = order.bank_name || "";
 
       // Build category part
       const categoryPart = [subCategoryName, childCategoryName]
         .filter(Boolean)
         .join(" ");
 
-      // Format registration number
-      const formattedRegNo = formatRegistrationNumber(registrationNo);
+      let subject = "";
 
-      // Build subject: Valuation Report_(Owner Name)_(Category)_(Reg No)_(Bank Name)
-      const parts = [
-        "Valuation Report",
-        registeredOwnerName,
-        categoryPart,
-        formattedRegNo,
-        bankName,
-      ].filter(Boolean); // Remove empty parts
+      if (order?.category_name === "COMMERCIAL VEHICLE") {
+        const registeredOwnerName = report.registered_owner_name || "";
+        const registrationNo = report.registration_no || "";
+        const bankName = order.bank_name || "";
 
-      const subject = parts.join("_");
+        // Format registration number
+        const formattedRegNo = formatRegistrationNumber(registrationNo);
 
-      if (subject && subject !== "Valuation Report") {
+        // Build subject: Valuation Report_(Owner Name)_(Category)_(Reg No)_(Bank Name)
+        const parts = [
+          "Valuation Report",
+          registeredOwnerName,
+          categoryPart,
+          formattedRegNo,
+          bankName,
+        ].filter(Boolean); // Remove empty parts
+        subject = parts.join("_");
+      } else if (
+        order?.category_name === "CONSTRUCTION EQUIPMENT" ||
+        order?.category_name === "CONSTRUCTION EQUIPMENTS" ||
+        order?.category_report_type === "report_ce"
+      ) {
+        const proposedOwnerName = report.proposed_owner_name || "";
+        const craneChassisNo = report.crane_chassis_no || "";
+
+        // Build subject: VALUATION REPORT_(Proposed Owner Name)_(Category)_(Crane Chassis No)
+        const parts = [
+          "VALUATION REPORT",
+          proposedOwnerName,
+          categoryPart,
+          craneChassisNo,
+        ].filter(Boolean);
+        subject = parts.join("_");
+      } else if (
+        order?.category_name === "MACHINERY" ||
+        order?.category_report_type === "report_machinery"
+      ) {
+        const proposedOwnerName = report.proposed_owner_name || "";
+        const machineSerialNo = report.machine_serial_no || "";
+        const lafId = report.laf_id || "";
+
+        // Build subject:
+        // VALUATION REPORT_(Proposed Owner Name)_(Category)_SERIAL NO-(Machine Serial No)_LAF ID-(LAF ID)
+        const parts = [
+          "VALUATION REPORT",
+          proposedOwnerName,
+          categoryPart,
+          machineSerialNo ? `SERIAL NO-${machineSerialNo}` : "",
+          lafId ? `LAF ID-${lafId}` : "",
+        ].filter(Boolean);
+        subject = parts.join("_");
+      }
+
+      if (subject) {
+        subject = subject.toUpperCase();
+      }
+
+      if (
+        subject &&
+        subject !== "Valuation Report" &&
+        subject !== "VALUATION REPORT"
+      ) {
         setMailFormData((prev) => ({
           ...prev,
           subject: subject,
@@ -520,6 +589,7 @@ function OrderDetails() {
   }, [
     showMailModal,
     order?.category_name,
+    order?.category_report_type,
     order?.sub_category_name,
     order?.child_category_name,
     order?.bank_name,

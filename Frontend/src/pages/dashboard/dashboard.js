@@ -3055,7 +3055,6 @@ function Dashboard() {
                       value={formData.registration_number}
                       onChange={(e) => {
                         const canEditRegistrationField =
-                          !isTelecaller &&
                           hasPermission(
                             allowedPermissions,
                             "edit_order_registration_number"
@@ -3071,7 +3070,6 @@ function Dashboard() {
                         });
                       }}
                       disabled={
-                        isTelecaller ||
                         !hasPermission(
                           allowedPermissions,
                           "edit_order_registration_number"
@@ -3262,18 +3260,15 @@ function Dashboard() {
                           }))}
                           value={formData.manager_id}
                           onChange={(val) => {
-                            // Only allow TELECALLER to change this field if they have permission
-                            if (!isTelecaller) {
-                              setFormData({
-                                ...formData,
-                                manager_id: val,
-                                // Clear field verifier whenever manager changes
-                                field_verifier_id: null,
-                              });
-                            }
+                            setFormData({
+                              ...formData,
+                              manager_id: val,
+                              // Clear field verifier whenever manager changes
+                              field_verifier_id: null,
+                            });
                           }}
                           placeholder="Select manager"
-                          disabled={isTelecaller}
+                          disabled={false}
                         />
                       </div>
                     )}
