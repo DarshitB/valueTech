@@ -352,9 +352,13 @@ function OrderDetails() {
         reportType = "report_ce";
       } else if (
         order?.category_name === "MACHINERY" ||
-        order?.category_report_type === "report_machinery"
+        order?.category_report_type === "report_machinery" ||
+        order?.category_report_type === "report_summarized"
       ) {
-        reportType = "report_machinery";
+        reportType =
+          order?.category_report_type === "report_summarized"
+            ? "report_summarized"
+            : "report_machinery";
       }
 
       if (reportType) {
@@ -553,7 +557,8 @@ function OrderDetails() {
         subject = parts.join("_");
       } else if (
         order?.category_name === "MACHINERY" ||
-        order?.category_report_type === "report_machinery"
+        order?.category_report_type === "report_machinery" ||
+        order?.category_report_type === "report_summarized"
       ) {
         const proposedOwnerName = report.proposed_owner_name || "";
         const machineSerialNo = report.machine_serial_no || "";
@@ -1790,7 +1795,8 @@ function OrderDetails() {
             )}
 
             {/* Machinery Report */}
-            {(order?.category_name === "MACHINERY" || order?.category_report_type === "report_machinery") && (
+            {((order?.category_name === "MACHINERY" || order?.category_report_type === "report_machinery") &&
+              order?.category_report_type !== "report_summarized") && (
               <>
                 {order?.valuer_name &&
                   order.valuer_name.trim() !== "" ? (
@@ -1816,6 +1822,46 @@ function OrderDetails() {
                     title="Machinery Report"
                     className="tooltip-link"
                     onClick={() => showValuerNameError("Machinery")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      cursor: "pointer",
+                      outline: "none",
+                      boxShadow: "none",
+                    }}
+                  >
+                    <ReportIcon />
+                  </button>
+                )}
+              </>
+            )}
+            {order?.category_report_type === "report_summarized" && (
+              <>
+                {order?.valuer_name &&
+                  order.valuer_name.trim() !== "" ? (
+                  order?.current_status_id === 10 && !isExemptAdmin ? (
+                    <span
+                      title="Summarized Report (Disabled)"
+                      className="tooltip-link disabled"
+                      style={{ cursor: "not-allowed" }}
+                    >
+                      <ReportIcon />
+                    </span>
+                  ) : (
+                    <Link
+                      to={`/orders/${id}/details/summarized-report`}
+                      title="Summarized Report"
+                      className="tooltip-link"
+                    >
+                      <ReportIcon />
+                    </Link>
+                  )
+                ) : (
+                  <button
+                    title="Summarized Report"
+                    className="tooltip-link"
+                    onClick={() => showValuerNameError("Summarized")}
                     style={{
                       background: "none",
                       border: "none",

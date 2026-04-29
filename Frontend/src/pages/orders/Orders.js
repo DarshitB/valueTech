@@ -2053,17 +2053,11 @@ function Orders() {
                         id="supervisor_number"
                         name="supervisor_number"
                         value={formData.supervisor_number}
-                        inputMode="numeric"
-                        maxLength={10}
                         onChange={(e) => {
-                          const value = e.target.value;
-                          // Allow only numeric input
-                          if (/^\d*$/.test(value)) {
-                            setFormData({
-                              ...formData,
-                              supervisor_number: value,
-                            });
-                          }
+                          setFormData({
+                            ...formData,
+                            supervisor_number: e.target.value,
+                          });
                         }}
                         disabled={false}
                       />
@@ -2075,17 +2069,11 @@ function Orders() {
                         id="driver_number"
                         name="driver_number"
                         value={formData.driver_number}
-                        inputMode="numeric"
-                        maxLength={10}
                         onChange={(e) => {
-                          const value = e.target.value;
-                          // Allow only numeric input
-                          if (/^\d*$/.test(value)) {
-                            setFormData({
-                              ...formData,
-                              driver_number: value,
-                            });
-                          }
+                          setFormData({
+                            ...formData,
+                            driver_number: e.target.value,
+                          });
                         }}
                         disabled={false}
                       />

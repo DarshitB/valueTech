@@ -26,6 +26,7 @@ const REPORT_TYPE_OPTIONS = [
   "report_avr",
   "report_marine",
   "report_machinery",
+  /* "report_summarized", */
 ];
 
 const reportTypeSelectOptions = REPORT_TYPE_OPTIONS.map((opt) => ({

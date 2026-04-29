@@ -3005,17 +3005,11 @@ function Dashboard() {
                         id="supervisor_number"
                         name="supervisor_number"
                         value={formData.supervisor_number}
-                        inputMode="numeric"
-                        maxLength={10}
                         onChange={(e) => {
-                          const value = e.target.value;
-                          // Allow only numeric input
-                          if (/^\d*$/.test(value)) {
-                            setFormData({
-                              ...formData,
-                              supervisor_number: value,
-                            });
-                          }
+                          setFormData({
+                            ...formData,
+                            supervisor_number: e.target.value,
+                          });
                         }}
                         disabled={false}
                       />
@@ -3027,17 +3021,11 @@ function Dashboard() {
                         id="driver_number"
                         name="driver_number"
                         value={formData.driver_number}
-                        inputMode="numeric"
-                        maxLength={10}
                         onChange={(e) => {
-                          const value = e.target.value;
-                          // Allow only numeric input
-                          if (/^\d*$/.test(value)) {
-                            setFormData({
-                              ...formData,
-                              driver_number: value,
-                            });
-                          }
+                          setFormData({
+                            ...formData,
+                            driver_number: e.target.value,
+                          });
                         }}
                         disabled={false}
                       />
@@ -3278,8 +3266,7 @@ function Dashboard() {
                     hasPermission(
                       allowedPermissions,
                       "view_order_add_edit_manager_filed"
-                    ) &&
-                    !isBankOfficer && (
+                    ) && (
                       <div className="form-group">
                         <label htmlFor="fieldVerifierField">
                           Field Verifier
@@ -3295,16 +3282,13 @@ function Dashboard() {
                           )}
                           value={formData.field_verifier_id}
                           onChange={(val) => {
-                            // Only allow TELECALLER to change this field if they have permission
-                            if (!isTelecaller) {
-                              setFormData({
-                                ...formData,
-                                field_verifier_id: val,
-                              });
-                            }
+                            setFormData({
+                              ...formData,
+                              field_verifier_id: val,
+                            });
                           }}
                           placeholder="Select field verifier"
-                          disabled={isTelecaller}
+                          disabled={false}
                         />
                       </div>
                     )}

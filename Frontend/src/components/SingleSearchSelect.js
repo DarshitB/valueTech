@@ -11,11 +11,23 @@ import Select from "react-select";
  * @param {Boolean} required - If true, marks field as required
  * @param {Boolean} disabled - If true, disables the select component
  */
-const SingleSearchSelect = ({ options, value, onChange, placeholder, isMulti = false, required = false, disabled = false }) => {
+const SingleSearchSelect = ({
+  options,
+  value,
+  onChange,
+  placeholder,
+  isMulti = false,
+  required = false,
+  disabled = false,
+  className,
+  styles,
+  menuPortalTarget,
+  menuPosition,
+}) => {
   // Handle selected value(s)
   const selected = isMulti
     ? options.filter((opt) => value?.includes(opt.value))
-    : options.find((opt) => opt.value === value) || null;
+    : options.find((opt) => String(opt.value) === String(value)) || null;
 
   return (
     <Select
@@ -36,6 +48,10 @@ const SingleSearchSelect = ({ options, value, onChange, placeholder, isMulti = f
       placeholder={placeholder || "Select an option..."}
       required={required}
       isDisabled={disabled}
+      className={className}
+      styles={styles}
+      menuPortalTarget={menuPortalTarget}
+      menuPosition={menuPosition}
     />
   );
 };

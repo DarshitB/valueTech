@@ -1,0 +1,42 @@
+---
+description: Enforce senior-level safe change lifecycle for every task
+alwaysApply: true
+---
+
+# Senior Change Lifecycle (Mandatory)
+
+Follow this sequence before and after every code update.
+
+## 1) Understand First
+- Restate the requirement in clear, testable terms.
+- Confirm scope, constraints, and expected behavior.
+- If any requirement is ambiguous, ask before coding.
+
+## 2) Pre-Change Impact Check
+- Identify affected files, flows, APIs, data, and edge cases.
+- Check what can break (UI, logic, validations, integrations, performance).
+- Define acceptance criteria and regression checklist.
+
+## 3) Safe Implementation
+- Apply smallest safe change that satisfies the requirement.
+- Preserve existing behavior unless change explicitly requires it.
+- Add/adjust focused comments only where logic is non-obvious.
+
+## 4) Focused Error Handling
+- Report only actionable root-cause errors and critical pain points.
+- Avoid noisy or generic error reporting.
+- Include precise context needed for quick fixes.
+
+## 5) Triple Validation
+- Verify correctness of the new behavior.
+- Verify no functional regressions in related flows.
+- Verify no visual regressions in affected screens/components.
+
+## 6) QA Gate Before Handoff
+- Run relevant checks/tests available in project workflow.
+- Manually test key user scenarios and edge cases.
+- Hand off only after all checks pass or clearly document any blocker/risk.
+
+## 7) Final Delivery Format
+- Provide: what changed, why, impact area, validation done, and residual risks.
+- Never mark work complete without lifecycle and QA confirmation.

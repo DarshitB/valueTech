@@ -11,6 +11,7 @@ const Order = require("../../../models/orders/order");
 const CvReport = require("../../../models/orders/reports/cvReport");
 const AvrReport = require("../../../models/orders/reports/avrReport");
 const MachineryReport = require("../../../models/orders/reports/machineryReport");
+const SummarizedReport = require("../../../models/orders/reports/summarizedReport");
 const CeReport = require("../../../models/orders/reports/ceReport");
 const MarineReport = require("../../../models/orders/reports/marineReport");
 const orderMediaDocument = require("../../../models/orders/orderMediaDocument");
@@ -22,6 +23,7 @@ const { ensureDirectoryExists } = require("../../../utils/localFileHelper");
 const cvReportTemplate = require("./templates/cv_report_template");
 const avrReportTemplate = require("./templates/avr_report_template");
 const machineryReportTemplate = require("./templates/machinery_report_template");
+const { generateSummarizedTableAppendixHTML } = require("./templates/summarized_report_template");
 const ceReportTemplate = require("./templates/ce_report_template");
 const marineReportTemplate = require("./templates/marine_report_template");
 
@@ -553,6 +555,8 @@ function getReportModelByType(reportType) {
       return AvrReport;
     case "report_machinery":
       return MachineryReport;
+    case "report_summarized":
+      return SummarizedReport;
     case "report_ce":
       return CeReport;
     case "report_marine":
@@ -581,6 +585,7 @@ exports.generateReport = async (req, res, next) => {
     const reportTypesWithAssetMake = [
       "report_cv",
       "report_machinery",
+      "report_summarized",
       "report_ce",
     ];
 
@@ -638,7 +643,7 @@ exports.generateReport = async (req, res, next) => {
     let chassisImageBase64 = null;
 
     if (
-      ["report_cv", "report_ce", "report_avr", "report_machinery"].includes(
+      ["report_cv", "report_ce", "report_avr", "report_machinery", "report_summarized"].includes(
         requestedReportType.toLowerCase()
       )
     ) {
@@ -856,7 +861,7 @@ exports.generateReport = async (req, res, next) => {
 
     // Map frontend field name to database column name for CV, CE, and Machinery report headings
     if (
-      ["report_cv", "report_ce", "report_machinery"].includes(
+      ["report_cv", "report_ce", "report_machinery", "report_summarized"].includes(
         requestedReportType.toLowerCase()
       )
     ) {
@@ -881,7 +886,7 @@ exports.generateReport = async (req, res, next) => {
     };
 
     if (
-      ["report_cv", "report_ce", "report_avr", "report_machinery"].includes(
+      ["report_cv", "report_ce", "report_avr", "report_machinery", "report_summarized"].includes(
         requestedReportType.toLowerCase()
       )
     ) {
@@ -1095,6 +1100,25 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
       bgImageFileName = "marine-vs.webp";
       stampPngFile = "marine-vs-stamp.png";
     }
+  } else if (reportType.toLowerCase() === "report_summarized") {
+    const nameField = formData.valuer_name || formData.surveyor;
+    if (nameField) {
+      const name = nameField.toUpperCase().trim();
+      if (name === "V.K. ASSOCIATES") {
+        bgImageFileName = "vks-horizontal.jpg";
+        stampPngFile = "vka.png";
+      } else if (name === "VALUETECH SOLUTIONS") {
+        bgImageFileName = "vs-horizontal.jpg";
+        stampPngFile = "vts.png";
+      } else if (name === "VISHAL D. KOTHARI") {
+        bgImageFileName = "vdk-horizontal.jpg";
+        stampPngFile = "vdk.png";
+      } else {
+        bgImageFileName = "vs-horizontal.jpg";
+      }
+    } else {
+      bgImageFileName = "vs-horizontal.jpg";
+    }
   } else {
     // For other report types (CV, AVR, Machinery, CE), use regular letterheads
     const nameField = formData.valuer_name || formData.surveyor;
@@ -1289,13 +1313,15 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
       }
     }
 
-    // Generate PDF with legal size dimensions (8.5" x 14")
+    // Generate PDF defaults (Legal portrait for existing reports)
     const pdfStartTime = Date.now();
 
     // For CV reports, use displayHeaderFooter to add page numbers
+    const isSummarizedReport = reportType.toLowerCase() === "report_summarized";
     const pdfOptions = {
       path: outputPath,
-      format: "Legal",
+      format: isSummarizedReport ? "A4" : "Legal",
+      landscape: isSummarizedReport,
       printBackground: true,
       margin: {
         top: "0px",
@@ -1303,8 +1329,9 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
         bottom: "0px",
         left: "0px",
       },
-      width: "8.5in",
-      height: "14in",
+      ...(isSummarizedReport
+        ? { width: "11.69in", height: "8.27in" }
+        : { width: "8.5in", height: "14in" }),
       preferCSSPageSize: true,
     };
 
@@ -1627,6 +1654,7 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
           "report_cv",
           "report_machinery",
           "report_avr",
+          "report_summarized",
         ].includes(reportType?.toLowerCase());
 
         // Measure ACTUAL page dimensions
@@ -1651,8 +1679,11 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
           ? parseInt(wrapperStyle.paddingBottom)
           : 0;
 
-        // Calculate REAL available space
-        const PAGE_HEIGHT_PX = 14 * 96; // 1344px
+        // Calculate REAL available space - A4 landscape for summarized, Legal portrait for others
+        const isSummarizedReport = reportType?.toLowerCase() === "report_summarized";
+        const PAGE_HEIGHT_PX = isSummarizedReport
+          ? Math.round(8.27 * 96) // 794px for A4 landscape
+          : 14 * 96; // 1344px for Legal portrait
 
         const spacerRow = thead.querySelector(".spacer-row");
         const actualSpacerHeight = spacerRow ? spacerRow.offsetHeight : 225;
@@ -2068,7 +2099,8 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
     if (
       reportType.toLowerCase() === "report_cv" ||
       reportType.toLowerCase() === "report_ce" ||
-      reportType.toLowerCase() === "report_machinery"
+      reportType.toLowerCase() === "report_machinery" ||
+      reportType.toLowerCase() === "report_summarized"
     ) {
       try {
         // ⭐ Use the new enhanced function
@@ -2094,6 +2126,7 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
             "report_cv",
             "report_machinery",
             "report_avr",
+            "report_summarized",
           ].includes(reportType?.toLowerCase());
 
           if (needsFooter) {
@@ -2179,6 +2212,47 @@ function generateReportHTML(
         reportTypeSelection
       );
 
+    case "report_summarized":
+      {
+        const machineryHtml = machineryReportTemplate.generateMachineryReportHTML(
+          formData,
+          extraData,
+          bgImageBase64,
+          stampImageBase64,
+          reportTypeSelection
+        );
+        const appendixHtml = generateSummarizedTableAppendixHTML(formData);
+        const summarizedOverrideCss = `
+<style>
+  /* Override machinery template's Legal-portrait page size to A4 landscape */
+  @page {
+    size: 11.69in 8.27in !important;
+    margin: 0px !important;
+  }
+  body {
+    width: 11.69in !important;
+    background-size: 11.69in 8.27in !important;
+    min-height: 8.27in !important;
+  }
+  .page, .content-wrapper {
+    min-height: 8.27in !important;
+  }
+  /* Match top spacer to summarized table appendix (180px) */
+  thead .spacer-row,
+  thead .spacer-row td {
+    height: 180px !important;
+    line-height: 180px !important;
+  }
+  /* Center-align all table text */
+  body, table, th, td, .main-table td, .main-table th {
+    text-align: center !important;
+  }
+</style>`;
+        return machineryHtml
+          .replace("</head>", `${summarizedOverrideCss}</head>`)
+          .replace("</body>", `${appendixHtml}</body>`);
+      }
+
     case "report_ce":
       return ceReportTemplate.generateCEReportHTML(
         formData,
@@ -2248,6 +2322,10 @@ exports.getReportByOrderAndType = async (req, res, next) => {
         report = await MachineryReport.findByOrderIdWithFlexibleFields(
           order_id
         );
+        break;
+
+      case "report_summarized":
+        report = await SummarizedReport.findByOrderIdWithFlexibleFields(order_id);
         break;
 
       case "report_ce":
@@ -2434,6 +2512,37 @@ exports.getReportByChildCategoryAndType = async (req, res, next) => {
         }
         break;
 
+      case "report_summarized":
+        const summarizedReport = await db("report_summarized")
+          .leftJoin("orders", "report_summarized.order_id", "orders.id")
+          .leftJoin(
+            "users as created_user",
+            "report_summarized.created_by",
+            "created_user.id"
+          )
+          .leftJoin(
+            "users as updated_user",
+            "report_summarized.updated_by",
+            "updated_user.id"
+          )
+          .where("orders.child_category_id", childCategoryId)
+          .whereNull("orders.deleted_at")
+          .select(
+            "report_summarized.*",
+            "orders.order_number",
+            "orders.child_category_id",
+            "created_user.name as created_by_name",
+            "updated_user.name as updated_by_name"
+          )
+          .orderBy("report_summarized.created_at", "desc")
+          .first();
+
+        if (summarizedReport) {
+          orderId = summarizedReport.order_id;
+          report = await SummarizedReport.findByOrderIdWithFlexibleFields(orderId);
+        }
+        break;
+
       case "report_ce":
         const ceReport = await db("report_ce")
           .leftJoin("orders", "report_ce.order_id", "orders.id")
@@ -2611,6 +2720,7 @@ exports.saveReportData = async (req, res, next) => {
     const reportTypesWithAssetMake = [
       "report_cv",
       "report_machinery",
+      "report_summarized",
       "report_ce",
     ];
     let assetMakeIdForDB = null;
@@ -2686,7 +2796,7 @@ exports.saveReportData = async (req, res, next) => {
 
     // Map frontend field name to database column name for CV, CE, and Machinery report headings
     if (
-      ["report_cv", "report_ce", "report_machinery"].includes(
+      ["report_cv", "report_ce", "report_machinery", "report_summarized"].includes(
         requestedReportType.toLowerCase()
       )
     ) {
@@ -2702,7 +2812,7 @@ exports.saveReportData = async (req, res, next) => {
     Object.assign(reportData, validFields);
 
     if (
-      ["report_cv", "report_ce", "report_avr", "report_machinery"].includes(
+      ["report_cv", "report_ce", "report_avr", "report_machinery", "report_summarized"].includes(
         requestedReportType.toLowerCase()
       )
     ) {
@@ -3843,6 +3953,13 @@ function filterValidReportFields(formData, reportType) {
       "disclaimer",
     ],
   };
+
+  if (!validColumns.report_summarized) {
+    validColumns.report_summarized = [
+      ...(validColumns.report_machinery || []),
+      "summarized_table_data",
+    ];
+  }
 
   const allowedColumns = validColumns[reportType.toLowerCase()] || [];
   const filteredData = {};
