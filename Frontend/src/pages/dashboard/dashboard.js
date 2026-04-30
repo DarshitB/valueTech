@@ -1260,23 +1260,49 @@ function Dashboard() {
       newFieldVerifierId = formData.field_verifier_id;
     }
 
-    // For edit mode, only include these fields if they have changed
+    // Determine who can actually change each field
+    const canChangeOfficer =
+      isBankOfficer ||
+      hasPermission(allowedPermissions, "view_order_add_edit_officer_filed");
+    const canChangeManager =
+      isManager ||
+      hasPermission(allowedPermissions, "view_order_add_edit_manager_filed");
+    const canChangeTelecaller = hasPermission(
+      allowedPermissions,
+      "view_order_add_edit_telecaller_filed"
+    );
+    const canChangeFieldVerifier = isManager || isSuperAdmin ||
+      hasPermission(allowedPermissions, "view_order_add_edit_manager_filed");
+
+    // For edit mode, only include these fields if they have changed AND user can change them
     if (isEdit) {
       const currentOrder = orders.find((order) => order.id === editOrderId);
 
-      if (newOfficerId !== (currentOrder.officer_id || null)) {
+      if (
+        canChangeOfficer &&
+        newOfficerId !== (currentOrder.officer_id || null)
+      ) {
         payload.officer_id = newOfficerId;
       }
 
-      if (newManagerId !== (currentOrder.manager_id || null)) {
+      if (
+        canChangeManager &&
+        newManagerId !== (currentOrder.manager_id || null)
+      ) {
         payload.manager_id = newManagerId;
       }
 
-      if (newTelecallerId !== (currentOrder.telecaller_id || null)) {
+      if (
+        canChangeTelecaller &&
+        newTelecallerId !== (currentOrder.telecaller_id || null)
+      ) {
         payload.telecaller_id = newTelecallerId;
       }
 
-      if (newFieldVerifierId !== (currentOrder.field_verifier_id || null)) {
+      if (
+        canChangeFieldVerifier &&
+        newFieldVerifierId !== (currentOrder.field_verifier_id || null)
+      ) {
         payload.field_verifier_id = newFieldVerifierId;
       }
     } else {

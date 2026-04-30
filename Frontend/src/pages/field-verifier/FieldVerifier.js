@@ -201,11 +201,15 @@ function FieldVerifiers() {
 
   const handleSubmit = () => {
     const mobileRegex = /^[0-9]{10}$/;
+    const canViewMobile = hasPermission(allowedPermissions, "view_field_verifier_mobile");
 
     if (!formData.name.trim()) return toast.error("Name is required.");
     if (!formData.username.trim()) return toast.error("Username required.");
-    if (!formData.mobile || !mobileRegex.test(formData.mobile))
-      return toast.error("Valid mobile required.");
+    // Only validate mobile if user can actually see/edit it
+    if (canViewMobile || !isEdit) {
+      if (!formData.mobile || !mobileRegex.test(formData.mobile))
+        return toast.error("Valid mobile required.");
+    }
     if (!formData.upi_id.trim()) return toast.error("UPI ID is required.");
     if (!formData.city_id) return toast.error("City selection is required.");
 
@@ -225,7 +229,6 @@ function FieldVerifiers() {
     const payload = {
       name: formData.name,
       username: formData.username,
-      mobile: formData.mobile,
       upi_id: formData.upi_id,
       city_id: formData.city_id,
 
@@ -237,6 +240,12 @@ function FieldVerifiers() {
       bank_account_number: formData.bank_account_number,
       bank_IFSC_code: formData.bank_IFSC_code,
     };
+
+    // Only include mobile in payload if user has permission to view it (real value)
+    // or it's a new record (no existing mobile to preserve)
+    if (canViewMobile || !isEdit) {
+      payload.mobile = formData.mobile;
+    }
 
     if (!isEdit || formData.password) {
       payload.password = formData.password;
