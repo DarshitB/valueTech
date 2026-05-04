@@ -16,7 +16,10 @@ import {
   clearCurrentReport,
 } from "../../../redux/reducers/orderReportReducer";
 import { fetchAssetMakesForReports } from "../../../redux/reducers/assetMakesReducer";
-import { fetchChildCategories } from "../../../redux/reducers/childCategoryReducer";
+import {
+  fetchChildCategories,
+  fetchChildCategoriesByCategoryName,
+} from "../../../redux/reducers/childCategoryReducer";
 import { usePageTitle } from "../../../context/PageTitleContext";
 import { resolveAssetUrl } from "../../../utils/urlUtils";
 import SingleSearchSelect from "../../../components/SingleSearchSelect";
@@ -252,9 +255,21 @@ const SUMMARIZED_FIXED_END_COLUMNS = [
 ];
 
 const SUMMARIZED_TRAILING_COLUMNS = [
-  { id: "contact_number", header: "Contact Number" },
   { id: "subcategory_id", header: "Subcategory Selection" },
+  { id: "contact_number", header: "Contact Number" },
 ];
+
+const SUMMARIZED_CURRENCY_COLUMN_IDS = new Set([
+  "total_invoice_cost",
+  "estimated_current_replacement_cost",
+  "amount_post_depreciation",
+  "estimated_fair_value",
+]);
+
+const SUMMARIZED_DIGITS_ONLY_COLUMN_IDS = new Set([
+  "residual_life_of_asset",
+  "depr_rate",
+]);
 
 const buildEmptySummarizedRow = (dynamicColumns = []) => {
   const base = {};
@@ -322,6 +337,9 @@ function SummarizedReport() {
   const [summarizedTableData, setSummarizedTableData] = useState(
     getDefaultSummarizedTableData
   );
+  const [summarizedChildCategories, setSummarizedChildCategories] = useState([]);
+  // Tracks which contact_number cells have been blurred (key: rowIndex)
+  const [contactNumberTouched, setContactNumberTouched] = useState({});
   const tabButtonStyle = useCallback(
     (tab) => ({
       backgroundColor: activeReportTab === tab ? "#e8edff" : "#ffffff",
@@ -388,7 +406,16 @@ function SummarizedReport() {
   }, [dispatch, id]);
 
   useEffect(() => {
-    dispatch(fetchChildCategories());
+    dispatch(fetchChildCategoriesByCategoryName({ categoryNames: "MACHINERY" }))
+      .unwrap()
+      .then((data) => {
+        setSummarizedChildCategories(Array.isArray(data) ? data : []);
+      })
+      .catch((error) => {
+        // Keep dropdown stable even if API call fails
+        void error;
+        setSummarizedChildCategories([]);
+      });
   }, [dispatch]);
 
   // Fetch finalized orders for current child category and load their Machinery report summary rows
@@ -1605,7 +1632,12 @@ function SummarizedReport() {
     try {
       const parsed = JSON.parse(raw);
       const dynamicColumns = Array.isArray(parsed?.dynamicColumns)
-        ? parsed.dynamicColumns.filter((c) => c?.id)
+        ? parsed.dynamicColumns
+            .filter((c) => c?.id)
+            .map((c) => ({
+              ...c,
+              allowSum: Boolean(c.allowSum),
+            }))
         : [];
       const rows = Array.isArray(parsed?.rows) ? parsed.rows : [];
       setSummarizedTableData({
@@ -1617,48 +1649,121 @@ function SummarizedReport() {
     }
   }, [reportFormData?.summarized_table_data]);
 
-  const summarizedSubcategoryOptions = useMemo(() => {
-    const normalized = (childCategories || []).map((item) => ({
-      value: item?.id,
-      label: item?.name || "",
-    }));
-    const hasCurrent = normalized.some(
-      (option) => String(option.value) === String(order?.child_category_id)
-    );
-    if (order?.child_category_id && order?.child_category_name && !hasCurrent) {
-      normalized.unshift({
-        value: order.child_category_id,
-        label: order.child_category_name,
-      });
-    }
-    return normalized;
-  }, [childCategories, order?.child_category_id, order?.child_category_name]);
+  const summarizedSubcategoryOptions = useMemo(
+    () =>
+      (summarizedChildCategories || []).map((item) => ({
+        value: item?.id,
+        label: item?.name || "",
+      })),
+    [summarizedChildCategories]
+  );
 
   const summarizedOrderedColumns = useMemo(
     () => [
+      ...SUMMARIZED_TRAILING_COLUMNS,
       ...SUMMARIZED_FIXED_START_COLUMNS,
       ...(summarizedTableData?.dynamicColumns || []),
       ...SUMMARIZED_FIXED_END_COLUMNS,
-      ...SUMMARIZED_TRAILING_COLUMNS,
     ],
     [summarizedTableData?.dynamicColumns]
+  );
+
+  const getSummarizedColumnWidth = useCallback((colId) => {
+    if (colId === "subcategory_id") return 300;
+    if (colId === "machine_description") return 400;
+    return 200;
+  }, []);
+
+  const summarizedTableMinWidth = useMemo(
+    () =>
+      summarizedOrderedColumns.reduce(
+        (total, col) => total + getSummarizedColumnWidth(col.id),
+        0
+      ) + 110, // Action column
+    [summarizedOrderedColumns, getSummarizedColumnWidth]
+  );
+
+  const summarizedGrandTotalsByColumn = useMemo(() => {
+    const rows = summarizedTableData.rows || [];
+    const totals = {
+      total_invoice_cost: 0,
+      estimated_current_replacement_cost: 0,
+      amount_post_depreciation: 0,
+      estimated_fair_value: 0,
+    };
+    rows.forEach((row) => {
+      totals.total_invoice_cost += parseCurrency(String(row?.total_invoice_cost ?? ""));
+      totals.estimated_current_replacement_cost += parseCurrency(
+        String(row?.estimated_current_replacement_cost ?? "")
+      );
+      totals.amount_post_depreciation += parseCurrency(String(row?.amount_post_depreciation ?? ""));
+      totals.estimated_fair_value += parseCurrency(String(row?.estimated_fair_value ?? ""));
+    });
+    return totals;
+  }, [summarizedTableData.rows, parseCurrency]);
+
+  const summarizedDynamicColumnTotals = useMemo(() => {
+    const dynamicCols = summarizedTableData.dynamicColumns || [];
+    const rows = summarizedTableData.rows || [];
+    const totals = {};
+    dynamicCols.forEach((col) => {
+      if (!col.allowSum) return;
+      let sum = 0;
+      rows.forEach((row) => {
+        const raw = String(row?.[col.id] ?? "").replace(/\D/g, "");
+        sum += raw ? parseInt(raw, 10) || 0 : 0;
+      });
+      totals[col.id] = sum;
+    });
+    return totals;
+  }, [summarizedTableData.dynamicColumns, summarizedTableData.rows]);
+
+  const handleSummarizedDynamicAllowSumChange = useCallback(
+    (columnId, allowSum) => {
+      const nextDynamicColumns = (summarizedTableData.dynamicColumns || []).map((col) =>
+        col.id === columnId ? { ...col, allowSum } : col
+      );
+      const nextRows =
+        allowSum === true
+          ? (summarizedTableData.rows || []).map((row) => ({
+              ...row,
+              [columnId]: String(row[columnId] ?? "").replace(/\D/g, ""),
+            }))
+          : summarizedTableData.rows;
+      handleSummarizedTableDataChange({
+        ...summarizedTableData,
+        dynamicColumns: nextDynamicColumns,
+        rows: nextRows,
+      });
+    },
+    [summarizedTableData, handleSummarizedTableDataChange]
+  );
+
+  const formatSummarizedGrandTotalCell = useCallback(
+    (numeric) =>
+      handleCurrencyFormatting(
+        (Math.round((Number(numeric) + Number.EPSILON) * 100) / 100).toFixed(2)
+      ),
+    [handleCurrencyFormatting]
   );
 
   const summarizedInputStyle = useMemo(
     () => ({
       minHeight: "42px",
+      width: "100%",
       padding: "8px 12px",
       marginBottom: 0,
       borderRadius: "4px",
       lineHeight: "1.4",
+      border: "1px solid #d1d5db",
     }),
     []
   );
 
   const summarizedSelectStyles = useMemo(
     () => ({
-      container: (base) => ({ ...base, minHeight: "42px" }),
-      control: (base) => ({ ...base, minHeight: "42px", height: "42px" }),
+      container: (base) => ({ ...base, minHeight: "42px", width: "100%" }),
+      control: (base) => ({ ...base, minHeight: "42px", height: "42px", width: "100%" }),
       valueContainer: (base) => ({ ...base, minHeight: "42px", padding: "0 8px" }),
       indicatorsContainer: (base) => ({ ...base, height: "42px" }),
       menu: (base) => ({ ...base, zIndex: 20 }),
@@ -1706,6 +1811,7 @@ function SummarizedReport() {
     const newColumn = {
       id: `dynamic_col_${Date.now()}_${nextIndex}`,
       header: "",
+      allowSum: false,
     };
     const nextDynamicColumns = [...(summarizedTableData.dynamicColumns || []), newColumn];
     const nextRows = (summarizedTableData.rows || []).map((row) => ({
@@ -5324,7 +5430,7 @@ function SummarizedReport() {
                     >
                       <button
                         type="button"
-                        className="btn btn-primary"
+                        className="btn btn-outline-primary"
                         onClick={handleAddSummarizedRow}
                         style={{
                           width: "fit-content",
@@ -5353,48 +5459,87 @@ function SummarizedReport() {
                       <table
                         className="table table-bordered"
                         style={{
-                          minWidth: `${summarizedOrderedColumns.length * 200}px`,
+                          minWidth: `${summarizedTableMinWidth}px`,
                           tableLayout: "fixed",
                         }}
                       >
                         <thead>
                           <tr>
+                            {SUMMARIZED_TRAILING_COLUMNS.map((col) => (
+                              <th
+                                key={col.id}
+                                style={{
+                                  minWidth: `${getSummarizedColumnWidth(col.id)}px`,
+                                  width: `${getSummarizedColumnWidth(col.id)}px`,
+                                }}
+                              >
+                                {col.header}
+                              </th>
+                            ))}
                             {SUMMARIZED_FIXED_START_COLUMNS.map((col) => (
-                              <th key={col.id} style={{ minWidth: "200px", width: "200px" }}>
+                              <th
+                                key={col.id}
+                                style={{
+                                  minWidth: `${getSummarizedColumnWidth(col.id)}px`,
+                                  width: `${getSummarizedColumnWidth(col.id)}px`,
+                                }}
+                              >
                                 {col.header}
                               </th>
                             ))}
                             {(summarizedTableData.dynamicColumns || []).map((col) => (
-                              <th key={col.id} style={{ minWidth: "200px", width: "200px" }}>
-                                <div className="d-flex align-items-start gap-1" style={{ position: "relative" }}>
-                                  <AutoGrowTextarea
-                                    className="form-field mb-0"
-                                    style={summarizedInputStyle}
-                                    value={col.header || ""}
-                                    onChange={(e) =>
-                                      handleSummarizedDynamicHeaderChange(col.id, e.target.value)
-                                    }
-                                    placeholder="Enter column heading"
-                                  />
-                                  <button
-                                    type="button"
-                                    className="flexible-field-remove-button"
-                                    onClick={() => handleRemoveSummarizedColumn(col.id)}
-                                    style={{ top: "-8px", right: "-8px" }}
-                                    title="Remove this column"
+                              <th
+                                key={col.id}
+                                style={{
+                                  minWidth: `${getSummarizedColumnWidth(col.id)}px`,
+                                  width: `${getSummarizedColumnWidth(col.id)}px`,
+                                }}
+                              >
+                                <div className="d-flex flex-column gap-1" style={{ position: "relative" }}>
+                                  <div className="d-flex align-items-start gap-1">
+                                    <AutoGrowTextarea
+                                      className="form-field mb-0"
+                                      style={summarizedInputStyle}
+                                      value={col.header || ""}
+                                      onChange={(e) =>
+                                        handleSummarizedDynamicHeaderChange(col.id, e.target.value)
+                                      }
+                                      placeholder="Enter column heading"
+                                    />
+                                    <button
+                                      type="button"
+                                      className="flexible-field-remove-button"
+                                      onClick={() => handleRemoveSummarizedColumn(col.id)}
+                                      style={{ top: "-8px", right: "-8px" }}
+                                      title="Remove this column"
+                                    >
+                                      <DeleteIcon />
+                                    </button>
+                                  </div>
+                                  <label
+                                    className="d-flex align-items-center gap-2 mb-0"
+                                    style={{ fontSize: "12px", fontWeight: 500, cursor: "pointer" }}
                                   >
-                                    <DeleteIcon />
-                                  </button>
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(col.allowSum)}
+                                      onChange={(e) =>
+                                        handleSummarizedDynamicAllowSumChange(col.id, e.target.checked)
+                                      }
+                                    />
+                                    Allow sum
+                                  </label>
                                 </div>
                               </th>
                             ))}
                             {SUMMARIZED_FIXED_END_COLUMNS.map((col) => (
-                              <th key={col.id} style={{ minWidth: "200px", width: "200px" }}>
-                                {col.header}
-                              </th>
-                            ))}
-                            {SUMMARIZED_TRAILING_COLUMNS.map((col) => (
-                              <th key={col.id} style={{ minWidth: "200px", width: "200px" }}>
+                              <th
+                                key={col.id}
+                                style={{
+                                  minWidth: `${getSummarizedColumnWidth(col.id)}px`,
+                                  width: `${getSummarizedColumnWidth(col.id)}px`,
+                                }}
+                              >
                                 {col.header}
                               </th>
                             ))}
@@ -5405,7 +5550,13 @@ function SummarizedReport() {
                           {(summarizedTableData.rows || []).map((row, rowIndex) => (
                             <tr key={`sum-row-${rowIndex}`}>
                               {summarizedOrderedColumns.map((col) => (
-                                <td key={`${rowIndex}-${col.id}`}>
+                                <td
+                                  key={`${rowIndex}-${col.id}`}
+                                  style={{
+                                    minWidth: `${getSummarizedColumnWidth(col.id)}px`,
+                                    width: `${getSummarizedColumnWidth(col.id)}px`,
+                                  }}
+                                >
                                   {col.id === "subcategory_id" ? (
                                     <SingleSearchSelect
                                       options={summarizedSubcategoryOptions}
@@ -5415,6 +5566,129 @@ function SummarizedReport() {
                                       }
                                       placeholder="Select Subcategory"
                                       styles={summarizedSelectStyles}
+                                    />
+                                  ) : col.id === "contact_number" ? (
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      className="form-field mb-0"
+                                      style={{
+                                        ...summarizedInputStyle,
+                                        borderColor:
+                                          contactNumberTouched[rowIndex] &&
+                                          (row[col.id] || "").length > 0 &&
+                                          (row[col.id] || "").length !== 10
+                                            ? "red"
+                                            : undefined,
+                                        outline:
+                                          contactNumberTouched[rowIndex] &&
+                                          (row[col.id] || "").length > 0 &&
+                                          (row[col.id] || "").length !== 10
+                                            ? "none"
+                                            : undefined,
+                                      }}
+                                      value={row[col.id] || ""}
+                                      maxLength={10}
+                                      onChange={(e) => {
+                                        const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
+                                        handleSummarizedCellChange(rowIndex, col.id, digitsOnly);
+                                      }}
+                                      onBlur={() =>
+                                        setContactNumberTouched((prev) => ({ ...prev, [rowIndex]: true }))
+                                      }
+                                      onFocus={() =>
+                                        setContactNumberTouched((prev) => ({ ...prev, [rowIndex]: false }))
+                                      }
+                                      placeholder="Enter contact number"
+                                    />
+                                  ) : col.id === "invoice_date" ? (
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      className="form-field mb-0"
+                                      style={summarizedInputStyle}
+                                      value={row[col.id] || ""}
+                                      maxLength={10}
+                                      onChange={(e) => {
+                                        let numericValue = (e.target.value || "").replace(
+                                          /\D/g,
+                                          ""
+                                        );
+                                        if (numericValue.length > 8) {
+                                          numericValue = numericValue.substring(0, 8);
+                                        }
+
+                                        let formattedValue = "";
+                                        if (numericValue.length > 4) {
+                                          formattedValue =
+                                            numericValue.substring(0, 2) +
+                                            "-" +
+                                            numericValue.substring(2, 4) +
+                                            "-" +
+                                            numericValue.substring(4);
+                                        } else if (numericValue.length > 2) {
+                                          formattedValue =
+                                            numericValue.substring(0, 2) +
+                                            "-" +
+                                            numericValue.substring(2);
+                                        } else {
+                                          formattedValue = numericValue;
+                                        }
+
+                                        handleSummarizedCellChange(
+                                          rowIndex,
+                                          col.id,
+                                          formattedValue
+                                        );
+                                      }}
+                                      placeholder="DD-MM-YYYY"
+                                    />
+                                  ) : SUMMARIZED_DIGITS_ONLY_COLUMN_IDS.has(col.id) ? (
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      className="form-field mb-0"
+                                      style={summarizedInputStyle}
+                                      value={row[col.id] || ""}
+                                      onChange={(e) => {
+                                        const digitsOnly = e.target.value.replace(/\D/g, "");
+                                        handleSummarizedCellChange(rowIndex, col.id, digitsOnly);
+                                      }}
+                                      placeholder="0"
+                                    />
+                                  ) : SUMMARIZED_CURRENCY_COLUMN_IDS.has(col.id) ? (
+                                    <input
+                                      type="text"
+                                      className="form-field mb-0"
+                                      style={summarizedInputStyle}
+                                      value={row[col.id] || ""}
+                                      onChange={(e) => {
+                                        const formatted = handleCurrencyFormatting(
+                                          e.target.value
+                                        );
+                                        handleSummarizedCellChange(
+                                          rowIndex,
+                                          col.id,
+                                          formatted
+                                        );
+                                      }}
+                                      placeholder="0.00"
+                                    />
+                                  ) : (summarizedTableData.dynamicColumns || []).find(
+                                      (c) => c.id === col.id
+                                    )?.allowSum ? (
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      autoComplete="off"
+                                      className="form-field mb-0"
+                                      style={summarizedInputStyle}
+                                      value={row[col.id] || ""}
+                                      onChange={(e) => {
+                                        const digitsOnly = e.target.value.replace(/\D/g, "");
+                                        handleSummarizedCellChange(rowIndex, col.id, digitsOnly);
+                                      }}
+                                      placeholder="0"
                                     />
                                   ) : (
                                     <AutoGrowTextarea
@@ -5451,6 +5725,63 @@ function SummarizedReport() {
                               </td>
                             </tr>
                           ))}
+                          <tr key="sum-row-grand-total" className="summarized-grand-total-row">
+                            {SUMMARIZED_TRAILING_COLUMNS.map((col) => (
+                              <td
+                                key={`grand-total-trail-${col.id}`}
+                                style={{
+                                  verticalAlign: "middle",
+                                  backgroundColor: "#f9fafb",
+                                  padding: "10px 12px",
+                                }}
+                              />
+                            ))}
+                            <td
+                              colSpan={SUMMARIZED_FIXED_START_COLUMNS.length}
+                              style={{
+                                fontWeight: 700,
+                                verticalAlign: "middle",
+                                padding: "10px 12px",
+                              }}
+                            >
+                              GRAND TOTAL - FAIR VALUATION AMOUNT (marked in green shade)
+                            </td>
+                            {(summarizedTableData.dynamicColumns || []).map((col) => (
+                              <td
+                                key={`grand-total-dynamic-${col.id}`}
+                                style={{
+                                  verticalAlign: "middle",
+                                  backgroundColor: col.allowSum ? "#f9fafb" : undefined,
+                                  fontWeight: col.allowSum ? 600 : undefined,
+                                  padding: "10px 12px",
+                                }}
+                              >
+                                {col.allowSum
+                                  ? summarizedDynamicColumnTotals[col.id] ?? 0
+                                  : ""}
+                              </td>
+                            ))}
+                            {SUMMARIZED_FIXED_END_COLUMNS.map((col) => (
+                              <td
+                                key={`grand-total-${col.id}`}
+                                style={{
+                                  verticalAlign: "middle",
+                                  backgroundColor:
+                                    col.id === "estimated_fair_value"
+                                      ? "#daf2d0"
+                                      : SUMMARIZED_CURRENCY_COLUMN_IDS.has(col.id)
+                                        ? "#f9fafb"
+                                        : undefined,
+                                  fontWeight: SUMMARIZED_CURRENCY_COLUMN_IDS.has(col.id) ? 600 : undefined,
+                                }}
+                              >
+                                {SUMMARIZED_CURRENCY_COLUMN_IDS.has(col.id)
+                                  ? formatSummarizedGrandTotalCell(summarizedGrandTotalsByColumn[col.id] ?? 0)
+                                  : ""}
+                              </td>
+                            ))}
+                            <td style={{ verticalAlign: "middle", backgroundColor: "#f3f4f6" }} />
+                          </tr>
                         </tbody>
                       </table>
                     </div>

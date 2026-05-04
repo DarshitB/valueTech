@@ -23,7 +23,7 @@ const { ensureDirectoryExists } = require("../../../utils/localFileHelper");
 const cvReportTemplate = require("./templates/cv_report_template");
 const avrReportTemplate = require("./templates/avr_report_template");
 const machineryReportTemplate = require("./templates/machinery_report_template");
-const { generateSummarizedTableAppendixHTML } = require("./templates/summarized_report_template");
+const { generateSummarizedNormalFieldsHTML, generateSummarizedTableAppendixHTML } = require("./templates/summarized_report_template");
 const ceReportTemplate = require("./templates/ce_report_template");
 const marineReportTemplate = require("./templates/marine_report_template");
 
@@ -2047,7 +2047,10 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
             table.appendChild(tfoot.cloneNode(true));
           }
 
-          if (isLastPage) {
+          // For summarized report the appendix always follows, so the last
+          // normal-fields table is never truly the last page of the document.
+          const isSummarized = reportType?.toLowerCase() === "report_summarized";
+          if (isLastPage && !isSummarized) {
             table.classList.add("last-page");
           }
 
@@ -2065,7 +2068,11 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
 
         if (tables.length === 1) {
           document.body.classList.add("single-page");
-          tables[0].classList.add("last-page");
+          // Single-page normal-fields: only mark last-page for non-summarized
+          const isSummarizedSingle = reportType?.toLowerCase() === "report_summarized";
+          if (!isSummarizedSingle) {
+            tables[0].classList.add("last-page");
+          }
         }
 
         return {
@@ -2091,6 +2098,206 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
       return splitResult;
     }
 
+    /**
+     * JS-controlled pagination for summarized appendix table only.
+     * Keeps note outside table and applies deterministic row chunking.
+     */
+    async function paginateSummarizedAppendix(
+      page,
+      appendixStartPage,
+      currentReportType
+    ) {
+      if ((currentReportType || "").toLowerCase() !== "report_summarized") {
+        return;
+      }
+      await page.evaluate((startPage, reportType) => {
+        if ((reportType || "").toLowerCase() !== "report_summarized") {
+          return;
+        }
+        const summaryRoot = document.querySelector(".summary-page");
+        if (!summaryRoot) return;
+
+        const originalTable = summaryRoot.querySelector("table.summary-table");
+        if (!originalTable) return;
+
+        const thead = originalTable.querySelector("thead");
+        const tbody = originalTable.querySelector("tbody");
+        if (!thead || !tbody) return;
+
+        const noteEl = summaryRoot.querySelector(".summary-note");
+        const stampSourceImg = summaryRoot.querySelector(".summary-stamp-source img");
+        const footerEl = summaryRoot.querySelector(".summary-footer-row");
+
+        const allRows = Array.from(tbody.querySelectorAll("tr"));
+        if (allRows.length === 0) return;
+
+        const grandRows = allRows.filter((row) =>
+          row.classList.contains("summary-grand-total-row")
+        );
+        const dataRows = allRows.filter(
+          (row) => !row.classList.contains("summary-grand-total-row")
+        );
+
+        const PAGE_HEIGHT_PX = Math.round(8.27 * 96); // A4 landscape height in px
+        const spacerRow = thead.querySelector(".spacer-row");
+        const spacerHeight = spacerRow ? spacerRow.offsetHeight : 180;
+
+        const theadRows = Array.from(thead.querySelectorAll("tr")).filter(
+          (row) => !row.classList.contains("spacer-row")
+        );
+        const theadContentHeight = theadRows.reduce(
+          (sum, row) => sum + row.offsetHeight,
+          0
+        );
+
+        const footerHeight = footerEl ? footerEl.offsetHeight : 30;
+        const noteHeight = noteEl ? noteEl.offsetHeight + 8 : 0;
+        // Last/single page uses note + optional right-side stamp row.
+        // Include the actual row height in fit math to prevent orphan footer on a blank next page.
+        const noteStampRowHeight = stampSourceImg
+          ? Math.max(noteHeight, 140) + 10 // 125 stamp + 15 top + row top margin
+          : noteHeight;
+        const grandRowsHeight = grandRows.reduce((sum, row) => sum + row.offsetHeight, 0);
+        // Keep a small safety buffer; large buffer leaves avoidable blank area.
+        const SAFETY_MARGIN = 10;
+
+        const baseAvailable =
+          PAGE_HEIGHT_PX -
+          spacerHeight -
+          theadContentHeight -
+          footerHeight -
+          SAFETY_MARGIN;
+        // First appendix page has extra usable vertical room because table starts at -30px.
+        const firstPageAvailable = baseAvailable + 30;
+
+        const lastPageAvailable = baseAvailable - noteStampRowHeight - grandRowsHeight;
+        const firstPageLastAvailable =
+          firstPageAvailable - noteStampRowHeight - grandRowsHeight;
+        const rowHeights = dataRows.map((row) => row.offsetHeight);
+
+        // First pass: chunking with first-page-aware capacity
+        const pages = [];
+        let idx = 0;
+        let builtPageCount = 0;
+        while (idx < dataRows.length) {
+          const availableForThisPage =
+            builtPageCount === 0 ? Math.max(firstPageAvailable, 60) : Math.max(baseAvailable, 60);
+          let acc = 0;
+          const start = idx;
+          while (
+            idx < dataRows.length &&
+            acc + rowHeights[idx] <= availableForThisPage
+          ) {
+            acc += rowHeights[idx];
+            idx += 1;
+          }
+          if (idx === start) {
+            idx += 1; // force progress for extra-tall rows
+          }
+          pages.push({ start, end: idx });
+          builtPageCount += 1;
+        }
+
+        // Ensure final page can hold grand total + note
+        const getPageRowsHeight = (pageDef) =>
+          rowHeights
+            .slice(pageDef.start, pageDef.end)
+            .reduce((sum, h) => sum + h, 0);
+
+        while (pages.length > 0) {
+          const last = pages[pages.length - 1];
+          const h = getPageRowsHeight(last);
+          const lastLimit =
+            pages.length === 1
+              ? Math.max(firstPageLastAvailable, 60)
+              : Math.max(lastPageAvailable, 60);
+          if (h <= lastLimit || last.end - last.start <= 1) {
+            break;
+          }
+          const splitAt = last.end - 1;
+          pages[pages.length - 1] = { start: last.start, end: splitAt };
+          pages.push({ start: splitAt, end: last.end });
+        }
+
+        summaryRoot.innerHTML = "";
+
+        const createFooter = (pageNo, isLastPage) => {
+          const footer = document.createElement("div");
+          footer.className = "summary-footer-row";
+          const left = document.createElement("span");
+          left.className = "summary-page-number-value page-number";
+          left.setAttribute("data-page-number", String(pageNo));
+          left.textContent = `Page ${pageNo}`;
+          const right = document.createElement("span");
+          right.className = "summary-continue-text continue-text";
+          right.textContent = isLastPage ? "" : "Continue to next page...";
+          footer.appendChild(left);
+          footer.appendChild(right);
+          return footer;
+        };
+
+        pages.forEach((chunk, pageIdx) => {
+          const isFirst = pageIdx === 0;
+          const isLast = pageIdx === pages.length - 1;
+          const isSingle = pages.length === 1;
+          const pageNo = startPage + pageIdx;
+
+          const pageBlock = document.createElement("div");
+          pageBlock.className = "summary-appendix-page";
+          pageBlock.style.position = "relative";
+          if (!isLast) {
+            pageBlock.style.pageBreakAfter = "always";
+          }
+
+          const table = document.createElement("table");
+          table.className = "summary-table";
+          table.style.width = "100%";
+          table.style.borderCollapse = "collapse";
+          table.style.marginTop = isFirst ? "-30px" : "0";
+          table.style.marginBottom = "0";
+
+          table.appendChild(thead.cloneNode(true));
+
+          const newTbody = document.createElement("tbody");
+          for (let i = chunk.start; i < chunk.end; i += 1) {
+            newTbody.appendChild(dataRows[i].cloneNode(true));
+          }
+          if (isLast && grandRows.length > 0) {
+            grandRows.forEach((row) => newTbody.appendChild(row.cloneNode(true)));
+          }
+          table.appendChild(newTbody);
+
+          pageBlock.appendChild(table);
+
+          if ((isLast || isSingle) && noteEl) {
+            if (stampSourceImg) {
+              const noteStampRow = document.createElement("div");
+              noteStampRow.className = "summary-note-stamp-row";
+
+              const noteClone = noteEl.cloneNode(true);
+              noteStampRow.appendChild(noteClone);
+
+              const stampHolder = document.createElement("div");
+              stampHolder.className = "summary-note-stamp";
+              stampHolder.appendChild(stampSourceImg.cloneNode(true));
+              noteStampRow.appendChild(stampHolder);
+              pageBlock.appendChild(noteStampRow);
+            } else {
+              pageBlock.appendChild(noteEl.cloneNode(true));
+            }
+          }
+
+          if (stampSourceImg && pages.length > 1 && !isLast) {
+            const pageStamp = stampSourceImg.cloneNode(true);
+            pageStamp.className = "summary-stamp-per-page";
+            pageBlock.appendChild(pageStamp);
+          }
+          pageBlock.appendChild(createFooter(pageNo, isLast));
+          summaryRoot.appendChild(pageBlock);
+        });
+      }, appendixStartPage, currentReportType);
+    }
+
     // Now update the existing generateReportPDF function
     // Find this section in your code (around line 800-900) and replace it:
 
@@ -2107,12 +2314,15 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
         const splitResult = await splitReportWithGroupedRows(page, reportType);
 
         if (splitResult.success) {
-          /* console.log(`✅ Split completed into ${splitResult.totalPages} pages!`);
-          if (splitResult.groupedRows) {
-            console.log(
-              `✅ Tyre-image and signature rows grouped together (height: ${splitResult.groupedRows.groupedRowsHeight}px)`
+          // For summarized report: update appendix page number to continue from normal-fields pages
+          if (reportType.toLowerCase() === "report_summarized") {
+            const appendixStartPage = (splitResult.totalPages || 1) + 1;
+            await paginateSummarizedAppendix(
+              page,
+              appendixStartPage,
+              reportType
             );
-          } */
+          }
         } else if (splitResult.singlePage) {
           /* console.log("✅ Single page report - no split needed"); */
 
@@ -2144,6 +2354,10 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
                 }
               }
             });
+            // For summarized report single-page: appendix starts at page 2
+            if (reportType.toLowerCase() === "report_summarized") {
+              await paginateSummarizedAppendix(page, 2, reportType);
+            }
           }
         }
 
@@ -2214,17 +2428,19 @@ function generateReportHTML(
 
     case "report_summarized":
       {
-        const machineryHtml = machineryReportTemplate.generateMachineryReportHTML(
+        const normalFieldsHtml = generateSummarizedNormalFieldsHTML(
           formData,
           extraData,
           bgImageBase64,
           stampImageBase64,
           reportTypeSelection
         );
-        const appendixHtml = generateSummarizedTableAppendixHTML(formData);
+        const appendixHtml = generateSummarizedTableAppendixHTML(
+          formData,
+          stampImageBase64
+        );
         const summarizedOverrideCss = `
 <style>
-  /* Override machinery template's Legal-portrait page size to A4 landscape */
   @page {
     size: 11.69in 8.27in !important;
     margin: 0px !important;
@@ -2237,18 +2453,21 @@ function generateReportHTML(
   .page, .content-wrapper {
     min-height: 8.27in !important;
   }
-  /* Match top spacer to summarized table appendix (180px) */
   thead .spacer-row,
   thead .spacer-row td {
     height: 180px !important;
     line-height: 180px !important;
   }
-  /* Center-align all table text */
   body, table, th, td, .main-table td, .main-table th {
     text-align: center !important;
   }
+  /* Footer rows must override the center-align above */
+  tfoot .footer-row td { text-align: left !important; border: none !important; }
+  tfoot .footer-row td.continue-text { text-align: right !important; }
+  .summary-footer-row td { text-align: left !important; border: none !important; border-top: 1px solid #e0e0e0 !important; }
+  .summary-footer-row td.summary-continue-text { text-align: right !important; }
 </style>`;
-        return machineryHtml
+        return normalFieldsHtml
           .replace("</head>", `${summarizedOverrideCss}</head>`)
           .replace("</body>", `${appendixHtml}</body>`);
       }
