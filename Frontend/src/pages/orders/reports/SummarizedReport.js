@@ -18,7 +18,6 @@ import {
 import { fetchAssetMakesForReports } from "../../../redux/reducers/assetMakesReducer";
 import {
   fetchChildCategories,
-  fetchChildCategoriesByCategoryName,
 } from "../../../redux/reducers/childCategoryReducer";
 import { usePageTitle } from "../../../context/PageTitleContext";
 import { resolveAssetUrl } from "../../../utils/urlUtils";
@@ -256,7 +255,6 @@ const SUMMARIZED_FIXED_END_COLUMNS = [
 
 const SUMMARIZED_TRAILING_COLUMNS = [
   { id: "subcategory_id", header: "Subcategory Selection" },
-  { id: "contact_number", header: "Contact Number" },
 ];
 
 const SUMMARIZED_CURRENCY_COLUMN_IDS = new Set([
@@ -338,8 +336,6 @@ function SummarizedReport() {
     getDefaultSummarizedTableData
   );
   const [summarizedChildCategories, setSummarizedChildCategories] = useState([]);
-  // Tracks which contact_number cells have been blurred (key: rowIndex)
-  const [contactNumberTouched, setContactNumberTouched] = useState({});
   const tabButtonStyle = useCallback(
     (tab) => ({
       backgroundColor: activeReportTab === tab ? "#e8edff" : "#ffffff",
@@ -406,7 +402,7 @@ function SummarizedReport() {
   }, [dispatch, id]);
 
   useEffect(() => {
-    dispatch(fetchChildCategoriesByCategoryName({ categoryNames: "MACHINERY" }))
+    dispatch(fetchChildCategories())
       .unwrap()
       .then((data) => {
         setSummarizedChildCategories(Array.isArray(data) ? data : []);
@@ -1771,17 +1767,39 @@ function SummarizedReport() {
     []
   );
 
+  const computeAmountPostDepreciation = useCallback(
+    (row) => {
+      const totalInvoiceCost = parseCurrency(String(row?.total_invoice_cost ?? ""));
+      const depreciationRate = Number(String(row?.depr_rate ?? "").replace(/\D/g, "")) || 0;
+      const computedValue = totalInvoiceCost - (totalInvoiceCost * depreciationRate) / 100;
+      const normalizedValue = Number.isFinite(computedValue) ? Math.max(computedValue, 0) : 0;
+      return handleCurrencyFormatting(
+        (Math.round((normalizedValue + Number.EPSILON) * 100) / 100).toFixed(2)
+      );
+    },
+    [parseCurrency, handleCurrencyFormatting]
+  );
+
   const handleSummarizedCellChange = useCallback(
     (rowIndex, columnId, value) => {
+      if (columnId === "amount_post_depreciation") return;
       const nextRows = (summarizedTableData.rows || []).map((row, idx) =>
-        idx === rowIndex ? { ...row, [columnId]: value } : row
+        idx === rowIndex
+          ? (() => {
+              const updatedRow = { ...row, [columnId]: value };
+              if (columnId === "total_invoice_cost" || columnId === "depr_rate") {
+                updatedRow.amount_post_depreciation = computeAmountPostDepreciation(updatedRow);
+              }
+              return updatedRow;
+            })()
+          : row
       );
       handleSummarizedTableDataChange({
         ...summarizedTableData,
         rows: nextRows,
       });
     },
-    [summarizedTableData, handleSummarizedTableDataChange]
+    [summarizedTableData, handleSummarizedTableDataChange, computeAmountPostDepreciation]
   );
 
   const handleSummarizedDynamicHeaderChange = useCallback(
@@ -5431,19 +5449,6 @@ function SummarizedReport() {
                       <button
                         type="button"
                         className="btn btn-outline-primary"
-                        onClick={handleAddSummarizedRow}
-                        style={{
-                          width: "fit-content",
-                          display: "inline-flex",
-                          flex: "0 0 auto",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        Add Row
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-outline-primary"
                         onClick={handleAddSummarizedColumn}
                         style={{
                           width: "fit-content",
@@ -5567,40 +5572,6 @@ function SummarizedReport() {
                                       placeholder="Select Subcategory"
                                       styles={summarizedSelectStyles}
                                     />
-                                  ) : col.id === "contact_number" ? (
-                                    <input
-                                      type="text"
-                                      inputMode="numeric"
-                                      className="form-field mb-0"
-                                      style={{
-                                        ...summarizedInputStyle,
-                                        borderColor:
-                                          contactNumberTouched[rowIndex] &&
-                                          (row[col.id] || "").length > 0 &&
-                                          (row[col.id] || "").length !== 10
-                                            ? "red"
-                                            : undefined,
-                                        outline:
-                                          contactNumberTouched[rowIndex] &&
-                                          (row[col.id] || "").length > 0 &&
-                                          (row[col.id] || "").length !== 10
-                                            ? "none"
-                                            : undefined,
-                                      }}
-                                      value={row[col.id] || ""}
-                                      maxLength={10}
-                                      onChange={(e) => {
-                                        const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
-                                        handleSummarizedCellChange(rowIndex, col.id, digitsOnly);
-                                      }}
-                                      onBlur={() =>
-                                        setContactNumberTouched((prev) => ({ ...prev, [rowIndex]: true }))
-                                      }
-                                      onFocus={() =>
-                                        setContactNumberTouched((prev) => ({ ...prev, [rowIndex]: false }))
-                                      }
-                                      placeholder="Enter contact number"
-                                    />
                                   ) : col.id === "invoice_date" ? (
                                     <input
                                       type="text"
@@ -5655,6 +5626,20 @@ function SummarizedReport() {
                                         handleSummarizedCellChange(rowIndex, col.id, digitsOnly);
                                       }}
                                       placeholder="0"
+                                    />
+                                  ) : col.id === "amount_post_depreciation" ? (
+                                    <input
+                                      type="text"
+                                      className="form-field mb-0"
+                                      style={{
+                                        ...summarizedInputStyle,
+                                        backgroundColor: "#f9fafb",
+                                        cursor: "not-allowed",
+                                      }}
+                                      value={row[col.id] || ""}
+                                      readOnly
+                                      tabIndex={-1}
+                                      placeholder="Auto calculated"
                                     />
                                   ) : SUMMARIZED_CURRENCY_COLUMN_IDS.has(col.id) ? (
                                     <input
@@ -5784,6 +5769,30 @@ function SummarizedReport() {
                           </tr>
                         </tbody>
                       </table>
+                    </div>
+                    <div
+                      className="form-group mb-3 mt-2"
+                      style={{
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "flex-start",
+                        gap: "8px",
+                        width: "100%",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="btn btn-outline-primary"
+                        onClick={handleAddSummarizedRow}
+                        style={{
+                          width: "fit-content",
+                          display: "inline-flex",
+                          flex: "0 0 auto",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Add Row
+                      </button>
                     </div>
                   </div>
                 </div>
