@@ -1584,6 +1584,7 @@ exports.sendMail = async (req, res, next) => {
       video_ids,
       mail_attachment,
       all_documents_in_one,
+      collage_compress,
       public_url,
       public_link_with_image,
     } =
@@ -1638,8 +1639,11 @@ exports.sendMail = async (req, res, next) => {
     const os = require("os");
     const { v4: uuidv4 } = require("uuid");
     const { 
+      isImageFile,
       isPdfFile,
-      compressPdfForEmail 
+      compressImageForEmail,
+      compressPdfForEmail,
+      generateCompressedPdf,
     } = require("../../utils/imageCompressor");
 
     const baseUrl =
@@ -1702,35 +1706,104 @@ exports.sendMail = async (req, res, next) => {
       return `${baseUrl}${relativeUrl}`;
     };
 
-    const prepareAttachmentPath = async (mediaUrl, fallbackFilename = "file.bin") => {
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const fetchWithRetry = async (url, attempts = 5, timeoutMs = 15000) => {
+      let lastError = null;
+
+      for (let attempt = 1; attempt <= attempts; attempt++) {
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+          try {
+            const requestUrl =
+              attempt > 1
+                ? `${url}${url.includes("?") ? "&" : "?"}_retry=${Date.now()}_${attempt}`
+                : url;
+            const response = await fetch(requestUrl, { signal: controller.signal });
+            if (response.ok) {
+              return response;
+            }
+
+            const status = Number(response.status || 0);
+            // Retry only transient statuses; fail fast for hard client errors.
+            const retryable = status === 429 || status >= 500;
+            if (!retryable) {
+              throw new BadRequestError(
+                `Unable to fetch attachment source (HTTP ${status})`
+              );
+            }
+            lastError = new Error(`HTTP ${status}`);
+          } finally {
+            clearTimeout(timeout);
+          }
+        } catch (error) {
+          // Preserve explicit validation errors as-is.
+          if (error instanceof BadRequestError) {
+            throw error;
+          }
+          lastError = error;
+        }
+
+        if (attempt < attempts) {
+          await sleep(500 * attempt);
+        }
+      }
+
+      throw new BadRequestError(
+        `Unable to fetch attachment source after retries (${String(
+          lastError?.message || "unknown error"
+        )})`
+      );
+    };
+
+    const prepareAttachmentPath = async (
+      mediaUrl,
+      fallbackFilename = "file.bin",
+      options = {}
+    ) => {
+      const allowRemoteHrefFallback = options.allowRemoteHrefFallback !== false;
       if (!mediaUrl || typeof mediaUrl !== "string") {
         throw new BadRequestError("Invalid media_url for attachment");
       }
 
       // Remote source (R2/public URL) -> download to temp file first.
       if (/^https?:\/\//i.test(mediaUrl)) {
-        const response = await fetch(mediaUrl);
-        if (!response.ok) {
-          throw new BadRequestError(
-            `Unable to fetch attachment source (HTTP ${response.status})`
+        try {
+          const response = await fetchWithRetry(mediaUrl, 3, 15000);
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          const extFromUrl = path.extname(mediaUrl.split("?")[0]) || "";
+          const extFromFallback = path.extname(fallbackFilename) || "";
+          const finalExt = extFromFallback || extFromUrl || ".bin";
+          const tempDir = path.join(process.cwd(), "uploads", "temp_email");
+          if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+          }
+          const tempPath = path.join(
+            tempDir,
+            `remote_${uuidv4()}${finalExt}`
           );
+          fs.writeFileSync(tempPath, buffer);
+          tempAttachmentPaths.push(tempPath);
+          return { path: tempPath, isTemporary: true };
+        } catch (downloadError) {
+          // Final fallback: keep mail flow alive by attaching via remote URL.
+          // Compression/merge is skipped for this item because local bytes are unavailable.
+          console.warn(
+            `Attachment download failed, using remote href fallback: ${downloadError.message}`
+          );
+          if (allowRemoteHrefFallback) {
+            return {
+              path: null,
+              href: mediaUrl,
+              isRemote: true,
+              isTemporary: false,
+            };
+          }
+          throw downloadError;
         }
-        const arrayBuffer = await response.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        const extFromUrl = path.extname(mediaUrl.split("?")[0]) || "";
-        const extFromFallback = path.extname(fallbackFilename) || "";
-        const finalExt = extFromFallback || extFromUrl || ".bin";
-        const tempDir = path.join(process.cwd(), "uploads", "temp_email");
-        if (!fs.existsSync(tempDir)) {
-          fs.mkdirSync(tempDir, { recursive: true });
-        }
-        const tempPath = path.join(
-          tempDir,
-          `remote_${uuidv4()}${finalExt}`
-        );
-        fs.writeFileSync(tempPath, buffer);
-        tempAttachmentPaths.push(tempPath);
-        return { path: tempPath, isTemporary: true };
       }
 
       // Local source (/uploads/...) -> absolute path on disk.
@@ -1763,6 +1836,18 @@ exports.sendMail = async (req, res, next) => {
       all_documents_in_one,
       "all_documents_in_one"
     ) === true;
+    const collageCompressEnabled = normalizeBool(
+      collage_compress,
+      "collage_compress"
+    ) === true;
+    const collageCompressTargetMbRaw = Number(
+      process.env.COLLAGE_COMPRESS_TARGET_MB
+    );
+    const collageCompressTargetMb =
+      Number.isFinite(collageCompressTargetMbRaw) &&
+      collageCompressTargetMbRaw > 0
+        ? collageCompressTargetMbRaw
+        : 0.3; // Default 300KB target
     const document_as_attachment =
       mailAttachmentOverride !== null
         ? mailAttachmentOverride
@@ -1815,6 +1900,7 @@ exports.sendMail = async (req, res, next) => {
           const prepared = await prepareAttachmentPath(video.media_url, filename);
           attachments.push({
             path: prepared.path,
+            href: prepared.href,
             filename,
             isTemporary: prepared.isTemporary,
           });
@@ -1828,6 +1914,8 @@ exports.sendMail = async (req, res, next) => {
     const mergeableReports = [];
     const mergeableCollages = [];
     const tempMergedPdfPaths = [];
+    const tempMergeSourcePaths = [];
+    const tempCompressionHelperPaths = [];
 
     if (document_ids && document_ids.length > 0) {
       const documentPromises = document_ids.map((docId) =>
@@ -1852,30 +1940,102 @@ exports.sendMail = async (req, res, next) => {
         const filename = path.basename(document.media_url);
 
         if (document_as_attachment) {
-          const prepared = await prepareAttachmentPath(document.media_url, filename);
+          const prepared = await prepareAttachmentPath(
+            document.media_url,
+            filename,
+            {
+              // Compression must operate on local bytes.
+              // Do not silently fallback to href for collages when compression is requested.
+              allowRemoteHrefFallback: !(
+                document.document_type === "collage" && collageCompressEnabled
+              ),
+            }
+          );
+          if (prepared.isRemote && prepared.href) {
+            documentAttachments.push({
+              path: null,
+              href: prepared.href,
+              filename,
+              isTemporary: false,
+            });
+            documentAttachmentCount++;
+            continue;
+          }
           const fullPath = prepared.path;
 
           const isMergeable = 
             document.document_type === "report" || document.document_type === "collage";
+          const shouldCompressCollageIndividually =
+            document.document_type === "collage" &&
+            document_as_attachment &&
+            collageCompressEnabled;
 
           if (isMergeable && allDocumentsInOne) {
-            // For merging we always use the absolute path.
-            // Collage PDFs are compressed (best-effort) to keep email size reasonable.
+            // For merge mode, collage compression can still be applied before merge.
             let sourcePdfPath = fullPath;
+            let sourceIsTemporary = prepared.isTemporary || sourcePdfPath !== fullPath;
 
-            const isCollagePdf =
-              isPdfFile(fullPath) && document.document_type === "collage";
-
-            if (isCollagePdf) {
+            if (shouldCompressCollageIndividually) {
               try {
-                const result = await compressPdfForEmail(fullPath, 1);
-                sourcePdfPath = result.path;
+                if (isPdfFile(fullPath)) {
+                  const result = await compressPdfForEmail(
+                    fullPath,
+                    collageCompressTargetMb
+                  );
+                  sourcePdfPath = result.path;
+                  // For some remote collage PDFs, extraction can fail.
+                  // Use companion JPG (<same path>.jpg) as a reliable fallback source.
+                  if (
+                    sourcePdfPath === fullPath &&
+                    /^https?:\/\//i.test(document.media_url || "")
+                  ) {
+                    const companionImageUrl = String(document.media_url).replace(
+                      /\.pdf(\?.*)?$/i,
+                      ".jpg"
+                    );
+                    if (companionImageUrl !== document.media_url) {
+                      const companionPrepared = await prepareAttachmentPath(
+                        companionImageUrl,
+                        filename.replace(/\.pdf$/i, ".jpg"),
+                        { allowRemoteHrefFallback: false }
+                      );
+                      const compressedCompanionImage = await compressImageForEmail(
+                        companionPrepared.path,
+                        collageCompressTargetMb
+                      );
+                      if (compressedCompanionImage !== companionPrepared.path) {
+                        tempCompressionHelperPaths.push(compressedCompanionImage);
+                      }
+                      const tempDir = path.join(process.cwd(), "uploads", "temp_email");
+                      if (!fs.existsSync(tempDir)) {
+                        fs.mkdirSync(tempDir, { recursive: true });
+                      }
+                      const rebuiltPdfPath = path.join(
+                        tempDir,
+                        `rebuilt_${uuidv4()}_${path.basename(filename, ".pdf")}.pdf`
+                      );
+                      await generateCompressedPdf(compressedCompanionImage, rebuiltPdfPath);
+                      sourcePdfPath = rebuiltPdfPath;
+                      tempMergeSourcePaths.push(rebuiltPdfPath);
+                    }
+                  }
+                } else if (isImageFile(fullPath)) {
+                  sourcePdfPath = await compressImageForEmail(
+                    fullPath,
+                    collageCompressTargetMb
+                  );
+                }
+                sourceIsTemporary = sourceIsTemporary || sourcePdfPath !== fullPath;
+                if (sourcePdfPath !== fullPath) {
+                  tempMergeSourcePaths.push(sourcePdfPath);
+                }
               } catch (compressionError) {
                 console.error(
-                  `Failed to compress collage ${filename}:`,
+                  `Failed to compress collage ${filename} before merge:`,
                   compressionError.message
                 );
                 sourcePdfPath = fullPath;
+                sourceIsTemporary = prepared.isTemporary;
               }
             }
 
@@ -1884,23 +2044,84 @@ exports.sendMail = async (req, res, next) => {
                 docId,
                 sourcePdfPath,
                 filename,
-                isTemporary: prepared.isTemporary || sourcePdfPath !== fullPath,
+                isTemporary: sourceIsTemporary,
               });
             } else {
               mergeableCollages.push({
                 docId,
                 sourcePdfPath,
                 filename,
-                isTemporary: prepared.isTemporary || sourcePdfPath !== fullPath,
+                isTemporary: sourceIsTemporary,
               });
             }
           } else {
             // Send as individual attachment (default behavior when
             // `all_documents_in_one` is false, and for non-mergeable docs).
+            let finalAttachmentPath = fullPath;
+            let finalIsTemporary = prepared.isTemporary;
+
+            if (shouldCompressCollageIndividually) {
+              try {
+                if (isPdfFile(fullPath)) {
+                  const result = await compressPdfForEmail(
+                    fullPath,
+                    collageCompressTargetMb
+                  );
+                  finalAttachmentPath = result.path;
+                  if (
+                    finalAttachmentPath === fullPath &&
+                    /^https?:\/\//i.test(document.media_url || "")
+                  ) {
+                    const companionImageUrl = String(document.media_url).replace(
+                      /\.pdf(\?.*)?$/i,
+                      ".jpg"
+                    );
+                    if (companionImageUrl !== document.media_url) {
+                      const companionPrepared = await prepareAttachmentPath(
+                        companionImageUrl,
+                        filename.replace(/\.pdf$/i, ".jpg"),
+                        { allowRemoteHrefFallback: false }
+                      );
+                      const compressedCompanionImage = await compressImageForEmail(
+                        companionPrepared.path,
+                        collageCompressTargetMb
+                      );
+                      if (compressedCompanionImage !== companionPrepared.path) {
+                        tempCompressionHelperPaths.push(compressedCompanionImage);
+                      }
+                      const tempDir = path.join(process.cwd(), "uploads", "temp_email");
+                      if (!fs.existsSync(tempDir)) {
+                        fs.mkdirSync(tempDir, { recursive: true });
+                      }
+                      const rebuiltPdfPath = path.join(
+                        tempDir,
+                        `rebuilt_${uuidv4()}_${path.basename(filename, ".pdf")}.pdf`
+                      );
+                      await generateCompressedPdf(compressedCompanionImage, rebuiltPdfPath);
+                      finalAttachmentPath = rebuiltPdfPath;
+                    }
+                  }
+                } else if (isImageFile(fullPath)) {
+                  finalAttachmentPath = await compressImageForEmail(
+                    fullPath,
+                    collageCompressTargetMb
+                  );
+                }
+                finalIsTemporary =
+                  finalIsTemporary || finalAttachmentPath !== fullPath;
+              } catch (compressionError) {
+                console.error(
+                  `Failed to compress collage ${filename}:`,
+                  compressionError.message
+                );
+                finalAttachmentPath = fullPath;
+              }
+            }
+
             documentAttachments.push({
-              path: fullPath,
+              path: finalAttachmentPath,
               filename,
-              isTemporary: prepared.isTemporary,
+              isTemporary: finalIsTemporary,
             });
             documentAttachmentCount++;
           }
@@ -2105,6 +2326,12 @@ exports.sendMail = async (req, res, next) => {
       }
       for (const tempPath of tempAttachmentPaths) {
         fs.promises.unlink(tempPath).catch(() => {});
+      }
+      for (const sourcePath of tempMergeSourcePaths) {
+        fs.promises.unlink(sourcePath).catch(() => {});
+      }
+      for (const helperPath of tempCompressionHelperPaths) {
+        fs.promises.unlink(helperPath).catch(() => {});
       }
     }
 

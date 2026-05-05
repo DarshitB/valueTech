@@ -41,35 +41,102 @@ const {
  */
 function downloadToTempFile(url) {
   return new Promise((resolve, reject) => {
-    const ext = path.extname(url.split("?")[0]) || ".tmp";
-    const tmpPath = path.join(os.tmpdir(), `r2_collage_${uuidv4()}${ext}`);
-    const file = fs.createWriteStream(tmpPath);
-    const protocol = url.startsWith("https://") ? https : http;
+    const MAX_REDIRECTS = 3;
+    const REQUEST_TIMEOUT_MS = 15000;
 
-    protocol
-      .get(url, (res) => {
-        if (res.statusCode !== 200) {
+    const downloadWithRedirect = (targetUrl, redirectCount = 0) => {
+      const ext = path.extname(targetUrl.split("?")[0]) || ".tmp";
+      const tmpPath = path.join(os.tmpdir(), `r2_collage_${uuidv4()}${ext}`);
+      const file = fs.createWriteStream(tmpPath);
+      const protocol = targetUrl.startsWith("https://") ? https : http;
+
+      const req = protocol.get(targetUrl, (res) => {
+        const statusCode = Number(res.statusCode || 0);
+
+        // Handle redirects from CDN/object storage.
+        if (
+          [301, 302, 303, 307, 308].includes(statusCode) &&
+          res.headers.location
+        ) {
           file.close();
           fs.unlink(tmpPath, () => {});
-          reject(
-            new Error(
-              `Failed to download ${url}: HTTP ${res.statusCode}`
-            )
-          );
+
+          if (redirectCount >= MAX_REDIRECTS) {
+            reject(new Error(`Too many redirects for ${targetUrl}`));
+            return;
+          }
+
+          const nextUrl = new URL(res.headers.location, targetUrl).toString();
+          downloadWithRedirect(nextUrl, redirectCount + 1);
           return;
         }
+
+        if (statusCode !== 200) {
+          file.close();
+          fs.unlink(tmpPath, () => {});
+          reject(new Error(`Failed to download ${targetUrl}: HTTP ${statusCode}`));
+          return;
+        }
+
         res.pipe(file);
         file.on("finish", () => file.close(() => resolve(tmpPath)));
         file.on("error", (err) => {
           fs.unlink(tmpPath, () => {});
           reject(err);
         });
-      })
-      .on("error", (err) => {
+      });
+
+      req.setTimeout(REQUEST_TIMEOUT_MS, () => {
+        req.destroy(new Error(`Request timeout after ${REQUEST_TIMEOUT_MS}ms`));
+      });
+
+      req.on("error", (err) => {
         fs.unlink(tmpPath, () => {});
         reject(err);
       });
+    };
+
+    downloadWithRedirect(url);
   });
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableDownloadError(error) {
+  const message = String(error?.message || "");
+  // Retry transient server/network failures.
+  if (/HTTP\s(5\d{2}|429)\b/i.test(message)) return true;
+  if (/timeout/i.test(message)) return true;
+  if (/ECONNRESET|ETIMEDOUT|EAI_AGAIN|ENOTFOUND|ECONNREFUSED/i.test(message)) {
+    return true;
+  }
+  // Do not retry hard client errors (4xx except 429).
+  if (/HTTP\s4\d{2}\b/i.test(message) && !/HTTP\s429\b/i.test(message)) {
+    return false;
+  }
+  return true;
+}
+
+async function downloadToTempFileWithRetry(url, maxAttempts = 3) {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await downloadToTempFile(url);
+    } catch (error) {
+      lastError = error;
+      const retryable = isRetryableDownloadError(error);
+      if (!retryable || attempt === maxAttempts) {
+        break;
+      }
+      // Exponential backoff to survive temporary R2/CDN blips.
+      await sleep(500 * attempt);
+    }
+  }
+
+  throw lastError || new Error(`Failed to download ${url}`);
 }
 
 /**
@@ -83,7 +150,7 @@ async function resolveMediaUrlToLocalPath(mediaUrl) {
   }
 
   if (/^https?:\/\//i.test(mediaUrl)) {
-    const tmpPath = await downloadToTempFile(mediaUrl);
+    const tmpPath = await downloadToTempFileWithRetry(mediaUrl, 3);
     return { localPath: tmpPath, isTemp: true };
   }
 

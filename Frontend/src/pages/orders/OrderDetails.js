@@ -309,6 +309,7 @@ function OrderDetails() {
     mail_attachment: false,
     public_link_with_image: false,
     all_documents_in_one: false,
+    collage_compress: false,
   });
 
   // Track removed documents (by ID) - documents user removes from mail attachments
@@ -442,6 +443,7 @@ function OrderDetails() {
             mail_attachment: Boolean(row.mail_attachment),
             public_link_with_image: Boolean(row.public_link_with_image),
             all_documents_in_one: Boolean(row.all_documents_in_one),
+            collage_compress: Boolean(row.collage_compress),
           });
         }
       })
@@ -1346,6 +1348,7 @@ function OrderDetails() {
       ...prev,
       mail_attachment: false,
       all_documents_in_one: false,
+      collage_compress: false,
     }));
   };
 
@@ -2297,6 +2300,7 @@ function OrderDetails() {
       mail_attachment: mailFormData.mail_attachment || false, // Boolean: true if checkbox is checked, false otherwise
       public_link_with_image: mailFormData.public_link_with_image || false, // Boolean: true if checkbox is checked, false otherwise
       all_documents_in_one: mailFormData.all_documents_in_one || false, // Boolean: true if checkbox is checked, false otherwise
+      collage_compress: mailFormData.collage_compress || false, // Boolean: compress collage under 1MB when eligible
       public_url: mailFormData.public_link_with_image
         ? `${window.location.origin}/public/orders/${id}/images` // URL with images (reports/collages/videos + images)
         : `${window.location.origin}/public/orders/${id}/documents`, // URL without images (reports/collages/videos only)
@@ -2339,6 +2343,7 @@ function OrderDetails() {
           mail_attachment: false,
           public_link_with_image: false,
           all_documents_in_one: false,
+          collage_compress: false,
         });
       }
     } catch (error) {
@@ -3212,6 +3217,9 @@ function OrderDetails() {
                             all_documents_in_one: isChecked
                               ? prev.all_documents_in_one
                               : false,
+                            collage_compress: isChecked
+                              ? prev.collage_compress
+                              : false,
                           }));
                         }}
                         disabled={isSendingMail}
@@ -3246,6 +3254,29 @@ function OrderDetails() {
                       </label>
                     </div>
                   )}
+
+                  {mailFormData.mail_attachment && (
+                      <div className="form-group">
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={mailFormData.collage_compress || false}
+                            onChange={(e) => {
+                              setMailFormData((prev) => ({
+                                ...prev,
+                                collage_compress: e.target.checked,
+                              }));
+                            }}
+                            disabled={isSendingMail}
+                            style={{
+                              marginRight: "8px",
+                              cursor: isSendingMail ? "not-allowed" : "pointer",
+                            }}
+                          />
+                          Compress collages
+                        </label>
+                      </div>
+                    )}
 
 
                   {hasPermission(allowedPermissions, "public_link_with_image_checkbox_mail_send") && (

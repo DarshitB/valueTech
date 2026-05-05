@@ -13,6 +13,47 @@ const { ensureDirectoryExists } = require("../../utils/localFileHelper");
 // Import custom error classes
 const { NotFoundError, BadRequestError } = require("../../utils/customErrors");
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function fetchRemoteWithRetry(url, attempts = 5, timeoutMs = 15000) {
+  let lastStatus = null;
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const requestUrl =
+          attempt > 1
+            ? `${url}${url.includes("?") ? "&" : "?"}_retry=${Date.now()}_${attempt}`
+            : url;
+        const response = await fetch(requestUrl, { signal: controller.signal });
+        if (response.ok) return response;
+
+        lastStatus = Number(response.status || 0);
+        const retryable = lastStatus === 429 || lastStatus >= 500;
+        if (!retryable) {
+          throw new BadRequestError(
+            `Unable to fetch document from source (HTTP ${lastStatus})`
+          );
+        }
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch (error) {
+      if (error instanceof BadRequestError) throw error;
+    }
+
+    if (attempt < attempts) {
+      await sleep(500 * attempt);
+    }
+  }
+
+  throw new BadRequestError(
+    `Unable to fetch document from source after retries (HTTP ${lastStatus || "timeout"})`
+  );
+}
+
 function getFilenameFromMediaUrl(mediaUrl) {
   if (!mediaUrl || typeof mediaUrl !== "string") return "document";
   try {
@@ -556,12 +597,7 @@ exports.downloadById = async (req, res, next) => {
 
     const mediaUrl = document.media_url || "";
     if (typeof mediaUrl === "string" && /^https?:\/\//i.test(mediaUrl)) {
-      const upstream = await fetch(mediaUrl);
-      if (!upstream.ok) {
-        throw new BadRequestError(
-          `Unable to fetch document from source (HTTP ${upstream.status})`
-        );
-      }
+      const upstream = await fetchRemoteWithRetry(mediaUrl, 5, 15000);
       const contentType = upstream.headers.get("content-type");
       if (contentType) res.setHeader("Content-Type", contentType);
       const arrayBuffer = await upstream.arrayBuffer();

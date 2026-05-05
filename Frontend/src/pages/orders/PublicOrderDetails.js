@@ -84,7 +84,24 @@ function PublicOrderDetails() {
       setTimeout(() => URL.revokeObjectURL(objectUrl), 90_000);
     } catch (_) {
       try {
-        newWindow.close();
+        newWindow.document.write(
+          "<!DOCTYPE html><html><head><title>Unable to Open</title>" +
+            "<style>" +
+            "body{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;" +
+            "background:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}" +
+            ".box{max-width:520px;padding:20px;background:#fff;border:1px solid #e5e7eb;" +
+            "border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.04);text-align:center;}" +
+            "h3{margin:0 0 8px;font-size:18px;color:#111827;}" +
+            "p{margin:0 0 14px;font-size:14px;color:#6b7280;line-height:1.5;}" +
+            "a{display:inline-block;padding:10px 14px;border-radius:8px;background:#2563eb;" +
+            "color:#fff;text-decoration:none;font-size:14px;}" +
+            "</style></head><body><div class='box'>" +
+            "<h3>Unable to open document right now</h3>" +
+            "<p>The preview request failed temporarily. You can try opening the source directly.</p>" +
+            `<a href="${url}" target="_self" rel="noopener noreferrer">Open Directly</a>` +
+            "</div></body></html>"
+        );
+        newWindow.document.close();
       } catch (closeErr) {}
     }
   };

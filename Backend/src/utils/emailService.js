@@ -90,6 +90,11 @@ const sendEmail = async (options) => {
       // Validate all files exist in parallel (async, non-blocking)
       await Promise.all(
         options.attachments.map(async (attachment) => {
+          // Remote attachment via URL/href (no local fs check needed)
+          if (attachment.href && typeof attachment.href === "string") {
+            return;
+          }
+
           // Handle both absolute and relative paths
           const filePath = path.isAbsolute(attachment.path) 
             ? attachment.path 
@@ -106,6 +111,13 @@ const sendEmail = async (options) => {
 
       // Map attachments after validation
       mailOptions.attachments = options.attachments.map((attachment) => {
+        if (attachment.href && typeof attachment.href === "string") {
+          return {
+            filename: attachment.filename || path.basename(attachment.href),
+            href: attachment.href,
+          };
+        }
+
         // Handle both absolute and relative paths
         const filePath = path.isAbsolute(attachment.path)
           ? attachment.path

@@ -412,10 +412,21 @@ function extractZipFile(zipPath, extractDir) {
 
       zipfile.readEntry();
       zipfile.on("entry", (entry) => {
+        const entryName = String(entry.fileName || "");
+        const normalizedEntryName = entryName.replace(/\\/g, "/");
+        const pathParts = normalizedEntryName.split("/").filter(Boolean);
+        const baseName = pathParts[pathParts.length - 1] || "";
+        const hasHiddenSegment = pathParts.some((part) => part.startsWith("."));
+        const isMacOsMeta =
+          normalizedEntryName.startsWith("__MACOSX/") ||
+          baseName.startsWith("._") ||
+          hasHiddenSegment;
+
         // Skip directories and non-media files
         if (
-          entry.fileName.endsWith("/") ||
-          !entry.fileName.match(
+          normalizedEntryName.endsWith("/") ||
+          isMacOsMeta ||
+          !normalizedEntryName.match(
             /\.(jpg|jpeg|png|gif|bmp|webp|mp4|avi|mov|wmv|flv|webm)$/i
           )
         ) {
@@ -875,6 +886,49 @@ function inferContentTypeFromUrl(mediaUrl) {
   return "application/octet-stream";
 }
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function fetchRemoteWithRetry(url, attempts = 5, timeoutMs = 15000) {
+  let lastStatus = null;
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const requestUrl =
+          attempt > 1
+            ? `${url}${url.includes("?") ? "&" : "?"}_retry=${Date.now()}_${attempt}`
+            : url;
+        const response = await fetch(requestUrl, { signal: controller.signal });
+        if (response.ok) return response;
+
+        lastStatus = Number(response.status || 0);
+        const retryable = lastStatus === 429 || lastStatus >= 500;
+        if (!retryable) {
+          throw new BadRequestError(
+            `Unable to fetch source file (HTTP ${lastStatus})`
+          );
+        }
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch (error) {
+      if (error instanceof BadRequestError) throw error;
+      lastError = error;
+    }
+
+    if (attempt < attempts) {
+      await sleep(500 * attempt);
+    }
+  }
+
+  throw new BadRequestError(
+    `Unable to fetch source file after retries (HTTP ${lastStatus || "timeout"})`
+  );
+}
+
 /**
  * GET /api/order-media/public/:orderId/:kind/:id/view
  * Public proxy stream for approved media/document.
@@ -921,12 +975,7 @@ async function viewApprovedMediaPublic(req, res, next) {
     res.setHeader("Cache-Control", "public, max-age=300");
 
     if (/^https?:\/\//i.test(mediaUrl)) {
-      const upstream = await fetch(mediaUrl);
-      if (!upstream.ok) {
-        throw new BadRequestError(
-          `Unable to fetch source file (HTTP ${upstream.status})`
-        );
-      }
+      const upstream = await fetchRemoteWithRetry(mediaUrl, 5, 15000);
       const contentType =
         upstream.headers.get("content-type") || inferContentTypeFromUrl(mediaUrl);
       res.setHeader("Content-Type", contentType);

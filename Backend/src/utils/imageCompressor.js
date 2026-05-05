@@ -7,6 +7,18 @@ const { ensureDirectoryExists } = require("./localFileHelper");
 const PDFDocument = require("pdfkit");
 const puppeteer = require("puppeteer");
 
+function sanitizeErrorMessage(error) {
+  const raw = String(error?.message || error || "");
+  // Prevent huge log spam when a data URI is part of the error.
+  const withoutDataUri = raw.replace(
+    /data:application\/pdf;base64,[A-Za-z0-9+/=]+/g,
+    "data:application/pdf;base64,<omitted>"
+  );
+  return withoutDataUri.length > 500
+    ? `${withoutDataUri.slice(0, 500)}...<truncated>`
+    : withoutDataUri;
+}
+
 /**
  * Check if a file is an image based on its extension
  * @param {string} filePath - Path to the file
@@ -193,7 +205,9 @@ async function extractImageFromPdf(pdfPath, outputImagePath) {
     return true;
     
   } catch (puppeteerError) {
-    console.error(`Puppeteer extraction failed: ${puppeteerError.message}`);
+    console.warn(
+      `Puppeteer extraction failed (will fallback): ${sanitizeErrorMessage(puppeteerError)}`
+    );
     
     if (browser) {
       try {
@@ -256,7 +270,9 @@ async function compressPdfForEmail(inputPdfPath, targetSizeMB = 1) {
     const extractionSuccess = await extractImageFromPdf(inputPdfPath, tempImagePath);
     
     if (!extractionSuccess) {
-      console.error(`All extraction methods failed for ${path.basename(inputPdfPath)}`);
+      console.warn(
+        `All extraction methods failed for ${path.basename(inputPdfPath)}; using original PDF`
+      );
       return { path: inputPdfPath, tempImagePath: null };
     }
 
@@ -272,7 +288,9 @@ async function compressPdfForEmail(inputPdfPath, targetSizeMB = 1) {
     try {
       tempCompressedImagePath = await compressImageToTargetSize(tempImagePath, targetSizeMB * 0.95); // 95% to account for PDF overhead
     } catch (compressError) {
-      console.error(`Failed to compress extracted image: ${compressError.message}`);
+      console.warn(
+        `Failed to compress extracted image; using original PDF: ${compressError.message}`
+      );
       
       // Cleanup extracted image
       try {
@@ -291,7 +309,9 @@ async function compressPdfForEmail(inputPdfPath, targetSizeMB = 1) {
     try {
       await generateCompressedPdf(tempCompressedImagePath, compressedPdfPath);
     } catch (pdfGenError) {
-      console.error(`Failed to generate compressed PDF: ${pdfGenError.message}`);
+      console.warn(
+        `Failed to generate compressed PDF; using original PDF: ${pdfGenError.message}`
+      );
       
       // Cleanup temp files
       try {
@@ -329,7 +349,9 @@ async function compressPdfForEmail(inputPdfPath, targetSizeMB = 1) {
       return { path: compressedPdfPath, tempImagePath: null };
       
     } catch (finalStatError) {
-      console.error(`Compressed PDF not found: ${finalStatError.message}`);
+      console.warn(
+        `Compressed PDF not found; using original PDF: ${finalStatError.message}`
+      );
       
       // Cleanup all temp files
       try {
@@ -345,7 +367,10 @@ async function compressPdfForEmail(inputPdfPath, targetSizeMB = 1) {
     }
 
   } catch (error) {
-    console.error(`Error compressing PDF ${inputPdfPath}:`, error.message);
+    console.warn(
+      `Error compressing PDF ${inputPdfPath}; using original PDF:`,
+      error.message
+    );
     
     // Cleanup any temp files
     if (tempImagePath) {
@@ -609,6 +634,7 @@ module.exports = {
   isPdfFile,
   compressImageForEmail,
   compressPdfForEmail,
+  generateCompressedPdf,
   compressImageToTargetSize,
   cleanupTempFile,
   cleanupTempAttachments,
