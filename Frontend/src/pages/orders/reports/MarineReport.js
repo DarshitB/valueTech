@@ -2551,6 +2551,7 @@ function MarineReport() {
                         { value: "Oil Tanker ", label: "Oil Tanker" },
                         { value: "Chemical Tanker", label: "Chemical Tanker" },
                         { value: "Accommodation Work Barge (AWB)", label: "Accommodation Work Barge (AWB)" },
+                        { value: "River Cruise Ship", label: "River Cruise Ship" },
                       ]}
                       value={
                         reportFormData.report_title || "Offshore Supply Vessel"
