@@ -46,6 +46,7 @@ import { toast } from "react-toastify";
 import { hasPermission } from "../../utils/permissionUtils";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
 import { resolveAssetUrl } from "../../utils/urlUtils";
+import R2StorageBadge from "../../components/R2StorageBadge";
 import ZipUploadModal from "../../components/ZipUploadModal";
 import ConfirmationModal from "../../components/ConfirmationModal";
 
@@ -1130,6 +1131,16 @@ function OrderImages() {
                                     <span>Media File</span>
                                   </div>
                                 )}
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    bottom: 32,
+                                    left: 5,
+                                    zIndex: 2,
+                                  }}
+                                >
+                                  <R2StorageBadge mediaUrl={image.media_url} />
+                                </div>
                                 <div className="order-image-card-actions">
                                   <input
                                     type="checkbox"

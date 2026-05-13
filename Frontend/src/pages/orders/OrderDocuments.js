@@ -34,6 +34,7 @@ import { toast } from "react-toastify";
 import { hasPermission } from "../../utils/permissionUtils";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
 import { resolveAssetUrl } from "../../utils/urlUtils";
+import R2StorageBadge from "../../components/R2StorageBadge";
 
 // Constants for security and configuration
 const ALLOWED_FILE_TYPES = [
@@ -1034,6 +1035,7 @@ function OrderDocuments() {
                     <span title={getFilenameFromMediaUrl(doc.media_url)}>
                       {getFilenameFromMediaUrl(doc.media_url)}
                     </span>
+                    <R2StorageBadge mediaUrl={doc.media_url} />
                     <ApprovalBadge status={doc.status} />
                   </div>
                 </td>
@@ -1234,6 +1236,7 @@ function OrderDocuments() {
                     <span title={getFilenameFromMediaUrl(doc.media_url)}>
                       {getFilenameFromMediaUrl(doc.media_url)}
                     </span>
+                    <R2StorageBadge mediaUrl={doc.media_url} />
                     <ApprovalBadge status={doc.status} />
                   </div>
                 </td>
