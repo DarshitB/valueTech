@@ -14,6 +14,9 @@ export const getFinalizedOrdersByChildCategory = (childCategoryId) =>
 export const getOrderById = (id) => axios.get(`${ENDPOINT}/${id}`); // Get order by ID
 export const getOrderR2SyncStatus = (id) =>
   axios.get(`${ENDPOINT}/${id}/r2-sync-status`);
+
+export const startOrderR2Sync = (id) =>
+  axios.post(`${ENDPOINT}/${id}/r2-sync`);
 export const createOrder = (data) => axios.post(ENDPOINT, data); // Add order
 export const updateOrder = (id, payload) =>
   axios.put(`${ENDPOINT}/${id}`, payload); // Update order

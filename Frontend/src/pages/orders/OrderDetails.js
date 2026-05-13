@@ -32,6 +32,7 @@ import {
   sendOrderMail,
   getOrderLastMail,
   getOrderR2SyncStatus,
+  startOrderR2Sync,
 } from "../../api/order.api";
 import { MentionsInput, Mention } from "react-mentions";
 import mentionsStyle from "./mentionsStyle";
@@ -217,8 +218,14 @@ function OrderDetails() {
   const [isMovingToStatus9, setIsMovingToStatus9] = useState(false);
   const [r2SyncStatus, setR2SyncStatus] = useState(null);
   const [r2SyncLoading, setR2SyncLoading] = useState(false);
+  const [isStartingR2Sync, setIsStartingR2Sync] = useState(false);
   const currentStatusId = Number(order?.current_status_id);
   const shouldShowR2Status = currentStatusId === 13 || currentStatusId === 14;
+  const canViewR2Sync = hasPermission(
+    allowedPermissions,
+    "view_order_r2_sync_button"
+  );
+  const shouldShowR2SyncUi = shouldShowR2Status && canViewR2Sync;
 
   // Complete order (status 13) via direct status update
   const handleCompleteOrder = async () => {
@@ -261,6 +268,26 @@ function OrderDetails() {
       setIsMovingToStatus9(false);
     }
   };
+
+  const handleStartR2Sync = useCallback(async () => {
+    if (!id) return;
+    setIsStartingR2Sync(true);
+    try {
+      await startOrderR2Sync(id);
+      toast.success("R2 sync queued");
+      const res = await getOrderR2SyncStatus(id);
+      setR2SyncStatus(res?.data?.data || null);
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Failed to start R2 sync";
+      toast.error(typeof msg === "string" ? msg : "Failed to start R2 sync");
+    } finally {
+      setIsStartingR2Sync(false);
+    }
+  }, [id]);
 
   // Order on Hold (status 14) via direct status update
   const handleOrderOnHold = async () => {
@@ -371,7 +398,7 @@ function OrderDetails() {
   }, [dispatch, id, showMailModal, order?.category_name, order?.category_report_type]);
 
   useEffect(() => {
-    if (!shouldShowR2Status || !id) {
+    if (!shouldShowR2SyncUi || !id) {
       setR2SyncStatus(null);
       setR2SyncLoading(false);
       return undefined;
@@ -381,7 +408,7 @@ function OrderDetails() {
     let cancelled = false;
 
     const fetchR2Status = async () => {
-      if (!id || !shouldShowR2Status) return;
+      if (!id || !shouldShowR2SyncUi) return;
       try {
         if (!cancelled && !r2SyncStatus) {
           setR2SyncLoading(true);
@@ -418,7 +445,7 @@ function OrderDetails() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [id, shouldShowR2Status]);
+  }, [id, shouldShowR2SyncUi]);
 
   // Prefill mail form from last-sent mail when modal opens
   useEffect(() => {
@@ -1573,6 +1600,16 @@ function OrderDetails() {
             ? "#dc2626"
             : "#6b7280";
 
+    const isR2SyncInProgress =
+      isStartingR2Sync ||
+      statusValue === "running" ||
+      statusValue === "queued";
+    const r2SyncButtonLabel = isR2SyncInProgress
+      ? statusValue === "running"
+        ? "Uploading..."
+        : "Syncing..."
+      : "Sync to R2";
+
     return (
       <div
         className="recent-activity-buttons"
@@ -2083,7 +2120,35 @@ function OrderDetails() {
               <MailIcon />
             </Link>
           )}
-        {shouldShowR2Status && (
+        {shouldShowR2SyncUi &&
+          statusValue !== "completed" && (
+          <button
+            type="button"
+            title="Upload order files to R2 and update media URLs"
+            className={`tooltip-link${
+              isR2SyncInProgress || ordersLoading ? " disabled" : ""
+            }`}
+            onClick={handleStartR2Sync}
+            disabled={isR2SyncInProgress || ordersLoading}
+            style={{
+              minWidth: "88px",
+              textAlign: "center",
+              fontSize: "12px",
+              fontWeight: 600,
+              color: "#2563eb",
+              border: "1px solid #2563eb",
+              borderRadius: "999px",
+              padding: "6px 10px",
+              lineHeight: 1.2,
+              background: "#fff",
+              cursor:
+                isR2SyncInProgress || ordersLoading ? "not-allowed" : "pointer",
+            }}
+          >
+            {r2SyncButtonLabel}
+          </button>
+        )}
+        {shouldShowR2SyncUi && (
           <span
             title={r2SyncStatus?.message || "R2 transfer status"}
             className="tooltip-link"
@@ -2131,7 +2196,9 @@ function OrderDetails() {
     OpenMailModal,
     r2SyncStatus,
     r2SyncLoading,
-    shouldShowR2Status,
+    shouldShowR2SyncUi,
+    isStartingR2Sync,
+    handleStartR2Sync,
   ]);
 
   // Handle mail form submission with enhanced validation

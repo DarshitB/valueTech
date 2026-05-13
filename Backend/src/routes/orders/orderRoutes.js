@@ -23,6 +23,12 @@ router.get(
 );
 router.get("/:orderId/last-mail", orderController.getLastMail);
 router.get("/:id/r2-sync-status", orderController.getR2SyncStatus);
+router.post(
+  "/:id/r2-sync",
+  checkPermission("view_order_r2_sync_button"),
+  activityLogger("orders", (req) => req.params.id, "r2_sync"),
+  orderController.startR2Sync
+);
 router.get("/:id", orderController.getById);
 router.post(
   "/",

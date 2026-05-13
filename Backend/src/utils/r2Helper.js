@@ -948,12 +948,11 @@ async function syncOrderToR2(orderId) {
 }
 
 /**
- * Fire-and-forget wrapper used by controllers. Runs on next tick so the
- * HTTP response is not blocked.
+ * Fire-and-forget: queue a full R2 sync for an order. Caller enforces business
+ * rules (e.g. only after status 13/14). Runs on next tick so the HTTP response
+ * is not blocked.
  */
-function triggerR2SyncIfNeeded(orderId, newStatusId) {
-  const statusId = Number(newStatusId);
-  if (!STATUSES_THAT_TRIGGER_SYNC.includes(statusId)) return;
+function queueManualR2Sync(orderId) {
   if (!orderId) return;
 
   setImmediate(async () => {
@@ -994,7 +993,7 @@ module.exports = {
   STATUSES_THAT_TRIGGER_SYNC,
   isSyncEnabled,
   syncOrderToR2,
-  triggerR2SyncIfNeeded,
+  queueManualR2Sync,
   getOrderR2SyncStatus,
   resumePendingR2SyncJobs,
   uploadFolderToR2,
