@@ -158,6 +158,7 @@ async function enrichOrdersWithAssignedUsersAndRefNo(orders) {
     machineryReports,
     ceReports,
     marineReports,
+    summarizedReports,
     customReports,
   ] = await Promise.all([
     db("report_cv")
@@ -180,13 +181,24 @@ async function enrichOrdersWithAssignedUsersAndRefNo(orders) {
       .select("order_id", "ref_no_id")
       .whereIn("order_id", orderIds)
       .whereNotNull("ref_no_id"),
+    db("report_summarized")
+      .select("order_id", "ref_no_id")
+      .whereIn("order_id", orderIds)
+      .whereNotNull("ref_no_id"),
     db("report_custom")
       .select("order_id", "content")
       .whereIn("order_id", orderIds)
       .whereNotNull("content"),
   ]);
 
-  [...cvReports, ...avrReports, ...machineryReports, ...ceReports, ...marineReports].forEach(
+  [
+    ...cvReports,
+    ...avrReports,
+    ...machineryReports,
+    ...ceReports,
+    ...marineReports,
+    ...summarizedReports,
+  ].forEach(
     (report) => {
       if (report.ref_no_id) {
         refNoIdMap[report.order_id] = report.ref_no_id;

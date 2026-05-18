@@ -2047,6 +2047,76 @@
       background-color: #e3e3e3;
       cursor: not-allowed;
     }
+
+    /* Sub Category Orders — scroll area with sticky header */
+    .finalized-reports-table-scroll {
+      max-height: min(60vh, 520px);
+      overflow: auto;
+      width: 100%;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      -webkit-overflow-scrolling: touch;
+
+      .table {
+        margin-bottom: 0;
+      }
+
+      thead th {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        background-color: rgba(88, 100, 189, 0.97) !important;
+        color: #fff !important;
+        box-shadow: 0 2px 4px rgba(15, 23, 42, 0.12);
+        vertical-align: middle;
+      }
+    }
+
+    /* Summarized table — sticky header + sticky grand total on vertical scroll */
+    .summarized-table-scroll {
+      max-height: min(85vh, 780px);
+      min-height: 420px;
+      overflow: auto;
+      width: 100%;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      -webkit-overflow-scrolling: touch;
+
+      .table {
+        margin-bottom: 0;
+      }
+
+      thead th {
+        position: sticky;
+        top: 0;
+        z-index: 4;
+        background-color: #f3f4f6 !important;
+        vertical-align: middle;
+        box-shadow: 0 1px 0 #dee2e6;
+      }
+
+      tr.summarized-grand-total-row td {
+        position: sticky;
+        bottom: 0;
+        z-index: 3;
+        background-color: #f3f4f6 !important;
+        padding: 14px 12px !important;
+        min-height: 52px;
+        vertical-align: middle !important;
+        box-shadow: 0 -1px 0 #dee2e6;
+        border-top: 2px solid #dee2e6;
+        font-weight: 600;
+      }
+
+      tr.summarized-grand-total-row td.summarized-grand-total-label-cell {
+        font-weight: 700;
+      }
+
+      tr.summarized-grand-total-row td.summarized-grand-total-fmv-cell {
+        background-color: #daf2d0 !important;
+        font-weight: 700;
+      }
+    }
   }
 }
 

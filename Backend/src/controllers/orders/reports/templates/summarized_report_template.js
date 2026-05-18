@@ -3,14 +3,15 @@ const renderFieldValue = (value) => {
   return String(value).replace(/\r\n/g, "<br>").replace(/\n/g, "<br>").replace(/\r/g, "<br>");
 };
 
+const SUMMARIZED_SR_NO_COLUMN = { id: "sr_no", header: "SR NO." };
+
 const FIXED_START = [
-  { id: "machine_description", header: "Machine Description" },
+  { id: "machine_description", header: "Asset Description" },
   { id: "asset_serial_no", header: "Asset Serial No." },
   { id: "yom", header: "Yom" },
   { id: "supplier_name", header: "Supplier Name" },
   { id: "invoice_no", header: "Invoice No." },
   { id: "invoice_date", header: "Invoice Date" },
-  { id: "resource_no", header: "Resource No." },
 ];
 
 const FIXED_END = [
@@ -19,6 +20,7 @@ const FIXED_END = [
   { id: "residual_life_of_asset", header: "Residual life of asset" },
   { id: "depr_rate", header: "Depr. Rate" },
   { id: "amount_post_depreciation", header: "Amount Post Depreciation" },
+  { id: "appraisal_value", header: "Appraisal Value" },
   { id: "estimated_fair_value", header: "Estimated Fair Value" },
 ];
 
@@ -26,6 +28,7 @@ const SUMMARIZED_GRAND_TOTAL_CURRENCY_IDS = new Set([
   "total_invoice_cost",
   "estimated_current_replacement_cost",
   "amount_post_depreciation",
+  "appraisal_value",
   "estimated_fair_value",
 ]);
 
@@ -33,6 +36,7 @@ const SUMMARIZED_CURRENCY_PREFIX_IDS = new Set([
   "total_invoice_cost",
   "estimated_current_replacement_cost",
   "amount_post_depreciation",
+  "appraisal_value",
   "estimated_fair_value",
 ]);
 
@@ -50,7 +54,48 @@ function getOrderedColumns(tableData) {
   const dynamic = Array.isArray(tableData?.dynamicColumns)
     ? tableData.dynamicColumns.filter((c) => c && c.id).map((c) => ({ id: c.id, header: c.header || "" }))
     : [];
-  return [...FIXED_START, ...dynamic, ...FIXED_END];
+  return [SUMMARIZED_SR_NO_COLUMN, ...FIXED_START, ...dynamic, ...FIXED_END];
+}
+
+const SUMMARIZED_FIXED_START_IDS = new Set(FIXED_START.map((c) => c.id));
+
+/** True if at least one row has a non-empty value (trimmed) for this column. */
+function hasSummarizedColumnData(rows, colId) {
+  if (!colId || !Array.isArray(rows) || rows.length === 0) return false;
+  for (const row of rows) {
+    if (!row) continue;
+    const trimmed = String(getCellValue(row, colId) ?? "").trim();
+    if (trimmed !== "") return true;
+  }
+  return false;
+}
+
+function isSummarizedNoteEmpty(raw) {
+  if (raw === null || raw === undefined) return true;
+  const trimmed = String(raw).trim();
+  if (trimmed === "") return true;
+  const stripped = trimmed
+    .replace(/<br\s*\/?>/gi, "")
+    .replace(/<\/?[^>]+>/gi, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, "");
+  return stripped === "";
+}
+
+function resolveSummarizedNoteText(formData) {
+  const candidates = [formData?.end_note, formData?.summarized_table_note];
+  for (const raw of candidates) {
+    if (!isSummarizedNoteEmpty(raw)) return String(raw).trim();
+  }
+  return "";
+}
+
+/** Omit columns with no data in any row (summarized appendix table only). */
+function getVisibleOrderedColumns(tableData) {
+  const all = getOrderedColumns(tableData);
+  const rows = Array.isArray(tableData?.rows) ? tableData.rows : [];
+  if (rows.length === 0) return all;
+  return all.filter((col) => hasSummarizedColumnData(rows, col.id));
 }
 
 function parseCurrencyValue(val) {
@@ -85,6 +130,7 @@ function computeSummarizedGrandTotals(rows) {
     total_invoice_cost: 0,
     estimated_current_replacement_cost: 0,
     amount_post_depreciation: 0,
+    appraisal_value: 0,
     estimated_fair_value: 0,
   };
   if (!Array.isArray(rows)) return totals;
@@ -95,6 +141,7 @@ function computeSummarizedGrandTotals(rows) {
       row.estimated_current_replacement_cost
     );
     totals.amount_post_depreciation += parseCurrencyValue(row.amount_post_depreciation);
+    totals.appraisal_value += parseCurrencyValue(row.appraisal_value);
     totals.estimated_fair_value += parseCurrencyValue(row.estimated_fair_value);
   }
   return totals;
@@ -112,25 +159,46 @@ function computeSummarizedDynamicAllowSumTotal(rows, colId) {
   return sum;
 }
 
-function renderSummarizedGrandTotalRow(tableData) {
+function renderSummarizedGrandTotalRow(tableData, orderedColumns) {
   const rows = Array.isArray(tableData?.rows) ? tableData.rows : [];
-  const dynamic = Array.isArray(tableData?.dynamicColumns)
-    ? tableData.dynamicColumns.filter((c) => c && c.id)
-    : [];
-  const labelColSpan = 8;
+  const dynamicMetaById = new Map(
+    (Array.isArray(tableData?.dynamicColumns) ? tableData.dynamicColumns : [])
+      .filter((c) => c && c.id)
+      .map((c) => [c.id, c])
+  );
   const totals = computeSummarizedGrandTotals(rows);
+  const cols = Array.isArray(orderedColumns) ? orderedColumns : [];
+  const labelStyle =
+    "background-color:#c8e6c9;font-weight:700;text-align:center;padding:8px;-webkit-print-color-adjust:exact;print-color-adjust:exact;";
 
   let html = '<tr class="summary-grand-total-row">';
-  html += `<td colspan="${labelColSpan}" class="summary-grand-total-label" style="background-color:#c8e6c9;font-weight:700;text-align:center;padding:8px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">GRAND TOTAL - FAIR VALUATION AMOUNT (marked in green shade)</td>`;
-  for (const col of dynamic) {
-    if (col.allowSum) {
-      const dynTotal = computeSummarizedDynamicAllowSumTotal(rows, col.id);
-      html += `<td style="font-weight:700;background-color:#f9fafb;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${renderFieldValue(String(dynTotal))}</td>`;
-    } else {
+  let i = 0;
+  while (i < cols.length) {
+    const col = cols[i];
+    if (col.id === "sr_no") {
       html += "<td></td>";
+      i += 1;
+      continue;
     }
-  }
-  for (const col of FIXED_END) {
+    if (SUMMARIZED_FIXED_START_IDS.has(col.id)) {
+      let j = i;
+      while (j < cols.length && SUMMARIZED_FIXED_START_IDS.has(cols[j].id)) j += 1;
+      const span = j - i;
+      html += `<td colspan="${span}" class="summary-grand-total-label" style="${labelStyle}">GRAND TOTAL - FAIR VALUATION AMOUNT (marked in green shade)</td>`;
+      i = j;
+      continue;
+    }
+    if (dynamicMetaById.has(col.id)) {
+      const meta = dynamicMetaById.get(col.id);
+      if (meta.allowSum) {
+        const dynTotal = computeSummarizedDynamicAllowSumTotal(rows, col.id);
+        html += `<td style="font-weight:700;background-color:#f9fafb;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${renderFieldValue(String(dynTotal))}</td>`;
+      } else {
+        html += "<td></td>";
+      }
+      i += 1;
+      continue;
+    }
     if (SUMMARIZED_GRAND_TOTAL_CURRENCY_IDS.has(col.id)) {
       const raw = totals[col.id] ?? 0;
       const rounded = Math.round((raw + Number.EPSILON) * 100) / 100;
@@ -140,9 +208,11 @@ function renderSummarizedGrandTotalRow(tableData) {
           ? "background-color:#daf2d0 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;"
           : "";
       html += `<td style="font-weight:700;${extraStyle}"><span class="summary-currency-value">${renderFieldValue(`₹ ${formatted}`)}</span></td>`;
-    } else {
-      html += `<td></td>`;
+      i += 1;
+      continue;
     }
+    html += "<td></td>";
+    i += 1;
   }
   html += "</tr>";
   return html;
@@ -771,7 +841,7 @@ function generateSummarizedNormalFieldsHTML(
         <tr>
             <td>DECLARATION:</td>
             <td colspan="8" style="text-transform:none; text-align:left;">
-                The aforesaid ${extraData.cat} / ${extraData.subCat} ${extraData.childCat} inspected by us &amp; found in ${formData.declaration} on the date of my inspection. This Report issued for ${formData.valuation_purpose} ${formData.valuation_purpose == "REPO PURPOSE" ? "(REPO)" : ""} of ${extraData.bank_name}, ${extraData.branch_name}, ${extraData.state_name} Only.
+                ${formData.declaration}
             </td>
         </tr>
         <tr>
@@ -817,30 +887,31 @@ function generateSummarizedNormalFieldsHTML(
 // ---------------------------------------------------------------------------
 function generateSummarizedTableAppendixHTML(formData, stampImageBase64) {
   const tableData = parseSummarizedTable(formData.summarized_table_data);
-  const orderedColumns = getOrderedColumns(tableData);
   const rows = Array.isArray(tableData?.rows) ? tableData.rows : [];
-  const colSpan = (orderedColumns.length || 1) + 1;
-  const summarizedNoteText =
-    formData?.summarized_table_note ||
-    "THAT THE MACHINERY VALUATION FROM SR.NO. 53 TO 59 IS NOT VALUED BECAUSE NO INFORMATION OR DOCUMENTS REGARDING THOSE MACHINES WERE NOT RECEIVED, AS BEING NEW PURCHASED MACHINE THEIR INVOICES OR OTHER DOCUMENTS ARE YET TO BE GENERATED. TODAY'S BRAND NEW RATE WILL BE SHARED IN EACH INDIVIDUAL REPORTS";
+  const orderedColumns = getVisibleOrderedColumns(tableData);
+  const colSpan = orderedColumns.length || 1;
+  const summarizedNoteText = resolveSummarizedNoteText(formData);
+  const summarizedNoteInnerHtml = summarizedNoteText
+    ? `<strong>*NOTE:</strong><br>${renderFieldValue(summarizedNoteText)}`
+    : "";
 
-  const renderedHeader = ["<th>SR NO.</th>", ...orderedColumns
+  const renderedHeader = orderedColumns
     .map((col) => `<th>${renderFieldValue(col.header || "-")}</th>`)
-    ].join("");
+    .join("");
 
   const dataRowsHtml =
     rows.length > 0
       ? rows
           .map(
-            (row, index) =>
-              `<tr><td>${index + 1}</td>${orderedColumns
+            (row) =>
+              `<tr>${orderedColumns
                 .map((col) => `<td>${renderFieldValue(formatSummarizedCellDisplay(col.id, getCellValue(row, col.id)))}</td>`)
                 .join("")}</tr>`
           )
           .join("")
       : `<tr><td colspan="${colSpan}" style="text-align:center;">No summarized table rows.</td></tr>`;
 
-  const renderedRows = dataRowsHtml + renderSummarizedGrandTotalRow(tableData);
+  const renderedRows = dataRowsHtml + renderSummarizedGrandTotalRow(tableData, orderedColumns);
 
   return `
 <style>
@@ -999,11 +1070,10 @@ function generateSummarizedTableAppendixHTML(formData, stampImageBase64) {
     </tbody>
   </table>
   <div class="summary-note">
-    <strong>*NOTE:</strong><br>
-    ${renderFieldValue(summarizedNoteText)}
-  </div>
-  <div class="summary-stamp-source">
-    ${stampImageBase64 ? `<img src="${stampImageBase64}" alt="Stamp">` : ""}
+    ${summarizedNoteInnerHtml}
+    <div class="summary-stamp-source">
+      ${stampImageBase64 ? `<img src="${stampImageBase64}" alt="Stamp">` : ""}
+    </div>
   </div>
   <div class="summary-footer-row">
     <span class="summary-page-number-value" data-page-number="2">Page 2</span>

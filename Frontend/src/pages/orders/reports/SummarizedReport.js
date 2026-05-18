@@ -231,14 +231,15 @@ const MACHINERY_CONDITION_OPTIONS = [
   { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
 ];
 
+const SUMMARIZED_SR_NO_COLUMN = { id: "sr_no", header: "SR NO." };
+
 const SUMMARIZED_FIXED_START_COLUMNS = [
-  { id: "machine_description", header: "Machine Description" },
+  { id: "machine_description", header: "Asset Description" },
   { id: "asset_serial_no", header: "Asset Serial No." },
   { id: "yom", header: "Yom" },
   { id: "supplier_name", header: "Supplier Name" },
   { id: "invoice_no", header: "Invoice No." },
   { id: "invoice_date", header: "Invoice Date" },
-  { id: "resource_no", header: "Resource No." },
 ];
 
 const SUMMARIZED_FIXED_END_COLUMNS = [
@@ -250,6 +251,7 @@ const SUMMARIZED_FIXED_END_COLUMNS = [
   { id: "residual_life_of_asset", header: "Residual life of asset" },
   { id: "depr_rate", header: "Depr. Rate" },
   { id: "amount_post_depreciation", header: "Amount Post Depreciation" },
+  { id: "appraisal_value", header: "Appraisal Value" },
   { id: "estimated_fair_value", header: "Estimated Fair Value" },
 ];
 
@@ -257,10 +259,22 @@ const SUMMARIZED_TRAILING_COLUMNS = [
   { id: "subcategory_id", header: "Subcategory Selection" },
 ];
 
+const SUMMARIZED_TOGGLEABLE_FIXED_COLUMNS = [
+  SUMMARIZED_SR_NO_COLUMN,
+  ...SUMMARIZED_TRAILING_COLUMNS,
+  ...SUMMARIZED_FIXED_START_COLUMNS,
+  ...SUMMARIZED_FIXED_END_COLUMNS,
+];
+
+const SUMMARIZED_TOGGLEABLE_FIXED_COLUMN_IDS = new Set(
+  SUMMARIZED_TOGGLEABLE_FIXED_COLUMNS.map((col) => col.id)
+);
+
 const SUMMARIZED_CURRENCY_COLUMN_IDS = new Set([
   "total_invoice_cost",
   "estimated_current_replacement_cost",
   "amount_post_depreciation",
+  "appraisal_value",
   "estimated_fair_value",
 ]);
 
@@ -272,6 +286,7 @@ const SUMMARIZED_DIGITS_ONLY_COLUMN_IDS = new Set([
 const buildEmptySummarizedRow = (dynamicColumns = []) => {
   const base = {};
   [
+    SUMMARIZED_SR_NO_COLUMN,
     ...SUMMARIZED_FIXED_START_COLUMNS,
     ...SUMMARIZED_FIXED_END_COLUMNS,
     ...SUMMARIZED_TRAILING_COLUMNS,
@@ -284,10 +299,125 @@ const buildEmptySummarizedRow = (dynamicColumns = []) => {
   return base;
 };
 
+const normalizeSummarizedRows = (rows, dynamicColumns = []) => {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return [buildEmptySummarizedRow(dynamicColumns)];
+  }
+  const emptyRow = buildEmptySummarizedRow(dynamicColumns);
+  return rows.map((row) => ({ ...emptyRow, ...(row || {}) }));
+};
+
 const getDefaultSummarizedTableData = () => ({
   dynamicColumns: [],
   rows: [buildEmptySummarizedRow([])],
 });
+
+/** null = empty, number = rate %, "non_numeric" = text (e.g. NA) */
+const parseDepreciationRateInput = (raw) => {
+  const trimmed = String(raw ?? "").trim();
+  if (trimmed === "") return null;
+  const normalized = trimmed.replace(/%$/, "").trim().replace(/,/g, "");
+  if (!/^-?\d+(\.\d+)?$/.test(normalized)) {
+    return "non_numeric";
+  }
+  const n = parseFloat(normalized);
+  return Number.isFinite(n) ? n : "non_numeric";
+};
+
+function SummarizedFixedColumnVisibilityDropdown({ columns, visibleIds, onVisibleIdsChange }) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const toggleColumn = (colId) => {
+    const next = new Set(visibleIds);
+    if (next.has(colId)) {
+      next.delete(colId);
+    } else {
+      next.add(colId);
+    }
+    onVisibleIdsChange(next);
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className="summarized-column-visibility-dropdown"
+      style={{ position: "relative", display: "inline-flex", flex: "0 0 auto" }}
+    >
+      <button
+        type="button"
+        className="btn btn-outline-secondary"
+        onClick={() => setOpen((prev) => !prev)}
+        style={{
+          width: "fit-content",
+          display: "inline-flex",
+          whiteSpace: "nowrap",
+        }}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+      >
+        Columns
+      </button>
+      {open ? (
+        <div
+          role="listbox"
+          aria-multiselectable="true"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 4px)",
+            right: 0,
+            zIndex: 20,
+            minWidth: "240px",
+            maxHeight: "320px",
+            overflowY: "auto",
+            backgroundColor: "#fff",
+            border: "1px solid #d1d5db",
+            borderRadius: "6px",
+            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.12)",
+            padding: "4px 0",
+          }}
+        >
+          {columns.map((col) => {
+            const selected = visibleIds.has(col.id);
+            return (
+              <button
+                key={col.id}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                onClick={() => toggleColumn(col.id)}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  border: "none",
+                  background: selected ? "#dbeafe" : "transparent",
+                  color: selected ? "#1d4ed8" : "#111827",
+                  fontWeight: selected ? 600 : 400,
+                  padding: "8px 12px",
+                  cursor: "pointer",
+                }}
+              >
+                {col.header}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function SummarizedReport() {
   // Extract order ID from route parameters
@@ -334,6 +464,11 @@ function SummarizedReport() {
   const [activeReportTab, setActiveReportTab] = useState("general");
   const [summarizedTableData, setSummarizedTableData] = useState(
     getDefaultSummarizedTableData
+  );
+  const summarizedTableScrollRef = useRef(null);
+  const scrollSummarizedTableToBottomRef = useRef(false);
+  const [summarizedVisibleFixedColumnIds, setSummarizedVisibleFixedColumnIds] = useState(
+    () => new Set(SUMMARIZED_TOGGLEABLE_FIXED_COLUMNS.map((col) => col.id))
   );
   const [summarizedChildCategories, setSummarizedChildCategories] = useState([]);
   const tabButtonStyle = useCallback(
@@ -646,6 +781,33 @@ function SummarizedReport() {
     setChassisPreviewUrl("");
   }, [id]);
 
+  const DEFAULT_DECLARATION_CONDITION = "ROAD WORTHY CONDITION";
+
+  const isDeclarationEmpty = useCallback((value) => {
+    if (value === null || value === undefined) return true;
+    return String(value).trim() === "";
+  }, []);
+
+  const getDefaultDeclaration = useCallback(
+    (orderData, formSnapshot = {}) => {
+      if (!orderData) return "";
+      const category = orderData.category_name || "";
+      const subCategory = orderData.sub_category_name
+        ? ` / ${orderData.sub_category_name}`
+        : "";
+      const childCategory = orderData.child_category_name
+        ? ` ${orderData.child_category_name}`
+        : "";
+      const valuationPurpose = formSnapshot.valuation_purpose || "";
+      const bank = orderData.bank_name || "";
+      const branch = orderData.branch_name || "";
+      const state = formSnapshot.state_name || "";
+
+      return `The aforesaid ${category}${subCategory}${childCategory} inspected by us & found in ${DEFAULT_DECLARATION_CONDITION} on the date of my inspection. This Report issued for ${valuationPurpose} of ${bank}, ${branch}, ${state} Only.`;
+    },
+    [DEFAULT_DECLARATION_CONDITION]
+  );
+
   // Build disclaimer text directly with valuer name and bank/branch/city from order
   const getDisclaimer = useCallback(
     (valuerName = "VALUETECH SOLUTIONS", orderForDisclaimer = null) => {
@@ -881,6 +1043,37 @@ function SummarizedReport() {
     return formattedValue;
   }, []);
 
+  const syncDepreciationValue = useCallback(
+    (state) => {
+      const invoiceCostRaw = state.tax_invoice_cost;
+      const depreciationRaw = state.depreciation;
+      const invoiceCost = parseCurrency(invoiceCostRaw);
+      const depRate = parseDepreciationRateInput(depreciationRaw);
+
+      if (depRate === "non_numeric") {
+        return {
+          ...state,
+          depreciation_value:
+            invoiceCostRaw != null && String(invoiceCostRaw).trim() !== ""
+              ? String(invoiceCostRaw)
+              : "",
+        };
+      }
+
+      if (depRate !== null && invoiceCost > 0 && depRate >= 0) {
+        const depreciationAmount = (invoiceCost * depRate) / 100;
+        const depreciationValue = invoiceCost - depreciationAmount;
+        return {
+          ...state,
+          depreciation_value: handleCurrencyFormatting(depreciationValue.toString()),
+        };
+      }
+
+      return { ...state, depreciation_value: "" };
+    },
+    [parseCurrency, handleCurrencyFormatting]
+  );
+
   // Form data state for Machinery report generation
   const [reportFormData, setReportFormData] = useState({
     // Report type and reference details
@@ -1018,6 +1211,7 @@ function SummarizedReport() {
     declaration: "",
     disclaimer: "", // Will be set dynamically when order loads
     summarized_table_data: "",
+    end_note: "",
   });
 
   // File state for chassis impression
@@ -1139,6 +1333,10 @@ function SummarizedReport() {
           }),
           // Disclaimer: always set from getDisclaimer (rollback point if we need DB-stored value later)
           disclaimer: getDisclaimer(order?.valuer_name || "VALUETECH SOLUTIONS", order),
+          declaration:
+            hasSavedReport || !isDeclarationEmpty(prev.declaration)
+              ? prev.declaration
+              : getDefaultDeclaration(order, prev),
         };
       });
     }
@@ -1147,6 +1345,8 @@ function SummarizedReport() {
     getLicenseNumber,
     getRefNoCode,
     getDisclaimer,
+    getDefaultDeclaration,
+    isDeclarationEmpty,
     buildCategorySuffix,
     buildValuationReportHeading,
     currentReport,
@@ -1422,6 +1622,10 @@ function SummarizedReport() {
       // Disclaimer: always use getDisclaimer (never override with saved data)
       updated.disclaimer = getDisclaimer(order?.valuer_name || "VALUETECH SOLUTIONS", order);
 
+      if (isDeclarationEmpty(updated.declaration)) {
+        updated.declaration = getDefaultDeclaration(order, updated);
+      }
+
       // Ensure ref_no_month has a default value if it's empty or null
       if (!updated.ref_no_month || updated.ref_no_month.trim() === "") {
         const months = [
@@ -1638,7 +1842,7 @@ function SummarizedReport() {
       const rows = Array.isArray(parsed?.rows) ? parsed.rows : [];
       setSummarizedTableData({
         dynamicColumns,
-        rows: rows.length > 0 ? rows : [buildEmptySummarizedRow(dynamicColumns || [])],
+        rows: normalizeSummarizedRows(rows, dynamicColumns),
       });
     } catch (err) {
       setSummarizedTableData(getDefaultSummarizedTableData());
@@ -1656,6 +1860,7 @@ function SummarizedReport() {
 
   const summarizedOrderedColumns = useMemo(
     () => [
+      SUMMARIZED_SR_NO_COLUMN,
       ...SUMMARIZED_TRAILING_COLUMNS,
       ...SUMMARIZED_FIXED_START_COLUMNS,
       ...(summarizedTableData?.dynamicColumns || []),
@@ -1664,7 +1869,26 @@ function SummarizedReport() {
     [summarizedTableData?.dynamicColumns]
   );
 
+  const isSummarizedFixedColumnVisible = useCallback(
+    (colId) => {
+      if (!SUMMARIZED_TOGGLEABLE_FIXED_COLUMN_IDS.has(colId)) return true;
+      return summarizedVisibleFixedColumnIds.has(colId);
+    },
+    [summarizedVisibleFixedColumnIds]
+  );
+
+  const summarizedDisplayOrderedColumns = useMemo(
+    () => summarizedOrderedColumns.filter((col) => isSummarizedFixedColumnVisible(col.id)),
+    [summarizedOrderedColumns, isSummarizedFixedColumnVisible]
+  );
+
+  const summarizedVisibleFixedStartColumns = useMemo(
+    () => SUMMARIZED_FIXED_START_COLUMNS.filter((col) => isSummarizedFixedColumnVisible(col.id)),
+    [isSummarizedFixedColumnVisible]
+  );
+
   const getSummarizedColumnWidth = useCallback((colId) => {
+    if (colId === "sr_no") return 90;
     if (colId === "subcategory_id") return 300;
     if (colId === "machine_description") return 400;
     return 200;
@@ -1672,11 +1896,11 @@ function SummarizedReport() {
 
   const summarizedTableMinWidth = useMemo(
     () =>
-      summarizedOrderedColumns.reduce(
+      summarizedDisplayOrderedColumns.reduce(
         (total, col) => total + getSummarizedColumnWidth(col.id),
         0
       ) + 110, // Action column
-    [summarizedOrderedColumns, getSummarizedColumnWidth]
+    [summarizedDisplayOrderedColumns, getSummarizedColumnWidth]
   );
 
   const summarizedGrandTotalsByColumn = useMemo(() => {
@@ -1685,6 +1909,7 @@ function SummarizedReport() {
       total_invoice_cost: 0,
       estimated_current_replacement_cost: 0,
       amount_post_depreciation: 0,
+      appraisal_value: 0,
       estimated_fair_value: 0,
     };
     rows.forEach((row) => {
@@ -1693,6 +1918,7 @@ function SummarizedReport() {
         String(row?.estimated_current_replacement_cost ?? "")
       );
       totals.amount_post_depreciation += parseCurrency(String(row?.amount_post_depreciation ?? ""));
+      totals.appraisal_value += parseCurrency(String(row?.appraisal_value ?? ""));
       totals.estimated_fair_value += parseCurrency(String(row?.estimated_fair_value ?? ""));
     });
     return totals;
@@ -1818,11 +2044,20 @@ function SummarizedReport() {
   const handleAddSummarizedRow = useCallback(() => {
     const dynamicCols = summarizedTableData.dynamicColumns || [];
     const nextRows = [...(summarizedTableData.rows || []), buildEmptySummarizedRow(dynamicCols)];
+    scrollSummarizedTableToBottomRef.current = true;
     handleSummarizedTableDataChange({
       ...summarizedTableData,
       rows: nextRows,
     });
   }, [summarizedTableData, handleSummarizedTableDataChange]);
+
+  useLayoutEffect(() => {
+    if (!scrollSummarizedTableToBottomRef.current) return;
+    scrollSummarizedTableToBottomRef.current = false;
+    const scrollEl = summarizedTableScrollRef.current;
+    if (!scrollEl) return;
+    scrollEl.scrollTo({ top: scrollEl.scrollHeight, behavior: "smooth" });
+  }, [summarizedTableData.rows]);
 
   const handleAddSummarizedColumn = useCallback(() => {
     const nextIndex = (summarizedTableData.dynamicColumns || []).length + 1;
@@ -1977,24 +2212,8 @@ function SummarizedReport() {
           updated[name] = handleCurrencyFormatting(value);
         }
 
-        // Auto-calculate depreciation_value when tax_invoice_cost or depreciation changes
-        if (name === "tax_invoice_cost" || name === "depreciation") {
-          const invoiceCost = parseCurrency(
-            name === "tax_invoice_cost" ? value : updated.tax_invoice_cost
-          );
-          const depreciationRate = parseFloat(
-            name === "depreciation" ? value : updated.depreciation
-          );
-
-          if (invoiceCost > 0 && depreciationRate >= 0) {
-            const depreciationAmount = (invoiceCost * depreciationRate) / 100;
-            const depreciationValue = invoiceCost - depreciationAmount;
-            updated.depreciation_value = handleCurrencyFormatting(
-              depreciationValue.toString()
-            );
-          } else {
-            updated.depreciation_value = "";
-          }
+        if (name === "depreciation") {
+          updated = syncDepreciationValue(updated);
         }
 
         // Auto-combine invoice_no and invoice_date into invoice_no_date
@@ -2017,7 +2236,7 @@ function SummarizedReport() {
         return updated;
       });
     },
-    [parseCurrency, handleCurrencyFormatting, convertNumberToWordsIndian, isAutoGeneratedHeading, buildValuationReportHeading]
+    [parseCurrency, handleCurrencyFormatting, convertNumberToWordsIndian, isAutoGeneratedHeading, buildValuationReportHeading, syncDepreciationValue]
   );
 
   // Handle SingleSearchSelect changes
@@ -2127,10 +2346,13 @@ function SummarizedReport() {
     if (!value || value.trim() === "") {
       // Track that this field was explicitly cleared
       clearedFieldsRef.current.add(name);
-      setReportFormData((prev) => ({
-        ...prev,
-        [name]: "",
-      }));
+      setReportFormData((prev) => {
+        const next = { ...prev, [name]: "" };
+        if (name === "tax_invoice_cost") {
+          return syncDepreciationValue(next);
+        }
+        return next;
+      });
       return;
     }
 
@@ -2161,11 +2383,14 @@ function SummarizedReport() {
       formattedValue += "." + decimalPart;
     }
 
-    setReportFormData((prev) => ({
-      ...prev,
-      [name]: formattedValue,
-    }));
-  }, []);
+    setReportFormData((prev) => {
+      const next = { ...prev, [name]: formattedValue };
+      if (name === "tax_invoice_cost") {
+        return syncDepreciationValue(next);
+      }
+      return next;
+    });
+  }, [syncDepreciationValue]);
 
   // Handle chassis impression file selection
   const handleFileChange = useCallback((e) => {
@@ -5020,30 +5245,25 @@ function SummarizedReport() {
                       </select>{" "}
                       &nbsp; Entries of {finalizedReportRows.length} entries
                     </div>
-                    <div className="table-responsive">
+                    <div className="finalized-reports-table-scroll">
                       <table className="table table-bordered table-striped">
-                        <thead
-                          style={{
-                            backgroundColor: "rgba(88, 100, 189, 0.7)",
-                            color: "#fff",
-                          }}
-                        >
+                        <thead>
                           <tr>
-                            <th style={{ color: "#fff" }}>Order Number</th>
-                            <th style={{ color: "#fff" }}>Asset Make</th>
-                            <th style={{ color: "#fff" }}>Manufacture Year</th>
-                            <th style={{ color: "#fff" }}>Current Invoice Cost</th>
-                            <th style={{ color: "#fff" }}>Depreciation</th>
-                            <th style={{ color: "#fff" }}>Depreciation Value</th>
-                            <th style={{ color: "#fff" }}>Appraiser Value</th>
-                            <th style={{ color: "#fff" }}>Fair Market Value</th>
-                            <th style={{ color: "#fff" }}>View</th>
+                            <th>Order Number</th>
+                            <th>Asset Make</th>
+                            <th>Manufacture Year</th>
+                            <th>Current Invoice Cost</th>
+                            <th>Depreciation</th>
+                            <th>Depreciation Value</th>
+                            <th>Appraiser Value</th>
+                            <th>Fair Market Value</th>
+                            <th>View</th>
                           </tr>
                         </thead>
                         <tbody>
                           {finalizedReportsLoading ? (
                             <tr>
-                              <td colSpan={9} className="text-center">
+                              <td colSpan={9} className="text-center">  
                                 Loading finalized reports...
                               </td>
                             </tr>
@@ -5150,7 +5370,7 @@ function SummarizedReport() {
                       name="depreciation_value"
                       value={reportFormData.depreciation_value}
                       readOnly
-                      placeholder="Auto-calculated from invoice cost and depreciation rate"
+                      placeholder="Auto-calculated, or matches invoice cost when depreciation is not a number"
                       required
                     />
                   </div>
@@ -5320,56 +5540,17 @@ function SummarizedReport() {
                 <div className="col-md-12">
                   <div className="form-group">
                     <label htmlFor="declaration">
-                      Declaration <span class="text-danger">*</span>
+                      Declaration <span className="text-danger">*</span>
                     </label>
-                    <p className="mb-0">
-                      The aforesaid{" "}
-                      {order?.category_name || ""}
-                      {order?.sub_category_name
-                        ? ` / ${order.sub_category_name}`
-                        : ""}{" "} {order?.child_category_name || ""} {" "}
-                      inspected by us & found in{" "}
-                    </p>
-                    <SingleSearchSelect
-                      options={[
-                        {
-                          value: "ROAD WORTHY CONDITION",
-                          label: "ROAD WORTHY CONDITION",
-                        },
-                        {
-                          value: "ACCIDENTAL CONDITION",
-                          label: "ACCIDENTAL CONDITION",
-                        },
-                        { value: "NOT WORKING", label: "NOT WORKING" },
-                        { value: "SCRAP CONDITION", label: "SCRAP CONDITION" },
-                        {
-                          value: "STACKED CONDITION",
-                          label: "STACKED CONDITION",
-                        },
-                        { value: "KNOCK DOWN", label: "KNOCK DOWN" },
-                        { value: "PARKING YARD", label: "PARKING YARD" },
-                        { value: "Dismantled Condition", label: "Dismantled Condition" },
-                        { value: "Normal Working Condition", label: "Normal Working Condition" },
-                        { value: "Total Operational & Functional Condition", label: "Total Operational & Functional Condition" },
-                        { value: "PACKED / KNOCKED DOWN", label: "PACKED / KNOCKED DOWN" },
-                        { value: "WORKABLE CONDITION", label: "WORKABLE CONDITION" },
-                        { value: "STACKED", label: "STACKED" },
-                        { value: "USABLE", label: "USABLE" },
-                        { value: "NOT AVAILABLE", label: "NOT AVAILABLE" },
-                        { value: "NOT APPLICABLE", label: "NOT APPLICABLE" },
-                      ]}
+                    <WysiwygTextarea
+                      className="form-field"
+                      id="declaration"
+                      name="declaration"
                       value={reportFormData.declaration}
-                      onChange={(value) =>
-                        handleSelectChange("declaration", value)
-                      }
+                      onChange={handleFormChange}
+                      rows={6}
                       required
                     />
-                    <p className="mb-0">
-                      on the date of my inspection. This Report issued for{" "}
-                      {reportFormData.valuation_purpose || ""} of{" "}
-                      {order?.bank_name || ""}, {order?.branch_name || ""},{" "}
-                      {reportFormData.state_name || ""} Only.
-                    </p>
                   </div>
                 </div>
                 <div className="col-md-12">
@@ -5446,6 +5627,11 @@ function SummarizedReport() {
                         flexDirection: "row",
                       }}
                     >
+                      <SummarizedFixedColumnVisibilityDropdown
+                        columns={SUMMARIZED_TOGGLEABLE_FIXED_COLUMNS}
+                        visibleIds={summarizedVisibleFixedColumnIds}
+                        onVisibleIdsChange={setSummarizedVisibleFixedColumnIds}
+                      />
                       <button
                         type="button"
                         className="btn btn-outline-primary"
@@ -5460,9 +5646,12 @@ function SummarizedReport() {
                         Add Column
                       </button>
                     </div>
-                    <div style={{ overflowX: "auto", width: "100%" }}>
+                    <div
+                      ref={summarizedTableScrollRef}
+                      className="summarized-table-scroll"
+                    >
                       <table
-                        className="table table-bordered"
+                        className="table table-bordered summarized-data-table"
                         style={{
                           minWidth: `${summarizedTableMinWidth}px`,
                           tableLayout: "fixed",
@@ -5470,7 +5659,19 @@ function SummarizedReport() {
                       >
                         <thead>
                           <tr>
-                            {SUMMARIZED_TRAILING_COLUMNS.map((col) => (
+                            {isSummarizedFixedColumnVisible(SUMMARIZED_SR_NO_COLUMN.id) && (
+                              <th
+                                style={{
+                                  minWidth: `${getSummarizedColumnWidth(SUMMARIZED_SR_NO_COLUMN.id)}px`,
+                                  width: `${getSummarizedColumnWidth(SUMMARIZED_SR_NO_COLUMN.id)}px`,
+                                }}
+                              >
+                                {SUMMARIZED_SR_NO_COLUMN.header}
+                              </th>
+                            )}
+                            {SUMMARIZED_TRAILING_COLUMNS.filter((col) =>
+                              isSummarizedFixedColumnVisible(col.id)
+                            ).map((col) => (
                               <th
                                 key={col.id}
                                 style={{
@@ -5481,7 +5682,9 @@ function SummarizedReport() {
                                 {col.header}
                               </th>
                             ))}
-                            {SUMMARIZED_FIXED_START_COLUMNS.map((col) => (
+                            {SUMMARIZED_FIXED_START_COLUMNS.filter((col) =>
+                              isSummarizedFixedColumnVisible(col.id)
+                            ).map((col) => (
                               <th
                                 key={col.id}
                                 style={{
@@ -5537,7 +5740,9 @@ function SummarizedReport() {
                                 </div>
                               </th>
                             ))}
-                            {SUMMARIZED_FIXED_END_COLUMNS.map((col) => (
+                            {SUMMARIZED_FIXED_END_COLUMNS.filter((col) =>
+                              isSummarizedFixedColumnVisible(col.id)
+                            ).map((col) => (
                               <th
                                 key={col.id}
                                 style={{
@@ -5554,7 +5759,7 @@ function SummarizedReport() {
                         <tbody>
                           {(summarizedTableData.rows || []).map((row, rowIndex) => (
                             <tr key={`sum-row-${rowIndex}`}>
-                              {summarizedOrderedColumns.map((col) => (
+                              {summarizedDisplayOrderedColumns.map((col) => (
                                 <td
                                   key={`${rowIndex}-${col.id}`}
                                   style={{
@@ -5711,61 +5916,46 @@ function SummarizedReport() {
                             </tr>
                           ))}
                           <tr key="sum-row-grand-total" className="summarized-grand-total-row">
-                            {SUMMARIZED_TRAILING_COLUMNS.map((col) => (
-                              <td
-                                key={`grand-total-trail-${col.id}`}
-                                style={{
-                                  verticalAlign: "middle",
-                                  backgroundColor: "#f9fafb",
-                                  padding: "10px 12px",
-                                }}
-                              />
+                            {isSummarizedFixedColumnVisible(SUMMARIZED_SR_NO_COLUMN.id) && (
+                              <td />
+                            )}
+                            {SUMMARIZED_TRAILING_COLUMNS.filter((col) =>
+                              isSummarizedFixedColumnVisible(col.id)
+                            ).map((col) => (
+                              <td key={`grand-total-trail-${col.id}`} />
                             ))}
-                            <td
-                              colSpan={SUMMARIZED_FIXED_START_COLUMNS.length}
-                              style={{
-                                fontWeight: 700,
-                                verticalAlign: "middle",
-                                padding: "10px 12px",
-                              }}
-                            >
-                              GRAND TOTAL - FAIR VALUATION AMOUNT (marked in green shade)
-                            </td>
-                            {(summarizedTableData.dynamicColumns || []).map((col) => (
+                            {summarizedVisibleFixedStartColumns.length > 0 && (
                               <td
-                                key={`grand-total-dynamic-${col.id}`}
-                                style={{
-                                  verticalAlign: "middle",
-                                  backgroundColor: col.allowSum ? "#f9fafb" : undefined,
-                                  fontWeight: col.allowSum ? 600 : undefined,
-                                  padding: "10px 12px",
-                                }}
+                                className="summarized-grand-total-label-cell"
+                                colSpan={summarizedVisibleFixedStartColumns.length}
                               >
+                                GRAND TOTAL - FAIR VALUATION AMOUNT (marked in green shade)
+                              </td>
+                            )}
+                            {(summarizedTableData.dynamicColumns || []).map((col) => (
+                              <td key={`grand-total-dynamic-${col.id}`}>
                                 {col.allowSum
                                   ? summarizedDynamicColumnTotals[col.id] ?? 0
                                   : ""}
                               </td>
                             ))}
-                            {SUMMARIZED_FIXED_END_COLUMNS.map((col) => (
+                            {SUMMARIZED_FIXED_END_COLUMNS.filter((col) =>
+                              isSummarizedFixedColumnVisible(col.id)
+                            ).map((col) => (
                               <td
                                 key={`grand-total-${col.id}`}
-                                style={{
-                                  verticalAlign: "middle",
-                                  backgroundColor:
-                                    col.id === "estimated_fair_value"
-                                      ? "#daf2d0"
-                                      : SUMMARIZED_CURRENCY_COLUMN_IDS.has(col.id)
-                                        ? "#f9fafb"
-                                        : undefined,
-                                  fontWeight: SUMMARIZED_CURRENCY_COLUMN_IDS.has(col.id) ? 600 : undefined,
-                                }}
+                                className={
+                                  col.id === "estimated_fair_value"
+                                    ? "summarized-grand-total-fmv-cell"
+                                    : ""
+                                }
                               >
                                 {SUMMARIZED_CURRENCY_COLUMN_IDS.has(col.id)
                                   ? formatSummarizedGrandTotalCell(summarizedGrandTotalsByColumn[col.id] ?? 0)
                                   : ""}
                               </td>
                             ))}
-                            <td style={{ verticalAlign: "middle", backgroundColor: "#f3f4f6" }} />
+                            <td className="summarized-grand-total-action-cell" />
                           </tr>
                         </tbody>
                       </table>
@@ -5793,6 +5983,18 @@ function SummarizedReport() {
                       >
                         Add Row
                       </button>
+                    </div>
+                    <div className="form-group mt-3">
+                      <label htmlFor="end_note">Note</label>
+                      <textarea
+                        className="form-field"
+                        id="end_note"
+                        name="end_note"
+                        value={reportFormData.end_note || ""}
+                        onChange={handleFormChange}
+                        rows={4}
+                        placeholder="Enter note"
+                      />
                     </div>
                   </div>
                 </div>

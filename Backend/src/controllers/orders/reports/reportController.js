@@ -2219,6 +2219,40 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
           pages.push({ start: splitAt, end: last.end });
         }
 
+        /** Measure column widths from full table (all rows) before split. */
+        const captureSummarizedColumnWidths = (table) => {
+          const headerRow = table.querySelector("thead tr:last-child");
+          if (!headerRow) return [];
+          return Array.from(headerRow.querySelectorAll("th, td")).map((cell) => {
+            const w = cell.getBoundingClientRect().width;
+            return Number.isFinite(w) && w > 0 ? w : 0;
+          });
+        };
+
+        /** Reuse first-layout column widths on every paginated table. */
+        const applySummarizedColumnWidths = (table, widthsPx) => {
+          if (!widthsPx || widthsPx.length === 0) return;
+          const total = widthsPx.reduce((sum, w) => sum + w, 0);
+          if (total <= 0) return;
+
+          table.style.tableLayout = "fixed";
+          table.style.width = "100%";
+
+          const existing = table.querySelector("colgroup.summarized-col-widths");
+          if (existing) existing.remove();
+
+          const colgroup = document.createElement("colgroup");
+          colgroup.className = "summarized-col-widths";
+          widthsPx.forEach((w) => {
+            const col = document.createElement("col");
+            col.style.width = `${(w / total) * 100}%`;
+            colgroup.appendChild(col);
+          });
+          table.insertBefore(colgroup, table.firstChild);
+        };
+
+        const summarizedColumnWidthsPx = captureSummarizedColumnWidths(originalTable);
+
         summaryRoot.innerHTML = "";
 
         const createFooter = (pageNo, isLastPage) => {
@@ -2266,6 +2300,7 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
             grandRows.forEach((row) => newTbody.appendChild(row.cloneNode(true)));
           }
           table.appendChild(newTbody);
+          applySummarizedColumnWidths(table, summarizedColumnWidthsPx);
 
           pageBlock.appendChild(table);
 
@@ -4177,6 +4212,7 @@ function filterValidReportFields(formData, reportType) {
     validColumns.report_summarized = [
       ...(validColumns.report_machinery || []),
       "summarized_table_data",
+      "end_note",
     ];
   }
 

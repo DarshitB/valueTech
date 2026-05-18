@@ -851,21 +851,31 @@ function OrderDocuments() {
     );
   }, []);
 
-  // Get report URL based on order category
+  // Get report URL based on order category / category_report_type (aligned with OrderDetails)
   const getReportUrl = useCallback(() => {
-    if (!order?.category_name) return null;
+    const reportType = order?.category_report_type;
+    const categoryName = order?.category_name?.toUpperCase() || "";
 
-    const categoryName = order.category_name.toUpperCase();
-
-    if (categoryName === "COMMERCIAL VEHICLE") {
+    if (reportType === "report_summarized") {
+      return `/orders/${id}/details/summarized-report`;
+    }
+    if (reportType === "report_cv" || categoryName === "COMMERCIAL VEHICLE") {
       return `/orders/${id}/details/cv-report`;
-    } else if (categoryName === "CONSTRUCTION EQUIPMENT") {
+    }
+    if (
+      reportType === "report_ce" ||
+      categoryName === "CONSTRUCTION EQUIPMENT" ||
+      categoryName === "CONSTRUCTION EQUIPMENTS"
+    ) {
       return `/orders/${id}/details/ce-report`;
-    } else if (categoryName.includes("AVR")) {
+    }
+    if (reportType === "report_avr" || categoryName.includes("AVR")) {
       return `/orders/${id}/details/avr-report`;
-    } else if (categoryName === "MACHINERY") {
+    }
+    if (reportType === "report_machinery" || categoryName === "MACHINERY") {
       return `/orders/${id}/details/machinery-report`;
-    } else if (categoryName === "MARINE") {
+    }
+    if (reportType === "report_marine" || categoryName === "MARINE") {
       return `/orders/${id}/details/marine-report`;
     }
 
@@ -874,15 +884,29 @@ function OrderDocuments() {
 
   // Get report type name for error messages
   const getReportTypeName = useCallback(() => {
-    if (!order?.category_name) return "Report";
+    const reportType = order?.category_report_type;
+    const categoryName = order?.category_name?.toUpperCase() || "";
 
-    const categoryName = order.category_name.toUpperCase();
-
-    if (categoryName === "COMMERCIAL VEHICLE") return "CV";
-    if (categoryName === "CONSTRUCTION EQUIPMENT") return "CE";
-    if (categoryName.includes("AVR")) return "AVR";
-    if (categoryName === "MACHINERY") return "Machinery";
-    if (categoryName === "MARINE") return "Marine";
+    if (reportType === "report_summarized") return "Summarized";
+    if (reportType === "report_cv" || categoryName === "COMMERCIAL VEHICLE") {
+      return "CV";
+    }
+    if (
+      reportType === "report_ce" ||
+      categoryName === "CONSTRUCTION EQUIPMENT" ||
+      categoryName === "CONSTRUCTION EQUIPMENTS"
+    ) {
+      return "CE";
+    }
+    if (reportType === "report_avr" || categoryName.includes("AVR")) {
+      return "AVR";
+    }
+    if (reportType === "report_machinery" || categoryName === "MACHINERY") {
+      return "Machinery";
+    }
+    if (reportType === "report_marine" || categoryName === "MARINE") {
+      return "Marine";
+    }
 
     return "Report";
   }, [order]);

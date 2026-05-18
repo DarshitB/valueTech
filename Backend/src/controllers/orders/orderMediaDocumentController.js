@@ -54,6 +54,39 @@ async function fetchRemoteWithRetry(url, attempts = 5, timeoutMs = 15000) {
   );
 }
 
+/** Upload-time suffix in IST — 12-hour clock + seconds + AM/PM, e.g. 3:45:15 PM -> "034515PM" */
+function getUploadTimeSuffix(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+  const parts = formatter.formatToParts(date);
+  const hour = parts.find((p) => p.type === "hour")?.value ?? "12";
+  const minute = parts.find((p) => p.type === "minute")?.value ?? "00";
+  const second = parts.find((p) => p.type === "second")?.value ?? "00";
+  const dayPeriod = (parts.find((p) => p.type === "dayPeriod")?.value ?? "AM").toUpperCase();
+  return `${hour}${minute}${second}${dayPeriod}`;
+}
+
+/** Build stored filename: basename_HHMMSSAM|PM.ext (adds _1, _2 on rare collision) */
+function buildDocumentFileName(originalName, uploadDir, uploadDate = new Date()) {
+  const fileExtension = path.extname(originalName);
+  const fileNameWithoutExt = path.basename(originalName, fileExtension);
+  const timeSuffix = getUploadTimeSuffix(uploadDate);
+  let fileName = `${fileNameWithoutExt}_${timeSuffix}${fileExtension}`;
+  let counter = 1;
+
+  while (fs.existsSync(path.join(uploadDir, fileName))) {
+    fileName = `${fileNameWithoutExt}_${timeSuffix}_${counter}${fileExtension}`;
+    counter += 1;
+  }
+
+  return fileName;
+}
+
 function getFilenameFromMediaUrl(mediaUrl) {
   if (!mediaUrl || typeof mediaUrl !== "string") return "document";
   try {
@@ -333,17 +366,17 @@ exports.upload = [
                 }
 
                 // Determine media type from extracted file
-                const fileExtension = path.extname(extractedFile.originalName);
                 const mimeType = getMimeTypeFromExtension(extractedFile.originalName);
                 const mediaType = determineMediaType(mimeType, extractedFile.originalName);
 
                 // Determine document type based on media type
                 const documentType = determineDocumentType(mediaType);
 
-                // Generate unique filename for the document
-                const fileNameWithoutExt = path.basename(extractedFile.originalName, fileExtension);
-                const randomNumber = Math.floor(Math.random() * 10000);
-                const fileName = `${fileNameWithoutExt}_${randomNumber}${fileExtension}`;
+                const fileName = buildDocumentFileName(
+                  extractedFile.originalName,
+                  uploadDir,
+                  now
+                );
                 const finalPath = path.join(uploadDir, fileName);
 
                 // Copy extracted file to final location
@@ -397,11 +430,11 @@ exports.upload = [
             // Determine document type based on media type
             const documentType = determineDocumentType(mediaType);
 
-            // Generate unique filename for the document
-            const fileExtension = path.extname(uploadedFile.originalname);
-            const fileNameWithoutExt = path.basename(uploadedFile.originalname, fileExtension);
-            const randomNumber = Math.floor(Math.random() * 10000); // Random 4-digit number
-            const fileName = `${fileNameWithoutExt}_${randomNumber}${fileExtension}`;
+            const fileName = buildDocumentFileName(
+              uploadedFile.originalname,
+              uploadDir,
+              now
+            );
             const finalPath = path.join(uploadDir, fileName);
 
             // Move file from temp to final location
