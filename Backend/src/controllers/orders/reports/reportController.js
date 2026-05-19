@@ -2139,6 +2139,10 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
         );
 
         const PAGE_HEIGHT_PX = Math.round(8.27 * 96); // A4 landscape height in px
+        const SAFETY_MARGIN = 10;
+        // Stamp is absolute (bottom -50px, height 105px) — reserve overlap only, not full page block.
+        const STAMP_CLEARANCE = stampSourceImg ? 65 : 0;
+
         const spacerRow = thead.querySelector(".spacer-row");
         const spacerHeight = spacerRow ? spacerRow.offsetHeight : 180;
 
@@ -2152,14 +2156,10 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
 
         const footerHeight = footerEl ? footerEl.offsetHeight : 30;
         const noteHeight = noteEl ? noteEl.offsetHeight + 8 : 0;
-        // Last/single page uses note + optional right-side stamp row.
-        // Include the actual row height in fit math to prevent orphan footer on a blank next page.
         const noteStampRowHeight = stampSourceImg
-          ? Math.max(noteHeight, 140) + 10 // 125 stamp + 15 top + row top margin
+          ? Math.max(noteHeight, 140) + 10
           : noteHeight;
         const grandRowsHeight = grandRows.reduce((sum, row) => sum + row.offsetHeight, 0);
-        // Keep a small safety buffer; large buffer leaves avoidable blank area.
-        const SAFETY_MARGIN = 10;
 
         const baseAvailable =
           PAGE_HEIGHT_PX -
@@ -2167,56 +2167,105 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
           theadContentHeight -
           footerHeight -
           SAFETY_MARGIN;
-        // First appendix page has extra usable vertical room because table starts at -30px.
         const firstPageAvailable = baseAvailable + 30;
+        const middlePageAvailable = Math.max(baseAvailable - STAMP_CLEARANCE, 60);
+        const firstMiddlePageAvailable = Math.max(firstPageAvailable - STAMP_CLEARANCE, 60);
 
         const lastPageAvailable = baseAvailable - noteStampRowHeight - grandRowsHeight;
         const firstPageLastAvailable =
           firstPageAvailable - noteStampRowHeight - grandRowsHeight;
+
         const rowHeights = dataRows.map((row) => row.offsetHeight);
 
-        // First pass: chunking with first-page-aware capacity
-        const pages = [];
-        let idx = 0;
-        let builtPageCount = 0;
-        while (idx < dataRows.length) {
-          const availableForThisPage =
-            builtPageCount === 0 ? Math.max(firstPageAvailable, 60) : Math.max(baseAvailable, 60);
-          let acc = 0;
-          const start = idx;
-          while (
-            idx < dataRows.length &&
-            acc + rowHeights[idx] <= availableForThisPage
-          ) {
-            acc += rowHeights[idx];
-            idx += 1;
-          }
-          if (idx === start) {
-            idx += 1; // force progress for extra-tall rows
-          }
-          pages.push({ start, end: idx });
-          builtPageCount += 1;
-        }
-
-        // Ensure final page can hold grand total + note
         const getPageRowsHeight = (pageDef) =>
           rowHeights
             .slice(pageDef.start, pageDef.end)
             .reduce((sum, h) => sum + h, 0);
 
-        while (pages.length > 0) {
+        const capacityForPageIndex = (pageIndex, isLastPage) => {
+          const isFirst = pageIndex === 0;
+          if (isLastPage) {
+            return Math.max(isFirst ? firstPageLastAvailable : lastPageAvailable, 60);
+          }
+          return Math.max(
+            isFirst ? firstMiddlePageAvailable : middlePageAvailable,
+            60
+          );
+        };
+
+        // Pass 1: pack rows — full height when all remaining fit on last page; else stamp clearance on middle pages
+        const pages = [];
+        let idx = 0;
+        let builtPageCount = 0;
+        while (idx < dataRows.length) {
+          const isFirst = builtPageCount === 0;
+          const remainingH = rowHeights
+            .slice(idx)
+            .reduce((sum, h) => sum + h, 0);
+          const fitsAsSingleLastPage =
+            remainingH <= (isFirst ? firstPageLastAvailable : lastPageAvailable);
+
+          const availableForThisPage = fitsAsSingleLastPage
+            ? Math.max(isFirst ? firstPageLastAvailable : lastPageAvailable, 60)
+            : Math.max(isFirst ? firstMiddlePageAvailable : middlePageAvailable, 60);
+
+          let acc = 0;
+          const start = idx;
+          while (idx < dataRows.length && acc + rowHeights[idx] <= availableForThisPage) {
+            acc += rowHeights[idx];
+            idx += 1;
+          }
+          if (idx === start) {
+            idx += 1;
+          }
+          pages.push({ start, end: idx });
+          builtPageCount += 1;
+        }
+
+        // Pass 2: last page must fit note + grand total — move overflow UP, never peel 1-row pages down
+        for (let guard = 0; guard < dataRows.length + 5; guard += 1) {
+          if (pages.length === 0) break;
+          const lastIdx = pages.length - 1;
+          const last = pages[lastIdx];
+          let h = getPageRowsHeight(last);
+          const limit = capacityForPageIndex(lastIdx, true);
+
+          if (h <= limit) break;
+
+          if (pages.length >= 2 && last.end - last.start > 1) {
+            const prev = pages[lastIdx - 1];
+            const moveRow = last.start;
+            const prevH = getPageRowsHeight(prev);
+            const prevCap = capacityForPageIndex(lastIdx - 1, false);
+            if (prevH + rowHeights[moveRow] <= prevCap) {
+              prev.end = moveRow + 1;
+              last.start = moveRow + 1;
+              continue;
+            }
+          }
+
+          if (last.end - last.start <= 1) break;
+
+          const splitAt = last.end - 1;
+          pages[lastIdx] = { start: last.start, end: splitAt };
+          pages.push({ start: splitAt, end: last.end });
+        }
+
+        // Pass 3: merge tiny trailing page into previous when it fits as last page
+        for (let guard = 0; guard < pages.length; guard += 1) {
+          if (pages.length < 2) break;
           const last = pages[pages.length - 1];
-          const h = getPageRowsHeight(last);
-          const lastLimit =
-            pages.length === 1
-              ? Math.max(firstPageLastAvailable, 60)
-              : Math.max(lastPageAvailable, 60);
-          if (h <= lastLimit || last.end - last.start <= 1) {
+          const prev = pages[pages.length - 2];
+          const lastRows = last.end - last.start;
+          if (lastRows > 3) break;
+          const combinedH = getPageRowsHeight({ start: prev.start, end: last.end });
+          const mergedPageIndex = pages.length - 2;
+          if (combinedH <= capacityForPageIndex(mergedPageIndex, true)) {
+            pages[pages.length - 2] = { start: prev.start, end: last.end };
+            pages.pop();
+          } else {
             break;
           }
-          const splitAt = last.end - 1;
-          pages[pages.length - 1] = { start: last.start, end: splitAt };
-          pages.push({ start: splitAt, end: last.end });
         }
 
         /** Measure column widths from full table (all rows) before split. */
@@ -2229,7 +2278,6 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
           });
         };
 
-        /** Reuse first-layout column widths on every paginated table. */
         const applySummarizedColumnWidths = (table, widthsPx) => {
           if (!widthsPx || widthsPx.length === 0) return;
           const total = widthsPx.reduce((sum, w) => sum + w, 0);
@@ -2252,6 +2300,65 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
         };
 
         const summarizedColumnWidthsPx = captureSummarizedColumnWidths(originalTable);
+
+        /** Merged-column metadata from row 0 (rowspan cells) — used when splitting across pages. */
+        const extractSummarizedVerticalMergeMeta = (rows) => {
+          if (!rows.length) return [];
+          const meta = [];
+          rows[0].querySelectorAll("td").forEach((td, colIndex) => {
+            const rowSpan = parseInt(td.getAttribute("rowspan"), 10);
+            if (Number.isFinite(rowSpan) && rowSpan > 1) {
+              meta.push({ colIndex, innerHTML: td.innerHTML });
+            }
+          });
+          return meta;
+        };
+
+        /**
+         * PDF pagination clones tbody chunks; full-table rowspan causes duplicated/overlapping
+         * text on page 2+. Cap rowspan per chunk and inject merge cells on continuation pages.
+         */
+        const applyVerticalMergeToChunk = (tbody, mergeMeta) => {
+          if (!mergeMeta || mergeMeta.length === 0) return;
+          const dataRows = Array.from(tbody.querySelectorAll("tr")).filter(
+            (row) => !row.classList.contains("summary-grand-total-row")
+          );
+          const dataRowCount = dataRows.length;
+          if (dataRowCount === 0) return;
+
+          const sortedMeta = [...mergeMeta].sort((a, b) => b.colIndex - a.colIndex);
+          sortedMeta.forEach(({ colIndex, innerHTML }) => {
+            const firstRow = dataRows[0];
+            const cells = firstRow.querySelectorAll("td");
+            const existing = cells[colIndex];
+            const existingRowspan = existing
+              ? parseInt(existing.getAttribute("rowspan"), 10)
+              : 0;
+
+            if (existingRowspan > 1) {
+              existing.setAttribute("rowspan", String(dataRowCount));
+              existing.style.verticalAlign = "middle";
+              existing.style.textAlign = "center";
+              return;
+            }
+
+            const newTd = document.createElement("td");
+            newTd.setAttribute("rowspan", String(dataRowCount));
+            newTd.className = "summarized-vertical-merged-cell";
+            newTd.style.verticalAlign = "middle";
+            newTd.style.textAlign = "center";
+            newTd.innerHTML = innerHTML;
+
+            if (colIndex >= cells.length) {
+              firstRow.appendChild(newTd);
+            } else {
+              firstRow.insertBefore(newTd, cells[colIndex]);
+            }
+          });
+        };
+
+        const summarizedVerticalMergeMeta =
+          extractSummarizedVerticalMergeMeta(dataRows);
 
         summaryRoot.innerHTML = "";
 
@@ -2300,6 +2407,7 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
             grandRows.forEach((row) => newTbody.appendChild(row.cloneNode(true)));
           }
           table.appendChild(newTbody);
+          applyVerticalMergeToChunk(newTbody, summarizedVerticalMergeMeta);
           applySummarizedColumnWidths(table, summarizedColumnWidthsPx);
 
           pageBlock.appendChild(table);

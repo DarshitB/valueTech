@@ -40,6 +40,35 @@ const SUMMARIZED_CURRENCY_PREFIX_IDS = new Set([
   "estimated_fair_value",
 ]);
 
+const SUMMARIZED_FIXED_END_COLUMN_IDS = new Set(FIXED_END.map((col) => col.id));
+
+/** Columns that cannot be vertically merged (matches SummarizedReport.js). */
+const SUMMARIZED_VERTICAL_MERGE_BLOCKLIST = new Set(["amount_post_depreciation"]);
+
+function canVerticallyMergeSummarizedColumn(colId) {
+  return Boolean(
+    colId &&
+      !SUMMARIZED_FIXED_END_COLUMN_IDS.has(colId) &&
+      !SUMMARIZED_VERTICAL_MERGE_BLOCKLIST.has(colId)
+  );
+}
+
+function getVerticalMergedColumnIds(tableData) {
+  const ids = Array.isArray(tableData?.verticalMergedColumnIds)
+    ? tableData.verticalMergedColumnIds
+    : [];
+  return ids.filter(canVerticallyMergeSummarizedColumn);
+}
+
+function getVerticalMergeValues(tableData) {
+  const raw = tableData?.verticalMergeValues;
+  return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+}
+
+function isVerticallyMergedColumn(colId, mergedColumnIds) {
+  return Boolean(colId && mergedColumnIds.includes(colId));
+}
+
 function parseSummarizedTable(raw) {
   if (!raw) return { dynamicColumns: [], rows: [] };
   if (typeof raw === "object") return raw;
@@ -60,8 +89,14 @@ function getOrderedColumns(tableData) {
 const SUMMARIZED_FIXED_START_IDS = new Set(FIXED_START.map((c) => c.id));
 
 /** True if at least one row has a non-empty value (trimmed) for this column. */
-function hasSummarizedColumnData(rows, colId) {
-  if (!colId || !Array.isArray(rows) || rows.length === 0) return false;
+function hasSummarizedColumnData(rows, colId, tableData) {
+  if (!colId) return false;
+  const mergedIds = getVerticalMergedColumnIds(tableData || {});
+  if (isVerticallyMergedColumn(colId, mergedIds)) {
+    const mergedVal = String(getVerticalMergeValues(tableData || {})[colId] ?? "").trim();
+    if (mergedVal !== "") return true;
+  }
+  if (!Array.isArray(rows) || rows.length === 0) return false;
   for (const row of rows) {
     if (!row) continue;
     const trimmed = String(getCellValue(row, colId) ?? "").trim();
@@ -95,7 +130,7 @@ function getVisibleOrderedColumns(tableData) {
   const all = getOrderedColumns(tableData);
   const rows = Array.isArray(tableData?.rows) ? tableData.rows : [];
   if (rows.length === 0) return all;
-  return all.filter((col) => hasSummarizedColumnData(rows, col.id));
+  return all.filter((col) => hasSummarizedColumnData(rows, col.id, tableData));
 }
 
 function parseCurrencyValue(val) {
@@ -233,6 +268,48 @@ function formatSummarizedCellDisplay(colId, value) {
     return `${value}%`;
   }
   return value;
+}
+
+function resolveSummarizedBodyCellValue(colId, row, tableData, mergedColumnIds) {
+  if (isVerticallyMergedColumn(colId, mergedColumnIds)) {
+    return getVerticalMergeValues(tableData)[colId] ?? "";
+  }
+  return getCellValue(row, colId);
+}
+
+function renderSummarizedBodyCell(colId, row, rowIndex, tableData, mergedColumnIds, dataRowCount) {
+  if (isVerticallyMergedColumn(colId, mergedColumnIds) && rowIndex > 0) {
+    return "";
+  }
+  const rawValue = resolveSummarizedBodyCellValue(colId, row, tableData, mergedColumnIds);
+  const inner = renderFieldValue(formatSummarizedCellDisplay(colId, rawValue));
+  if (isVerticallyMergedColumn(colId, mergedColumnIds) && rowIndex === 0) {
+    const rowSpan = Math.max(dataRowCount, 1);
+    return `<td rowspan="${rowSpan}" class="summarized-vertical-merged-cell">${inner}</td>`;
+  }
+  return `<td>${inner}</td>`;
+}
+
+function renderSummarizedDataRowsHtml(rows, orderedColumns, tableData) {
+  const mergedColumnIds = getVerticalMergedColumnIds(tableData);
+  const dataRowCount = rows.length;
+  return rows
+    .map(
+      (row, rowIndex) =>
+        `<tr>${orderedColumns
+          .map((col) =>
+            renderSummarizedBodyCell(
+              col.id,
+              row,
+              rowIndex,
+              tableData,
+              mergedColumnIds,
+              dataRowCount
+            )
+          )
+          .join("")}</tr>`
+    )
+    .join("");
 }
 
 // ---------------------------------------------------------------------------
@@ -901,14 +978,7 @@ function generateSummarizedTableAppendixHTML(formData, stampImageBase64) {
 
   const dataRowsHtml =
     rows.length > 0
-      ? rows
-          .map(
-            (row) =>
-              `<tr>${orderedColumns
-                .map((col) => `<td>${renderFieldValue(formatSummarizedCellDisplay(col.id, getCellValue(row, col.id)))}</td>`)
-                .join("")}</tr>`
-          )
-          .join("")
+      ? renderSummarizedDataRowsHtml(rows, orderedColumns, tableData)
       : `<tr><td colspan="${colSpan}" style="text-align:center;">No summarized table rows.</td></tr>`;
 
   const renderedRows = dataRowsHtml + renderSummarizedGrandTotalRow(tableData, orderedColumns);
@@ -954,6 +1024,10 @@ function generateSummarizedTableAppendixHTML(formData, stampImageBase64) {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     color-adjust: exact !important;
+  }
+  .summary-table td.summarized-vertical-merged-cell {
+    vertical-align: middle !important;
+    text-align: center !important;
   }
   .summary-table .spacer-row {
     height: 180px;
@@ -1085,4 +1159,10 @@ function generateSummarizedTableAppendixHTML(formData, stampImageBase64) {
 module.exports = {
   generateSummarizedNormalFieldsHTML,
   generateSummarizedTableAppendixHTML,
+  // Exported for unit tests / reuse
+  canVerticallyMergeSummarizedColumn,
+  getVerticalMergedColumnIds,
+  getVerticalMergeValues,
+  renderSummarizedDataRowsHtml,
+  hasSummarizedColumnData,
 };

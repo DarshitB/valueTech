@@ -255,6 +255,10 @@ const SUMMARIZED_FIXED_END_COLUMNS = [
   { id: "estimated_fair_value", header: "Estimated Fair Value" },
 ];
 
+const SUMMARIZED_FIXED_END_COLUMN_IDS = new Set(
+  SUMMARIZED_FIXED_END_COLUMNS.map((col) => col.id)
+);
+
 const SUMMARIZED_TRAILING_COLUMNS = [
   { id: "subcategory_id", header: "Subcategory Selection" },
 ];
@@ -310,7 +314,32 @@ const normalizeSummarizedRows = (rows, dynamicColumns = []) => {
 const getDefaultSummarizedTableData = () => ({
   dynamicColumns: [],
   rows: [buildEmptySummarizedRow([])],
+  verticalMergedColumnIds: [],
+  verticalMergeValues: {},
 });
+
+const SUMMARIZED_VERTICAL_MERGE_BLOCKLIST = new Set(["amount_post_depreciation"]);
+
+const canVerticallyMergeSummarizedColumn = (colId) =>
+  Boolean(
+    colId &&
+      !SUMMARIZED_FIXED_END_COLUMN_IDS.has(colId) &&
+      !SUMMARIZED_VERTICAL_MERGE_BLOCKLIST.has(colId)
+  );
+
+/** Rowspan must cover every data row plus hover-insert <tr>s between them (2n - 1). */
+const getSummarizedVerticalMergeRowSpan = (dataRowCount) =>
+  dataRowCount > 0 ? dataRowCount * 2 - 1 : 1;
+
+const getSummarizedColumnLabel = (col, dynamicColumns = []) => {
+  if (!col) return "";
+  if (col.header) return col.header;
+  const dynamic = dynamicColumns.find((c) => c.id === col.id);
+  return dynamic?.header || col.id || "";
+};
+
+const isVerticallyMergedColumn = (colId, verticalMergedColumnIds = []) =>
+  Boolean(colId && verticalMergedColumnIds.includes(colId));
 
 /** null = empty, number = rate %, "non_numeric" = text (e.g. NA) */
 const parseDepreciationRateInput = (raw) => {
@@ -323,6 +352,206 @@ const parseDepreciationRateInput = (raw) => {
   const n = parseFloat(normalized);
   return Number.isFinite(n) ? n : "non_numeric";
 };
+
+const SUMMARIZED_NAV_SKIP_COLUMN_IDS = new Set(["amount_post_depreciation"]);
+
+const isSummarizedNavCellActive = (rowIndex, colIndex, columns, mergedColumnIds) => {
+  const col = columns[colIndex];
+  if (!col) return false;
+  if (SUMMARIZED_NAV_SKIP_COLUMN_IDS.has(col.id)) return false;
+  if (isVerticallyMergedColumn(col.id, mergedColumnIds) && rowIndex > 0) return false;
+  return true;
+};
+
+const findSummarizedNavCell = (
+  startRow,
+  startCol,
+  dRow,
+  dCol,
+  rowCount,
+  colCount,
+  columns,
+  mergedColumnIds
+) => {
+  let row = startRow + dRow;
+  let col = startCol + dCol;
+  const maxSteps = Math.max(rowCount, colCount) * 2;
+  for (let step = 0; step < maxSteps; step += 1) {
+    if (row < 0 || row >= rowCount || col < 0 || col >= colCount) {
+      return null;
+    }
+    if (isSummarizedNavCellActive(row, col, columns, mergedColumnIds)) {
+      return { row, col };
+    }
+    row += dRow;
+    col += dCol;
+  }
+  return null;
+};
+
+/** Plain ↑/↓: navigate between rows unless user is moving inside a multi-line textarea. */
+const shouldSummarizedVerticalNavFromField = (el, direction) => {
+  if (!el) return false;
+  if (el.tagName === "INPUT" && el.getAttribute("role") !== "combobox") return true;
+  if (el.tagName !== "TEXTAREA") return false;
+
+  const value = typeof el.value === "string" ? el.value : "";
+  if (!value.includes("\n")) return true;
+
+  const start = el.selectionStart ?? 0;
+  const end = el.selectionEnd ?? 0;
+  const before = value.slice(0, start);
+  const lineIndex = before.split("\n").length - 1;
+
+  if (direction === "up") {
+    return lineIndex === 0;
+  }
+  if (direction === "down") {
+    const after = value.slice(end);
+    const linesAfter = after.split("\n");
+    return linesAfter.length <= 1;
+  }
+  return false;
+};
+
+const focusSummarizedNavCell = (scrollRoot, row, col) => {
+  if (!scrollRoot) return false;
+  const td = scrollRoot.querySelector(
+    `tbody td[data-summarized-nav-row="${row}"][data-summarized-nav-col="${col}"]`
+  );
+  if (!td) return false;
+  const focusable =
+    td.querySelector("textarea.form-field") ||
+    td.querySelector('input.form-field:not([readonly]):not([tabindex="-1"])') ||
+    td.querySelector('input[role="combobox"]') ||
+    td.querySelector('[class*="control"] input');
+  if (!focusable) return false;
+  focusable.focus();
+  const textLength =
+    typeof focusable.value === "string" ? focusable.value.length : 0;
+  if (typeof focusable.setSelectionRange === "function") {
+    focusable.setSelectionRange(textLength, textLength);
+  }
+  return true;
+};
+
+function SummarizedRowInsertZone({ insertIndex, colSpan, onInsert }) {
+  return (
+    <tr className="summarized-row-insert-zone">
+      <td colSpan={colSpan}>
+        <div className="summarized-row-insert-zone-inner">
+          <button
+            type="button"
+            className="summarized-row-insert-button"
+            onClick={() => onInsert(insertIndex)}
+            title="Add row here"
+            aria-label="Add row here"
+          >
+            +
+          </button>
+          <div className="summarized-row-insert-line" aria-hidden="true" />
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+/** Per-column: merge all rows into one cell (rowspan), not merging columns together. */
+function SummarizedVerticalColumnMergeDropdown({
+  columns,
+  dynamicColumns,
+  verticalMergedColumnIds,
+  onToggleColumnMerge,
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
+  const mergedSet = useMemo(() => new Set(verticalMergedColumnIds || []), [verticalMergedColumnIds]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="summarized-vertical-merge-dropdown"
+      style={{ position: "relative", display: "inline-flex", flex: "0 0 auto" }}
+    >
+      <button
+        type="button"
+        className="btn btn-outline-secondary"
+        onClick={() => setOpen((prev) => !prev)}
+        style={{ width: "fit-content", display: "inline-flex", whiteSpace: "nowrap" }}
+        aria-expanded={open}
+      >
+        Merge column rows
+      </button>
+      {open ? (
+        <div
+          role="listbox"
+          aria-multiselectable="true"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 4px)",
+            right: 0,
+            zIndex: 20,
+            minWidth: "240px",
+            maxHeight: "320px",
+            overflowY: "auto",
+            backgroundColor: "#fff",
+            border: "1px solid #d1d5db",
+            borderRadius: "6px",
+            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.12)",
+            padding: "4px 0",
+          }}
+        >
+          {columns.map((col) => {
+            const blocked = !canVerticallyMergeSummarizedColumn(col.id);
+            const merged = mergedSet.has(col.id);
+            return (
+              <button
+                key={col.id}
+                type="button"
+                role="option"
+                aria-selected={merged}
+                disabled={blocked}
+                onClick={() => onToggleColumnMerge(col.id, !merged)}
+                title={
+                  blocked
+                    ? "This column cannot be row-merged"
+                    : merged
+                      ? "Unmerge rows in this column"
+                      : "Merge all rows in this column"
+                }
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  border: "none",
+                  background: merged ? "#dbeafe" : "transparent",
+                  color: merged ? "#1d4ed8" : "#111827",
+                  fontWeight: merged ? 600 : 400,
+                  padding: "8px 12px",
+                  cursor: blocked ? "not-allowed" : "pointer",
+                  opacity: blocked ? 0.45 : 1,
+                }}
+              >
+                {getSummarizedColumnLabel(col, dynamicColumns)}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function SummarizedFixedColumnVisibilityDropdown({ columns, visibleIds, onVisibleIdsChange }) {
   const [open, setOpen] = useState(false);
@@ -1840,9 +2069,18 @@ function SummarizedReport() {
             }))
         : [];
       const rows = Array.isArray(parsed?.rows) ? parsed.rows : [];
+      const verticalMergedColumnIds = Array.isArray(parsed?.verticalMergedColumnIds)
+        ? parsed.verticalMergedColumnIds.filter((id) => canVerticallyMergeSummarizedColumn(id))
+        : [];
+      const verticalMergeValues =
+        parsed?.verticalMergeValues && typeof parsed.verticalMergeValues === "object"
+          ? parsed.verticalMergeValues
+          : {};
       setSummarizedTableData({
         dynamicColumns,
         rows: normalizeSummarizedRows(rows, dynamicColumns),
+        verticalMergedColumnIds,
+        verticalMergeValues,
       });
     } catch (err) {
       setSummarizedTableData(getDefaultSummarizedTableData());
@@ -1882,15 +2120,54 @@ function SummarizedReport() {
     [summarizedOrderedColumns, isSummarizedFixedColumnVisible]
   );
 
+  const summarizedVerticalMergeEligibleColumns = useMemo(
+    () =>
+      summarizedDisplayOrderedColumns.filter((col) =>
+        canVerticallyMergeSummarizedColumn(col.id)
+      ),
+    [summarizedDisplayOrderedColumns]
+  );
+
   const summarizedVisibleFixedStartColumns = useMemo(
     () => SUMMARIZED_FIXED_START_COLUMNS.filter((col) => isSummarizedFixedColumnVisible(col.id)),
     [isSummarizedFixedColumnVisible]
   );
 
+  const summarizedVerticalMergedColumnIds = useMemo(
+    () => summarizedTableData?.verticalMergedColumnIds || [],
+    [summarizedTableData?.verticalMergedColumnIds]
+  );
+
+  const summarizedVerticalMergedSet = useMemo(
+    () => new Set(summarizedVerticalMergedColumnIds),
+    [summarizedVerticalMergedColumnIds]
+  );
+
+  const summarizedVerticalMergeValues = useMemo(
+    () => summarizedTableData?.verticalMergeValues || {},
+    [summarizedTableData?.verticalMergeValues]
+  );
+
+  const summarizedDataRowCount = (summarizedTableData.rows || []).length;
+  const summarizedDataRowSpan = useMemo(
+    () => getSummarizedVerticalMergeRowSpan(summarizedDataRowCount),
+    [summarizedDataRowCount]
+  );
+
   const getSummarizedColumnWidth = useCallback((colId) => {
     if (colId === "sr_no") return 90;
-    if (colId === "subcategory_id") return 300;
+    if (colId === "subcategory_id") return 200;
     if (colId === "machine_description") return 400;
+    if (colId === "yom") return 150;
+    if (colId === "invoice_no") return 150;
+    if (colId === "invoice_date") return 125;
+    if (colId === "total_invoice_cost") return 175;
+    if (colId === "estimated_current_replacement_cost") return 175;
+    if (colId === "residual_life_of_asset") return 75;
+    if (colId === "depr_rate") return 75;
+    if (colId === "amount_post_depreciation") return 175;
+    if (colId === "appraisal_value") return 175;
+    if (colId === "estimated_fair_value") return 175;
     return 200;
   }, []);
 
@@ -2051,6 +2328,24 @@ function SummarizedReport() {
     });
   }, [summarizedTableData, handleSummarizedTableDataChange]);
 
+  const handleInsertSummarizedRowAt = useCallback(
+    (insertIndex) => {
+      const dynamicCols = summarizedTableData.dynamicColumns || [];
+      const existingRows = summarizedTableData.rows || [];
+      const newRow = buildEmptySummarizedRow(dynamicCols);
+      const nextRows = [
+        ...existingRows.slice(0, insertIndex),
+        newRow,
+        ...existingRows.slice(insertIndex),
+      ];
+      handleSummarizedTableDataChange({
+        ...summarizedTableData,
+        rows: nextRows,
+      });
+    },
+    [summarizedTableData, handleSummarizedTableDataChange]
+  );
+
   useLayoutEffect(() => {
     if (!scrollSummarizedTableToBottomRef.current) return;
     scrollSummarizedTableToBottomRef.current = false;
@@ -2072,6 +2367,7 @@ function SummarizedReport() {
       [newColumn.id]: "",
     }));
     handleSummarizedTableDataChange({
+      ...summarizedTableData,
       dynamicColumns: nextDynamicColumns,
       rows: nextRows,
     });
@@ -2101,14 +2397,296 @@ function SummarizedReport() {
         delete nextRow[columnId];
         return nextRow;
       });
+      const nextVerticalMergedColumnIds = (summarizedTableData.verticalMergedColumnIds || []).filter(
+        (id) => id !== columnId
+      );
+      const nextVerticalMergeValues = { ...(summarizedTableData.verticalMergeValues || {}) };
+      delete nextVerticalMergeValues[columnId];
       handleSummarizedTableDataChange({
         ...summarizedTableData,
         dynamicColumns: nextDynamicColumns,
+        rows: nextRows,
+        verticalMergedColumnIds: nextVerticalMergedColumnIds,
+        verticalMergeValues: nextVerticalMergeValues,
+      });
+    },
+    [summarizedTableData, handleSummarizedTableDataChange]
+  );
+
+  const handleToggleVerticalColumnMerge = useCallback(
+    (columnId, shouldMerge) => {
+      if (!canVerticallyMergeSummarizedColumn(columnId)) return;
+      const currentIds = summarizedTableData.verticalMergedColumnIds || [];
+      if (shouldMerge) {
+        if (currentIds.includes(columnId)) return;
+        const seedValue = String((summarizedTableData.rows || [])[0]?.[columnId] ?? "");
+        handleSummarizedTableDataChange({
+          ...summarizedTableData,
+          verticalMergedColumnIds: [...currentIds, columnId],
+          verticalMergeValues: {
+            ...(summarizedTableData.verticalMergeValues || {}),
+            [columnId]: seedValue,
+          },
+        });
+        return;
+      }
+      const sharedValue = summarizedTableData.verticalMergeValues?.[columnId] ?? "";
+      const nextVerticalMergeValues = { ...(summarizedTableData.verticalMergeValues || {}) };
+      delete nextVerticalMergeValues[columnId];
+      const nextRows = (summarizedTableData.rows || []).map((row) => ({
+        ...row,
+        [columnId]: sharedValue,
+      }));
+      handleSummarizedTableDataChange({
+        ...summarizedTableData,
+        verticalMergedColumnIds: currentIds.filter((id) => id !== columnId),
+        verticalMergeValues: nextVerticalMergeValues,
         rows: nextRows,
       });
     },
     [summarizedTableData, handleSummarizedTableDataChange]
   );
+
+  const handleVerticalMergeValueChange = useCallback(
+    (columnId, value) => {
+      handleSummarizedTableDataChange({
+        ...summarizedTableData,
+        verticalMergeValues: {
+          ...(summarizedTableData.verticalMergeValues || {}),
+          [columnId]: value,
+        },
+      });
+    },
+    [summarizedTableData, handleSummarizedTableDataChange]
+  );
+
+  const handleSummarizedTableKeyDown = useCallback(
+    (e) => {
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      const isVertical = e.key === "ArrowUp" || e.key === "ArrowDown";
+      const isHorizontal = e.key === "ArrowLeft" || e.key === "ArrowRight";
+      if (!isVertical && !isHorizontal) return;
+
+      const useGridNav = e.shiftKey ? isVertical || isHorizontal : isVertical;
+      if (!useGridNav) return;
+
+      const scrollRoot = summarizedTableScrollRef.current;
+      if (!scrollRoot?.contains(document.activeElement)) return;
+
+      const active = document.activeElement;
+      if (active?.getAttribute("aria-expanded") === "true") return;
+      if (active?.closest('[class*="menu"], [role="listbox"]')) return;
+
+      if (!e.shiftKey) {
+        if (active?.getAttribute("role") === "combobox") return;
+        const verticalDir = e.key === "ArrowUp" ? "up" : "down";
+        if (!shouldSummarizedVerticalNavFromField(active, verticalDir)) return;
+      }
+
+      const tbody = scrollRoot.querySelector("tbody");
+      const activeTd = active?.closest("td[data-summarized-nav-row]");
+      if (!tbody || !activeTd || !tbody.contains(activeTd)) return;
+
+      const startRow = parseInt(activeTd.getAttribute("data-summarized-nav-row"), 10);
+      const startCol = parseInt(activeTd.getAttribute("data-summarized-nav-col"), 10);
+      if (!Number.isFinite(startRow) || !Number.isFinite(startCol)) return;
+
+      const rowCount = (summarizedTableData.rows || []).length;
+      const columns = summarizedDisplayOrderedColumns;
+      const colCount = columns.length;
+      const mergedColumnIds = summarizedVerticalMergedColumnIds;
+
+      let dRow = 0;
+      let dCol = 0;
+      if (e.key === "ArrowUp") dRow = -1;
+      else if (e.key === "ArrowDown") dRow = 1;
+      else if (e.key === "ArrowLeft") dCol = -1;
+      else if (e.key === "ArrowRight") dCol = 1;
+
+      const target = findSummarizedNavCell(
+        startRow,
+        startCol,
+        dRow,
+        dCol,
+        rowCount,
+        colCount,
+        columns,
+        mergedColumnIds
+      );
+      if (!target) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      focusSummarizedNavCell(scrollRoot, target.row, target.col);
+    },
+    [
+      summarizedTableData.rows,
+      summarizedDisplayOrderedColumns,
+      summarizedVerticalMergedColumnIds,
+    ]
+  );
+
+  const renderSummarizedDataCell = (col, row, rowIndex, colIndex) => {
+    const columnId = col.id;
+    const verticallyMerged = summarizedVerticalMergedSet.has(columnId);
+    if (verticallyMerged && rowIndex > 0) {
+      return null;
+    }
+
+    const cellStyle = {
+      minWidth: `${getSummarizedColumnWidth(columnId)}px`,
+      width: `${getSummarizedColumnWidth(columnId)}px`,
+    };
+    const mergedTdProps = verticallyMerged
+      ? {
+          rowSpan: summarizedDataRowSpan,
+          className: "summarized-merged-cell",
+          style: { ...cellStyle, verticalAlign: "top", textAlign: "center" },
+        }
+      : { style: cellStyle };
+
+    const cellValue = verticallyMerged
+      ? summarizedVerticalMergeValues[columnId] ?? ""
+      : row[columnId] || "";
+
+    const setCellValue = (nextValue) => {
+      if (verticallyMerged) {
+        handleVerticalMergeValueChange(columnId, nextValue);
+      } else {
+        handleSummarizedCellChange(rowIndex, columnId, nextValue);
+      }
+    };
+
+    let cellContent;
+    if (columnId === "subcategory_id") {
+      cellContent = (
+        <SingleSearchSelect
+          options={summarizedSubcategoryOptions}
+          value={cellValue}
+          onChange={setCellValue}
+          placeholder="Select Subcategory"
+          styles={summarizedSelectStyles}
+        />
+      );
+    } else if (columnId === "invoice_date") {
+      cellContent = (
+        <input
+          type="text"
+          inputMode="numeric"
+          className="form-field mb-0"
+          style={summarizedInputStyle}
+          value={cellValue}
+          maxLength={10}
+          onChange={(e) => {
+            let numericValue = (e.target.value || "").replace(/\D/g, "");
+            if (numericValue.length > 8) {
+              numericValue = numericValue.substring(0, 8);
+            }
+            let formattedValue = "";
+            if (numericValue.length > 4) {
+              formattedValue =
+                numericValue.substring(0, 2) +
+                "-" +
+                numericValue.substring(2, 4) +
+                "-" +
+                numericValue.substring(4);
+            } else if (numericValue.length > 2) {
+              formattedValue =
+                numericValue.substring(0, 2) + "-" + numericValue.substring(2);
+            } else {
+              formattedValue = numericValue;
+            }
+            setCellValue(formattedValue);
+          }}
+          placeholder="DD-MM-YYYY"
+        />
+      );
+    } else if (SUMMARIZED_DIGITS_ONLY_COLUMN_IDS.has(columnId)) {
+      cellContent = (
+        <input
+          type="text"
+          inputMode="numeric"
+          className="form-field mb-0"
+          style={summarizedInputStyle}
+          value={cellValue}
+          onChange={(e) => setCellValue(e.target.value.replace(/\D/g, ""))}
+          placeholder="0"
+        />
+      );
+    } else if (columnId === "amount_post_depreciation") {
+      cellContent = (
+        <input
+          type="text"
+          className="form-field mb-0"
+          style={{
+            ...summarizedInputStyle,
+            backgroundColor: "#f9fafb",
+            cursor: "not-allowed",
+          }}
+          value={row[columnId] || ""}
+          readOnly
+          tabIndex={-1}
+          placeholder="Auto calculated"
+        />
+      );
+    } else if (SUMMARIZED_CURRENCY_COLUMN_IDS.has(columnId)) {
+      cellContent = (
+        <input
+          type="text"
+          className="form-field mb-0"
+          style={summarizedInputStyle}
+          value={cellValue}
+          onChange={(e) => setCellValue(handleCurrencyFormatting(e.target.value))}
+          placeholder="0.00"
+        />
+      );
+    } else if ((summarizedTableData.dynamicColumns || []).find((c) => c.id === columnId)?.allowSum) {
+      cellContent = (
+        <input
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          className="form-field mb-0"
+          style={summarizedInputStyle}
+          value={cellValue}
+          onChange={(e) => setCellValue(e.target.value.replace(/\D/g, ""))}
+          placeholder="0"
+        />
+      );
+    } else {
+      cellContent = (
+        <AutoGrowTextarea
+          className="form-field mb-0"
+          style={summarizedInputStyle}
+          value={cellValue}
+          onChange={(e) => setCellValue(e.target.value)}
+        />
+      );
+    }
+
+    const isNavCell =
+      !SUMMARIZED_NAV_SKIP_COLUMN_IDS.has(columnId) &&
+      (!verticallyMerged || rowIndex === 0);
+
+    return (
+      <td
+        key={
+          verticallyMerged
+            ? `${columnId}-merged-rows-${summarizedDataRowSpan}`
+            : `${rowIndex}-${columnId}`
+        }
+        {...mergedTdProps}
+        {...(isNavCell
+          ? {
+              "data-summarized-nav-row": rowIndex,
+              "data-summarized-nav-col": colIndex,
+            }
+          : {})}
+      >
+        {cellContent}
+      </td>
+    );
+  };
 
   // Handle form input changes
   const handleFormChange = useCallback(
@@ -5617,21 +6195,36 @@ function SummarizedReport() {
                 <div className="row">
                   <div className="col-12">
                     <div
-                      className="form-group mb-3"
+                      className="form-group mb-3 summarized-table-toolbar"
                       style={{
                         display: "flex",
-                        justifyContent: "flex-end",
+                        justifyContent: "space-between",
                         alignItems: "center",
                         gap: "8px",
                         width: "100%",
                         flexDirection: "row",
                       }}
                     >
-                      <SummarizedFixedColumnVisibilityDropdown
-                        columns={SUMMARIZED_TOGGLEABLE_FIXED_COLUMNS}
-                        visibleIds={summarizedVisibleFixedColumnIds}
-                        onVisibleIdsChange={setSummarizedVisibleFixedColumnIds}
-                      />
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <SummarizedFixedColumnVisibilityDropdown
+                          columns={SUMMARIZED_TOGGLEABLE_FIXED_COLUMNS}
+                          visibleIds={summarizedVisibleFixedColumnIds}
+                          onVisibleIdsChange={setSummarizedVisibleFixedColumnIds}
+                        />
+                        <SummarizedVerticalColumnMergeDropdown
+                          columns={summarizedVerticalMergeEligibleColumns}
+                          dynamicColumns={summarizedTableData.dynamicColumns || []}
+                          verticalMergedColumnIds={summarizedVerticalMergedColumnIds}
+                          onToggleColumnMerge={handleToggleVerticalColumnMerge}
+                        />
+                      </div>
                       <button
                         type="button"
                         className="btn btn-outline-primary"
@@ -5641,6 +6234,7 @@ function SummarizedReport() {
                           display: "inline-flex",
                           flex: "0 0 auto",
                           whiteSpace: "nowrap",
+                          flexShrink: 0,
                         }}
                       >
                         Add Column
@@ -5649,6 +6243,10 @@ function SummarizedReport() {
                     <div
                       ref={summarizedTableScrollRef}
                       className="summarized-table-scroll"
+                      style={{
+                        "--summarized-table-min-width": `${summarizedTableMinWidth}px`,
+                      }}
+                      onKeyDown={handleSummarizedTableKeyDown}
                     >
                       <table
                         className="table table-bordered summarized-data-table"
@@ -5758,144 +6356,20 @@ function SummarizedReport() {
                         </thead>
                         <tbody>
                           {(summarizedTableData.rows || []).map((row, rowIndex) => (
+                            <React.Fragment key={`sum-row-block-${rowIndex}`}>
+                              {rowIndex > 0 ? (
+                                <SummarizedRowInsertZone
+                                  insertIndex={rowIndex}
+                                  colSpan={summarizedDisplayOrderedColumns.length + 1}
+                                  onInsert={handleInsertSummarizedRowAt}
+                                />
+                              ) : null}
                             <tr key={`sum-row-${rowIndex}`}>
-                              {summarizedDisplayOrderedColumns.map((col) => (
-                                <td
-                                  key={`${rowIndex}-${col.id}`}
-                                  style={{
-                                    minWidth: `${getSummarizedColumnWidth(col.id)}px`,
-                                    width: `${getSummarizedColumnWidth(col.id)}px`,
-                                  }}
-                                >
-                                  {col.id === "subcategory_id" ? (
-                                    <SingleSearchSelect
-                                      options={summarizedSubcategoryOptions}
-                                      value={row[col.id] || ""}
-                                      onChange={(value) =>
-                                        handleSummarizedCellChange(rowIndex, col.id, value)
-                                      }
-                                      placeholder="Select Subcategory"
-                                      styles={summarizedSelectStyles}
-                                    />
-                                  ) : col.id === "invoice_date" ? (
-                                    <input
-                                      type="text"
-                                      inputMode="numeric"
-                                      className="form-field mb-0"
-                                      style={summarizedInputStyle}
-                                      value={row[col.id] || ""}
-                                      maxLength={10}
-                                      onChange={(e) => {
-                                        let numericValue = (e.target.value || "").replace(
-                                          /\D/g,
-                                          ""
-                                        );
-                                        if (numericValue.length > 8) {
-                                          numericValue = numericValue.substring(0, 8);
-                                        }
-
-                                        let formattedValue = "";
-                                        if (numericValue.length > 4) {
-                                          formattedValue =
-                                            numericValue.substring(0, 2) +
-                                            "-" +
-                                            numericValue.substring(2, 4) +
-                                            "-" +
-                                            numericValue.substring(4);
-                                        } else if (numericValue.length > 2) {
-                                          formattedValue =
-                                            numericValue.substring(0, 2) +
-                                            "-" +
-                                            numericValue.substring(2);
-                                        } else {
-                                          formattedValue = numericValue;
-                                        }
-
-                                        handleSummarizedCellChange(
-                                          rowIndex,
-                                          col.id,
-                                          formattedValue
-                                        );
-                                      }}
-                                      placeholder="DD-MM-YYYY"
-                                    />
-                                  ) : SUMMARIZED_DIGITS_ONLY_COLUMN_IDS.has(col.id) ? (
-                                    <input
-                                      type="text"
-                                      inputMode="numeric"
-                                      className="form-field mb-0"
-                                      style={summarizedInputStyle}
-                                      value={row[col.id] || ""}
-                                      onChange={(e) => {
-                                        const digitsOnly = e.target.value.replace(/\D/g, "");
-                                        handleSummarizedCellChange(rowIndex, col.id, digitsOnly);
-                                      }}
-                                      placeholder="0"
-                                    />
-                                  ) : col.id === "amount_post_depreciation" ? (
-                                    <input
-                                      type="text"
-                                      className="form-field mb-0"
-                                      style={{
-                                        ...summarizedInputStyle,
-                                        backgroundColor: "#f9fafb",
-                                        cursor: "not-allowed",
-                                      }}
-                                      value={row[col.id] || ""}
-                                      readOnly
-                                      tabIndex={-1}
-                                      placeholder="Auto calculated"
-                                    />
-                                  ) : SUMMARIZED_CURRENCY_COLUMN_IDS.has(col.id) ? (
-                                    <input
-                                      type="text"
-                                      className="form-field mb-0"
-                                      style={summarizedInputStyle}
-                                      value={row[col.id] || ""}
-                                      onChange={(e) => {
-                                        const formatted = handleCurrencyFormatting(
-                                          e.target.value
-                                        );
-                                        handleSummarizedCellChange(
-                                          rowIndex,
-                                          col.id,
-                                          formatted
-                                        );
-                                      }}
-                                      placeholder="0.00"
-                                    />
-                                  ) : (summarizedTableData.dynamicColumns || []).find(
-                                      (c) => c.id === col.id
-                                    )?.allowSum ? (
-                                    <input
-                                      type="text"
-                                      inputMode="numeric"
-                                      autoComplete="off"
-                                      className="form-field mb-0"
-                                      style={summarizedInputStyle}
-                                      value={row[col.id] || ""}
-                                      onChange={(e) => {
-                                        const digitsOnly = e.target.value.replace(/\D/g, "");
-                                        handleSummarizedCellChange(rowIndex, col.id, digitsOnly);
-                                      }}
-                                      placeholder="0"
-                                    />
-                                  ) : (
-                                    <AutoGrowTextarea
-                                      className="form-field mb-0"
-                                      style={summarizedInputStyle}
-                                      value={row[col.id] || ""}
-                                      onChange={(e) =>
-                                        handleSummarizedCellChange(
-                                          rowIndex,
-                                          col.id,
-                                          e.target.value
-                                        )
-                                      }
-                                    />
-                                  )}
-                                </td>
-                              ))}
+                              {summarizedDisplayOrderedColumns
+                                .map((col, colIndex) =>
+                                  renderSummarizedDataCell(col, row, rowIndex, colIndex)
+                                )
+                                .filter(Boolean)}
                               <td>
                                 {rowIndex > 0 ? (
                                   <button
@@ -5914,6 +6388,7 @@ function SummarizedReport() {
                                 )}
                               </td>
                             </tr>
+                            </React.Fragment>
                           ))}
                           <tr key="sum-row-grand-total" className="summarized-grand-total-row">
                             {isSummarizedFixedColumnVisible(SUMMARIZED_SR_NO_COLUMN.id) && (

@@ -3224,14 +3224,15 @@ function OrderDetails() {
 
                   <div className="form-group">
                     <label htmlFor="subject">Subject</label>
-                    <input
+                    <textarea
                       className="form-field"
                       id="subject"
                       name="subject"
-                      type="text"
                       value={mailFormData.subject}
                       onChange={handleMailFormChange}
+                      rows="3"
                       placeholder="Enter email subject"
+                      style={{ resize: "vertical" }}
                       maxLength="200"
                       aria-label="Subject"
                       disabled={isSendingMail}
