@@ -552,7 +552,7 @@ function OrderDetails() {
       let subject = "";
 
       if (order?.category_name === "COMMERCIAL VEHICLE") {
-        const registeredOwnerName = report.registered_owner_name || "";
+        const registeredOwnerName = report.proposed_owner_name || "";
         const registrationNo = report.registration_no || "";
         const bankName = order.bank_name || "";
 
