@@ -285,9 +285,9 @@ function renderSummarizedBodyCell(colId, row, rowIndex, tableData, mergedColumnI
   const inner = renderFieldValue(formatSummarizedCellDisplay(colId, rawValue));
   if (isVerticallyMergedColumn(colId, mergedColumnIds) && rowIndex === 0) {
     const rowSpan = Math.max(dataRowCount, 1);
-    return `<td rowspan="${rowSpan}" class="summarized-vertical-merged-cell">${inner}</td>`;
+    return `<td rowspan="${rowSpan}" class="summarized-vertical-merged-cell" data-col-id="${colId}">${inner}</td>`;
   }
-  return `<td>${inner}</td>`;
+  return `<td data-col-id="${colId}">${inner}</td>`;
 }
 
 function renderSummarizedDataRowsHtml(rows, orderedColumns, tableData) {
@@ -973,7 +973,10 @@ function generateSummarizedTableAppendixHTML(formData, stampImageBase64) {
     : "";
 
   const renderedHeader = orderedColumns
-    .map((col) => `<th>${renderFieldValue(col.header || "-")}</th>`)
+    .map(
+      (col) =>
+        `<th data-col-id="${col.id}">${renderFieldValue(col.header || "-")}</th>`
+    )
     .join("");
 
   const dataRowsHtml =

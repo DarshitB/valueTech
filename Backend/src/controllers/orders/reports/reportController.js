@@ -2301,64 +2301,161 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
 
         const summarizedColumnWidthsPx = captureSummarizedColumnWidths(originalTable);
 
+        const getSummarizedAppendixColumnIds = (table) => {
+          const headerRow = table?.querySelector("thead tr:last-child");
+          if (!headerRow) return [];
+          return Array.from(headerRow.querySelectorAll("th, td"))
+            .map((el) => el.getAttribute("data-col-id"))
+            .filter(Boolean);
+        };
+
         /** Merged-column metadata from row 0 (rowspan cells) — used when splitting across pages. */
-        const extractSummarizedVerticalMergeMeta = (rows) => {
+        const extractSummarizedVerticalMergeMeta = (rows, columnIds) => {
           if (!rows.length) return [];
           const meta = [];
           rows[0].querySelectorAll("td").forEach((td, colIndex) => {
             const rowSpan = parseInt(td.getAttribute("rowspan"), 10);
-            if (Number.isFinite(rowSpan) && rowSpan > 1) {
-              meta.push({ colIndex, innerHTML: td.innerHTML });
+            if (!Number.isFinite(rowSpan) || rowSpan <= 1) return;
+            const colId =
+              td.getAttribute("data-col-id") ||
+              (Array.isArray(columnIds) ? columnIds[colIndex] : null);
+            if (colId) {
+              meta.push({ colId, innerHTML: td.innerHTML });
+              return;
             }
+            meta.push({ colIndex, innerHTML: td.innerHTML });
           });
           return meta;
         };
 
+        const buildSummarizedMergedTd = (colId, rowSpan, innerHTML) => {
+          const td = document.createElement("td");
+          td.setAttribute("data-col-id", colId);
+          td.setAttribute("rowspan", String(rowSpan));
+          td.className = "summarized-vertical-merged-cell";
+          td.style.verticalAlign = "middle";
+          td.style.textAlign = "center";
+          td.innerHTML = innerHTML;
+          return td;
+        };
+
+        const normalizeSummarizedChunkRow = (
+          row,
+          columnIds,
+          mergedByColId,
+          { isFirstDataRow, dataRowCount }
+        ) => {
+          const cellByColId = new Map();
+          row.querySelectorAll("td").forEach((td) => {
+            const colId = td.getAttribute("data-col-id");
+            if (colId) cellByColId.set(colId, td);
+          });
+
+          row.innerHTML = "";
+          columnIds.forEach((colId) => {
+            if (mergedByColId.has(colId)) {
+              if (!isFirstDataRow) return;
+              const mergedTd = buildSummarizedMergedTd(
+                colId,
+                dataRowCount,
+                mergedByColId.get(colId)
+              );
+              row.appendChild(mergedTd);
+              return;
+            }
+
+            const existing = cellByColId.get(colId);
+            if (existing) {
+              existing.removeAttribute("rowspan");
+              row.appendChild(existing);
+              return;
+            }
+
+            const emptyTd = document.createElement("td");
+            emptyTd.setAttribute("data-col-id", colId);
+            row.appendChild(emptyTd);
+          });
+        };
+
         /**
          * PDF pagination clones tbody chunks; full-table rowspan causes duplicated/overlapping
-         * text on page 2+. Cap rowspan per chunk and inject merge cells on continuation pages.
+         * text on page 2+. Rebuild each chunk row by column id so multiple merged columns
+         * stay aligned on continuation pages (td indices differ when rowspan cells are omitted).
          */
-        const applyVerticalMergeToChunk = (tbody, mergeMeta) => {
+        const applyVerticalMergeToChunk = (tbody, mergeMeta, columnIds) => {
           if (!mergeMeta || mergeMeta.length === 0) return;
+          if (!columnIds || columnIds.length === 0) return;
+
+          const mergedByColId = new Map();
+          mergeMeta.forEach((entry) => {
+            if (entry.colId) {
+              mergedByColId.set(entry.colId, entry.innerHTML);
+            }
+          });
+
+          if (mergedByColId.size === 0) {
+            const legacyMeta = mergeMeta.filter(
+              (entry) => Number.isFinite(entry.colIndex)
+            );
+            if (legacyMeta.length === 0) return;
+
+            const dataRows = Array.from(tbody.querySelectorAll("tr")).filter(
+              (row) => !row.classList.contains("summary-grand-total-row")
+            );
+            const dataRowCount = dataRows.length;
+            if (dataRowCount === 0) return;
+
+            const sortedMeta = [...legacyMeta].sort((a, b) => b.colIndex - a.colIndex);
+            sortedMeta.forEach(({ colIndex, innerHTML }) => {
+              const firstRow = dataRows[0];
+              const cells = firstRow.querySelectorAll("td");
+              const existing = cells[colIndex];
+              const existingRowspan = existing
+                ? parseInt(existing.getAttribute("rowspan"), 10)
+                : 0;
+
+              if (existingRowspan > 1) {
+                existing.setAttribute("rowspan", String(dataRowCount));
+                existing.style.verticalAlign = "middle";
+                existing.style.textAlign = "center";
+                return;
+              }
+
+              const newTd = document.createElement("td");
+              newTd.setAttribute("rowspan", String(dataRowCount));
+              newTd.className = "summarized-vertical-merged-cell";
+              newTd.style.verticalAlign = "middle";
+              newTd.style.textAlign = "center";
+              newTd.innerHTML = innerHTML;
+
+              if (colIndex >= cells.length) {
+                firstRow.appendChild(newTd);
+              } else {
+                firstRow.insertBefore(newTd, cells[colIndex]);
+              }
+            });
+            return;
+          }
+
           const dataRows = Array.from(tbody.querySelectorAll("tr")).filter(
             (row) => !row.classList.contains("summary-grand-total-row")
           );
           const dataRowCount = dataRows.length;
           if (dataRowCount === 0) return;
 
-          const sortedMeta = [...mergeMeta].sort((a, b) => b.colIndex - a.colIndex);
-          sortedMeta.forEach(({ colIndex, innerHTML }) => {
-            const firstRow = dataRows[0];
-            const cells = firstRow.querySelectorAll("td");
-            const existing = cells[colIndex];
-            const existingRowspan = existing
-              ? parseInt(existing.getAttribute("rowspan"), 10)
-              : 0;
-
-            if (existingRowspan > 1) {
-              existing.setAttribute("rowspan", String(dataRowCount));
-              existing.style.verticalAlign = "middle";
-              existing.style.textAlign = "center";
-              return;
-            }
-
-            const newTd = document.createElement("td");
-            newTd.setAttribute("rowspan", String(dataRowCount));
-            newTd.className = "summarized-vertical-merged-cell";
-            newTd.style.verticalAlign = "middle";
-            newTd.style.textAlign = "center";
-            newTd.innerHTML = innerHTML;
-
-            if (colIndex >= cells.length) {
-              firstRow.appendChild(newTd);
-            } else {
-              firstRow.insertBefore(newTd, cells[colIndex]);
-            }
+          dataRows.forEach((row, rowIndex) => {
+            normalizeSummarizedChunkRow(row, columnIds, mergedByColId, {
+              isFirstDataRow: rowIndex === 0,
+              dataRowCount,
+            });
           });
         };
 
-        const summarizedVerticalMergeMeta =
-          extractSummarizedVerticalMergeMeta(dataRows);
+        const summarizedColumnIds = getSummarizedAppendixColumnIds(originalTable);
+        const summarizedVerticalMergeMeta = extractSummarizedVerticalMergeMeta(
+          dataRows,
+          summarizedColumnIds
+        );
 
         summaryRoot.innerHTML = "";
 
@@ -2407,7 +2504,11 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
             grandRows.forEach((row) => newTbody.appendChild(row.cloneNode(true)));
           }
           table.appendChild(newTbody);
-          applyVerticalMergeToChunk(newTbody, summarizedVerticalMergeMeta);
+          applyVerticalMergeToChunk(
+            newTbody,
+            summarizedVerticalMergeMeta,
+            summarizedColumnIds
+          );
           applySummarizedColumnWidths(table, summarizedColumnWidthsPx);
 
           pageBlock.appendChild(table);
