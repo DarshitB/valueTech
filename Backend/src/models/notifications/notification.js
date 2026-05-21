@@ -1,21 +1,21 @@
 const db = require("../../../db");
 const { PROTECTED_ROLE } = require("../../constants/protectedRoles");
 
+const VIEW_COMMENT_NOTIFICATIONS_PERMISSION = "view_comment_notifications";
+
 /**
- * Check if a user has "view_order_comments" permission
- * @param {number} userId - The user ID
- * @param {number} roleId - The user's role ID
- * @param {string} roleName - The user's role name
- * @returns {Promise<boolean>} - True if user has permission
+ * Whether the viewing user's role may see comment notifications in the API.
+ * Permission is added manually in DB (no migration).
  */
-async function hasViewOrderCommentsPermission(userId, roleId, roleName) {
+async function hasViewCommentNotificationsPermission(roleId, roleName) {
   try {
-    // Protected role (developer_admin) always has permission
     if (roleName === PROTECTED_ROLE) {
       return true;
     }
+    if (!roleId) {
+      return false;
+    }
 
-    // Check if user's role has "view_order_comments" permission
     const permission = await db("permissions")
       .join(
         "role_permissions",
@@ -23,7 +23,7 @@ async function hasViewOrderCommentsPermission(userId, roleId, roleName) {
         "role_permissions.permission_id"
       )
       .where({
-        "permissions.name": "view_order_comments",
+        "permissions.name": VIEW_COMMENT_NOTIFICATIONS_PERMISSION,
         "role_permissions.role_id": roleId,
       })
       .whereNull("role_permissions.deleted_at")
@@ -31,54 +31,55 @@ async function hasViewOrderCommentsPermission(userId, roleId, roleName) {
 
     return !!permission;
   } catch (error) {
-    // On error, default to false (no permission)
-    console.error("Error checking view_order_comments permission:", error);
+    console.error("Error checking view_comment_notifications permission:", error);
     return false;
   }
 }
 
+function isCommentNotificationRow(notif) {
+  return !!(notif?.comment_id && notif?.notification_type === "comment");
+}
+
 /**
- * Filter comment notifications based on "view_order_comments" permission
- * @param {Array} notifications - Array of notification objects
- * @returns {Promise<Array>} - Filtered notifications
+ * Strip comment notifications when the viewer lacks view_comment_notifications.
  */
-async function filterCommentNotifications(notifications) {
-  if (!notifications || notifications.length === 0) {
-    return notifications;
+async function filterCommentNotifications(notifications, viewerRoleId, viewerRoleName) {
+  const list = notifications || [];
+  const canView = await hasViewCommentNotificationsPermission(
+    viewerRoleId,
+    viewerRoleName
+  );
+  if (canView) {
+    return list;
   }
+  return list.filter((notif) => !isCommentNotificationRow(notif));
+}
 
-  const filteredResults = [];
-  
-  for (const notif of notifications) {
-    // If it's a comment notification, check permission
-    if (notif.comment_id && notif.notification_type === "comment") {
-      // Get user's role information
-      const notificationUser = await db("users")
-        .leftJoin("roles", "users.role_id", "roles.id")
-        .select("users.id", "users.role_id", "roles.name as role_name")
-        .where("users.id", notif.user_id)
-        .whereNull("users.deleted_at")
-        .first();
-
-      if (notificationUser) {
-        const hasPermission = await hasViewOrderCommentsPermission(
-          notificationUser.id,
-          notificationUser.role_id,
-          notificationUser.role_name
+/**
+ * Privileged roles: hide your own status/comment alerts from others' feeds,
+ * but always include media uploads (status 7 + "Uploaded" in activity_extra).
+ */
+function applyPrivilegedSelfActionFilter(queryBuilder, userId) {
+  return queryBuilder.where(function () {
+    this.where(function () {
+      this.whereNotNull("notifications.activity_id").where(function () {
+        this.where("order_status_history.changed_by", "!=", userId).orWhere(
+          function () {
+            this.where("order_status_history.status_id", 7).whereRaw(
+              "COALESCE(order_status_history.activity_extra, '') ILIKE ?",
+              ["%uploaded%"]
+            );
+          }
         );
-
-        // Only include if user has permission
-        if (hasPermission) {
-          filteredResults.push(notif);
-        }
-      }
-    } else {
-      // Not a comment notification, include it
-      filteredResults.push(notif);
-    }
-  }
-  
-  return filteredResults;
+      });
+    }).orWhere(function () {
+      this.whereNotNull("notifications.comment_id").where(
+        "order_comments.user_id",
+        "!=",
+        userId
+      );
+    });
+  });
 }
 
 const notification = {
@@ -167,21 +168,11 @@ const notification = {
         // DEVELOPER_ADMIN, SUPER ADMIN, TELECALLER see all (no additional filter)
       }
 
-      // Exclude self-actions for admin roles
-      // For status history: exclude if user performed the action
-      // For comments: exclude if user is the commenter
       if (hasPrivilegedRole) {
-        baseNotificationQuery = baseNotificationQuery.where(function() {
-          this.where(function() {
-            // Status history notifications: exclude if user performed action
-            this.whereNotNull("notifications.activity_id")
-              .where("order_status_history.changed_by", "!=", userId);
-          }).orWhere(function() {
-            // Comment notifications: exclude if user is the commenter
-            this.whereNotNull("notifications.comment_id")
-              .where("order_comments.user_id", "!=", userId);
-          });
-        });
+        baseNotificationQuery = applyPrivilegedSelfActionFilter(
+          baseNotificationQuery,
+          userId
+        );
       }
 
       // Apply last_check filter if provided
@@ -202,14 +193,16 @@ const notification = {
         .leftJoin("order_status_master", "order_status_history.status_id", "order_status_master.id")
         .leftJoin("order_comments", "notifications.comment_id", "order_comments.id")
         .leftJoin("users as notification_user", "notifications.user_id", "notification_user.id")
-        .leftJoin("users as changed_by_user", function() {
-          this.on("order_status_history.changed_by", "=", "changed_by_user.id")
-              .andOn("order_status_history.user_type", "!=", db.raw("'field_verifier'"));
-        })
-        .leftJoin("field_verifiers", function() {
-          this.on("order_status_history.changed_by", "=", "field_verifiers.id")
-              .andOn("order_status_history.user_type", "=", db.raw("'field_verifier'"));
-        })
+        .leftJoin(
+          "users as changed_by_user",
+          "order_status_history.changed_by",
+          "changed_by_user.id"
+        )
+        .leftJoin(
+          "field_verifiers",
+          "order_status_history.changed_by",
+          "field_verifiers.id"
+        )
         .leftJoin("users as comment_user", "order_comments.user_id", "comment_user.id")
         .leftJoin(
           "field_verifiers as comment_field_verifier",
@@ -243,13 +236,10 @@ const notification = {
           "order_status_history.changed_by",
           "order_status_history.user_type",
           db.raw(`
-            COALESCE(
-              CASE 
-                WHEN order_status_history.user_type = 'field_verifier' THEN field_verifiers.name 
-                ELSE changed_by_user.name 
-              END,
-              'System'
-            ) as changed_by_name
+            CASE
+              WHEN order_status_history.user_type = 'field_verifier' THEN field_verifiers.name
+              ELSE changed_by_user.name
+            END as changed_by_name
           `),
           "order_status_history.changed_at",
           "order_comments.comment as comment_text",
@@ -274,7 +264,11 @@ const notification = {
 
       const results = await query;
       // Filter comment notifications based on permission
-      const filteredResults = await filterCommentNotifications(results || []);
+      const filteredResults = await filterCommentNotifications(
+        results || [],
+        user?.role_id,
+        user?.role_name || userRole
+      );
       return filteredResults;
     } catch (error) {
       return [];
@@ -359,20 +353,7 @@ const notification = {
       } else if (roleName.includes("MANAGER")) {
         query = query.where("orders.manager_id", userId);
       }
-      // Exclude self-actions for admin roles
-      // For status history: exclude if user performed the action
-      // For comments: exclude if user is the commenter
-      query = query.where(function() {
-        this.where(function() {
-          // Status history notifications: exclude if user performed action
-          this.whereNotNull("notifications.activity_id")
-            .where("order_status_history.changed_by", "!=", userId);
-        }).orWhere(function() {
-          // Comment notifications: exclude if user is the commenter
-          this.whereNotNull("notifications.comment_id")
-            .where("order_comments.user_id", "!=", userId);
-        });
-      });
+      query = applyPrivilegedSelfActionFilter(query, userId);
     }
 
     // Use distinct count to avoid duplicates from joins
@@ -467,20 +448,10 @@ const notification = {
         } else if (roleName.includes("MANAGER")) {
           baseNotificationQuery = baseNotificationQuery.where("orders.manager_id", userId);
         }
-        // Exclude self-actions for admin roles
-        // For status history: exclude if user performed the action
-        // For comments: exclude if user is the commenter
-        baseNotificationQuery = baseNotificationQuery.where(function() {
-          this.where(function() {
-            // Status history notifications: exclude if user performed action
-            this.whereNotNull("notifications.activity_id")
-              .where("order_status_history.changed_by", "!=", userId);
-          }).orWhere(function() {
-            // Comment notifications: exclude if user is the commenter
-            this.whereNotNull("notifications.comment_id")
-              .where("order_comments.user_id", "!=", userId);
-          });
-        });
+        baseNotificationQuery = applyPrivilegedSelfActionFilter(
+          baseNotificationQuery,
+          userId
+        );
       }
 
       // STEP 2: Fetch full notification data for all unread (per-user) notifications.
@@ -492,14 +463,16 @@ const notification = {
         .leftJoin("order_status_master", "order_status_history.status_id", "order_status_master.id")
         .leftJoin("order_comments", "notifications.comment_id", "order_comments.id")
         .leftJoin("users as notification_user", "notifications.user_id", "notification_user.id")
-        .leftJoin("users as changed_by_user", function() {
-          this.on("order_status_history.changed_by", "=", "changed_by_user.id")
-              .andOn("order_status_history.user_type", "!=", db.raw("'field_verifier'"));
-        })
-        .leftJoin("field_verifiers", function() {
-          this.on("order_status_history.changed_by", "=", "field_verifiers.id")
-              .andOn("order_status_history.user_type", "=", db.raw("'field_verifier'"));
-        })
+        .leftJoin(
+          "users as changed_by_user",
+          "order_status_history.changed_by",
+          "changed_by_user.id"
+        )
+        .leftJoin(
+          "field_verifiers",
+          "order_status_history.changed_by",
+          "field_verifiers.id"
+        )
         .leftJoin("users as comment_user", "order_comments.user_id", "comment_user.id")
         .leftJoin(
           "field_verifiers as comment_field_verifier",
@@ -533,13 +506,10 @@ const notification = {
           "order_status_history.changed_by",
           "order_status_history.user_type",
           db.raw(`
-            COALESCE(
-              CASE 
-                WHEN order_status_history.user_type = 'field_verifier' THEN field_verifiers.name 
-                ELSE changed_by_user.name 
-              END,
-              'System'
-            ) as changed_by_name
+            CASE
+              WHEN order_status_history.user_type = 'field_verifier' THEN field_verifiers.name
+              ELSE changed_by_user.name
+            END as changed_by_name
           `),
           "order_status_history.changed_at",
           "order_comments.comment as comment_text",
@@ -564,7 +534,11 @@ const notification = {
 
       const results = await query;
       // Filter comment notifications based on permission
-      const filteredResults = await filterCommentNotifications(results || []);
+      const filteredResults = await filterCommentNotifications(
+        results || [],
+        user?.role_id,
+        user?.role_name || userRole
+      );
       return filteredResults;
     } catch (error) {
       return [];
@@ -647,20 +621,10 @@ const notification = {
       } else if (roleName.includes("MANAGER")) {
         baseNotificationQuery = baseNotificationQuery.where("orders.manager_id", userId);
       }
-      // Exclude self-actions for admin roles
-      // For status history: exclude if user performed the action
-      // For comments: exclude if user is the commenter
-      baseNotificationQuery = baseNotificationQuery.where(function() {
-        this.where(function() {
-          // Status history notifications: exclude if user performed action
-          this.whereNotNull("notifications.activity_id")
-            .where("order_status_history.changed_by", "!=", userId);
-        }).orWhere(function() {
-          // Comment notifications: exclude if user is the commenter
-          this.whereNotNull("notifications.comment_id")
-            .where("order_comments.user_id", "!=", userId);
-        });
-      });
+      baseNotificationQuery = applyPrivilegedSelfActionFilter(
+        baseNotificationQuery,
+        userId
+      );
     }
 
     // STEP 2: Fetch full notification data (read + unread).
@@ -672,14 +636,16 @@ const notification = {
       .leftJoin("order_status_master", "order_status_history.status_id", "order_status_master.id")
       .leftJoin("order_comments", "notifications.comment_id", "order_comments.id")
       .leftJoin("users as notification_user", "notifications.user_id", "notification_user.id")
-      .leftJoin("users as changed_by_user", function() {
-        this.on("order_status_history.changed_by", "=", "changed_by_user.id")
-            .andOn("order_status_history.user_type", "!=", db.raw("'field_verifier'"));
-      })
-      .leftJoin("field_verifiers", function() {
-        this.on("order_status_history.changed_by", "=", "field_verifiers.id")
-            .andOn("order_status_history.user_type", "=", db.raw("'field_verifier'"));
-      })
+      .leftJoin(
+        "users as changed_by_user",
+        "order_status_history.changed_by",
+        "changed_by_user.id"
+      )
+      .leftJoin(
+        "field_verifiers",
+        "order_status_history.changed_by",
+        "field_verifiers.id"
+      )
       .leftJoin("users as comment_user", "order_comments.user_id", "comment_user.id")
       .leftJoin(
         "field_verifiers as comment_field_verifier",
@@ -713,13 +679,10 @@ const notification = {
         "order_status_history.changed_by",
         "order_status_history.user_type",
         db.raw(`
-          COALESCE(
-            CASE 
-              WHEN order_status_history.user_type = 'field_verifier' THEN field_verifiers.name 
-              ELSE changed_by_user.name 
-            END,
-            'System'
-          ) as changed_by_name
+          CASE
+            WHEN order_status_history.user_type = 'field_verifier' THEN field_verifiers.name
+            ELSE changed_by_user.name
+          END as changed_by_name
         `),
         "order_status_history.changed_at",
         "order_comments.comment as comment_text",
@@ -744,7 +707,11 @@ const notification = {
 
     const results = await query;
     // Filter comment notifications based on permission
-    const filteredResults = await filterCommentNotifications(results || []);
+    const filteredResults = await filterCommentNotifications(
+      results || [],
+      user?.role_id,
+      user?.role_name || userRole
+    );
     return filteredResults;
   },
 
@@ -912,20 +879,7 @@ const notification = {
       } else if (roleName.includes("MANAGER")) {
         query = query.where("orders.manager_id", userId);
       }
-      // Exclude self-actions for admin roles
-      // For status history: exclude if user performed the action
-      // For comments: exclude if user is the commenter
-      query = query.where(function() {
-        this.where(function() {
-          // Status history notifications: exclude if user performed action
-          this.whereNotNull("notifications.activity_id")
-            .where("order_status_history.changed_by", "!=", userId);
-        }).orWhere(function() {
-          // Comment notifications: exclude if user is the commenter
-          this.whereNotNull("notifications.comment_id")
-            .where("order_comments.user_id", "!=", userId);
-        });
-      });
+      query = applyPrivilegedSelfActionFilter(query, userId);
     }
 
     // Get notification IDs that match the permission filters

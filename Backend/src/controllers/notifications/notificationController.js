@@ -3,7 +3,8 @@ const { BadRequestError, NotFoundError } = require("../../utils/customErrors");
 const db = require("../../../db");
 const { PROTECTED_ROLE } = require("../../constants/protectedRoles");
 
-const VIEW_ALL_MEDIA_PERMISSION = "view_all_order_media_files";
+const VIEW_MEDIA_NOTIFICATIONS_PERMISSION = "view_media_notifications";
+const VIEW_COMMENT_NOTIFICATIONS_PERMISSION = "view_comment_notifications";
 
 async function hasPermission(roleId, roleName, permissionName) {
   if (!roleId || !permissionName) return false;
@@ -21,16 +22,16 @@ async function hasPermission(roleId, roleName, permissionName) {
   return !!permission;
 }
 
-function isFieldVerifierUploadNotification(notif) {
+/** Assets Submitted + "Uploaded" in activity_extra (mobile app or ZIP from dashboard). */
+function isMediaUploadNotification(notif) {
+  if (!notif || notif.notification_type === "comment") return false;
   const statusIdNum = Number(notif?.status_id);
-  const userType = String(notif?.user_type || "").toLowerCase();
   const activityExtra = String(notif?.activity_extra || "");
+  return statusIdNum === 7 && /uploaded/i.test(activityExtra);
+}
 
-  return (
-    statusIdNum === 7 &&
-    userType === "field_verifier" &&
-    /uploaded/i.test(activityExtra)
-  );
+function isCommentNotification(notif) {
+  return !!(notif?.comment_id && notif?.notification_type === "comment");
 }
 
 /**
@@ -65,10 +66,15 @@ exports.getNotifications = async (req, res, next) => {
       }
     }
 
-    const canViewAllMediaFiles = await hasPermission(
+    const canViewMediaNotifications = await hasPermission(
       req.user?.role_id,
       req.user?.role_name,
-      VIEW_ALL_MEDIA_PERMISSION
+      VIEW_MEDIA_NOTIFICATIONS_PERMISSION
+    );
+    const canViewCommentNotifications = await hasPermission(
+      req.user?.role_id,
+      req.user?.role_name,
+      VIEW_COMMENT_NOTIFICATIONS_PERMISSION
     );
 
     // Get total unread count (all time, not filtered by last_check)
@@ -92,11 +98,14 @@ exports.getNotifications = async (req, res, next) => {
       });
     }
 
-    // Hide field-verifier upload notifications for users without
-    // `view_all_order_media_files` permission.
-    if (!canViewAllMediaFiles) {
+    if (!canViewMediaNotifications) {
       notifications = (notifications || []).filter(
-        (notif) => !isFieldVerifierUploadNotification(notif)
+        (notif) => !isMediaUploadNotification(notif)
+      );
+    }
+    if (!canViewCommentNotifications) {
+      notifications = (notifications || []).filter(
+        (notif) => !isCommentNotification(notif)
       );
     }
 
@@ -125,6 +134,7 @@ exports.getNotifications = async (req, res, next) => {
         notification_type: notif.notification_type || "status_change",
         title: notif.title || null,
         description: notif.description || null,
+        status_id: notif.status_id ?? null,
         status_name: notif.status_name || null,
         activity_extra: notif.activity_extra || null,
         changed_by_id: notif.changed_by || null,
@@ -244,10 +254,15 @@ exports.getAllNotifications = async (req, res, next) => {
       throw new BadRequestError("Offset must be a non-negative integer");
     }
 
-    const canViewAllMediaFiles = await hasPermission(
+    const canViewMediaNotifications = await hasPermission(
       req.user?.role_id,
       req.user?.role_name,
-      VIEW_ALL_MEDIA_PERMISSION
+      VIEW_MEDIA_NOTIFICATIONS_PERMISSION
+    );
+    const canViewCommentNotifications = await hasPermission(
+      req.user?.role_id,
+      req.user?.role_name,
+      VIEW_COMMENT_NOTIFICATIONS_PERMISSION
     );
 
     // Get all notifications
@@ -257,9 +272,14 @@ exports.getAllNotifications = async (req, res, next) => {
       offset: offsetNum
     });
 
-    if (!canViewAllMediaFiles) {
+    if (!canViewMediaNotifications) {
       notifications = (notifications || []).filter(
-        (notif) => !isFieldVerifierUploadNotification(notif)
+        (notif) => !isMediaUploadNotification(notif)
+      );
+    }
+    if (!canViewCommentNotifications) {
+      notifications = (notifications || []).filter(
+        (notif) => !isCommentNotification(notif)
       );
     }
 
@@ -280,6 +300,7 @@ exports.getAllNotifications = async (req, res, next) => {
         notification_type: notif.notification_type || "status_change",
         title: notif.title || null,
         description: notif.description || null,
+        status_id: notif.status_id ?? null,
         status_name: notif.status_name || null,
         activity_extra: notif.activity_extra || null,
         changed_by_id: notif.changed_by || null,

@@ -9,6 +9,10 @@ import {
 } from "../redux/reducers/notificationReducer";
 import { selectPermissions, selectUser } from "../redux/selectors/authSelectors";
 import { hasPermission } from "../utils/permissionUtils";
+import {
+  getNotificationActorName,
+  isBellNotification,
+} from "../utils/notificationUtils";
 import "./NotificationDropdown.scss";
 
 // Utility: Format date for notifications (same as OrderDetails)
@@ -65,10 +69,9 @@ function NotificationDropdown() {
   const allowedPermissions = useSelector(selectPermissions);
   const currentUser = useSelector(selectUser);
   
-  // Bell shows only non-comment notifications (status changes, etc.)
-  // Comment notifications are shown in the separate CommentNotificationDropdown
+  // Bell: status/updates only — comments and media uploads use separate icons
   const displayNotifications = useMemo(
-    () => notifications.filter((n) => n.notification_type !== "comment"),
+    () => notifications.filter(isBellNotification),
     [notifications]
   );
 
@@ -126,17 +129,15 @@ function NotificationDropdown() {
       return;
     }
 
-    const lastCheck = getLastCheckTime();
     dispatch(
       fetchNotifications({
-        last_check: lastCheck,
         limit: 50,
       })
     ).catch((error) => {
       // Silently handle errors - don't disrupt UX
       console.error("Error fetching notifications:", error);
     });
-  }, [dispatch, currentUser?.id, allowedPermissions, getLastCheckTime]);
+  }, [dispatch, currentUser?.id, allowedPermissions]);
 
   // Initial fetch on mount
   useEffect(() => {
@@ -295,8 +296,7 @@ function NotificationDropdown() {
     // Format exactly like OrderDetails component (lines 2258-2270)
     const showValue = (val) => val || "";
     
-    // Get user name - prefer user_name from API, fallback to changed_by_name, then "Unknown User"
-    const userName = notification.user_name || notification.changed_by_name || "Unknown User";
+    const userName = getNotificationActorName(notification);
     
     /* console.log("Formatted userName:", userName); */
     

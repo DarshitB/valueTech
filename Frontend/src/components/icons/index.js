@@ -39,4 +39,5 @@ export {
   SendIcon,
   TrashIcon,
   CommentBirdIcon,
+  MediaNotificationIcon,
 } from "./Icons";

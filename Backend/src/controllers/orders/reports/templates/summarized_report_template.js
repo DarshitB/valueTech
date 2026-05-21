@@ -16,7 +16,7 @@ const FIXED_START = [
 
 const FIXED_END = [
   { id: "total_invoice_cost", header: "Total Invoice Cost" },
-  { id: "estimated_current_replacement_cost", header: "Estimated Current Replacement Cost" },
+  { id: "estimated_current_replacement_cost", header: "Current Replacement Cost" },
   { id: "residual_life_of_asset", header: "Residual life of asset" },
   { id: "depr_rate", header: "Depr. Rate" },
   { id: "amount_post_depreciation", header: "Amount Post Depreciation" },

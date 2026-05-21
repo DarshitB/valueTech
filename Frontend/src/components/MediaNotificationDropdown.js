@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link } from "react-router-dom";
-import { CommentBirdIcon } from "./icons";
+import { MediaNotificationIcon } from "./icons";
 import {
   fetchNotifications,
   markNotificationAsRead,
@@ -10,12 +10,12 @@ import {
 import { selectPermissions, selectUser } from "../redux/selectors/authSelectors";
 import { hasPermission } from "../utils/permissionUtils";
 import {
-  isCommentNotification,
-  VIEW_COMMENT_NOTIFICATIONS_PERMISSION,
+  formatMediaActivityDescription,
+  isMediaUploadNotification,
+  VIEW_MEDIA_NOTIFICATIONS_PERMISSION,
 } from "../utils/notificationUtils";
 import "./NotificationDropdown.scss";
 
-// Reuse same date formatter as NotificationDropdown
 function formatActivityTime(dateString) {
   if (!dateString) return "-";
   const date = new Date(dateString);
@@ -31,44 +31,44 @@ function formatActivityTime(dateString) {
   hours = hours ? hours : 12;
   const minutesStr = minutes.toString().padStart(2, "0");
   const timeStr = `${hours}:${minutesStr} ${ampm}`;
-  const monthAbbr = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const monthAbbr = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
   if (activityDate.getTime() === today.getTime()) return `Today at ${timeStr}`;
   if (activityDate.getTime() === yesterday.getTime()) return `Yesterday at ${timeStr}`;
   return `${date.getDate()} ${monthAbbr[date.getMonth()]} at ${timeStr}`;
 }
 
-function CommentNotificationDropdown() {
+function MediaNotificationDropdown() {
   const dispatch = useDispatch();
-
   const notifications = useSelector((state) => state.notifications.list);
   const loading = useSelector((state) => state.notifications.loading);
   const allowedPermissions = useSelector(selectPermissions);
   const currentUser = useSelector(selectUser);
 
-  const canViewCommentNotifications = hasPermission(
-    allowedPermissions,
-    VIEW_COMMENT_NOTIFICATIONS_PERMISSION
-  );
-
-  const commentNotifications = useMemo(
-    () => notifications.filter(isCommentNotification),
+  const mediaNotifications = useMemo(
+    () => notifications.filter(isMediaUploadNotification),
     [notifications]
   );
 
   const [isOpen, setIsOpen] = useState(false);
-  const [hasNewComments, setHasNewComments] = useState(false);
+  const [hasNewMedia, setHasNewMedia] = useState(false);
   const [readNotificationIds, setReadNotificationIds] = useState(new Set());
   const dropdownRef = useRef(null);
   const lastCheckTimeRef = useRef(null);
   const pollingIntervalRef = useRef(null);
 
-  // Separate last-check key so opening the comment dropdown doesn't reset bell's last-check
+  const canViewMediaNotifications = hasPermission(
+    allowedPermissions,
+    VIEW_MEDIA_NOTIFICATIONS_PERMISSION
+  );
+
   const getLastCheckKey = useCallback(
-    () => (currentUser?.id ? `comments_last_check_${currentUser.id}` : null),
+    () => (currentUser?.id ? `media_last_check_${currentUser.id}` : null),
     [currentUser?.id]
   );
 
-  // Load last check time on mount
   useEffect(() => {
     if (currentUser?.id) {
       const key = getLastCheckKey();
@@ -83,7 +83,6 @@ function CommentNotificationDropdown() {
     }
   }, [currentUser?.id, getLastCheckKey]);
 
-  // Load read notification IDs from localStorage (shared with bell dropdown)
   useEffect(() => {
     if (currentUser?.id) {
       const readKey = `notifications_read_${currentUser.id}`;
@@ -92,61 +91,66 @@ function CommentNotificationDropdown() {
         try {
           setReadNotificationIds(new Set(JSON.parse(saved)));
         } catch (e) {
-          console.error("Error parsing comment read notifications:", e);
+          console.error("Error parsing media read notifications:", e);
         }
       }
     }
   }, [currentUser?.id]);
 
   const fetchNotificationsData = useCallback(() => {
-    if (!currentUser?.id || !canViewCommentNotifications) return;
-    dispatch(fetchNotifications({ limit: 50 })).catch((error) => {
-      console.error("Error fetching comment notifications:", error);
+    if (!currentUser?.id || !canViewMediaNotifications) return;
+    // Always load the full recent list — last_check is only for the "new" highlight,
+    // not for API filtering (filtering caused missing older same-day uploads).
+    dispatch(
+      fetchNotifications({
+        limit: 50,
+      })
+    ).catch((error) => {
+      console.error("Error fetching media notifications:", error);
     });
-  }, [dispatch, currentUser?.id, canViewCommentNotifications]);
+  }, [dispatch, currentUser?.id, canViewMediaNotifications]);
 
   useEffect(() => {
     fetchNotificationsData();
   }, [fetchNotificationsData]);
 
   useEffect(() => {
-    if (!canViewCommentNotifications) return undefined;
+    if (!canViewMediaNotifications) return undefined;
     pollingIntervalRef.current = setInterval(fetchNotificationsData, 30000);
     return () => {
       if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
     };
-  }, [canViewCommentNotifications, fetchNotificationsData]);
+  }, [canViewMediaNotifications, fetchNotificationsData]);
 
-  // Detect new unread comment notifications
   useEffect(() => {
-    if (lastCheckTimeRef.current && commentNotifications.length > 0) {
-      const hasNew = commentNotifications.some((notif) => {
+    if (lastCheckTimeRef.current && mediaNotifications.length > 0) {
+      const hasNew = mediaNotifications.some((notif) => {
         const isUnread = !notif.is_read && !readNotificationIds.has(notif.id);
         if (!isUnread) return false;
-        const notifTime = new Date(notif.commented_at || notif.created_at).getTime();
+        const notifTime = new Date(notif.changed_at || notif.created_at).getTime();
         const lastCheck = lastCheckTimeRef.current?.getTime();
         if (!lastCheck) return true;
         return notifTime > lastCheck;
       });
-      setHasNewComments(hasNew);
-    } else if (commentNotifications.length > 0) {
-      const hasUnread = commentNotifications.some(
+      setHasNewMedia(hasNew);
+    } else if (mediaNotifications.length > 0) {
+      const hasUnread = mediaNotifications.some(
         (n) => !n.is_read && !readNotificationIds.has(n.id)
       );
-      setHasNewComments(hasUnread);
+      setHasNewMedia(hasUnread);
     } else {
-      setHasNewComments(false);
+      setHasNewMedia(false);
     }
-  }, [commentNotifications, readNotificationIds]);
+  }, [mediaNotifications, readNotificationIds]);
 
-  // Unread badge count — comment notifications only
-  const localUnreadCount = useMemo(() => {
-    return commentNotifications.filter(
-      (n) => n.is_read !== true && !readNotificationIds.has(n.id)
-    ).length;
-  }, [commentNotifications, readNotificationIds]);
+  const localUnreadCount = useMemo(
+    () =>
+      mediaNotifications.filter(
+        (n) => n.is_read !== true && !readNotificationIds.has(n.id)
+      ).length,
+    [mediaNotifications, readNotificationIds]
+  );
 
-  // Mark a single comment notification as read
   const handleMarkAsRead = useCallback(
     async (notificationId) => {
       if (!currentUser?.id) return;
@@ -158,18 +162,17 @@ function CommentNotificationDropdown() {
       try {
         await dispatch(markNotificationAsRead(notificationId)).unwrap();
       } catch (error) {
-        console.error("Failed to mark comment notification as read:", error);
+        console.error("Failed to mark media notification as read:", error);
       }
     },
     [dispatch, readNotificationIds, currentUser?.id]
   );
 
-  // Mark all comment notifications as read
   const handleMarkAllAsRead = useCallback(async () => {
     if (!currentUser?.id) return;
-    const allIds = new Set(commentNotifications.map((n) => n.id));
+    const allIds = new Set(mediaNotifications.map((n) => n.id));
     setReadNotificationIds((prev) => new Set([...prev, ...allIds]));
-    setHasNewComments(false);
+    setHasNewMedia(false);
     const readKey = `notifications_read_${currentUser.id}`;
     const merged = new Set([...readNotificationIds, ...allIds]);
     localStorage.setItem(readKey, JSON.stringify(Array.from(merged)));
@@ -181,28 +184,31 @@ function CommentNotificationDropdown() {
     try {
       await dispatch(markAllNotificationsAsRead()).unwrap();
     } catch (error) {
-      console.error("Failed to mark all comment notifications as read:", error);
+      console.error("Failed to mark all media notifications as read:", error);
     }
-  }, [dispatch, commentNotifications, readNotificationIds, currentUser?.id, getLastCheckKey]);
+  }, [
+    dispatch,
+    mediaNotifications,
+    readNotificationIds,
+    currentUser?.id,
+    getLastCheckKey,
+  ]);
 
-  // Toggle dropdown open/close
   const handleToggle = useCallback(() => {
     setIsOpen((prev) => {
       if (!prev && currentUser?.id) {
-        // Update last check time when opening
         const key = getLastCheckKey();
         if (key) {
           lastCheckTimeRef.current = new Date();
           localStorage.setItem(key, lastCheckTimeRef.current.toISOString());
         }
-        setHasNewComments(false);
+        setHasNewMedia(false);
         fetchNotificationsData();
       }
       return !prev;
     });
   }, [currentUser?.id, getLastCheckKey, fetchNotificationsData]);
 
-  // Close on outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -213,21 +219,7 @@ function CommentNotificationDropdown() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
 
-  // Format comment notification text
-  const formatCommentDescription = useCallback((notification) => {
-    const commenter = notification.comment_user_name || notification.user_name || "Someone";
-    if (notification.comment_text) {
-      const preview =
-        notification.comment_text.length > 80
-          ? notification.comment_text.substring(0, 80) + "..."
-          : notification.comment_text;
-      return `${commenter}: ${preview}`;
-    }
-    if (notification.description) return notification.description;
-    return `${commenter} added a comment`;
-  }, []);
-
-  if (!canViewCommentNotifications) {
+  if (!canViewMediaNotifications) {
     return null;
   }
 
@@ -239,10 +231,10 @@ function CommentNotificationDropdown() {
       <span
         className="nav-link notification-toggle nav-link-lg"
         onClick={handleToggle}
-        title="Comments"
+        title="Media uploads"
       >
-        <CommentBirdIcon
-          className={`feather bell bird-icon ${hasNewComments ? "has-new" : ""}`}
+        <MediaNotificationIcon
+          className={`feather bell media-icon ${hasNewMedia ? "has-new" : ""}`}
         />
         {localUnreadCount > 0 && (
           <span className="notification-badge">
@@ -256,7 +248,7 @@ function CommentNotificationDropdown() {
         }`}
       >
         <div className="dropdown-header">
-          <span>Comments</span>
+          <span>Media uploads</span>
           {localUnreadCount > 0 && (
             <button
               className="mark-all-read-btn"
@@ -272,12 +264,12 @@ function CommentNotificationDropdown() {
             <div className="notification-item notification-loading">
               <p>Loading...</p>
             </div>
-          ) : commentNotifications.length === 0 ? (
+          ) : mediaNotifications.length === 0 ? (
             <div className="notification-item notification-empty">
-              <p>No comment notifications</p>
+              <p>No media upload notifications</p>
             </div>
           ) : (
-            commentNotifications.map((notification) => {
+            mediaNotifications.map((notification) => {
               const isRead =
                 notification.is_read === true ||
                 readNotificationIds.has(notification.id);
@@ -322,11 +314,11 @@ function CommentNotificationDropdown() {
                       )}
                     </div>
                     <p className="notification-description">
-                      {formatCommentDescription(notification)}
+                      {formatMediaActivityDescription(notification)}
                     </p>
                     <p className="notification-time">
                       {formatActivityTime(
-                        notification.commented_at || notification.created_at
+                        notification.changed_at || notification.created_at
                       )}
                     </p>
                   </div>
@@ -340,4 +332,4 @@ function CommentNotificationDropdown() {
   );
 }
 
-export default CommentNotificationDropdown;
+export default MediaNotificationDropdown;

@@ -246,7 +246,7 @@ const SUMMARIZED_FIXED_END_COLUMNS = [
   { id: "total_invoice_cost", header: "Total Invoice Cost" },
   {
     id: "estimated_current_replacement_cost",
-    header: "Estimated Current Replacement Cost",
+    header: "Current Replacement Cost",
   },
   { id: "residual_life_of_asset", header: "Residual life of asset" },
   { id: "depr_rate", header: "Depr. Rate" },

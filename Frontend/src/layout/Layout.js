@@ -33,6 +33,7 @@ import {
 import { usePageTitle } from "../context/PageTitleContext";
 import NotificationDropdown from "../components/NotificationDropdown";
 import CommentNotificationDropdown from "../components/CommentNotificationDropdown";
+import MediaNotificationDropdown from "../components/MediaNotificationDropdown";
 
 function Layout() {
   /* start get location for add active class */
@@ -86,10 +87,14 @@ function Layout() {
           </div>
           <ul className="navbar-nav navbar-right">
             {hasPermission(allowedPermissions, "view_notification") && (
-              <>
-                <NotificationDropdown />
-                <CommentNotificationDropdown />
-              </>
+              <NotificationDropdown />
+            )}
+            {hasPermission(
+              allowedPermissions,
+              "view_comment_notifications"
+            ) && <CommentNotificationDropdown />}
+            {hasPermission(allowedPermissions, "view_media_notifications") && (
+              <MediaNotificationDropdown />
             )}
             <li className={`dropdown ${userProfile ? "show" : ""}`}>
               <span
