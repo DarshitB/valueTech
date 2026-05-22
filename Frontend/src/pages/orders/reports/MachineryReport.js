@@ -26,6 +26,13 @@ import "../order.scss";
 import { DeleteIcon, ViewIcon } from "../../../components/icons";
 import { getFinalizedOrdersByChildCategory } from "../../../api/order.api";
 import { getOrderReport } from "../../../api/orderReport.api";
+import FairMarketValueAmountInWordsField from "../../../components/reports/FairMarketValueAmountInWordsField";
+import { useAutoFillAmountInWordsFromFmv } from "../../../hooks/useAutoFillAmountInWordsFromFmv";
+import {
+  computeAmountInWordsFromFmv,
+  convertNumberToWordsIndian,
+  hasAmountInWordsContent,
+} from "../../../utils/reportAmountInWords";
 
 // WYSIWYG Textarea Component - preserves HTML formatting
 const WysiwygTextarea = ({
@@ -624,89 +631,6 @@ function MachineryReport() {
     return parseFloat(value.replace(/,/g, "")) || 0;
   }, []);
 
-  // Function to convert number to words in Indian format
-  const convertNumberToWordsIndian = useCallback((num) => {
-    const a = [
-      "",
-      "ONE",
-      "TWO",
-      "THREE",
-      "FOUR",
-      "FIVE",
-      "SIX",
-      "SEVEN",
-      "EIGHT",
-      "NINE",
-      "TEN",
-      "ELEVEN",
-      "TWELVE",
-      "THIRTEEN",
-      "FOURTEEN",
-      "FIFTEEN",
-      "SIXTEEN",
-      "SEVENTEEN",
-      "EIGHTEEN",
-      "NINETEEN",
-    ];
-    const b = [
-      "",
-      "",
-      "TWENTY",
-      "THIRTY",
-      "FORTY",
-      "FIFTY",
-      "SIXTY",
-      "SEVENTY",
-      "EIGHTY",
-      "NINETY",
-    ];
-
-    if (num === 0) return "ZERO ONLY";
-
-    function numToWords(n) {
-      let str = "";
-      if (n > 19) {
-        str += b[Math.floor(n / 10)] + (n % 10 ? " " + a[n % 10] : "");
-      } else {
-        str += a[n];
-      }
-      return str;
-    }
-
-    let words = "";
-
-    const crore = Math.floor(num / 10000000);
-    if (crore > 0) {
-      words += numToWords(crore) + " CRORE ";
-      num %= 10000000;
-    }
-
-    const lakh = Math.floor(num / 100000);
-    if (lakh > 0) {
-      words += numToWords(lakh) + " LAKH ";
-      num %= 100000;
-    }
-
-    const thousand = Math.floor(num / 1000);
-    if (thousand > 0) {
-      words += numToWords(thousand) + " THOUSAND ";
-      num %= 1000;
-    }
-
-    const hundred = Math.floor(num / 100);
-    if (hundred > 0) {
-      words += a[hundred] + " HUNDRED ";
-      num %= 100;
-    }
-
-    if (num > 0) {
-      if (words !== "") words += "AND ";
-      words += numToWords(num) + " ";
-    }
-
-    return words.trim() + " ONLY";
-  }, []);
-
   // Function to format currency input (Indian number format)
   const handleCurrencyFormatting = useCallback((value) => {
     if (!value || typeof value !== "string") return "";
@@ -891,6 +815,13 @@ function MachineryReport() {
   const initialFlexibleFieldsRef = useRef(null);
   // Ref to store the last intercepted navigation target
   const pendingNavRef = useRef(null);
+
+  useAutoFillAmountInWordsFromFmv({
+    fairMarketValue: reportFormData.fair_market_value,
+    setReportFormData,
+    parseCurrency,
+    convertNumberToWordsIndian,
+  });
 
   // Auto-populate form data when order data is available
   useEffect(() => {
@@ -1557,6 +1488,14 @@ function MachineryReport() {
           updated[name] = handleCurrencyFormatting(value);
         }
 
+        if (name === "fair_market_value") {
+          updated.amount_in_words = computeAmountInWordsFromFmv(
+            updated.fair_market_value,
+            parseCurrency,
+            convertNumberToWordsIndian
+          );
+        }
+
         // Auto-calculate depreciation_value when tax_invoice_cost or depreciation changes
         if (name === "tax_invoice_cost" || name === "depreciation") {
           const invoiceCost = parseCurrency(
@@ -1911,15 +1850,17 @@ function MachineryReport() {
         return;
       }
 
-      // Compute and validate amount_in_words centrally based on fair_market_value
       const fmvRaw = reportFormData.fair_market_value;
-      const fmvAmount = parseCurrency(fmvRaw);
-      const computedAmountInWords = fmvRaw
-        ? convertNumberToWordsIndian(fmvAmount)
-        : "";
-
-      // If FMV is present but amount_in_words couldn't be computed, block submit
-      if (fmvRaw && !computedAmountInWords) {
+      const computedAmountInWords = computeAmountInWordsFromFmv(
+        fmvRaw,
+        parseCurrency,
+        convertNumberToWordsIndian
+      );
+      if (
+        fmvRaw &&
+        !hasAmountInWordsContent(reportFormData.amount_in_words) &&
+        !computedAmountInWords
+      ) {
         toast.error(
           "Amount in words missing. Please enter a valid Fair Market Value."
         );
@@ -1934,11 +1875,6 @@ function MachineryReport() {
 
       // Add report type selection (Rough/Production)
       formData.append("report_type_selection", reportTypeSelection);
-
-      // Ensure amount_in_words is present in payload when FMV exists
-      if (fmvRaw) {
-        formData.set("amount_in_words", computedAmountInWords);
-      }
 
       // Ensure invoice_no_date is properly combined before sending
       const invoiceNo = reportFormData.invoice_no || "";
@@ -1956,11 +1892,6 @@ function MachineryReport() {
       // Add all form fields to FormData - simple logic: if value exists send it, if null/empty send null
       Object.keys(reportFormData).forEach((key) => {
         let value = reportFormData[key];
-
-        // Skip amount_in_words - handled separately above
-        if (key === "amount_in_words") {
-          return;
-        }
 
         // Skip disclaimer - handled separately below
         if (key === "disclaimer") {
@@ -2173,10 +2104,6 @@ function MachineryReport() {
 
   // Builds the save payload — used by both handleSaveReport and the navigation blocker.
   const buildSavePayload = useCallback(() => {
-    const fmvRaw = reportFormData.fair_market_value;
-    const fmvAmount = parseCurrency(fmvRaw);
-    const computedAmountInWords = fmvRaw ? convertNumberToWordsIndian(fmvAmount) : "";
-
     const reportData = {};
 
     const valuerName = reportFormData.valuer_name || "VALUETECH SOLUTIONS";
@@ -2186,7 +2113,6 @@ function MachineryReport() {
       let value = reportFormData[key];
 
       if (key === "disclaimer") return;
-      if (key === "amount_in_words") { reportData[key] = computedAmountInWords || null; return; }
       if (key === "invoice_no_date") return;
 
       // Default for tax_invoice_copy_heading when empty
@@ -2274,15 +2200,17 @@ function MachineryReport() {
       return;
     }
 
-    // Compute and validate amount_in_words centrally based on fair_market_value
     const fmvRaw = reportFormData.fair_market_value;
-    const fmvAmount = parseCurrency(fmvRaw);
-    const computedAmountInWords = fmvRaw
-      ? convertNumberToWordsIndian(fmvAmount)
-      : "";
-
-    // If FMV is present but amount_in_words couldn't be computed, block save
-    if (fmvRaw && !computedAmountInWords) {
+    const computedAmountInWords = computeAmountInWordsFromFmv(
+      fmvRaw,
+      parseCurrency,
+      convertNumberToWordsIndian
+    );
+    if (
+      fmvRaw &&
+      !hasAmountInWordsContent(reportFormData.amount_in_words) &&
+      !computedAmountInWords
+    ) {
       toast.error(
         "Amount in words missing. Please enter a valid Fair Market Value."
       );
@@ -2784,15 +2712,6 @@ function MachineryReport() {
 
   // Memoized values for expensive calculations
   const currentDate = useMemo(() => getCurrentDate(), [getCurrentDate]);
-  const amountInWords = useMemo(() => {
-    const value = reportFormData.fair_market_value;
-    const amount = parseCurrency(value);
-    return amount > 0 ? convertNumberToWordsIndian(amount) : "";
-  }, [
-    reportFormData.fair_market_value,
-    parseCurrency,
-    convertNumberToWordsIndian,
-  ]);
 
   return (
     <section className="order-details-wrapper">
@@ -4744,24 +4663,10 @@ function MachineryReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="amount_in_words">
-                      Fair Market Value Amount In Words{" "}
-                      <span class="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="amount_in_words"
-                      name="amount_in_words"
-                      value={amountInWords}
-                      readOnly
-                      placeholder="Auto-generated from fair market value"
-                      required
-                    />
-                  </div>
-                </div>
+                <FairMarketValueAmountInWordsField
+                  value={reportFormData.amount_in_words}
+                  onChange={handleFormChange}
+                />
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="no_of_photograph">

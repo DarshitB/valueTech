@@ -884,8 +884,8 @@ function generateSummarizedNormalFieldsHTML(
         <tr>
             <td>TAX INVOICE COST:</td>
             <td colspan="2">Rs. ${formData.tax_invoice_cost}</td>
-            <td>DEPRECIATION % &amp; VALUE:</td>
-            <td>${formData.depreciation}%</td>
+            <td>DEPRECIATION:</td>
+            <td>${formData.depreciation}</td>
             <td>Rs. ${formData.depreciation_value}</td>
             <td>APPRAISER VALUE:</td>
             <td colspan="2">Rs. ${formData.appraiser_value}</td>

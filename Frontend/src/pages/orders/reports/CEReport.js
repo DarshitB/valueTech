@@ -28,6 +28,13 @@ import "../order.scss";
 import { DeleteIcon, ViewIcon } from "../../../components/icons";
 import { getFinalizedOrdersByChildCategory } from "../../../api/order.api";
 import { getOrderReport } from "../../../api/orderReport.api";
+import FairMarketValueAmountInWordsField from "../../../components/reports/FairMarketValueAmountInWordsField";
+import { useAutoFillAmountInWordsFromFmv } from "../../../hooks/useAutoFillAmountInWordsFromFmv";
+import {
+  computeAmountInWordsFromFmv,
+  convertNumberToWordsIndian,
+  hasAmountInWordsContent,
+} from "../../../utils/reportAmountInWords";
 
 // WYSIWYG Textarea Component - preserves HTML formatting
 const WysiwygTextarea = ({
@@ -589,89 +596,6 @@ function CEReport() {
     return parseFloat(value.replace(/,/g, "")) || 0;
   }, []);
 
-  // Function to convert number to words in Indian format
-  const convertNumberToWordsIndian = useCallback((num) => {
-    const a = [
-      "",
-      "ONE",
-      "TWO",
-      "THREE",
-      "FOUR",
-      "FIVE",
-      "SIX",
-      "SEVEN",
-      "EIGHT",
-      "NINE",
-      "TEN",
-      "ELEVEN",
-      "TWELVE",
-      "THIRTEEN",
-      "FOURTEEN",
-      "FIFTEEN",
-      "SIXTEEN",
-      "SEVENTEEN",
-      "EIGHTEEN",
-      "NINETEEN",
-    ];
-    const b = [
-      "",
-      "",
-      "TWENTY",
-      "THIRTY",
-      "FORTY",
-      "FIFTY",
-      "SIXTY",
-      "SEVENTY",
-      "EIGHTY",
-      "NINETY",
-    ];
-
-    if (num === 0) return "ZERO ONLY";
-
-    function numToWords(n) {
-      let str = "";
-      if (n > 19) {
-        str += b[Math.floor(n / 10)] + (n % 10 ? " " + a[n % 10] : "");
-      } else {
-        str += a[n];
-      }
-      return str;
-    }
-
-    let words = "";
-
-    const crore = Math.floor(num / 10000000);
-    if (crore > 0) {
-      words += numToWords(crore) + " CRORE ";
-      num %= 10000000;
-    }
-
-    const lakh = Math.floor(num / 100000);
-    if (lakh > 0) {
-      words += numToWords(lakh) + " LAKH ";
-      num %= 100000;
-    }
-
-    const thousand = Math.floor(num / 1000);
-    if (thousand > 0) {
-      words += numToWords(thousand) + " THOUSAND ";
-      num %= 1000;
-    }
-
-    const hundred = Math.floor(num / 100);
-    if (hundred > 0) {
-      words += a[hundred] + " HUNDRED ";
-      num %= 100;
-    }
-
-    if (num > 0) {
-      if (words !== "") words += "AND ";
-      words += numToWords(num) + " ";
-    }
-
-    return words.trim() + " ONLY";
-  }, []);
-
   // Function to convert number to words for tyres
   const numberToWords = useCallback((n) => {
     const words = [
@@ -949,6 +873,13 @@ function CEReport() {
   const unblockRef = useRef(null);
   // Ref to store the last intercepted navigation target
   const pendingNavRef = useRef(null);
+
+  useAutoFillAmountInWordsFromFmv({
+    fairMarketValue: reportFormData.fair_market_value,
+    setReportFormData,
+    parseCurrency,
+    convertNumberToWordsIndian,
+  });
 
   // State for registration field options (Not Available / Not Applicable)
   const [registrationNoOption, setRegistrationNoOption] = useState(null); // null, "NOT_AVAILABLE", "NOT_APPLICABLE"
@@ -2234,6 +2165,14 @@ function CEReport() {
           updated[name] = handleCurrencyFormatting(value);
         }
 
+        if (name === "fair_market_value") {
+          updated.amount_in_words = computeAmountInWordsFromFmv(
+            updated.fair_market_value,
+            parseCurrency,
+            convertNumberToWordsIndian
+          );
+        }
+
         // Auto-calculate depreciation_value when invoice_cost or depreciation changes
         if (name === "invoice_cost" || name === "depreciation") {
           const invoiceCost = parseCurrency(
@@ -2631,15 +2570,17 @@ function CEReport() {
         return;
       }
 
-      // Compute and validate amount_in_words centrally based on fair_market_value
       const fmvRaw = reportFormData.fair_market_value;
-      const fmvAmount = parseCurrency(fmvRaw);
-      const computedAmountInWords = fmvRaw
-        ? convertNumberToWordsIndian(fmvAmount)
-        : "";
-
-      // If FMV is present but amount_in_words couldn't be computed, block submit
-      if (fmvRaw && !computedAmountInWords) {
+      const computedAmountInWords = computeAmountInWordsFromFmv(
+        fmvRaw,
+        parseCurrency,
+        convertNumberToWordsIndian
+      );
+      if (
+        fmvRaw &&
+        !hasAmountInWordsContent(reportFormData.amount_in_words) &&
+        !computedAmountInWords
+      ) {
         toast.error(
           "Amount in words missing. Please enter a valid Fair Market Value."
         );
@@ -2654,11 +2595,6 @@ function CEReport() {
       
       // Add report type selection (Rough/Production)
       formData.append("report_type_selection", reportTypeSelection);
-
-      // Ensure amount_in_words is present in payload when FMV exists
-      if (fmvRaw) {
-        formData.set("amount_in_words", computedAmountInWords);
-      }
 
       // Ensure invoice_no_date is properly combined before sending
       const invoiceNo = reportFormData.invoice_no || "";
@@ -2676,11 +2612,6 @@ function CEReport() {
       // Add all form fields to FormData - simple logic: if value exists send it, if null/empty send null
       Object.keys(reportFormData).forEach((key) => {
         let value = reportFormData[key];
-
-        // Skip amount_in_words - handled separately above
-        if (key === "amount_in_words") {
-          return;
-        }
 
         // Skip invoice_no_date - will be added separately with fresh computed value
         if (key === "invoice_no_date") {
@@ -2868,19 +2799,11 @@ function CEReport() {
   // Builds FormData payload for the Save API.
   // Used by both handleSaveReport and the navigation blocker.
   const buildSavePayload = useCallback(() => {
-    const fmvRaw = reportFormData.fair_market_value;
-    const fmvAmount = parseCurrency(fmvRaw);
-    const computedAmountInWords = fmvRaw ? convertNumberToWordsIndian(fmvAmount) : "";
-
     const reportData = {};
 
     Object.keys(reportFormData).forEach((key) => {
       let value = reportFormData[key];
 
-      if (key === "amount_in_words") {
-        reportData[key] = computedAmountInWords || null;
-        return;
-      }
       if (key === "invoice_no_date") return;
 
       if (key === "registration_no") {
@@ -2992,172 +2915,24 @@ function CEReport() {
       return;
     }
 
-    // Compute and validate amount_in_words centrally based on fair_market_value
     const fmvRaw = reportFormData.fair_market_value;
-    const fmvAmount = parseCurrency(fmvRaw);
-    const computedAmountInWords = fmvRaw
-      ? convertNumberToWordsIndian(fmvAmount)
-      : "";
-
-    // If FMV is present but amount_in_words couldn't be computed, block save
-    if (fmvRaw && !computedAmountInWords) {
+    const computedAmountInWords = computeAmountInWordsFromFmv(
+      fmvRaw,
+      parseCurrency,
+      convertNumberToWordsIndian
+    );
+    if (
+      fmvRaw &&
+      !hasAmountInWordsContent(reportFormData.amount_in_words) &&
+      !computedAmountInWords
+    ) {
       toast.error(
         "Amount in words missing. Please enter a valid Fair Market Value."
       );
       return;
     }
 
-    // Create report data object with only non-empty fields
-    const reportData = {};
-
-    // Add all form fields to reportData - simple logic: if value exists send it, if null/empty send null
-    Object.keys(reportFormData).forEach((key) => {
-      let value = reportFormData[key];
-
-      // Handle amount_in_words - use computed value
-      if (key === "amount_in_words") {
-        reportData[key] = computedAmountInWords || null;
-        return;
-      }
-
-// Skip invoice_no_date - will be added separately with fresh computed value
-      if (key === "invoice_no_date") {
-        return;
-      }
-
-      // Handle registration fields with options
-        if (key === "registration_no") {
-        if (registrationNoOption === "NOT_AVAILABLE") {
-          value = "NOT AVAILABLE";
-        } else if (registrationNoOption === "NOT_APPLICABLE") {
-          value = "NOT APPLICABLE";
-        }
-      }
-
-      if (key === "registration_date") {
-        if (registrationDateOption === "NOT_AVAILABLE") {
-          value = "NOT AVAILABLE";
-        } else if (registrationDateOption === "NOT_APPLICABLE") {
-          value = "NOT APPLICABLE";
-        }
-      }
-
-      if (key === "registered_location") {
-        if (registeredLocationOption === "NOT_AVAILABLE") {
-          value = "NOT AVAILABLE";
-        } else if (registeredLocationOption === "NOT_APPLICABLE") {
-          value = "NOT APPLICABLE";
-        }
-      }
-
-      // Simple logic: if value exists, send it; if null/empty, send null
-      // Note: Textarea values (with line breaks, spaces, formatting) are preserved as-is
-      if (value !== null && value !== undefined && value !== "") {
-        reportData[key] = String(value); // Preserve all formatting including line breaks
-      } else {
-        reportData[key] = null; // Send null for empty values
-      }
-    });
-
-    // Always include report_date_heading in payload (even if user did not change it - use preselected default)
-    reportData.report_date_heading = reportFormData.report_date_heading || "Report Date";
-
-    // Add invoice_no_date (combined from invoice_no and invoice_date) - always include with fresh computed value
-    const invoiceNo = reportFormData.invoice_no || "";
-    const invoiceDate = reportFormData.invoice_date || "";
-    let combinedInvoiceData = "";
-    if (invoiceNo && invoiceDate) {
-      combinedInvoiceData = `${invoiceNo} Dated ${invoiceDate}`;
-    } else if (invoiceNo) {
-      combinedInvoiceData = invoiceNo;
-    } else if (invoiceDate) {
-      combinedInvoiceData = `Dated ${invoiceDate}`;
-    }
-    reportData.invoice_no_date = combinedInvoiceData || null;
-
-    // Add flexible fields in the same format as report generation
-    let formDataIndex = 0;
-    flexibleFields.forEach((field) => {
-      // Only include fields with actual values
-      if (field.field_value && field.field_value.trim() !== "") {
-        reportData[`flexible_fields[${formDataIndex}][section_name]`] =
-          field.section_name;
-        reportData[`flexible_fields[${formDataIndex}][col_span]`] =
-          field.col_span;
-        reportData[`flexible_fields[${formDataIndex}][field_label]`] =
-          field.field_label;
-        reportData[`flexible_fields[${formDataIndex}][field_value]`] = String(
-          field.field_value || ""
-        ); // Preserve all formatting including line breaks
-        reportData[`flexible_fields[${formDataIndex}][field_order]`] =
-          field.field_order;
-        formDataIndex++;
-
-        // Add second field for "Add Two" functionality
-        if (
-          field.col_span === 2 &&
-          field.field_label_2 !== undefined &&
-          field.field_value_2 &&
-          field.field_value_2.trim() !== ""
-        ) {
-          reportData[`flexible_fields[${formDataIndex}][section_name]`] =
-            field.section_name;
-          reportData[`flexible_fields[${formDataIndex}][col_span]`] =
-            field.col_span;
-          reportData[`flexible_fields[${formDataIndex}][field_label]`] =
-            field.field_label_2;
-          reportData[`flexible_fields[${formDataIndex}][field_value]`] = String(
-            field.field_value_2 || ""
-          ); // Preserve all formatting including line breaks
-          reportData[`flexible_fields[${formDataIndex}][field_order]`] =
-            field.field_order + 1;
-          formDataIndex++;
-        }
-      }
-    });
-
-    // Add chassis impression file if available (as base64 or file path)
-    if (chassisImpressionFile) {
-      reportData["chassis_no_pencil_impression"] = chassisImpressionFile;
-    }
-
-    // Only proceed if there's actual data to save
-    if (Object.keys(reportData).length === 0) {
-      toast.warning(
-        "No data to save. Please fill in some fields before saving."
-      );
-      return;
-    }
-
-    /* console.log("📤 CEReport - Sending to backend - reportData:", reportData);
-    console.log(
-      "📤 CEReport - amount_in_words in payload:",
-      reportData.amount_in_words
-    ); */
-
-    // Debug log for payload
-    /* console.log("🔍 CEReport Save - Final reportData:", reportData);
-    console.log(
-      "🔍 CEReport Save - amount_in_words in payload:",
-      reportData.amount_in_words
-    );
-    console.log(
-      "🔍 CEReport Save - fair_market_value:",
-      reportFormData.fair_market_value
-    ); */
-
-    // Convert reportData object to FormData for multipart submission
-    const formData = new FormData();
-    Object.entries(reportData).forEach(([key, value]) => {
-      if (value instanceof File || value instanceof Blob) {
-        formData.append(key, value);
-      } else if (value === null) {
-        // Explicitly send null values for cleared fields (as empty string for FormData)
-        formData.append(key, "");
-      } else if (value !== undefined) {
-        formData.append(key, value);
-      }
-    });
+    const formData = buildSavePayload();
 
     // Don't clear clearedFieldsRef after save - user might generate report next
     // It will be cleared when component unmounts or order changes (handled in useEffect)
@@ -3179,13 +2954,11 @@ function CEReport() {
     reportFormData,
     flexibleFields,
     validateFlexibleFields,
+    buildSavePayload,
     chassisImpressionFile,
     dispatch,
     id,
     order,
-    parseCurrency,
-    convertNumberToWordsIndian,
-    numberToWords,
     canEditRefNoId,
     registrationNoOption,
     registrationDateOption,
@@ -3642,15 +3415,6 @@ function CEReport() {
 
   // Memoized values for expensive calculations
   const currentDate = useMemo(() => getCurrentDate(), [getCurrentDate]);
-  const amountInWords = useMemo(() => {
-    const value = reportFormData.fair_market_value;
-    const amount = parseCurrency(value);
-    return amount > 0 ? convertNumberToWordsIndian(amount) : "";
-  }, [
-    reportFormData.fair_market_value,
-    parseCurrency,
-    convertNumberToWordsIndian,
-  ]);
 
   const tyreCountInWords = useMemo(() => {
     const count = parseInt(reportFormData.tyre_count) || 0;
@@ -6234,24 +5998,10 @@ function CEReport() {
                     </div>
                   </div>
                 </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="amount_in_words">
-                      Fair Market Value Amount In Words{" "}
-                      <span class="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="amount_in_words"
-                      name="amount_in_words"
-                      value={amountInWords}
-                      readOnly
-                      placeholder="Auto-generated from fair market value"
-                      required
-                    />
-                  </div>
-                </div>
+                <FairMarketValueAmountInWordsField
+                  value={reportFormData.amount_in_words}
+                  onChange={handleFormChange}
+                />
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="no_of_photograph">

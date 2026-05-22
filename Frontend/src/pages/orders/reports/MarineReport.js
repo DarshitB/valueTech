@@ -26,6 +26,7 @@ import { selectPermissions } from "../../../redux/selectors/authSelectors";
 import { hasPermission } from "../../../utils/permissionUtils";
 import "../order.scss";
 import { DeleteIcon, CloseIcon } from "../../../components/icons";
+import { convertNumberToWordsIndian } from "../../../utils/numberToWordsIndian";
 
 // WYSIWYG Textarea Component - preserves HTML formatting
 const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "", name }) => {
@@ -209,87 +210,6 @@ function MarineReport() {
   }, []);
 
   // Function to convert number to words (Indian format)
-  const convertNumberToWordsIndian = useCallback((num) => {
-    const a = [
-      "",
-      "ONE",
-      "TWO",
-      "THREE",
-      "FOUR",
-      "FIVE",
-      "SIX",
-      "SEVEN",
-      "EIGHT",
-      "NINE",
-      "TEN",
-      "ELEVEN",
-      "TWELVE",
-      "THIRTEEN",
-      "FOURTEEN",
-      "FIFTEEN",
-      "SIXTEEN",
-      "SEVENTEEN",
-      "EIGHTEEN",
-      "NINETEEN",
-    ];
-    const b = [
-      "",
-      "",
-      "TWENTY",
-      "THIRTY",
-      "FORTY",
-      "FIFTY",
-      "SIXTY",
-      "SEVENTY",
-      "EIGHTY",
-      "NINETY",
-    ];
-
-    if (num === 0) return "ZERO ONLY";
-
-    function numToWords(n) {
-      let str = "";
-      if (n > 19) {
-        str += b[Math.floor(n / 10)] + (n % 10 ? " " + a[n % 10] : "");
-      } else {
-        str += a[n];
-      }
-      return str;
-    }
-
-    let words = "";
-    const crore = Math.floor(num / 10000000);
-    if (crore > 0) {
-      words += numToWords(crore) + " CRORE ";
-      num %= 10000000;
-    }
-
-    const lakh = Math.floor(num / 100000);
-    if (lakh > 0) {
-      words += numToWords(lakh) + " LAKH ";
-      num %= 100000;
-    }
-
-    const thousand = Math.floor(num / 1000);
-    if (thousand > 0) {
-      words += numToWords(thousand) + " THOUSAND ";
-      num %= 1000;
-    }
-
-    const hundred = Math.floor(num / 100);
-    if (hundred > 0) {
-      words += a[hundred] + " HUNDRED ";
-      num %= 100;
-    }
-
-    if (num > 0) {
-      if (words !== "") words += "AND ";
-      words += numToWords(num) + " ";
-    }
-
-    return words.trim() + " ONLY";
-  }, []);
-
   // Function to format currency input (Indian number format)
 
   // Form state

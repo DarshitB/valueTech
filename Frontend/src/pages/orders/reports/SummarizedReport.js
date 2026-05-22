@@ -29,6 +29,13 @@ import "../order.scss";
 import { DeleteIcon, ViewIcon } from "../../../components/icons";
 import { getFinalizedOrdersByChildCategory } from "../../../api/order.api";
 import { getOrderReport } from "../../../api/orderReport.api";
+import FairMarketValueAmountInWordsField from "../../../components/reports/FairMarketValueAmountInWordsField";
+import { useAutoFillAmountInWordsFromFmv } from "../../../hooks/useAutoFillAmountInWordsFromFmv";
+import {
+  computeAmountInWordsFromFmv,
+  convertNumberToWordsIndian,
+  hasAmountInWordsContent,
+} from "../../../utils/reportAmountInWords";
 
 // WYSIWYG Textarea Component - preserves HTML formatting
 const WysiwygTextarea = ({
@@ -282,6 +289,24 @@ const SUMMARIZED_CURRENCY_COLUMN_IDS = new Set([
   "estimated_fair_value",
 ]);
 
+/** General fields always driven by summarized table grand totals when table has values. */
+const SUMMARIZED_TABLE_DERIVED_GENERAL_FIELDS = new Set([
+  "tax_invoice_cost",
+  "depreciation_value",
+  "appraiser_value",
+  "fair_market_value",
+  "amount_in_words",
+]);
+
+const summarizedRowsHaveValuationTotals = (rows = []) =>
+  rows.some(
+    (row) =>
+      parseFloat(String(row?.total_invoice_cost ?? "").replace(/,/g, "")) > 0 ||
+      parseFloat(String(row?.amount_post_depreciation ?? "").replace(/,/g, "")) > 0 ||
+      parseFloat(String(row?.appraisal_value ?? "").replace(/,/g, "")) > 0 ||
+      parseFloat(String(row?.estimated_fair_value ?? "").replace(/,/g, "")) > 0
+  );
+
 const SUMMARIZED_DIGITS_ONLY_COLUMN_IDS = new Set([
   "residual_life_of_asset",
   "depr_rate",
@@ -340,18 +365,6 @@ const getSummarizedColumnLabel = (col, dynamicColumns = []) => {
 
 const isVerticallyMergedColumn = (colId, verticalMergedColumnIds = []) =>
   Boolean(colId && verticalMergedColumnIds.includes(colId));
-
-/** null = empty, number = rate %, "non_numeric" = text (e.g. NA) */
-const parseDepreciationRateInput = (raw) => {
-  const trimmed = String(raw ?? "").trim();
-  if (trimmed === "") return null;
-  const normalized = trimmed.replace(/%$/, "").trim().replace(/,/g, "");
-  if (!/^-?\d+(\.\d+)?$/.test(normalized)) {
-    return "non_numeric";
-  }
-  const n = parseFloat(normalized);
-  return Number.isFinite(n) ? n : "non_numeric";
-};
 
 const SUMMARIZED_NAV_SKIP_COLUMN_IDS = new Set(["amount_post_depreciation"]);
 
@@ -1161,89 +1174,6 @@ function SummarizedReport() {
     return parseFloat(value.replace(/,/g, "")) || 0;
   }, []);
 
-  // Function to convert number to words in Indian format
-  const convertNumberToWordsIndian = useCallback((num) => {
-    const a = [
-      "",
-      "ONE",
-      "TWO",
-      "THREE",
-      "FOUR",
-      "FIVE",
-      "SIX",
-      "SEVEN",
-      "EIGHT",
-      "NINE",
-      "TEN",
-      "ELEVEN",
-      "TWELVE",
-      "THIRTEEN",
-      "FOURTEEN",
-      "FIFTEEN",
-      "SIXTEEN",
-      "SEVENTEEN",
-      "EIGHTEEN",
-      "NINETEEN",
-    ];
-    const b = [
-      "",
-      "",
-      "TWENTY",
-      "THIRTY",
-      "FORTY",
-      "FIFTY",
-      "SIXTY",
-      "SEVENTY",
-      "EIGHTY",
-      "NINETY",
-    ];
-
-    if (num === 0) return "ZERO ONLY";
-
-    function numToWords(n) {
-      let str = "";
-      if (n > 19) {
-        str += b[Math.floor(n / 10)] + (n % 10 ? " " + a[n % 10] : "");
-      } else {
-        str += a[n];
-      }
-      return str;
-    }
-
-    let words = "";
-
-    const crore = Math.floor(num / 10000000);
-    if (crore > 0) {
-      words += numToWords(crore) + " CRORE ";
-      num %= 10000000;
-    }
-
-    const lakh = Math.floor(num / 100000);
-    if (lakh > 0) {
-      words += numToWords(lakh) + " LAKH ";
-      num %= 100000;
-    }
-
-    const thousand = Math.floor(num / 1000);
-    if (thousand > 0) {
-      words += numToWords(thousand) + " THOUSAND ";
-      num %= 1000;
-    }
-
-    const hundred = Math.floor(num / 100);
-    if (hundred > 0) {
-      words += a[hundred] + " HUNDRED ";
-      num %= 100;
-    }
-
-    if (num > 0) {
-      if (words !== "") words += "AND ";
-      words += numToWords(num) + " ";
-    }
-
-    return words.trim() + " ONLY";
-  }, []);
-
   // Function to format currency input (Indian number format)
   const handleCurrencyFormatting = useCallback((value) => {
     if (!value || typeof value !== "string") return "";
@@ -1272,35 +1202,64 @@ function SummarizedReport() {
     return formattedValue;
   }, []);
 
-  const syncDepreciationValue = useCallback(
-    (state) => {
-      const invoiceCostRaw = state.tax_invoice_cost;
-      const depreciationRaw = state.depreciation;
-      const invoiceCost = parseCurrency(invoiceCostRaw);
-      const depRate = parseDepreciationRateInput(depreciationRaw);
-
-      if (depRate === "non_numeric") {
-        return {
-          ...state,
-          depreciation_value:
-            invoiceCostRaw != null && String(invoiceCostRaw).trim() !== ""
-              ? String(invoiceCostRaw)
-              : "",
-        };
-      }
-
-      if (depRate !== null && invoiceCost > 0 && depRate >= 0) {
-        const depreciationAmount = (invoiceCost * depRate) / 100;
-        const depreciationValue = invoiceCost - depreciationAmount;
-        return {
-          ...state,
-          depreciation_value: handleCurrencyFormatting(depreciationValue.toString()),
-        };
-      }
-
-      return { ...state, depreciation_value: "" };
+  const computeSummarizedGrandTotalsFromRows = useCallback(
+    (rows = []) => {
+      const totals = {
+        total_invoice_cost: 0,
+        estimated_current_replacement_cost: 0,
+        amount_post_depreciation: 0,
+        appraisal_value: 0,
+        estimated_fair_value: 0,
+      };
+      rows.forEach((row) => {
+        totals.total_invoice_cost += parseCurrency(String(row?.total_invoice_cost ?? ""));
+        totals.estimated_current_replacement_cost += parseCurrency(
+          String(row?.estimated_current_replacement_cost ?? "")
+        );
+        totals.amount_post_depreciation += parseCurrency(
+          String(row?.amount_post_depreciation ?? "")
+        );
+        totals.appraisal_value += parseCurrency(String(row?.appraisal_value ?? ""));
+        totals.estimated_fair_value += parseCurrency(
+          String(row?.estimated_fair_value ?? "")
+        );
+      });
+      return totals;
     },
-    [parseCurrency, handleCurrencyFormatting]
+    [parseCurrency]
+  );
+
+  const formatGrandTotalForGeneralField = useCallback(
+    (numeric) => {
+      const n = Number(numeric) || 0;
+      return handleCurrencyFormatting(
+        (Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2)
+      );
+    },
+    [handleCurrencyFormatting]
+  );
+
+  /** Map summarized table grand totals → general valuation fields. */
+  const getGeneralFieldsFromTableTotals = useCallback(
+    (totals, convertToWordsIndian) => {
+      const fields = {
+        tax_invoice_cost: formatGrandTotalForGeneralField(totals.total_invoice_cost),
+        depreciation_value: formatGrandTotalForGeneralField(
+          totals.amount_post_depreciation
+        ),
+        appraiser_value: formatGrandTotalForGeneralField(totals.appraisal_value),
+        fair_market_value: formatGrandTotalForGeneralField(totals.estimated_fair_value),
+      };
+      const fmvNum = Number(totals.estimated_fair_value) || 0;
+      if (fmvNum > 0 && convertToWordsIndian) {
+        const words = convertToWordsIndian(fmvNum);
+        if (words) {
+          fields.amount_in_words = words;
+        }
+      }
+      return fields;
+    },
+    [formatGrandTotalForGeneralField]
   );
 
   // Form data state for Machinery report generation
@@ -1470,12 +1429,26 @@ function SummarizedReport() {
     (nextData) => {
       markDirty();
       setSummarizedTableData(nextData);
+      const rows = nextData?.rows || [];
+      const generalFromTotals =
+        rows.length > 0 && summarizedRowsHaveValuationTotals(rows)
+          ? getGeneralFieldsFromTableTotals(
+              computeSummarizedGrandTotalsFromRows(rows),
+              convertNumberToWordsIndian
+            )
+          : {};
       setReportFormData((prev) => ({
         ...prev,
         summarized_table_data: JSON.stringify(nextData),
+        ...generalFromTotals,
       }));
     },
-    [markDirty]
+    [
+      markDirty,
+      computeSummarizedGrandTotalsFromRows,
+      getGeneralFieldsFromTableTotals,
+      convertNumberToWordsIndian,
+    ]
   );
 
   // Auto-populate form data when order data is available
@@ -1751,6 +1724,28 @@ function SummarizedReport() {
         ? `OVER ALL FEED BACK OF THE INSPECTED ${categorySuffixUpper}`
         : "";
 
+      let generalFromTableTotalsOnLoad = {};
+      if (report.summarized_table_data) {
+        try {
+          const parsed = JSON.parse(report.summarized_table_data);
+          const dynamicColumns = Array.isArray(parsed?.dynamicColumns)
+            ? parsed.dynamicColumns
+            : [];
+          const rows = normalizeSummarizedRows(parsed?.rows, dynamicColumns);
+          if (rows.length > 0 && summarizedRowsHaveValuationTotals(rows)) {
+            generalFromTableTotalsOnLoad = getGeneralFieldsFromTableTotals(
+              computeSummarizedGrandTotalsFromRows(rows),
+              convertNumberToWordsIndian
+            );
+          }
+        } catch (_) {
+          /* use DB values for derived fields if table JSON is invalid */
+        }
+      }
+
+      const preferTableTotalsForGeneralFields =
+        Object.keys(generalFromTableTotalsOnLoad).length > 0;
+
       // More robust field population - try to set all relevant fields
       Object.entries(report).forEach(([key, value]) => {
         // Skip system fields, valuer-related fields, heading fields, and disclaimer (always use getDisclaimer)
@@ -1764,7 +1759,9 @@ function SummarizedReport() {
           key === "license_no" ||
           key === "ref_no_code" ||
           key === "disclaimer" ||
-          headingFields.includes(key)
+          headingFields.includes(key) ||
+          (preferTableTotalsForGeneralFields &&
+            SUMMARIZED_TABLE_DERIVED_GENERAL_FIELDS.has(key))
         ) {
           return;
         }
@@ -1875,6 +1872,10 @@ function SummarizedReport() {
         updated.ref_no_month = `SFW-${months[currentMonth]}-`;
       }
 
+      if (preferTableTotalsForGeneralFields) {
+        Object.assign(updated, generalFromTableTotalsOnLoad);
+      }
+
       return updated;
     });
 
@@ -1933,6 +1934,8 @@ function SummarizedReport() {
     buildCategorySuffix,
     buildValuationReportHeading,
     getDisclaimer,
+    computeSummarizedGrandTotalsFromRows,
+    getGeneralFieldsFromTableTotals,
   ]);
 
   // Prefill proposed_owner_name from order.customer_name_2 only when API/report didn't provide it.
@@ -2087,6 +2090,34 @@ function SummarizedReport() {
     }
   }, [reportFormData?.summarized_table_data]);
 
+  // When table rows load or change, push grand totals into general fields (same as table footer).
+  useEffect(() => {
+    const rows = summarizedTableData?.rows;
+    if (!Array.isArray(rows) || rows.length === 0) return;
+    if (!summarizedRowsHaveValuationTotals(rows)) return;
+
+    const generalFromTotals = getGeneralFieldsFromTableTotals(
+      computeSummarizedGrandTotalsFromRows(rows),
+      convertNumberToWordsIndian
+    );
+    setReportFormData((prev) => ({
+      ...prev,
+      ...generalFromTotals,
+    }));
+  }, [
+    summarizedTableData.rows,
+    computeSummarizedGrandTotalsFromRows,
+    getGeneralFieldsFromTableTotals,
+    convertNumberToWordsIndian,
+  ]);
+
+  useAutoFillAmountInWordsFromFmv({
+    fairMarketValue: reportFormData.fair_market_value,
+    setReportFormData,
+    parseCurrency,
+    convertNumberToWordsIndian,
+  });
+
   const summarizedSubcategoryOptions = useMemo(
     () =>
       (summarizedChildCategories || []).map((item) => ({
@@ -2180,26 +2211,10 @@ function SummarizedReport() {
     [summarizedDisplayOrderedColumns, getSummarizedColumnWidth]
   );
 
-  const summarizedGrandTotalsByColumn = useMemo(() => {
-    const rows = summarizedTableData.rows || [];
-    const totals = {
-      total_invoice_cost: 0,
-      estimated_current_replacement_cost: 0,
-      amount_post_depreciation: 0,
-      appraisal_value: 0,
-      estimated_fair_value: 0,
-    };
-    rows.forEach((row) => {
-      totals.total_invoice_cost += parseCurrency(String(row?.total_invoice_cost ?? ""));
-      totals.estimated_current_replacement_cost += parseCurrency(
-        String(row?.estimated_current_replacement_cost ?? "")
-      );
-      totals.amount_post_depreciation += parseCurrency(String(row?.amount_post_depreciation ?? ""));
-      totals.appraisal_value += parseCurrency(String(row?.appraisal_value ?? ""));
-      totals.estimated_fair_value += parseCurrency(String(row?.estimated_fair_value ?? ""));
-    });
-    return totals;
-  }, [summarizedTableData.rows, parseCurrency]);
+  const summarizedGrandTotalsByColumn = useMemo(
+    () => computeSummarizedGrandTotalsFromRows(summarizedTableData.rows || []),
+    [summarizedTableData.rows, computeSummarizedGrandTotalsFromRows]
+  );
 
   const summarizedDynamicColumnTotals = useMemo(() => {
     const dynamicCols = summarizedTableData.dynamicColumns || [];
@@ -2790,8 +2805,12 @@ function SummarizedReport() {
           updated[name] = handleCurrencyFormatting(value);
         }
 
-        if (name === "depreciation") {
-          updated = syncDepreciationValue(updated);
+        if (name === "fair_market_value") {
+          updated.amount_in_words = computeAmountInWordsFromFmv(
+            updated.fair_market_value,
+            parseCurrency,
+            convertNumberToWordsIndian
+          );
         }
 
         // Auto-combine invoice_no and invoice_date into invoice_no_date
@@ -2814,7 +2833,7 @@ function SummarizedReport() {
         return updated;
       });
     },
-    [parseCurrency, handleCurrencyFormatting, convertNumberToWordsIndian, isAutoGeneratedHeading, buildValuationReportHeading, syncDepreciationValue]
+    [parseCurrency, handleCurrencyFormatting, convertNumberToWordsIndian, isAutoGeneratedHeading, buildValuationReportHeading]
   );
 
   // Handle SingleSearchSelect changes
@@ -2924,13 +2943,10 @@ function SummarizedReport() {
     if (!value || value.trim() === "") {
       // Track that this field was explicitly cleared
       clearedFieldsRef.current.add(name);
-      setReportFormData((prev) => {
-        const next = { ...prev, [name]: "" };
-        if (name === "tax_invoice_cost") {
-          return syncDepreciationValue(next);
-        }
-        return next;
-      });
+      setReportFormData((prev) => ({
+        ...prev,
+        [name]: "",
+      }));
       return;
     }
 
@@ -2961,14 +2977,11 @@ function SummarizedReport() {
       formattedValue += "." + decimalPart;
     }
 
-    setReportFormData((prev) => {
-      const next = { ...prev, [name]: formattedValue };
-      if (name === "tax_invoice_cost") {
-        return syncDepreciationValue(next);
-      }
-      return next;
-    });
-  }, [syncDepreciationValue]);
+    setReportFormData((prev) => ({
+      ...prev,
+      [name]: formattedValue,
+    }));
+  }, []);
 
   // Handle chassis impression file selection
   const handleFileChange = useCallback((e) => {
@@ -3134,15 +3147,17 @@ function SummarizedReport() {
         return;
       }
 
-      // Compute and validate amount_in_words centrally based on fair_market_value
       const fmvRaw = reportFormData.fair_market_value;
-      const fmvAmount = parseCurrency(fmvRaw);
-      const computedAmountInWords = fmvRaw
-        ? convertNumberToWordsIndian(fmvAmount)
-        : "";
-
-      // If FMV is present but amount_in_words couldn't be computed, block submit
-      if (fmvRaw && !computedAmountInWords) {
+      const computedAmountInWords = computeAmountInWordsFromFmv(
+        fmvRaw,
+        parseCurrency,
+        convertNumberToWordsIndian
+      );
+      if (
+        fmvRaw &&
+        !hasAmountInWordsContent(reportFormData.amount_in_words) &&
+        !computedAmountInWords
+      ) {
         toast.error(
           "Amount in words missing. Please enter a valid Fair Market Value."
         );
@@ -3157,11 +3172,6 @@ function SummarizedReport() {
 
       // Add report type selection (Rough/Production)
       formData.append("report_type_selection", reportTypeSelection);
-
-      // Ensure amount_in_words is present in payload when FMV exists
-      if (fmvRaw) {
-        formData.set("amount_in_words", computedAmountInWords);
-      }
 
       // Ensure invoice_no_date is properly combined before sending
       const invoiceNo = reportFormData.invoice_no || "";
@@ -3179,11 +3189,6 @@ function SummarizedReport() {
       // Add all form fields to FormData - simple logic: if value exists send it, if null/empty send null
       Object.keys(reportFormData).forEach((key) => {
         let value = reportFormData[key];
-
-        // Skip amount_in_words - handled separately above
-        if (key === "amount_in_words") {
-          return;
-        }
 
         // Skip disclaimer - handled separately below
         if (key === "disclaimer") {
@@ -3396,10 +3401,6 @@ function SummarizedReport() {
 
   // Builds the save payload — used by both handleSaveReport and the navigation blocker.
   const buildSavePayload = useCallback(() => {
-    const fmvRaw = reportFormData.fair_market_value;
-    const fmvAmount = parseCurrency(fmvRaw);
-    const computedAmountInWords = fmvRaw ? convertNumberToWordsIndian(fmvAmount) : "";
-
     const reportData = {};
 
     const valuerName = reportFormData.valuer_name || "VALUETECH SOLUTIONS";
@@ -3409,7 +3410,6 @@ function SummarizedReport() {
       let value = reportFormData[key];
 
       if (key === "disclaimer") return;
-      if (key === "amount_in_words") { reportData[key] = computedAmountInWords || null; return; }
       if (key === "invoice_no_date") return;
 
       // Default for tax_invoice_copy_heading when empty
@@ -3497,15 +3497,17 @@ function SummarizedReport() {
       return;
     }
 
-    // Compute and validate amount_in_words centrally based on fair_market_value
     const fmvRaw = reportFormData.fair_market_value;
-    const fmvAmount = parseCurrency(fmvRaw);
-    const computedAmountInWords = fmvRaw
-      ? convertNumberToWordsIndian(fmvAmount)
-      : "";
-
-    // If FMV is present but amount_in_words couldn't be computed, block save
-    if (fmvRaw && !computedAmountInWords) {
+    const computedAmountInWords = computeAmountInWordsFromFmv(
+      fmvRaw,
+      parseCurrency,
+      convertNumberToWordsIndian
+    );
+    if (
+      fmvRaw &&
+      !hasAmountInWordsContent(reportFormData.amount_in_words) &&
+      !computedAmountInWords
+    ) {
       toast.error(
         "Amount in words missing. Please enter a valid Fair Market Value."
       );
@@ -4007,15 +4009,6 @@ function SummarizedReport() {
 
   // Memoized values for expensive calculations
   const currentDate = useMemo(() => getCurrentDate(), [getCurrentDate]);
-  const amountInWords = useMemo(() => {
-    const value = reportFormData.fair_market_value;
-    const amount = parseCurrency(value);
-    return amount > 0 ? convertNumberToWordsIndian(amount) : "";
-  }, [
-    reportFormData.fair_market_value,
-    parseCurrency,
-    convertNumberToWordsIndian,
-  ]);
 
   return (
     <section className="order-details-wrapper">
@@ -5947,8 +5940,8 @@ function SummarizedReport() {
                       id="depreciation_value"
                       name="depreciation_value"
                       value={reportFormData.depreciation_value}
-                      readOnly
-                      placeholder="Auto-calculated, or matches invoice cost when depreciation is not a number"
+                      onChange={handleCurrencyChange}
+                      placeholder="₹ 0.00"
                       required
                     />
                   </div>
@@ -5989,24 +5982,10 @@ function SummarizedReport() {
                     />
                   </div>
                 </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="amount_in_words">
-                      Fair Market Value Amount In Words{" "}
-                      <span class="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="amount_in_words"
-                      name="amount_in_words"
-                      value={amountInWords}
-                      readOnly
-                      placeholder="Auto-generated from fair market value"
-                      required
-                    />
-                  </div>
-                </div>
+                <FairMarketValueAmountInWordsField
+                  value={reportFormData.amount_in_words}
+                  onChange={handleFormChange}
+                />
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="no_of_photograph">
