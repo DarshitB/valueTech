@@ -3969,6 +3969,8 @@ function filterValidReportFields(formData, reportType) {
       "registry_vessel_location",
       "registered_or_proposed_owner",
       "registered_or_proposed_owner_address",
+      "proposed_owner",
+      "proposed_owner_address",
       "purpose_of_valuation",
       "marine_vessel_name",
       "type_or_description_of_vessel",

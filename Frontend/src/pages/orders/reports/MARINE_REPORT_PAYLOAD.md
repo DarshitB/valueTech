@@ -87,6 +87,8 @@ All fields from the main form are included in the payload, even if empty:
   "registry_vessel_location": "",
   "registered_or_proposed_owner": "",
   "registered_or_proposed_owner_address": "",
+  "proposed_owner": "",
+  "proposed_owner_address": "",
   
   // Vessel Information
   "marine_vessel_name": "",

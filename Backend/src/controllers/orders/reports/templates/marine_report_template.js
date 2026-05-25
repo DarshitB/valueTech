@@ -995,8 +995,10 @@ function generateMarineReportHTML(
             ${(() => {
               // Generate all table rows first
               const tableRows = [
-                generateTableRow("Registered Or Proposed Owner", formData.registered_or_proposed_owner),
-                generateTableRow("Registered Or Proposed Owner Address", formData.registered_or_proposed_owner_address),
+                generateTableRow("Registered Owner", formData.registered_or_proposed_owner),
+                generateTableRow("Registered Owner Address", formData.registered_or_proposed_owner_address),
+                generateTableRow("Proposed Owner", formData.proposed_owner),
+                generateTableRow("Proposed Owner Address", formData.proposed_owner_address),
                 generateTableRow("Purpose Of Valuation", formData.purpose_of_valuation),
                 (() => {
                   const bankName = getValue(formData.bank_name);

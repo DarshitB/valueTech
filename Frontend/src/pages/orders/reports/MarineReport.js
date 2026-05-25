@@ -28,6 +28,37 @@ import "../order.scss";
 import { DeleteIcon, CloseIcon } from "../../../components/icons";
 import { convertNumberToWordsIndian } from "../../../utils/numberToWordsIndian";
 
+/** Stable string id — API returns numeric id; modal keys are always strings. */
+const normalizeFlexibleFieldId = (field, fallbackIndex = 0) => {
+  if (field?.id != null && String(field.id) !== "") {
+    return String(field.id);
+  }
+  const section = field?.section_name || "flex";
+  const order = field?.field_order ?? fallbackIndex;
+  return `${section}_${order}_${fallbackIndex}`;
+};
+
+const flexibleFieldIdsMatch = (a, b) =>
+  String(a) === String(b);
+
+/** Not persisted — preview-only (same pattern as vessel_photo_preview). */
+const MARINE_FORM_PAYLOAD_SKIP_KEYS = new Set(["vessel_photo_preview"]);
+
+/** Always sent on save/generate even when untouched (backend columns must exist). */
+const MARINE_ALWAYS_SEND_FORM_KEYS = [
+  "how_many_grades_products_can_vessel_load_discharge_with_double",
+  "proposed_owner",
+  "proposed_owner_address",
+];
+
+const appendMissingMarineFormFields = (formData, formState) => {
+  MARINE_ALWAYS_SEND_FORM_KEYS.forEach((key) => {
+    if (!Object.prototype.hasOwnProperty.call(formState, key)) {
+      formData.append(key, "");
+    }
+  });
+};
+
 // WYSIWYG Textarea Component - preserves HTML formatting
 const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "", name }) => {
   const editorRef = useRef(null);
@@ -273,6 +304,8 @@ function MarineReport() {
     vessel_photo: "",
     vessel_photo_preview: "",
     vessel_photo_id: null,
+    proposed_owner: "",
+    proposed_owner_address: "",
     certifications_vessel_note: "",
     disclaimer: "",
   });
@@ -444,6 +477,8 @@ function MarineReport() {
       vessel_photo: "",
       vessel_photo_preview: "",
       vessel_photo_id: null,
+      proposed_owner: "",
+      proposed_owner_address: "",
       disclaimer: "",
     };
 
@@ -627,28 +662,32 @@ function MarineReport() {
 
     if (Array.isArray(report.flexible_fields)) {
       // Process flexible fields to regenerate image previews from generic field_3 (image path)
-      const processedFields = report.flexible_fields.map((field) => {
+      const processedFields = report.flexible_fields.map((field, index) => {
+        const normalized = {
+          ...field,
+          id: normalizeFlexibleFieldId(field, index),
+        };
         // If field has image path (field_3) but no image_preview, regenerate preview from path
-        if (field.field_3 && !field.image_preview) {
+        if (normalized.field_3 && !normalized.image_preview) {
           let imageUrl = "";
           try {
-            const parsed = JSON.parse(field.field_3);
+            const parsed = JSON.parse(normalized.field_3);
             if (parsed.path) {
               imageUrl = resolveAssetUrl(parsed.path);
             } else if (parsed.link) {
               imageUrl = resolveAssetUrl(parsed.link);
             } else {
-              imageUrl = field.field_3;
+              imageUrl = normalized.field_3;
             }
           } catch (error) {
-            imageUrl = resolveAssetUrl(field.field_3);
+            imageUrl = resolveAssetUrl(normalized.field_3);
           }
           return {
-            ...field,
+            ...normalized,
             image_preview: imageUrl,
           };
         }
-        return field;
+        return normalized;
       });
       setFlexibleFields(processedFields);
     }
@@ -1049,7 +1088,9 @@ function MarineReport() {
     if (initialFormDataRef.current !== null) isDirtyRef.current = true;
     setFlexibleFields((prev) =>
       prev.map((field) =>
-        field.id === fieldId ? { ...field, [fieldType]: value } : field
+        flexibleFieldIdsMatch(field.id, fieldId)
+          ? { ...field, [fieldType]: value }
+          : field
       )
     );
   };
@@ -1092,12 +1133,12 @@ function MarineReport() {
 
   // Open image selection modal for a specific field
   const openImageModal = useCallback((fieldId) => {
-    setImageModalOpen((prev) => ({ ...prev, [fieldId]: true }));
+    setImageModalOpen((prev) => ({ ...prev, [String(fieldId)]: true }));
   }, []);
 
   // Close image selection modal for a specific field
   const closeImageModal = useCallback((fieldId) => {
-    setImageModalOpen((prev) => ({ ...prev, [fieldId]: false }));
+    setImageModalOpen((prev) => ({ ...prev, [String(fieldId)]: false }));
   }, []);
 
   // Handle image selection from API (stores image path and preview URL)
@@ -1107,7 +1148,7 @@ function MarineReport() {
       const imageUrl = getImageUrl(mediaItem.media_url);
       setFlexibleFields((prev) =>
         prev.map((field) =>
-          field.id === fieldId
+          flexibleFieldIdsMatch(field.id, fieldId)
             ? {
               ...field,
               image_file: null, // Clear file since we're using API path
@@ -1118,7 +1159,7 @@ function MarineReport() {
             : field
         )
       );
-      closeImageModal(fieldId);
+      closeImageModal(String(fieldId));
     },
     [getImageUrl, closeImageModal]
   );
@@ -1222,7 +1263,9 @@ function MarineReport() {
   // Remove flexible field
   const removeFlexibleField = (fieldId) => {
     if (initialFormDataRef.current !== null) isDirtyRef.current = true;
-    setFlexibleFields((prev) => prev.filter((field) => field.id !== fieldId));
+    setFlexibleFields((prev) =>
+      prev.filter((field) => !flexibleFieldIdsMatch(field.id, fieldId))
+    );
   };
 
   // Validate flexible fields
@@ -1420,7 +1463,7 @@ function MarineReport() {
                         const fieldIdToRemove = field.id;
                         setFlexibleFields((prev) =>
                           prev.map((f) =>
-                            f.id === fieldIdToRemove
+                            flexibleFieldIdsMatch(f.id, fieldIdToRemove)
                               ? {
                                 ...f,
                                 image_preview: "",
@@ -1843,6 +1886,8 @@ function MarineReport() {
 
     // Add ALL form fields to FormData - ensure every field is included to prevent data loss
     Object.keys(reportFormData).forEach((key) => {
+      if (MARINE_FORM_PAYLOAD_SKIP_KEYS.has(key)) return;
+
       let value = reportFormData[key];
 
       // Check if this field was explicitly cleared by the user
@@ -1867,6 +1912,8 @@ function MarineReport() {
       }
     });
 
+    appendMissingMarineFormFields(formData, reportFormData);
+
     // Ensure report_title_type is always included (mandatory field)
     if (!reportFormData.report_title_type) {
       formData.set("report_title_type", "VALUATION REPORT");
@@ -1887,13 +1934,6 @@ function MarineReport() {
     }
     // Always include report_date_heading in payload (even if user did not change it - use preselected default)
     formData.set("report_date_heading", reportFormData.report_date_heading || "Report Date");
-
-    // Ensure how_many_grades_products_can_vessel_load_discharge_with_double is always included
-    // This field might not exist in reportFormData if it was never interacted with
-    // Check if the field exists in reportFormData, and if not, add it to FormData
-    if (!reportFormData.hasOwnProperty("how_many_grades_products_can_vessel_load_discharge_with_double")) {
-      formData.append("how_many_grades_products_can_vessel_load_discharge_with_double", "");
-    }
 
     // Ensure disclaimer is always included in payload (even if null/empty/undefined)
     const disclaimerValue = reportFormData.disclaimer ?? "";
@@ -2055,6 +2095,8 @@ function MarineReport() {
 
     // Add ALL form fields to FormData - ensure every field is included to prevent data loss
     Object.keys(reportFormData).forEach((key) => {
+      if (MARINE_FORM_PAYLOAD_SKIP_KEYS.has(key)) return;
+
       let value = reportFormData[key];
 
       // Check if this field was explicitly cleared by the user
@@ -2079,6 +2121,8 @@ function MarineReport() {
       }
     });
 
+    appendMissingMarineFormFields(formData, reportFormData);
+
     // Ensure report_title_type is always included (mandatory field)
     if (!reportFormData.report_title_type) {
       formData.set("report_title_type", "VALUATION REPORT");
@@ -2099,13 +2143,6 @@ function MarineReport() {
     }
     // Always include report_date_heading in payload (even if user did not change it - use preselected default)
     formData.set("report_date_heading", reportFormData.report_date_heading || "Report Date");
-
-    // Ensure how_many_grades_products_can_vessel_load_discharge_with_double is always included
-    // This field might not exist in reportFormData if it was never interacted with
-    // Check if the field exists in reportFormData, and if not, add it to FormData
-    if (!reportFormData.hasOwnProperty("how_many_grades_products_can_vessel_load_discharge_with_double")) {
-      formData.append("how_many_grades_products_can_vessel_load_discharge_with_double", "");
-    }
 
     // Ensure disclaimer is always included in payload (even if null/empty/undefined)
     const disclaimerValue = reportFormData.disclaimer ?? "";
@@ -2943,7 +2980,7 @@ function MarineReport() {
                 </div>
                 <div className="col-md-6">
                   <div className="form-group">
-                    <label>Registered Or Proposed Owner</label>
+                    <label>Registered Owner</label>
                   </div>
                 </div>
                 <div className="col-md-6">
@@ -2953,14 +2990,14 @@ function MarineReport() {
                       name="registered_or_proposed_owner"
                       value={reportFormData.registered_or_proposed_owner || ""}
                       onChange={handleFormChange}
-                      placeholder="Enter Registered Or Proposed Owner"
+                      placeholder="Enter Registered Owner"
                       rows={3}
                     />
                   </div>
                 </div>
                 <div className="col-md-6">
                   <div className="form-group">
-                    <label>Registered Or Proposed Owner Address</label>
+                    <label>Registered Owner Address</label>
                   </div>
                 </div>
                 <div className="col-md-6">
@@ -2973,7 +3010,44 @@ function MarineReport() {
                         ""
                       }
                       onChange={handleFormChange}
-                      placeholder="Enter Registered Or Proposed Owner Address"
+                      placeholder="Enter Registered Owner Address"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>Proposed Owner</label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <WysiwygTextarea
+                      className="form-field"
+                      name="proposed_owner"
+                      value={reportFormData.proposed_owner || ""}
+                      onChange={handleFormChange}
+                      placeholder="Enter Proposed Owner"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>Proposed Owner Address</label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <WysiwygTextarea
+                      className="form-field"
+                      name="proposed_owner_address"
+                      value={
+                        reportFormData.proposed_owner_address ||
+                        ""
+                      }
+                      onChange={handleFormChange}
+                      placeholder="Enter Proposed Owner Address"
                       rows={3}
                     />
                   </div>
