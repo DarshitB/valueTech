@@ -270,6 +270,9 @@ const SUMMARIZED_TRAILING_COLUMNS = [
   { id: "subcategory_id", header: "Subcategory Selection" },
 ];
 
+/** Hidden in table UI and Columns picker for now; data key kept on rows for later. */
+const SUMMARIZED_UI_HIDDEN_COLUMN_IDS = new Set(["subcategory_id"]);
+
 const SUMMARIZED_TOGGLEABLE_FIXED_COLUMNS = [
   SUMMARIZED_SR_NO_COLUMN,
   ...SUMMARIZED_TRAILING_COLUMNS,
@@ -280,6 +283,57 @@ const SUMMARIZED_TOGGLEABLE_FIXED_COLUMNS = [
 const SUMMARIZED_TOGGLEABLE_FIXED_COLUMN_IDS = new Set(
   SUMMARIZED_TOGGLEABLE_FIXED_COLUMNS.map((col) => col.id)
 );
+
+const SUMMARIZED_COLUMNS_FOR_VISIBILITY_UI = SUMMARIZED_TOGGLEABLE_FIXED_COLUMNS.filter(
+  (col) => !SUMMARIZED_UI_HIDDEN_COLUMN_IDS.has(col.id)
+);
+
+/** Shared across all summarized reports (same idea as dashboard filter_* localStorage keys). */
+const SUMMARIZED_REPORT_VISIBLE_COLUMNS_STORAGE_KEY =
+  "summarized_report_visible_column_ids";
+
+const SUMMARIZED_COLUMNS_FOR_VISIBILITY_UI_IDS = new Set(
+  SUMMARIZED_COLUMNS_FOR_VISIBILITY_UI.map((col) => col.id)
+);
+
+const getDefaultSummarizedVisibleColumnIds = () =>
+  new Set(SUMMARIZED_COLUMNS_FOR_VISIBILITY_UI_IDS);
+
+const loadSummarizedVisibleColumnIdsFromStorage = () => {
+  try {
+    const raw = localStorage.getItem(SUMMARIZED_REPORT_VISIBLE_COLUMNS_STORAGE_KEY);
+    if (!raw) {
+      return getDefaultSummarizedVisibleColumnIds();
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return getDefaultSummarizedVisibleColumnIds();
+    }
+    const ids = parsed.filter(
+      (id) =>
+        typeof id === "string" &&
+        SUMMARIZED_COLUMNS_FOR_VISIBILITY_UI_IDS.has(id) &&
+        !SUMMARIZED_UI_HIDDEN_COLUMN_IDS.has(id)
+    );
+    return new Set(ids);
+  } catch {
+    return getDefaultSummarizedVisibleColumnIds();
+  }
+};
+
+const saveSummarizedVisibleColumnIdsToStorage = (visibleIds) => {
+  try {
+    const ids = [...visibleIds].filter((id) =>
+      SUMMARIZED_COLUMNS_FOR_VISIBILITY_UI_IDS.has(id)
+    );
+    localStorage.setItem(
+      SUMMARIZED_REPORT_VISIBLE_COLUMNS_STORAGE_KEY,
+      JSON.stringify(ids)
+    );
+  } catch {
+    /* private mode / quota — ignore */
+  }
+};
 
 const SUMMARIZED_CURRENCY_COLUMN_IDS = new Set([
   "total_invoice_cost",
@@ -513,7 +567,7 @@ function SummarizedVerticalColumnMergeDropdown({
           style={{
             position: "absolute",
             top: "calc(100% + 4px)",
-            right: 0,
+            left: 0,
             zIndex: 20,
             minWidth: "240px",
             maxHeight: "320px",
@@ -618,7 +672,7 @@ function SummarizedFixedColumnVisibilityDropdown({ columns, visibleIds, onVisibl
           style={{
             position: "absolute",
             top: "calc(100% + 4px)",
-            right: 0,
+            left: 0,
             zIndex: 20,
             minWidth: "240px",
             maxHeight: "320px",
@@ -710,8 +764,15 @@ function SummarizedReport() {
   const summarizedTableScrollRef = useRef(null);
   const scrollSummarizedTableToBottomRef = useRef(false);
   const [summarizedVisibleFixedColumnIds, setSummarizedVisibleFixedColumnIds] = useState(
-    () => new Set(SUMMARIZED_TOGGLEABLE_FIXED_COLUMNS.map((col) => col.id))
+    loadSummarizedVisibleColumnIdsFromStorage
   );
+
+  const handleSummarizedVisibleColumnIdsChange = useCallback((nextVisibleIds) => {
+    const nextSet =
+      nextVisibleIds instanceof Set ? nextVisibleIds : new Set(nextVisibleIds);
+    setSummarizedVisibleFixedColumnIds(nextSet);
+    saveSummarizedVisibleColumnIdsToStorage(nextSet);
+  }, []);
   const [summarizedChildCategories, setSummarizedChildCategories] = useState([]);
   const tabButtonStyle = useCallback(
     (tab) => ({
@@ -2140,6 +2201,7 @@ function SummarizedReport() {
 
   const isSummarizedFixedColumnVisible = useCallback(
     (colId) => {
+      if (SUMMARIZED_UI_HIDDEN_COLUMN_IDS.has(colId)) return false;
       if (!SUMMARIZED_TOGGLEABLE_FIXED_COLUMN_IDS.has(colId)) return true;
       return summarizedVisibleFixedColumnIds.has(colId);
     },
@@ -6193,9 +6255,9 @@ function SummarizedReport() {
                         }}
                       >
                         <SummarizedFixedColumnVisibilityDropdown
-                          columns={SUMMARIZED_TOGGLEABLE_FIXED_COLUMNS}
+                          columns={SUMMARIZED_COLUMNS_FOR_VISIBILITY_UI}
                           visibleIds={summarizedVisibleFixedColumnIds}
-                          onVisibleIdsChange={setSummarizedVisibleFixedColumnIds}
+                          onVisibleIdsChange={handleSummarizedVisibleColumnIdsChange}
                         />
                         <SummarizedVerticalColumnMergeDropdown
                           columns={summarizedVerticalMergeEligibleColumns}

@@ -1539,6 +1539,9 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
             const isLastPage = p === splitPoints.length - 1;
 
             const table = document.createElement("table");
+            if (origTable.className) {
+              table.className = origTable.className;
+            }
             // Page 1 needs margin-top:-30px to cancel .content-wrapper's 30px
             // top padding so the 225px spacer-row lands the content at 225px
             // from the top of the page. Pages 2+ start at the top of a fresh
@@ -1689,13 +1692,26 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
         const actualSpacerHeight = spacerRow ? spacerRow.offsetHeight : 225;
 
         const tfootHeight = tfoot ? tfoot.offsetHeight : 0;
-        const tfootSpacerRow = tfoot ? tfoot.querySelector(".spacer-row") : null;
         const tfootFooterRow = tfoot ? tfoot.querySelector(".footer-row") : null;
 
         const tfootFooterHeight = tfootFooterRow ? tfootFooterRow.offsetHeight : 30;
-        const actualBottomSpace = tfootFooterHeight;
+        // Summarized part 1 tfoot = page-number row only; reserve its full height (no pack slack).
+        const actualBottomSpace = isSummarizedReport
+          ? Math.max(
+              tfoot ? tfoot.offsetHeight : 0,
+              tfootFooterHeight + 6
+            )
+          : tfootFooterHeight;
 
-        const SAFETY_MARGIN = 30;
+        // Summarized part 1 pagination — midpoint between loose (55px slack) and strict (0px).
+        const SUMMARIZED_BOTTOM_PACK_SLACK_PX = 28;
+        const SUMMARIZED_TYRE_SIGNATURE_FIT_FACTOR = 1.04;
+        const SUMMARIZED_TAIL_PULL_FACTOR = 1.05;
+        const SUMMARIZED_REMAINING_ROWS_FIT_FACTOR = 1.015;
+        const SUMMARIZED_MERGE_TAIL_SLACK_PX = 12;
+        const SUMMARIZED_STAMP_HEIGHT_BUFFER_PX = 80;
+
+        const SAFETY_MARGIN = isSummarizedReport ? 15 : 30;
         const realAvailable =
           PAGE_HEIGHT_PX -
           actualSpacerHeight -
@@ -1784,6 +1800,24 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
             break; // Both found
           }
         }
+        if (isSummarizedReport && signatureRow) {
+          groupedRowsHeight += SUMMARIZED_STAMP_HEIGHT_BUFFER_PX;
+        }
+
+        const countRenderableRowsInSplit = (split, pageIndex) => {
+          let count = 0;
+          const end = split.startRow + split.rowCount;
+          for (let i = split.startRow; i < end && i < tbodyRows.length; i++) {
+            if (
+              pageIndex > 0 &&
+              (i === proposedOwnerNameIndex || i === proposedOwnerAddressIndex)
+            ) {
+              continue;
+            }
+            count += 1;
+          }
+          return count;
+        };
 
         // Multi-page split calculation
         const firstPageTheadHeight = baseTheadHeight;
@@ -1798,8 +1832,11 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
         let pageNumber = 1;
 
         while (currentRowIndex < tbodyRows.length) {
-          const availableSpace =
+          const rawPageAvailable =
             pageNumber === 1 ? firstPageAvailable : subsequentAvailable;
+          const availableSpace = isSummarizedReport
+            ? rawPageAvailable + SUMMARIZED_BOTTOM_PACK_SLACK_PX
+            : rawPageAvailable;
           let accHeight = 0;
           let rowsInThisPage = 0;
           let actualRowsProcessed = 0;
@@ -1824,8 +1861,10 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
             if (isTyreImageRow && signatureRow) {
               const combinedHeight = groupedRowsHeight;
               const newHeight = accHeight + combinedHeight;
-
-              if (newHeight <= availableSpace) {
+              const tyreFitLimit = isSummarizedReport
+                ? availableSpace * SUMMARIZED_TYRE_SIGNATURE_FIT_FACTOR
+                : availableSpace;
+              if (newHeight <= tyreFitLimit) {
                 // Both rows fit - add them together
                 accHeight = newHeight;
                 rowsInThisPage += 2;
@@ -1850,10 +1889,15 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
                 return td.textContent.length > 100;
               }
             );
-            const rowBuffer = hasLongText ? 10 : 0;
+            const rowBuffer = hasLongText
+              ? isSummarizedReport
+                ? 4
+                : 10
+              : 0;
             const newHeight = accHeight + rowHeight;
+            const rowFitLimit = availableSpace;
 
-            if (newHeight + rowBuffer <= availableSpace) {
+            if (newHeight + rowBuffer <= rowFitLimit) {
               accHeight = newHeight;
               rowsInThisPage++;
               actualRowsProcessed++;
@@ -1894,7 +1938,9 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
 
               const rowHeight = tbodyRows[i].offsetHeight;
               const newTestHeight = testHeight + rowHeight;
-              const aggressiveThreshold = availableSpace * 1.01;
+              const aggressiveThreshold = isSummarizedReport
+                ? availableSpace * SUMMARIZED_REMAINING_ROWS_FIT_FACTOR
+                : availableSpace * 1.01;
 
               if (newTestHeight <= aggressiveThreshold) {
                 testHeight = newTestHeight;
@@ -1913,6 +1959,24 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
             }
           }
 
+          if (
+            isSummarizedReport &&
+            tyreImageRow &&
+            signatureRow &&
+            tyreImageIndex >= 0 &&
+            currentRowIndex + actualRowsProcessed === tyreImageIndex
+          ) {
+            const combinedHeight = groupedRowsHeight;
+            if (
+              accHeight + combinedHeight <=
+              availableSpace * SUMMARIZED_TAIL_PULL_FACTOR
+            ) {
+              accHeight += combinedHeight;
+              actualRowsProcessed += 2;
+              rowsInThisPage += 2;
+            }
+          }
+
           splitPoints.push({
             pageNumber: pageNumber,
             startRow: currentRowIndex,
@@ -1926,6 +1990,48 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
           pageNumber++;
 
           if (pageNumber > 100) break;
+        }
+
+        // Summarized part 1: merge tail page when it fits in leftover space + small slack.
+        if (isSummarizedReport) {
+          const mergeSummarizedTailPage = () => {
+            if (splitPoints.length < 2) return false;
+            const lastIdx = splitPoints.length - 1;
+            const last = splitPoints[lastIdx];
+            const prev = splitPoints[lastIdx - 1];
+            if (!last || !prev || last.rowCount <= 0) return false;
+
+            let hasTyreOrSignature = false;
+            let onlyTailOrSkipped = true;
+            for (let i = last.startRow; i < last.startRow + last.rowCount; i++) {
+              if (i === tyreImageIndex || i === signatureIndex) {
+                hasTyreOrSignature = true;
+              } else if (
+                i !== proposedOwnerNameIndex &&
+                i !== proposedOwnerAddressIndex
+              ) {
+                onlyTailOrSkipped = false;
+              }
+            }
+
+            if (!hasTyreOrSignature || !onlyTailOrSkipped || last.rowCount > 4) {
+              return false;
+            }
+
+            if (last.spaceUsed > prev.unusedSpace + SUMMARIZED_MERGE_TAIL_SLACK_PX) {
+              return false;
+            }
+
+            prev.rowCount += last.rowCount;
+            prev.spaceUsed += last.spaceUsed;
+            prev.unusedSpace = prev.spaceAvailable - prev.spaceUsed;
+            splitPoints.pop();
+            return true;
+          };
+
+          while (mergeSummarizedTailPage()) {
+            /* pull tail rows only if they fit in measured unused space */
+          }
         }
 
         // Check if single page
@@ -1949,16 +2055,26 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
           }
         }
 
+        // Summarized part 1: drop splits that would render an empty tbody (header-only page).
+        const buildSplitPoints = isSummarizedReport
+          ? splitPoints.filter((split, pageIndex) =>
+              countRenderableRowsInSplit(split, pageIndex) > 0
+            )
+          : splitPoints;
+
         // Build multiple tables
         const tables = [];
         const finalWrapper = origTable.parentElement;
 
-        for (let p = 0; p < splitPoints.length; p++) {
-          const split = splitPoints[p];
+        for (let p = 0; p < buildSplitPoints.length; p++) {
+          const split = buildSplitPoints[p];
           const isFirstPage = split.pageNumber === 1;
-          const isLastPage = p === splitPoints.length - 1;
+          const isLastPage = p === buildSplitPoints.length - 1;
 
           const table = document.createElement("table");
+          if (origTable.className) {
+            table.className = origTable.className;
+          }
           // Page 1 needs margin-top:-30px to cancel .content-wrapper's 30px
           // top padding so the 225px spacer-row lands the content at 225px
           // from the top of the page. Pages 2+ start at the top of a fresh
@@ -2055,7 +2171,10 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
           }
 
           if (needsFooter) {
-            setPageNumber(table, split.pageNumber);
+            setPageNumber(
+              table,
+              isSummarizedReport ? p + 1 : split.pageNumber
+            );
           }
 
           tables.push(table);
@@ -2704,6 +2823,12 @@ function generateReportHTML(
   }
   body, table, th, td, .main-table td, .main-table th {
     text-align: center !important;
+  }
+  td.cell-text-left,
+  th.cell-text-left,
+  .main-table td.cell-text-left {
+    text-align: left !important;
+    text-transform: none !important;
   }
   /* Footer rows must override the center-align above */
   tfoot .footer-row td { text-align: left !important; border: none !important; }

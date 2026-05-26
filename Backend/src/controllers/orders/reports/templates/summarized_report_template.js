@@ -3,6 +3,13 @@ const renderFieldValue = (value) => {
   return String(value).replace(/\r\n/g, "<br>").replace(/\n/g, "<br>").replace(/\r/g, "<br>");
 };
 
+/** Appendix column headers: use \\n or <br> for manual line breaks (e.g. "Total\\nInvoice\\nCost"). */
+function renderSummarizedTableHeader(header) {
+  const trimmed = String(header ?? "").trim();
+  if (!trimmed) return "-";
+  return renderFieldValue(trimmed);
+}
+
 const SUMMARIZED_SR_NO_COLUMN = { id: "sr_no", header: "SR NO." };
 
 const FIXED_START = [
@@ -15,13 +22,13 @@ const FIXED_START = [
 ];
 
 const FIXED_END = [
-  { id: "total_invoice_cost", header: "Total Invoice Cost" },
-  { id: "estimated_current_replacement_cost", header: "Current Replacement Cost" },
-  { id: "residual_life_of_asset", header: "Residual life of asset" },
-  { id: "depr_rate", header: "Depr. Rate" },
-  { id: "amount_post_depreciation", header: "Amount Post Depreciation" },
-  { id: "appraisal_value", header: "Appraisal Value" },
-  { id: "estimated_fair_value", header: "Estimated Fair Value" },
+  { id: "total_invoice_cost", header: "Total\nInvoice\nCost" },
+  { id: "estimated_current_replacement_cost", header: "Current\nReplacement\nCost" },
+  { id: "residual_life_of_asset", header: "Residual\nlife of\nasset" },
+  { id: "depr_rate", header: "Depr.\nRate" },
+  { id: "amount_post_depreciation", header: "Amount\nPost\nDepreciation" },
+  { id: "appraisal_value", header: "Appraisal\nValue" },
+  { id: "estimated_fair_value", header: "Estimated\nFair Value" },
 ];
 
 const SUMMARIZED_GRAND_TOTAL_CURRENCY_IDS = new Set([
@@ -87,6 +94,9 @@ function getOrderedColumns(tableData) {
 }
 
 const SUMMARIZED_FIXED_START_IDS = new Set(FIXED_START.map((c) => c.id));
+
+const SUMMARIZED_CELL_TEXT_LEFT_ATTR =
+  'class="cell-text-left" style="text-align:left !important;text-transform:none !important;"';
 
 /** True if at least one row has a non-empty value (trimmed) for this column. */
 function hasSummarizedColumnData(rows, colId, tableData) {
@@ -421,10 +431,6 @@ function generateSummarizedNormalFieldsHTML(
 <html>
 <head>
     <style>
-        :root {
-            --bottom-space: 30px;
-        }
-
         @page {
             margin: 0px;
             size: 8.5in 14in;
@@ -566,18 +572,6 @@ function generateSummarizedNormalFieldsHTML(
         tbody { display: table-row-group; }
         tfoot { display: table-footer-group; }
 
-        tfoot .spacer-row {
-            height: var(--bottom-space);
-            border: none;
-            visibility: hidden;
-        }
-        tfoot .spacer-row td {
-            border: none;
-            padding: 0;
-            height: var(--bottom-space);
-            line-height: var(--bottom-space);
-        }
-
         tfoot .footer-row {
             height: 30px;
             border-top: 1px solid #e0e0e0;
@@ -639,6 +633,13 @@ function generateSummarizedNormalFieldsHTML(
         }
         table.main-table tr.tyre-image-row td,
         table.main-table tr.signature-row td { overflow: visible; }
+
+        /* Left-aligned narrative blocks (PDF override uses !important on all td) */
+        td.cell-text-left,
+        table.main-table td.cell-text-left {
+            text-align: left !important;
+            text-transform: none !important;
+        }
 
         ${reportTypeSelection === "Rough" ? `
         .watermark {
@@ -904,12 +905,12 @@ function generateSummarizedNormalFieldsHTML(
         </tr>
         <tr>
             <td>VALUER COMMENTS/REMARKS:</td>
-            <td colspan="8" style="text-align:left;">${renderFieldValue(formData.valuer_comments_remarks)}</td>
+            <td colspan="8" ${SUMMARIZED_CELL_TEXT_LEFT_ATTR}>${renderFieldValue(formData.valuer_comments_remarks)}</td>
         </tr>
         ${formData.valuer_special_remarks != null && formData.valuer_special_remarks !== ""
           ? `<tr>
             <td>VALUER SPECIAL REMARKS:</td>
-            <td colspan="8" style="text-align:left;">${formData.valuer_special_remarks}</td>
+            <td colspan="8" ${SUMMARIZED_CELL_TEXT_LEFT_ATTR}>${renderFieldValue(formData.valuer_special_remarks)}</td>
         </tr>` : ""}
         ${generateSummarizedFlexibleFieldsForSection(
           formData.flexible_fields || [],
@@ -917,13 +918,11 @@ function generateSummarizedNormalFieldsHTML(
         )}
         <tr>
             <td>DECLARATION:</td>
-            <td colspan="8" style="text-transform:none; text-align:left;">
-                ${formData.declaration}
-            </td>
+            <td colspan="8" ${SUMMARIZED_CELL_TEXT_LEFT_ATTR}>${renderFieldValue(formData.declaration)}</td>
         </tr>
         <tr>
             <td>DISCLAIMER:</td>
-            <td colspan="8" style="text-align:left;">${renderFieldValue(formData.disclaimer)}</td>
+            <td colspan="8" ${SUMMARIZED_CELL_TEXT_LEFT_ATTR}>${renderFieldValue(formData.disclaimer)}</td>
         </tr>
         <tr class="tyre-image-row">
             <td colspan="9" style="height:58px; position:relative;">
@@ -947,9 +946,6 @@ function generateSummarizedNormalFieldsHTML(
                 <td colspan="5" class="continue-text">
                     Continue to next page...
                 </td>
-            </tr>
-            <tr class="spacer-row">
-                <td colspan="9" style="height:var(--bottom-space); border:none; padding:0;"></td>
             </tr>
         </tfoot>
     </table>
@@ -975,7 +971,7 @@ function generateSummarizedTableAppendixHTML(formData, stampImageBase64) {
   const renderedHeader = orderedColumns
     .map(
       (col) =>
-        `<th data-col-id="${col.id}">${renderFieldValue(col.header || "-")}</th>`
+        `<th data-col-id="${col.id}">${renderSummarizedTableHeader(col.header)}</th>`
     )
     .join("");
 
@@ -1015,13 +1011,19 @@ function generateSummarizedTableAppendixHTML(formData, stampImageBase64) {
     text-align: center !important;
     background: transparent !important;
   }
+  .summary-table tbody td {
+    padding-top: 5px !important;
+    padding-bottom: 5px !important;
+  }
   .summary-table .summary-currency-value {
     display: inline-block;
     white-space: nowrap !important;
   }
-  .summary-table th {
+  .summary-table thead th {
     text-align: center !important;
     vertical-align: middle !important;
+    line-height: 1.15;
+    white-space: normal !important;
   }
   .summary-table tr.summary-grand-total-row td {
     -webkit-print-color-adjust: exact !important;
@@ -1081,7 +1083,7 @@ function generateSummarizedTableAppendixHTML(formData, stampImageBase64) {
   .summary-note {
     width: 80%;
     margin-top: 10px;
-    font-size: 10px;
+    font-size: 12px;
     line-height: 1.3;
     text-align: left;
     text-transform: uppercase;
@@ -1138,7 +1140,8 @@ function generateSummarizedTableAppendixHTML(formData, stampImageBase64) {
         <td colspan="${colSpan}" style="height:180px;border:none;padding:0;"></td>
       </tr>
       <tr>
-        <th colspan="${colSpan}" class="summary-title">PLANT & MACHINERY - ANNEXURE I INDUSTRIAL</th>
+      <!--
+        <th colspan="${colSpan}" class="summary-title">PLANT & MACHINERY - ANNEXURE I INDUSTRIAL</th> -->
       </tr>
       <tr>${renderedHeader}</tr>
     </thead>
