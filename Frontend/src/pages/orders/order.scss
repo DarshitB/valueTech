@@ -2124,6 +2124,14 @@
         padding-top: 8px !important;
       }
 
+      .summarized-order-fetch-cell {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        position: relative;
+        z-index: 2;
+      }
+
       tr.summarized-row-insert-zone {
         position: relative;
         z-index: 1;
@@ -2137,6 +2145,7 @@
           background: transparent !important;
           vertical-align: middle;
           overflow: visible;
+          pointer-events: none;
         }
 
         .summarized-row-insert-zone-inner {

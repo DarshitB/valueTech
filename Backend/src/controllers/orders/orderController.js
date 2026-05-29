@@ -17,6 +17,7 @@ const {
   queueManualR2Sync,
   STATUSES_THAT_TRIGGER_SYNC,
 } = require("../../utils/r2Helper");
+const { resolveOrderReportType } = require("../../utils/resolveOrderReportType");
 
 // Helper functions to get names by IDs
 async function getUserName(userId) {
@@ -427,6 +428,31 @@ exports.getById = async (req, res, next) => {
     if (!order) throw new NotFoundError("Order not found");
 
     res.json(order);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Get order by order number (any status except soft-deleted)
+exports.getByOrderNumber = async (req, res, next) => {
+  try {
+    const orderNumber = String(req.params.orderNumber || "").trim();
+    if (!orderNumber) {
+      throw new BadRequestError("orderNumber is required");
+    }
+
+    const order = await Order.findByOrderNumber(orderNumber);
+    if (!order) throw new NotFoundError("Order not found");
+
+    const reportType = resolveOrderReportType(
+      order.category_name,
+      order.category_report_type || order.report_type
+    );
+
+    res.json({
+      ...order,
+      report_type: reportType,
+    });
   } catch (err) {
     next(err);
   }

@@ -17,9 +17,14 @@ const assetMakesForReports = {
 
   // Get asset makes record by ID
   findById: async (id) => {
+    const normalizedId = Number(id);
+    if (!Number.isInteger(normalizedId) || normalizedId <= 0) {
+      return null;
+    }
+
     const record = await db("asset_makes_for_reports")
       .leftJoin("users as created_user", "asset_makes_for_reports.created_by", "created_user.id")
-      .where("asset_makes_for_reports.id", id)
+      .where("asset_makes_for_reports.id", normalizedId)
       .select(
         "asset_makes_for_reports.*",
         "created_user.name as created_by_name"

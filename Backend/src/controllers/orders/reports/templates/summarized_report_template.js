@@ -28,7 +28,7 @@ const FIXED_END = [
   { id: "depr_rate", header: "Depr.\nRate" },
   { id: "amount_post_depreciation", header: "Amount\nPost\nDepreciation" },
   { id: "appraisal_value", header: "Appraisal\nValue" },
-  { id: "estimated_fair_value", header: "Estimated\nFair Value" },
+  { id: "estimated_fair_value", header: "Fair Value" },
 ];
 
 const SUMMARIZED_GRAND_TOTAL_CURRENCY_IDS = new Set([
@@ -149,6 +149,19 @@ function parseCurrencyValue(val) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function isDashOnlySummarizedFairValue(value) {
+  const normalized = String(value ?? "").trim();
+  return normalized === "-" || normalized === "–" || normalized === "—";
+}
+
+function areAllSummarizedFairValueRowsDashOnly(rows) {
+  return (
+    Array.isArray(rows) &&
+    rows.length > 0 &&
+    rows.every((row) => isDashOnlySummarizedFairValue(row?.estimated_fair_value))
+  );
+}
+
 /** Match frontend Indian currency display (digits + grouping + up to 2 decimals) */
 function formatIndianCurrencyInputString(value) {
   if (!value || typeof value !== "string") return "";
@@ -212,6 +225,13 @@ function renderSummarizedGrandTotalRow(tableData, orderedColumns) {
       .map((c) => [c.id, c])
   );
   const totals = computeSummarizedGrandTotals(rows);
+  const useManualFairValueTotal = areAllSummarizedFairValueRowsDashOnly(rows);
+  const manualFairValueTotal = parseCurrencyValue(
+    tableData?.manualEstimatedFairValueGrandTotal
+  );
+  if (useManualFairValueTotal && manualFairValueTotal > 0) {
+    totals.estimated_fair_value = manualFairValueTotal;
+  }
   const cols = Array.isArray(orderedColumns) ? orderedColumns : [];
   const labelStyle =
     "background-color:#c8e6c9;font-weight:700;text-align:center;padding:8px;-webkit-print-color-adjust:exact;print-color-adjust:exact;";
@@ -271,7 +291,13 @@ function getCellValue(row, colId) {
 
 function formatSummarizedCellDisplay(colId, value) {
   if (value === null || value === undefined || value === "") return "";
+  const normalizedValue = String(value ?? "").trim();
+  const isDashOnlyValue =
+    normalizedValue === "-" || normalizedValue === "–" || normalizedValue === "—";
   if (SUMMARIZED_CURRENCY_PREFIX_IDS.has(colId)) {
+    if (colId === "estimated_fair_value" && isDashOnlyValue) {
+      return normalizedValue;
+    }
     return `<span class="summary-currency-value">₹ ${value}</span>`;
   }
   if (colId === "depr_rate") {
@@ -955,10 +981,19 @@ function generateSummarizedNormalFieldsHTML(
   `;
 }
 
+/** Generate-only: tbody vertical padding for appendix table (default 5px). */
+function resolveSummarizedAppendixCellPaddingPx(formData) {
+  const raw = formData?.summarized_appendix_cell_padding_px;
+  const parsed = parseInt(String(raw ?? "5").trim(), 10);
+  if (Number.isNaN(parsed)) return 5;
+  return Math.min(100, Math.max(0, parsed));
+}
+
 // ---------------------------------------------------------------------------
 // Summarized table appendix (second page)
 // ---------------------------------------------------------------------------
 function generateSummarizedTableAppendixHTML(formData, stampImageBase64) {
+  const appendixCellPaddingPx = resolveSummarizedAppendixCellPaddingPx(formData);
   const tableData = parseSummarizedTable(formData.summarized_table_data);
   const rows = Array.isArray(tableData?.rows) ? tableData.rows : [];
   const orderedColumns = getVisibleOrderedColumns(tableData);
@@ -1012,8 +1047,8 @@ function generateSummarizedTableAppendixHTML(formData, stampImageBase64) {
     background: transparent !important;
   }
   .summary-table tbody td {
-    padding-top: 5px !important;
-    padding-bottom: 5px !important;
+    padding-top: ${appendixCellPaddingPx}px !important;
+    padding-bottom: ${appendixCellPaddingPx}px !important;
   }
   .summary-table .summary-currency-value {
     display: inline-block;
@@ -1105,32 +1140,32 @@ function generateSummarizedTableAppendixHTML(formData, stampImageBase64) {
     color-adjust: exact;
   }
   .summary-note-stamp-row {
-    display: flex;
-    align-items: flex-start;
+    display: block;
     margin-top: 10px;
     text-transform: uppercase;
   }
   .summary-note-stamp-row .summary-note {
-    width: 80%;
+    width: 100%;
     margin-top: 0;
   }
   .summary-note-stamp-row .summary-note-stamp {
-    width: 20%;
-    padding-top: 15px;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
+    float: right;
+    width: 190px;
+    margin: 0 0 8px 8px;
+    padding-top: 0;
+    display: block;
     position: relative;
   }
   .summary-note-stamp-row .summary-note-stamp img {
-    width: auto;
-    height: 125px;
-    max-width: 100%;
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 120px;
+    max-width: 190px;
+    margin-top: -15px;
     object-fit: contain;
-    position: absolute;
-    top: -30px;
-    left: 50%;
-    transform: translateX(calc(-50% - 40px));
+    position: static;
+    transform: none;
   }
 </style>
 <div class="content-wrapper summary-page" lang="en">

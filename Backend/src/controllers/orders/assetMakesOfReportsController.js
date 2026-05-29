@@ -43,12 +43,13 @@ exports.getByOrderType = async (req, res, next) => {
 exports.getById = async (req, res, next) => {
   try {
     const { id } = req.params;
+    const idNum = Number(id);
 
-    if (!id || isNaN(parseInt(id))) {
+    if (!Number.isInteger(idNum) || idNum <= 0) {
       throw new BadRequestError("Valid ID is required");
     }
 
-    const record = await AssetMakesOfReports.findById(id);
+    const record = await AssetMakesOfReports.findById(idNum);
     if (!record) {
       throw new NotFoundError("Asset makes record not found");
     }

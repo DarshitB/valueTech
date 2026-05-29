@@ -15,6 +15,20 @@ export const fetchOrderReport = createAsyncThunk(
   }
 );
 
+/** Fetch report for lookup only — does not overwrite currentReport on the page. */
+export const fetchOrderReportLookup = createAsyncThunk(
+  "orderReports/fetchReportLookup",
+  async ({ orderId, reportType }, { rejectWithValue }) => {
+    try {
+      const res = await orderReportApi.getOrderReport(orderId, reportType);
+      console.log("fetchOrderReportLookup res", res.data);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
 // Async action: Fetch order report by child category ID and report type
 export const fetchOrderReportByChildCategory = createAsyncThunk(
   "orderReports/fetchReportByChildCategory",
@@ -81,6 +95,8 @@ const initialState = {
   saving: false,          // Loading state for save operations
   saveError: null,        // Error message for save operations
   savedReport: null,      // Saved report response
+  reportLookup: null,     // Last report fetched for row lookup (summarized table)
+  reportLookupLoading: false,
 };
 
 // Order Report slice
@@ -126,6 +142,18 @@ const orderReportSlice = createSlice({
         if (!isSilent) {
           toast.error(`Failed to fetch report: ${action.payload}`);
         }
+      })
+
+      // Fetch report for lookup (does not replace currentReport)
+      .addCase(fetchOrderReportLookup.pending, (state) => {
+        state.reportLookupLoading = true;
+      })
+      .addCase(fetchOrderReportLookup.fulfilled, (state, action) => {
+        state.reportLookupLoading = false;
+        state.reportLookup = action.payload;
+      })
+      .addCase(fetchOrderReportLookup.rejected, (state) => {
+        state.reportLookupLoading = false;
       })
 
       // Fetch order report by child category

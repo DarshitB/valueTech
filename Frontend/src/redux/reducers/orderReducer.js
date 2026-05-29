@@ -43,6 +43,19 @@ export const fetchOrderById = createAsyncThunk(
   }
 );
 
+// Async action: Fetch order by order number (any status)
+export const fetchOrderByOrderNumber = createAsyncThunk(
+  "orders/fetchByOrderNumber",
+  async (orderNumber, { rejectWithValue }) => {
+    try {
+      const res = await orderApi.getOrderByOrderNumber(orderNumber);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
 // Async action: Create a new order
 export const addOrder = createAsyncThunk("orders/add", async (data, { rejectWithValue }) => {
   try {
@@ -245,13 +258,21 @@ const initialState = {
   finalizedByChildCategory: null, // Finalized orders API response payload
   finalizedByChildCategoryLoading: false,
   finalizedByChildCategoryError: null,
+  orderByNumber: null, // Order resolved by order_number (summarized row fetch, etc.)
+  orderByNumberLoading: false,
+  orderByNumberError: null,
 };
 
 // Order slice
 const orderSlice = createSlice({
   name: "orders",
   initialState,
-  reducers: {}, // No synchronous reducers yet
+  reducers: {
+    clearOrderByNumber: (state) => {
+      state.orderByNumber = null;
+      state.orderByNumberError = null;
+    },
+  },
 
   extraReducers: (builder) => {
     builder
@@ -306,6 +327,20 @@ const orderSlice = createSlice({
       })
       .addCase(fetchOrderById.rejected, (state, action) => {
         toast.error(`Failed to fetch order: ${action.payload}`);
+      })
+
+      // Fetch order by order number
+      .addCase(fetchOrderByOrderNumber.pending, (state) => {
+        state.orderByNumberLoading = true;
+        state.orderByNumberError = null;
+      })
+      .addCase(fetchOrderByOrderNumber.fulfilled, (state, action) => {
+        state.orderByNumberLoading = false;
+        state.orderByNumber = action.payload;
+      })
+      .addCase(fetchOrderByOrderNumber.rejected, (state, action) => {
+        state.orderByNumberLoading = false;
+        state.orderByNumberError = action.payload;
       })
 
       // Add new order (API may return single order object or array of orders when number_of_order_duplication > 1)
@@ -608,4 +643,5 @@ const orderSlice = createSlice({
   },
 });
 
+export const { clearOrderByNumber } = orderSlice.actions;
 export default orderSlice.reducer;

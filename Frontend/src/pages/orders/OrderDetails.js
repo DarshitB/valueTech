@@ -353,9 +353,18 @@ function OrderDetails() {
       if (hasPermission(allowedPermissions, "view_order_media_documents")) {
         dispatch(fetchOrderMediaDocuments(id));
       }
-      dispatch(fetchOfficers());
     }
   }, [dispatch, id, allowedPermissions]);
+
+  // Officers for mail to/cc/bcc — scoped to order bank (developer_admin still gets all via API)
+  useEffect(() => {
+    if (!id) return;
+    if (order?.bank_id) {
+      dispatch(fetchOfficers({ bankId: order.bank_id }));
+    } else {
+      dispatch(fetchOfficers());
+    }
+  }, [dispatch, id, order?.bank_id]);
 
   // Fetch approved documents and media when mail modal is opened
   useEffect(() => {

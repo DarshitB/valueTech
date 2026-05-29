@@ -957,8 +957,30 @@ const order = {
   // Find order by order number
   findByOrderNumber: async (orderNumber) => {
     const order = await db("orders")
+      .leftJoin(
+        "child_category",
+        "orders.child_category_id",
+        "child_category.id"
+      )
+      .leftJoin(
+        "sub_category",
+        "child_category.sub_category_id",
+        "sub_category.id"
+      )
+      .leftJoin("category", "sub_category.category_id", "category.id")
+      .select(
+        "orders.*",
+        "child_category.id as child_category_id",
+        "child_category.name as child_category_name",
+        "sub_category.id as sub_category_id",
+        "sub_category.name as sub_category_name",
+        "category.id as category_id",
+        "category.name as category_name",
+        "category.report_type as report_type",
+        "category.report_type as category_report_type"
+      )
       .where({ order_number: orderNumber })
-      .whereNull("deleted_at")
+      .whereNull("orders.deleted_at")
       .first();
     return order;
   },

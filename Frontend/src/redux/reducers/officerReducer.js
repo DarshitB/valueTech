@@ -2,11 +2,14 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import * as officerApi from "../../api/officers.api";
 import { toast } from "react-toastify";
 
-// Fetch all officers
-export const fetchOfficers = createAsyncThunk("officers/fetchAll", async () => {
-  const res = await officerApi.getOfficers();
-  return res.data;
-});
+// Fetch all officers (optional bankId for order mail modal — same-bank officers)
+export const fetchOfficers = createAsyncThunk(
+  "officers/fetchAll",
+  async (params = {}) => {
+    const res = await officerApi.getOfficers(params);
+    return res.data;
+  }
+);
 
 // Fetch officer by ID
 export const fetchOfficerById = createAsyncThunk("officers/fetchById", async (id) => {

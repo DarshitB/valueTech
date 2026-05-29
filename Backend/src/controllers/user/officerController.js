@@ -15,7 +15,16 @@ const {
 // Get All Officers based on user role
 exports.getAll = async (req, res, next) => {
   try {
-    const officers = await Officer.getAllOfficersByRole(req.user);
+    const bankIdRaw = req.query.bank_id;
+    let bankId = null;
+    if (bankIdRaw !== undefined && bankIdRaw !== null && bankIdRaw !== "") {
+      const parsed = parseInt(bankIdRaw, 10);
+      if (Number.isInteger(parsed) && parsed > 0) {
+        bankId = parsed;
+      }
+    }
+
+    const officers = await Officer.getAllOfficersByRole(req.user, { bankId });
     res.json(officers);
   } catch (err) {
     next(err);

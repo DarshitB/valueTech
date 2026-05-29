@@ -3,7 +3,13 @@ import axios from "./axios"; // Axios instance configured with base URL
 
 const ENDPOINT = "/api/officers"; // Base endpoint for all state-related requests
 
-export const getOfficers = () => axios.get(ENDPOINT); // Fetch all officer
+export const getOfficers = (params = {}) => {
+  const query = {};
+  if (params.bankId) {
+    query.bank_id = params.bankId;
+  }
+  return axios.get(ENDPOINT, { params: query });
+}; // Fetch all officer
 export const getOfficerById = (id) => axios.get(`${ENDPOINT}/${id}`); // Get officer by ID
 export const createOfficer = (data) => axios.post(ENDPOINT, data); // Add officer city
 export const updateOfficer = (id, payload) =>

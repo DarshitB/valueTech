@@ -840,6 +840,7 @@ exports.generateReport = async (req, res, next) => {
       new_asset_make,
       vessel_photo_preview,
       vessel_photo_for_template,
+      summarized_appendix_cell_padding_px: _summarizedAppendixCellPaddingPx,
       ...mainReportData
     } = formData;
 
@@ -2290,9 +2291,12 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
         const middlePageAvailable = Math.max(baseAvailable - STAMP_CLEARANCE, 60);
         const firstMiddlePageAvailable = Math.max(firstPageAvailable - STAMP_CLEARANCE, 60);
 
-        const lastPageAvailable = baseAvailable - noteStampRowHeight - grandRowsHeight;
-        const firstPageLastAvailable =
-          firstPageAvailable - noteStampRowHeight - grandRowsHeight;
+        // Last table page: reserve stamp clearance + grand total.
+        // Note is handled separately (it can move alone to next page).
+        const lastTablePageAvailable =
+          baseAvailable - STAMP_CLEARANCE - grandRowsHeight;
+        const firstPageLastTableAvailable =
+          firstPageAvailable - STAMP_CLEARANCE - grandRowsHeight;
 
         const rowHeights = dataRows.map((row) => row.offsetHeight);
 
@@ -2304,7 +2308,10 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
         const capacityForPageIndex = (pageIndex, isLastPage) => {
           const isFirst = pageIndex === 0;
           if (isLastPage) {
-            return Math.max(isFirst ? firstPageLastAvailable : lastPageAvailable, 60);
+            return Math.max(
+              isFirst ? firstPageLastTableAvailable : lastTablePageAvailable,
+              60
+            );
           }
           return Math.max(
             isFirst ? firstMiddlePageAvailable : middlePageAvailable,
@@ -2322,10 +2329,10 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
             .slice(idx)
             .reduce((sum, h) => sum + h, 0);
           const fitsAsSingleLastPage =
-            remainingH <= (isFirst ? firstPageLastAvailable : lastPageAvailable);
+            remainingH <= (isFirst ? firstPageLastTableAvailable : lastTablePageAvailable);
 
           const availableForThisPage = fitsAsSingleLastPage
-            ? Math.max(isFirst ? firstPageLastAvailable : lastPageAvailable, 60)
+            ? Math.max(isFirst ? firstPageLastTableAvailable : lastTablePageAvailable, 60)
             : Math.max(isFirst ? firstMiddlePageAvailable : middlePageAvailable, 60);
 
           let acc = 0;
@@ -2341,7 +2348,7 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
           builtPageCount += 1;
         }
 
-        // Pass 2: last page must fit note + grand total — move overflow UP, never peel 1-row pages down
+        // Pass 2: last table page must fit data rows + grand total (not note) — move overflow up if needed
         for (let guard = 0; guard < dataRows.length + 5; guard += 1) {
           if (pages.length === 0) break;
           const lastIdx = pages.length - 1;
@@ -2576,6 +2583,19 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
           summarizedColumnIds
         );
 
+        const noteFitsOnLastTablePage = (() => {
+          if (!noteEl || pages.length === 0) return true;
+          const lastIdx = pages.length - 1;
+          const lastChunk = pages[lastIdx];
+          const isFirstAndLastPage = lastIdx === 0;
+          const tableRowsHeight = getPageRowsHeight(lastChunk) + grandRowsHeight;
+          // For fit check with note, compare against full page capacity (before grand-total reservation),
+          // because tableRowsHeight already includes grandRowsHeight.
+          const tableCapacity = isFirstAndLastPage ? firstPageAvailable : baseAvailable;
+          return tableRowsHeight + noteStampRowHeight <= tableCapacity;
+        })();
+        const appendNoteOnSeparatePage = Boolean(noteEl) && !noteFitsOnLastTablePage;
+
         summaryRoot.innerHTML = "";
 
         const createFooter = (pageNo, isLastPage) => {
@@ -2595,14 +2615,15 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
 
         pages.forEach((chunk, pageIdx) => {
           const isFirst = pageIdx === 0;
-          const isLast = pageIdx === pages.length - 1;
-          const isSingle = pages.length === 1;
+          const isLastTablePage = pageIdx === pages.length - 1;
+          const isLast = isLastTablePage && !appendNoteOnSeparatePage;
+          const isSingle = pages.length === 1 && !appendNoteOnSeparatePage;
           const pageNo = startPage + pageIdx;
 
           const pageBlock = document.createElement("div");
           pageBlock.className = "summary-appendix-page";
           pageBlock.style.position = "relative";
-          if (!isLast) {
+          if (!isLastTablePage || appendNoteOnSeparatePage) {
             pageBlock.style.pageBreakAfter = "always";
           }
 
@@ -2619,7 +2640,7 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
           for (let i = chunk.start; i < chunk.end; i += 1) {
             newTbody.appendChild(dataRows[i].cloneNode(true));
           }
-          if (isLast && grandRows.length > 0) {
+          if (isLastTablePage && grandRows.length > 0) {
             grandRows.forEach((row) => newTbody.appendChild(row.cloneNode(true)));
           }
           table.appendChild(newTbody);
@@ -2632,18 +2653,18 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
 
           pageBlock.appendChild(table);
 
-          if ((isLast || isSingle) && noteEl) {
+          if ((isLast || isSingle) && noteEl && !appendNoteOnSeparatePage) {
             if (stampSourceImg) {
               const noteStampRow = document.createElement("div");
               noteStampRow.className = "summary-note-stamp-row";
-
-              const noteClone = noteEl.cloneNode(true);
-              noteStampRow.appendChild(noteClone);
 
               const stampHolder = document.createElement("div");
               stampHolder.className = "summary-note-stamp";
               stampHolder.appendChild(stampSourceImg.cloneNode(true));
               noteStampRow.appendChild(stampHolder);
+
+              const noteClone = noteEl.cloneNode(true);
+              noteStampRow.appendChild(noteClone);
               pageBlock.appendChild(noteStampRow);
             } else {
               pageBlock.appendChild(noteEl.cloneNode(true));
@@ -2658,6 +2679,37 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
           pageBlock.appendChild(createFooter(pageNo, isLast));
           summaryRoot.appendChild(pageBlock);
         });
+
+        if (appendNoteOnSeparatePage && noteEl) {
+          const notePageNo = startPage + pages.length;
+          const noteBlock = document.createElement("div");
+          noteBlock.className = "summary-appendix-page";
+          noteBlock.style.position = "relative";
+          // Keep note-only page aligned below letterhead/top header zone like normal appendix pages.
+          const noteTopOffset = Math.max(
+            spacerHeight + theadContentHeight - 10,
+            190
+          );
+          noteBlock.style.paddingTop = `${noteTopOffset}px`;
+
+          if (stampSourceImg) {
+            const noteStampRow = document.createElement("div");
+            noteStampRow.className = "summary-note-stamp-row";
+
+            const stampHolder = document.createElement("div");
+            stampHolder.className = "summary-note-stamp";
+            stampHolder.appendChild(stampSourceImg.cloneNode(true));
+            noteStampRow.appendChild(stampHolder);
+
+            noteStampRow.appendChild(noteEl.cloneNode(true));
+            noteBlock.appendChild(noteStampRow);
+          } else {
+            noteBlock.appendChild(noteEl.cloneNode(true));
+          }
+
+          noteBlock.appendChild(createFooter(notePageNo, true));
+          summaryRoot.appendChild(noteBlock);
+        }
       }, appendixStartPage, currentReportType);
     }
 
@@ -2943,11 +2995,15 @@ exports.getReportByOrderAndType = async (req, res, next) => {
 
     // If report has asset_make ID, fetch the name
     if (report.asset_make) {
-      const assetMakeRecord = await AssetMakesForReports.findById(
-        report.asset_make
-      );
-      if (assetMakeRecord) {
-        report.asset_make_name = assetMakeRecord.name;
+      const assetMakeId = Number(report.asset_make);
+      if (Number.isInteger(assetMakeId) && assetMakeId > 0) {
+        const assetMakeRecord = await AssetMakesForReports.findById(assetMakeId);
+        if (assetMakeRecord) {
+          report.asset_make_name = assetMakeRecord.name;
+        }
+      } else if (typeof report.asset_make === "string" && report.asset_make.trim()) {
+        // Backward compatibility: old records may contain name directly.
+        report.asset_make_name = report.asset_make.trim();
       }
     }
 
@@ -3210,11 +3266,15 @@ exports.getReportByChildCategoryAndType = async (req, res, next) => {
 
     // If report has asset_make ID, fetch the name
     if (report.asset_make) {
-      const assetMakeRecord = await AssetMakesForReports.findById(
-        report.asset_make
-      );
-      if (assetMakeRecord) {
-        report.asset_make_name = assetMakeRecord.name;
+      const assetMakeId = Number(report.asset_make);
+      if (Number.isInteger(assetMakeId) && assetMakeId > 0) {
+        const assetMakeRecord = await AssetMakesForReports.findById(assetMakeId);
+        if (assetMakeRecord) {
+          report.asset_make_name = assetMakeRecord.name;
+        }
+      } else if (typeof report.asset_make === "string" && report.asset_make.trim()) {
+        // Backward compatibility: old records may contain name directly.
+        report.asset_make_name = report.asset_make.trim();
       }
     }
 

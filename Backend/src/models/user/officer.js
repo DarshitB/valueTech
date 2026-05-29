@@ -2,7 +2,19 @@ const db = require("../../../db");
 
 const officer = {
   // Get all officers (with categories included)
-  getAllOfficersByRole: async (user) => {
+  getAllOfficersByRole: async (user, options = {}) => {
+    const { bankId = null } = options;
+    const roleName = String(user.role_name || "").toUpperCase();
+    const isDeveloperAdmin =
+      roleName.includes("DEVELOPER_ADMIN") ||
+      String(user.role_name || "").toLowerCase().trim() === "developer_admin";
+
+    const parsedBankId = Number(bankId);
+    const applyOrderBankFilter =
+      Number.isInteger(parsedBankId) &&
+      parsedBankId > 0 &&
+      !isDeveloperAdmin;
+
     // Base officer query
     const baseQuery = db("officers")
       .leftJoin("users", "officers.user_id", "users.id")
@@ -40,18 +52,20 @@ const officer = {
       .whereNull("officers.deleted_at")
       .where("officers.is_active", true);
 
-    // Role-based filters - flexible matching using includes()
-    const roleName = user.role_name.toUpperCase();
-    
-    if (roleName.includes("BANK AUTHORITY")) {
-      baseQuery.andWhere(function () {
-        this.where("officers.created_by", user.id).orWhere(
-          "officers.user_id",
-          user.id
-        );
-      });
-    } else if (roleName.includes("BANK OFFICER")) {
-      baseQuery.andWhere("officers.user_id", user.id);
+    if (applyOrderBankFilter) {
+      baseQuery.andWhere("bank.id", parsedBankId);
+    } else {
+      // Role-based filters - flexible matching using includes()
+      if (roleName.includes("BANK AUTHORITY")) {
+        baseQuery.andWhere(function () {
+          this.where("officers.created_by", user.id).orWhere(
+            "officers.user_id",
+            user.id
+          );
+        });
+      } else if (roleName.includes("BANK OFFICER")) {
+        baseQuery.andWhere("officers.user_id", user.id);
+      }
     }
 
     const officers = await baseQuery;

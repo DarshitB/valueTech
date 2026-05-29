@@ -8,9 +8,13 @@ import React, {
 } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchOrderById } from "../../../redux/reducers/orderReducer";
+import {
+  fetchOrderById,
+  fetchOrderByOrderNumber,
+} from "../../../redux/reducers/orderReducer";
 import {
   fetchOrderReport,
+  fetchOrderReportLookup,
   generateOrderReport,
   saveOrderReport,
   clearCurrentReport,
@@ -49,6 +53,7 @@ const WysiwygTextarea = ({
 }) => {
   const editorRef = useRef(null);
   const isUpdatingRef = useRef(false);
+  
 
   // Normalize empty WYSIWYG HTML created by contentEditable.
   // contentEditable often produces "<br>" / "<div><br></div>" when visually empty.
@@ -241,6 +246,7 @@ const MACHINERY_CONDITION_OPTIONS = [
 const SUMMARIZED_SR_NO_COLUMN = { id: "sr_no", header: "SR NO." };
 
 const SUMMARIZED_FIXED_START_COLUMNS = [
+  { id: "source_order_number", header: "Select Order" },
   { id: "machine_description", header: "Asset Description" },
   { id: "asset_serial_no", header: "Asset Serial No." },
   { id: "yom", header: "Yom" },
@@ -259,7 +265,7 @@ const SUMMARIZED_FIXED_END_COLUMNS = [
   { id: "depr_rate", header: "Depr. Rate" },
   { id: "amount_post_depreciation", header: "Amount Post Depreciation" },
   { id: "appraisal_value", header: "Appraisal Value" },
-  { id: "estimated_fair_value", header: "Estimated Fair Value" },
+  { id: "estimated_fair_value", header: "Fair Value" },
 ];
 
 const SUMMARIZED_FIXED_END_COLUMN_IDS = new Set(
@@ -272,6 +278,10 @@ const SUMMARIZED_TRAILING_COLUMNS = [
 
 /** Hidden in table UI and Columns picker for now; data key kept on rows for later. */
 const SUMMARIZED_UI_HIDDEN_COLUMN_IDS = new Set(["subcategory_id"]);
+
+/** Default tbody vertical padding for summarized appendix table in generated PDF. */
+const SUMMARIZED_APPENDIX_DEFAULT_ROW_PADDING_PX = 5;
+const SUMMARIZED_APPENDIX_MAX_ROW_PADDING_PX = 100;
 
 const SUMMARIZED_TOGGLEABLE_FIXED_COLUMNS = [
   SUMMARIZED_SR_NO_COLUMN,
@@ -315,7 +325,9 @@ const loadSummarizedVisibleColumnIdsFromStorage = () => {
         SUMMARIZED_COLUMNS_FOR_VISIBILITY_UI_IDS.has(id) &&
         !SUMMARIZED_UI_HIDDEN_COLUMN_IDS.has(id)
     );
-    return new Set(ids);
+    const visible = new Set(ids);
+    visible.add("source_order_number");
+    return visible;
   } catch {
     return getDefaultSummarizedVisibleColumnIds();
   }
@@ -366,6 +378,12 @@ const SUMMARIZED_DIGITS_ONLY_COLUMN_IDS = new Set([
   "depr_rate",
 ]);
 
+const SUMMARIZED_FETCH_ALLOWED_REPORT_TYPES = new Set([
+  "report_ce",
+  "report_cv",
+  "report_machinery",
+]);
+
 const buildEmptySummarizedRow = (dynamicColumns = []) => {
   const base = {};
   [
@@ -395,9 +413,13 @@ const getDefaultSummarizedTableData = () => ({
   rows: [buildEmptySummarizedRow([])],
   verticalMergedColumnIds: [],
   verticalMergeValues: {},
+  manualEstimatedFairValueGrandTotal: "",
 });
 
-const SUMMARIZED_VERTICAL_MERGE_BLOCKLIST = new Set(["amount_post_depreciation"]);
+const SUMMARIZED_VERTICAL_MERGE_BLOCKLIST = new Set([
+  "amount_post_depreciation",
+  "source_order_number",
+]);
 
 const canVerticallyMergeSummarizedColumn = (colId) =>
   Boolean(
@@ -420,7 +442,10 @@ const getSummarizedColumnLabel = (col, dynamicColumns = []) => {
 const isVerticallyMergedColumn = (colId, verticalMergedColumnIds = []) =>
   Boolean(colId && verticalMergedColumnIds.includes(colId));
 
-const SUMMARIZED_NAV_SKIP_COLUMN_IDS = new Set(["amount_post_depreciation"]);
+const SUMMARIZED_NAV_SKIP_COLUMN_IDS = new Set([
+  "amount_post_depreciation",
+  "source_order_number",
+]);
 
 const isSummarizedNavCellActive = (rowIndex, colIndex, columns, mergedColumnIds) => {
   const col = columns[colIndex];
@@ -501,6 +526,47 @@ const focusSummarizedNavCell = (scrollRoot, row, col) => {
   }
   return true;
 };
+
+function SummarizedOrderFetchCell({
+  rowIndex,
+  value,
+  onChange,
+  onFetch,
+  isFetching,
+  inputStyle,
+}) {
+  const inputRef = useRef(null);
+
+  const handleFetchClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const orderNumber = String(inputRef.current?.value ?? value ?? "").trim();
+    onFetch(rowIndex, orderNumber);
+  };
+
+  return (
+    <div className="summarized-order-fetch-cell">
+      <input
+        ref={inputRef}
+        type="text"
+        className="form-field mb-0"
+        style={{ ...inputStyle, marginBottom: 0 }}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Order No."
+      />
+      <button
+        type="button"
+        className="btn btn-outline-primary btn-sm"
+        onClick={handleFetchClick}
+        disabled={isFetching}
+        style={{ whiteSpace: "nowrap", flexShrink: 0 }}
+      >
+        {isFetching ? "Fetching..." : "Fetch"}
+      </button>
+    </div>
+  );
+}
 
 function SummarizedRowInsertZone({ insertIndex, colSpan, onInsert }) {
   return (
@@ -720,7 +786,6 @@ function SummarizedReport() {
   const { id } = useParams();
   // Initialize Redux dispatch function
   const dispatch = useDispatch();
-
   // Select order data from Redux store
   const order = useSelector((state) => state.orders.selected);
   // Select order report data from Redux store
@@ -758,6 +823,9 @@ function SummarizedReport() {
   // State for report type selection (Rough/Production)
   const [reportTypeSelection, setReportTypeSelection] = useState("Rough");
   const [activeReportTab, setActiveReportTab] = useState("general");
+  /** Generate-only: appendix table tbody padding (px); not saved to DB. */
+  const [summarizedAppendixRowPaddingPx, setSummarizedAppendixRowPaddingPx] =
+    useState(String(SUMMARIZED_APPENDIX_DEFAULT_ROW_PADDING_PX));
   const [summarizedTableData, setSummarizedTableData] = useState(
     getDefaultSummarizedTableData
   );
@@ -805,6 +873,8 @@ function SummarizedReport() {
   // Fetch finalized orders for current child category (table summary at bottom)
   const [finalizedReportRows, setFinalizedReportRows] = useState([]);
   const [finalizedReportsLoading, setFinalizedReportsLoading] = useState(false);
+  const [summarizedOrderFetchLoadingByRow, setSummarizedOrderFetchLoadingByRow] =
+    useState({});
   const [entriesToShow, setEntriesToShow] = useState(5);
   const visibleFinalizedRows = useMemo(
     () => finalizedReportRows.slice(0, entriesToShow),
@@ -1323,6 +1393,39 @@ function SummarizedReport() {
     [formatGrandTotalForGeneralField]
   );
 
+  const isDashOnlySummarizedFairValue = useCallback((value) => {
+    const normalized = String(value ?? "").trim();
+    return normalized === "-" || normalized === "–" || normalized === "—";
+  }, []);
+
+  const areAllSummarizedFairValueRowsDashOnly = useCallback(
+    (rows = []) =>
+      Array.isArray(rows) &&
+      rows.length > 0 &&
+      rows.every((row) => isDashOnlySummarizedFairValue(row?.estimated_fair_value)),
+    [isDashOnlySummarizedFairValue]
+  );
+
+  const getSummarizedResolvedFairValueGrandTotal = useCallback(
+    (rows = [], tableData = summarizedTableData) => {
+      const computedFairValueTotal =
+        computeSummarizedGrandTotalsFromRows(rows).estimated_fair_value;
+      if (!areAllSummarizedFairValueRowsDashOnly(rows)) {
+        return computedFairValueTotal;
+      }
+      const manualValue = parseCurrency(
+        String(tableData?.manualEstimatedFairValueGrandTotal ?? "")
+      );
+      return manualValue > 0 ? manualValue : computedFairValueTotal;
+    },
+    [
+      summarizedTableData,
+      computeSummarizedGrandTotalsFromRows,
+      areAllSummarizedFairValueRowsDashOnly,
+      parseCurrency,
+    ]
+  );
+
   // Form data state for Machinery report generation
   const [reportFormData, setReportFormData] = useState({
     // Report type and reference details
@@ -1494,7 +1597,13 @@ function SummarizedReport() {
       const generalFromTotals =
         rows.length > 0 && summarizedRowsHaveValuationTotals(rows)
           ? getGeneralFieldsFromTableTotals(
-              computeSummarizedGrandTotalsFromRows(rows),
+              {
+                ...computeSummarizedGrandTotalsFromRows(rows),
+                estimated_fair_value: getSummarizedResolvedFairValueGrandTotal(
+                  rows,
+                  nextData
+                ),
+              },
               convertNumberToWordsIndian
             )
           : {};
@@ -1508,6 +1617,7 @@ function SummarizedReport() {
       markDirty,
       computeSummarizedGrandTotalsFromRows,
       getGeneralFieldsFromTableTotals,
+      getSummarizedResolvedFairValueGrandTotal,
       convertNumberToWordsIndian,
     ]
   );
@@ -1795,7 +1905,13 @@ function SummarizedReport() {
           const rows = normalizeSummarizedRows(parsed?.rows, dynamicColumns);
           if (rows.length > 0 && summarizedRowsHaveValuationTotals(rows)) {
             generalFromTableTotalsOnLoad = getGeneralFieldsFromTableTotals(
-              computeSummarizedGrandTotalsFromRows(rows),
+              {
+                ...computeSummarizedGrandTotalsFromRows(rows),
+                estimated_fair_value: getSummarizedResolvedFairValueGrandTotal(
+                  rows,
+                  parsed
+                ),
+              },
               convertNumberToWordsIndian
             );
           }
@@ -2145,6 +2261,7 @@ function SummarizedReport() {
         rows: normalizeSummarizedRows(rows, dynamicColumns),
         verticalMergedColumnIds,
         verticalMergeValues,
+        manualEstimatedFairValueGrandTotal: parsed?.manualEstimatedFairValueGrandTotal || "",
       });
     } catch (err) {
       setSummarizedTableData(getDefaultSummarizedTableData());
@@ -2158,7 +2275,13 @@ function SummarizedReport() {
     if (!summarizedRowsHaveValuationTotals(rows)) return;
 
     const generalFromTotals = getGeneralFieldsFromTableTotals(
-      computeSummarizedGrandTotalsFromRows(rows),
+      {
+        ...computeSummarizedGrandTotalsFromRows(rows),
+        estimated_fair_value: getSummarizedResolvedFairValueGrandTotal(
+          rows,
+          summarizedTableData
+        ),
+      },
       convertNumberToWordsIndian
     );
     setReportFormData((prev) => ({
@@ -2167,7 +2290,9 @@ function SummarizedReport() {
     }));
   }, [
     summarizedTableData.rows,
+    summarizedTableData.manualEstimatedFairValueGrandTotal,
     computeSummarizedGrandTotalsFromRows,
+    getSummarizedResolvedFairValueGrandTotal,
     getGeneralFieldsFromTableTotals,
     convertNumberToWordsIndian,
   ]);
@@ -2250,9 +2375,10 @@ function SummarizedReport() {
   const getSummarizedColumnWidth = useCallback((colId) => {
     if (colId === "sr_no") return 90;
     if (colId === "subcategory_id") return 200;
+    if (colId === "source_order_number") return 240;
     if (colId === "machine_description") return 400;
-    if (colId === "yom") return 150;
-    if (colId === "invoice_no") return 150;
+    if (colId === "yom") return 125;
+    if (colId === "invoice_no") return 175;
     if (colId === "invoice_date") return 125;
     if (colId === "total_invoice_cost") return 175;
     if (colId === "estimated_current_replacement_cost") return 175;
@@ -2276,6 +2402,38 @@ function SummarizedReport() {
   const summarizedGrandTotalsByColumn = useMemo(
     () => computeSummarizedGrandTotalsFromRows(summarizedTableData.rows || []),
     [summarizedTableData.rows, computeSummarizedGrandTotalsFromRows]
+  );
+
+  const summarizedAllFairValueRowsDashOnly = useMemo(
+    () => areAllSummarizedFairValueRowsDashOnly(summarizedTableData.rows || []),
+    [summarizedTableData.rows, areAllSummarizedFairValueRowsDashOnly]
+  );
+
+  const summarizedDisplayedFairValueGrandTotal = useMemo(() => {
+    if (!summarizedAllFairValueRowsDashOnly) {
+      return summarizedGrandTotalsByColumn.estimated_fair_value ?? 0;
+    }
+    const manualValue = parseCurrency(
+      String(summarizedTableData.manualEstimatedFairValueGrandTotal ?? "")
+    );
+    return manualValue > 0
+      ? manualValue
+      : summarizedGrandTotalsByColumn.estimated_fair_value ?? 0;
+  }, [
+    summarizedAllFairValueRowsDashOnly,
+    summarizedTableData.manualEstimatedFairValueGrandTotal,
+    summarizedGrandTotalsByColumn.estimated_fair_value,
+    parseCurrency,
+  ]);
+
+  const handleSummarizedManualFairValueGrandTotalChange = useCallback(
+    (value) => {
+      handleSummarizedTableDataChange({
+        ...summarizedTableData,
+        manualEstimatedFairValueGrandTotal: handleCurrencyFormatting(value),
+      });
+    },
+    [summarizedTableData, handleSummarizedTableDataChange, handleCurrencyFormatting]
   );
 
   const summarizedDynamicColumnTotals = useMemo(() => {
@@ -2380,6 +2538,142 @@ function SummarizedReport() {
       });
     },
     [summarizedTableData, handleSummarizedTableDataChange, computeAmountPostDepreciation]
+  );
+
+  const handleFetchSummarizedOrderIntoRow = useCallback(
+    async (rowIndex, orderNumberFromInput) => {
+      const rows = summarizedTableData.rows || [];
+      const sourceOrderNumber = String(
+        orderNumberFromInput ?? rows[rowIndex]?.source_order_number ?? ""
+      ).trim();
+
+      if (!sourceOrderNumber) {
+        toast.error("Please enter order number first.");
+        return;
+      }
+
+      setSummarizedOrderFetchLoadingByRow((prev) => ({ ...prev, [rowIndex]: true }));
+      try {
+        const matchedOrder = await dispatch(
+          fetchOrderByOrderNumber(sourceOrderNumber)
+        ).unwrap();
+
+        if (!matchedOrder?.id) {
+          toast.error("Order number not found.");
+          return;
+        }
+
+        const reportType = String(matchedOrder.report_type || "").trim();
+        if (!reportType || !SUMMARIZED_FETCH_ALLOWED_REPORT_TYPES.has(reportType)) {
+          toast.error(
+            reportType
+              ? `Report type "${reportType}" is not allowed. Allowed: report_ce, report_cv, report_machinery.`
+              : "This order does not have an allowed report type."
+          );
+          return;
+        }
+
+        let report = {};
+        try {
+          const reportPayload = await dispatch(
+            fetchOrderReportLookup({
+              orderId: matchedOrder.id,
+              reportType,
+            })
+          ).unwrap();
+          report = reportPayload?.data?.report || {};
+        } catch (_) {
+          report = {};
+        }
+
+        if (!report || Object.keys(report).length === 0) {
+          toast.error(`No ${reportType} data found for this order.`);
+          return;
+        }
+
+        const currencyOrBlank = (val) => {
+          const text = String(val ?? "").trim();
+          if (!text) return "";
+          if (text === "-" || text === "–" || text === "—") return "";
+          return handleCurrencyFormatting(text);
+        };
+
+        const digitsOnly = (val) => String(val ?? "").replace(/\D/g, "");
+        const rawInvoiceNoDate = String(report?.invoice_no_date || "").trim();
+        let parsedInvoiceNo = String(report?.invoice_no || "").trim();
+        let parsedInvoiceDate = String(report?.invoice_date || "").trim();
+
+        if (rawInvoiceNoDate) {
+          const match = rawInvoiceNoDate.match(/^(.*?)\s*Dated\s*(.*)$/i);
+          if (match) {
+            const leftInvoiceNo = String(match[1] || "").trim();
+            const rightInvoiceDate = String(match[2] || "").trim();
+            if (leftInvoiceNo) parsedInvoiceNo = leftInvoiceNo;
+            if (rightInvoiceDate) parsedInvoiceDate = rightInvoiceDate;
+          } else if (!parsedInvoiceNo) {
+            parsedInvoiceNo = rawInvoiceNoDate;
+          }
+        }
+
+        const nextRows = rows.map((row, idx) => {
+          if (idx !== rowIndex) return row;
+
+          const updatedRow = {
+            ...row,
+            source_order_number: matchedOrder.order_number || sourceOrderNumber,
+            machine_description:
+              report?.asset_make_name ||
+              report?.new_asset_make ||
+              report?.asset_make ||
+              "",
+            /* asset_serial_no:
+              report?.machine_serial_no || report?.owner_serial_no || report?.serial_no || "",
+            yom: report?.manufacture_year || "", */
+            supplier_name: report?.supplier_names || report?.supplier_name || "",
+            invoice_no: parsedInvoiceNo,
+            invoice_date: parsedInvoiceDate,
+            total_invoice_cost: currencyOrBlank(
+              report?.tax_invoice_cost ||
+                report?.current_invoice_cost ||
+                report?.total_invoice_cost
+            ),
+            depr_rate: digitsOnly(report?.depreciation),
+            appraisal_value: currencyOrBlank(report?.appraiser_value),
+            estimated_fair_value: currencyOrBlank(report?.fair_market_value),
+          };
+
+          updatedRow.amount_post_depreciation = currencyOrBlank(report?.depreciation_value);
+          if (!updatedRow.amount_post_depreciation) {
+            updatedRow.amount_post_depreciation = computeAmountPostDepreciation(updatedRow);
+          }
+
+          return updatedRow;
+        });
+
+        handleSummarizedTableDataChange({
+          ...summarizedTableData,
+          rows: nextRows,
+        });
+        toast.success(
+          `Row filled from order ${matchedOrder.order_number || sourceOrderNumber} (${reportType}).`
+        );
+      } catch (err) {
+        const message =
+          typeof err === "string"
+            ? err
+            : err?.message || "Could not fetch report for this order.";
+        toast.error(message);
+      } finally {
+        setSummarizedOrderFetchLoadingByRow((prev) => ({ ...prev, [rowIndex]: false }));
+      }
+    },
+    [
+      dispatch,
+      summarizedTableData,
+      handleCurrencyFormatting,
+      handleSummarizedTableDataChange,
+      computeAmountPostDepreciation,
+    ]
   );
 
   const handleSummarizedDynamicHeaderChange = useCallback(
@@ -2635,7 +2929,18 @@ function SummarizedReport() {
     };
 
     let cellContent;
-    if (columnId === "subcategory_id") {
+    if (columnId === "source_order_number") {
+      cellContent = (
+        <SummarizedOrderFetchCell
+          rowIndex={rowIndex}
+          value={cellValue}
+          onChange={setCellValue}
+          onFetch={handleFetchSummarizedOrderIntoRow}
+          isFetching={Boolean(summarizedOrderFetchLoadingByRow[rowIndex])}
+          inputStyle={summarizedInputStyle}
+        />
+      );
+    } else if (columnId === "subcategory_id") {
       cellContent = (
         <SingleSearchSelect
           options={summarizedSubcategoryOptions}
@@ -2704,6 +3009,25 @@ function SummarizedReport() {
           readOnly
           tabIndex={-1}
           placeholder="Auto calculated"
+        />
+      );
+    } else if (columnId === "estimated_fair_value") {
+      cellContent = (
+        <input
+          type="text"
+          className="form-field mb-0"
+          style={summarizedInputStyle}
+          value={cellValue}
+          onChange={(e) => {
+            const next = e.target.value || "";
+            const trimmed = next.trim();
+            if (trimmed === "-" || trimmed === "–" || trimmed === "—") {
+              setCellValue("-");
+              return;
+            }
+            setCellValue(handleCurrencyFormatting(next));
+          }}
+          placeholder="0.00"
         />
       );
     } else if (SUMMARIZED_CURRENCY_COLUMN_IDS.has(columnId)) {
@@ -3178,6 +3502,43 @@ function SummarizedReport() {
     return errors;
   }, [flexibleFields]);
 
+  const handleSummarizedAppendixRowPaddingChange = useCallback((event) => {
+    const raw = event.target.value;
+    if (raw === "") {
+      setSummarizedAppendixRowPaddingPx("");
+      return;
+    }
+    if (/^\d+$/.test(raw)) {
+      setSummarizedAppendixRowPaddingPx(raw);
+    }
+  }, []);
+
+  const handleSummarizedAppendixRowPaddingBlur = useCallback(() => {
+    setSummarizedAppendixRowPaddingPx((prev) => {
+      const parsed = parseInt(prev, 10);
+      if (Number.isNaN(parsed) || prev === "") {
+        return String(SUMMARIZED_APPENDIX_DEFAULT_ROW_PADDING_PX);
+      }
+      return String(
+        Math.min(
+          SUMMARIZED_APPENDIX_MAX_ROW_PADDING_PX,
+          Math.max(0, parsed)
+        )
+      );
+    });
+  }, []);
+
+  const resolveSummarizedAppendixRowPaddingForGenerate = useCallback(() => {
+    const parsed = parseInt(summarizedAppendixRowPaddingPx, 10);
+    if (Number.isNaN(parsed) || summarizedAppendixRowPaddingPx === "") {
+      return SUMMARIZED_APPENDIX_DEFAULT_ROW_PADDING_PX;
+    }
+    return Math.min(
+      SUMMARIZED_APPENDIX_MAX_ROW_PADDING_PX,
+      Math.max(0, parsed)
+    );
+  }, [summarizedAppendixRowPaddingPx]);
+
   // Handle form submission for report generation
   const handleReportSubmit = useCallback(
     (e) => {
@@ -3331,6 +3692,12 @@ function SummarizedReport() {
         formData.append("chassis_no_pencil_impression", chassisImpressionFile);
       }
 
+      // Generate-only: appendix table row padding (sent for PDF; not saved to DB)
+      formData.append(
+        "summarized_appendix_cell_padding_px",
+        String(resolveSummarizedAppendixRowPaddingForGenerate())
+      );
+
       // Add flexible fields to FormData with proper sequential ordering
       let formDataIndex = 0;
       flexibleFields.forEach((field) => {
@@ -3458,6 +3825,7 @@ function SummarizedReport() {
       chassisImpressionFile,
       reportTypeSelection,
       canEditRefNoId,
+      resolveSummarizedAppendixRowPaddingForGenerate,
     ]
   );
 
@@ -4084,12 +4452,16 @@ function SummarizedReport() {
                 <Link
                   to={`/orders/${id}/details/documents`}
                   className="btn btn-primary"
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
                   View Documents
                 </Link>
                 <Link
                   to={`/orders/${id}/details/images`}
                   className="btn btn-primary"
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
                   View Images
                 </Link>
@@ -6265,6 +6637,31 @@ function SummarizedReport() {
                           verticalMergedColumnIds={summarizedVerticalMergedColumnIds}
                           onToggleColumnMerge={handleToggleVerticalColumnMerge}
                         />
+                        <label
+                          className="summarized-appendix-row-padding-control"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            margin: 0,
+                            fontSize: "14px",
+                            whiteSpace: "nowrap",
+                          }}
+                          title="Vertical padding for appendix table rows in the generated PDF only (not saved)"
+                        >
+                          Table row padding (px)
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            className="form-control form-control-sm"
+                            style={{ width: "72px" }}
+                            value={summarizedAppendixRowPaddingPx}
+                            onChange={handleSummarizedAppendixRowPaddingChange}
+                            onBlur={handleSummarizedAppendixRowPaddingBlur}
+                            aria-label="Appendix table row padding in pixels"
+                          />
+                        </label>
                       </div>
                       <button
                         type="button"
@@ -6467,7 +6864,36 @@ function SummarizedReport() {
                                 }
                               >
                                 {SUMMARIZED_CURRENCY_COLUMN_IDS.has(col.id)
-                                  ? formatSummarizedGrandTotalCell(summarizedGrandTotalsByColumn[col.id] ?? 0)
+                                  ? col.id === "estimated_fair_value" &&
+                                    summarizedAllFairValueRowsDashOnly
+                                    ? (
+                                      <input
+                                        type="text"
+                                        className="form-field mb-0"
+                                        style={{
+                                          ...summarizedInputStyle,
+                                          backgroundColor: "#daf2d0",
+                                          fontWeight: 700,
+                                        }}
+                                        value={
+                                          summarizedTableData.manualEstimatedFairValueGrandTotal ||
+                                          formatSummarizedGrandTotalCell(
+                                            summarizedDisplayedFairValueGrandTotal
+                                          )
+                                        }
+                                        onChange={(e) =>
+                                          handleSummarizedManualFairValueGrandTotalChange(
+                                            e.target.value
+                                          )
+                                        }
+                                        placeholder="0.00"
+                                      />
+                                    )
+                                    : formatSummarizedGrandTotalCell(
+                                      col.id === "estimated_fair_value"
+                                        ? summarizedDisplayedFairValueGrandTotal
+                                        : summarizedGrandTotalsByColumn[col.id] ?? 0
+                                    )
                                   : ""}
                               </td>
                             ))}
