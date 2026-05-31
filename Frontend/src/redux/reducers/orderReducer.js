@@ -15,9 +15,13 @@ export const fetchOrders = createAsyncThunk(
 // Async action: Fetch orders with WO status (status 13 and 14)
 export const fetchOrdersWithWoStatus = createAsyncThunk(
   "orders/fetchWoStatus",
-  async () => {
-    const res = await orderApi.getOrdersWithWoStatus();
-    return res.data;
+  async (params, { rejectWithValue }) => {
+    try {
+      const res = await orderApi.getOrdersWithWoStatus(params);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
   }
 );
 
@@ -258,6 +262,8 @@ const initialState = {
   finalizedByChildCategory: null, // Finalized orders API response payload
   finalizedByChildCategoryLoading: false,
   finalizedByChildCategoryError: null,
+  woStatusPagination: null,
+  woStatusFilterOptions: null,
   orderByNumber: null, // Order resolved by order_number (summarized row fetch, etc.)
   orderByNumberLoading: false,
   orderByNumberError: null,
@@ -297,7 +303,20 @@ const orderSlice = createSlice({
         state.error = null;
       })
       .addCase(fetchOrdersWithWoStatus.fulfilled, (state, action) => {
-        state.list = action.payload;
+        const payload = action.payload;
+        if (Array.isArray(payload)) {
+          state.list = payload;
+          state.woStatusPagination = null;
+        } else if (payload && Array.isArray(payload.data)) {
+          state.list = payload.data;
+          state.woStatusPagination = payload.pagination || null;
+          if (payload.filterOptions) {
+            state.woStatusFilterOptions = payload.filterOptions;
+          }
+        } else {
+          state.list = [];
+          state.woStatusPagination = null;
+        }
         state.loading = false;
       })
       .addCase(fetchOrdersWithWoStatus.rejected, (state, action) => {

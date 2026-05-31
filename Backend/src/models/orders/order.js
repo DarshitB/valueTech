@@ -1,4 +1,11 @@
 const db = require("../../../db");
+const {
+  ORDER_LIST_SELECT,
+  applyOrderListJoins,
+  parsePagination,
+  applyRequestFilters,
+  buildFilterOptions,
+} = require("../../utils/orderListQueryHelpers");
 
 // Helper: robust role parsing to distinguish ADMIN vs SUPER/DEVELOPER ADMIN variants
 function parseRole(roleNameRaw) {
@@ -397,94 +404,9 @@ const order = {
   },
 
   // Get all orders that are finalized (status 13) or on hold (status 14) - same logic as getAllOrders but only these statuses
-  getAllOrdersWithWoStatus: async (user) => {
-    // Base order query
-    const baseQuery = db("orders")
-      .leftJoin(
-        "order_status_master",
-        "orders.current_status_id",
-        "order_status_master.id"
-      )
-      .leftJoin("officers", "orders.officer_id", "officers.id")
-      .leftJoin("users as officer_user", "officers.user_id", "officer_user.id")
-      .leftJoin("bank_branch", "officers.branch_id", "bank_branch.id")
-      .leftJoin("bank", "bank_branch.bank_id", "bank.id")
-      .leftJoin("cities", "bank_branch.city_id", "cities.id")
-      .leftJoin("states", "cities.state_id", "states.id")
-      .leftJoin("users as manager", "orders.manager_id", "manager.id")
-      .leftJoin("users as telecaller", "orders.telecaller_id", "telecaller.id")
-      .leftJoin("users as created_user", "orders.created_by", "created_user.id")
-      .leftJoin("users as updated_user", "orders.updated_by", "updated_user.id")
-      .leftJoin(
-        "field_verifiers",
-        "orders.field_verifier_id",
-        "field_verifiers.id"
-      )
-      .leftJoin(
-        "child_category",
-        "orders.child_category_id",
-        "child_category.id"
-      )
-      .leftJoin(
-        "sub_category",
-        "child_category.sub_category_id",
-        "sub_category.id"
-      )
-      .leftJoin("category", "sub_category.category_id", "category.id")
-      .select(
-        "orders.id",
-        "orders.order_number",
-        "orders.customer_name",
-        "orders.customer_name_2",
-        "orders.contact",
-        "orders.alternative_contact",
-        "orders.supervisor_number",
-        "orders.driver_number",
-        "orders.payment_amount",
-        "orders.payment_mode",
-        "orders.payment_status",
-        "orders.officer_id",
-        "officer_user.name as officer_name",
-        "officer_user.email as officer_email",
-        "officer_user.mobile as officer_mobile",
-        "officers.branch_id",
-        "bank_branch.name as branch_name",
-        "bank.id as bank_id",
-        "bank.name as bank_name",
-        "cities.id as city_id",
-        "cities.name as city_name",
-        "states.id as state_id",
-        "states.name as state_name",
-        "orders.manager_id",
-        "manager.name as manager_name",
-        "orders.telecaller_id",
-        "telecaller.name as telecaller_name",
-        "orders.registration_number",
-        "orders.place_of_inspection",
-        "orders.date_of_inspection",
-        "orders.current_status_id",
-        "order_status_master.name as current_status_name",
-        "order_status_master.description as current_status_description",
-        "orders.order_priority",
-        "orders.order_type",
-        "orders.created_at",
-        "created_user.name as created_by",
-        "orders.updated_at",
-        "updated_user.name as updated_by",
-        "orders.field_verifier_id",
-        "field_verifiers.name as field_verifier_name",
-        "child_category.id as child_category_id",
-        "child_category.name as child_category_name",
-        "sub_category.id as sub_category_id",
-        "sub_category.name as sub_category_name",
-        "category.id as category_id",
-        "category.name as category_name",
-        "category.report_type as category_report_type",
-        "orders.valuer_name",
-        "orders.job_started_at",
-        "orders.job_started_by",
-        "orders.covered_distance_by_verifier"
-      )
+  getAllOrdersWithWoStatus: async (user, queryOptions = {}) => {
+    const baseQuery = applyOrderListJoins(db("orders"))
+      .select(ORDER_LIST_SELECT)
       .whereNull("orders.deleted_at")
       .whereIn("orders.current_status_id", [13, 14]);
 
@@ -525,16 +447,11 @@ const order = {
     } else if ((user.role_name || "").toUpperCase().includes("MANAGER")) {
       baseQuery.andWhere("orders.manager_id", user.id);
     } else if ((user.role_name || "").toUpperCase().includes("TELECALLER")) {
-      // TELECALLER can only see orders assigned to them via telecaller_id,
-      // and only while no manager is assigned yet
       baseQuery
         .andWhere("orders.telecaller_id", user.id)
         .whereNull("orders.manager_id");
     }
 
-    // Additional department-based filtering:
-    // - Officer-type roles (BANK OFFICER / BANK AUTHORITY / CREDIT HEAD) use officer_categories
-    // - Other roles (e.g. manager, telecaller, etc.) use user_categories
     if (
       roleName.includes("BANK OFFICER") ||
       roleName.includes("BANK AUTHORITY") ||
@@ -547,27 +464,64 @@ const order = {
       if (departmentCategoryIds.length > 0) {
         baseQuery.whereIn("category.id", departmentCategoryIds);
       }
-      // If officer has no departments, do not apply any extra category filter
     } else {
       const departmentCategoryIds = await getUserDepartmentCategoryIds(user.id);
 
       if (departmentCategoryIds.length > 0) {
         baseQuery.whereIn("category.id", departmentCategoryIds);
       }
-      // If user has no departments, do not apply any extra category filter
     }
 
-    // For MANAGER roles, exclude orders with current_status_id >= 8
     if (roleName.includes("MANAGER")) {
       baseQuery.andWhere("orders.current_status_id", "<", 8);
     }
 
-    // Sort by newest first
-    baseQuery.orderBy("orders.created_at", "asc");
+    const pagination = parsePagination(queryOptions);
+    if (!pagination) {
+      baseQuery.orderBy("orders.created_at", "asc");
+      const orders = await baseQuery;
+      return enrichOrdersWithAssignedUsersAndRefNo(orders);
+    }
 
-    const orders = await baseQuery;
+    const roleScopedQuery = baseQuery.clone();
+    applyRequestFilters(roleScopedQuery, queryOptions);
 
-    return enrichOrdersWithAssignedUsersAndRefNo(orders);
+    const countRow = await roleScopedQuery
+      .clone()
+      .clearSelect()
+      .clearOrder()
+      .countDistinct({ total: "orders.id" })
+      .first();
+    const total = Number(countRow?.total || 0);
+
+    const rows = await roleScopedQuery
+      .clone()
+      .orderBy("orders.created_at", "desc")
+      .limit(pagination.limit)
+      .offset(pagination.offset);
+
+    const data = await enrichOrdersWithAssignedUsersAndRefNo(rows);
+
+    const includeFilterOptions =
+      queryOptions.include_filter_options === "1" ||
+      queryOptions.include_filter_options === "true" ||
+      queryOptions.include_filter_options === true;
+
+    const response = {
+      data,
+      pagination: {
+        page: pagination.page,
+        limit: pagination.limit,
+        total,
+        totalPages: total > 0 ? Math.ceil(total / pagination.limit) : 1,
+      },
+    };
+
+    if (includeFilterOptions) {
+      response.filterOptions = await buildFilterOptions(baseQuery);
+    }
+
+    return response;
   },
 
   // Get orders for mobile app filtered by field verifier ID (excludes finalized 13 and on hold 14)

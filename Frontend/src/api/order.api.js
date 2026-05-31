@@ -5,7 +5,10 @@ const ENDPOINT = "/api/orders"; // Base endpoint for all state-related requests
 
 export const getOrders = () => axios.get(ENDPOINT); // Fetch all orders
 
-export const getOrdersWithWoStatus = () => axios.get(`${ENDPOINT}/finalized-and-on-hold-orders`); // Fetch orders finalized (13) or on hold (14)
+export const getOrdersWithWoStatus = (params) =>
+  axios.get(`${ENDPOINT}/finalized-and-on-hold-orders`, {
+    ...(params && Object.keys(params).length > 0 ? { params } : {}),
+  }); // Optional query: page, limit, filters; without params returns full list (legacy)
 
 // Fetch finalized orders by child category ID
 export const getFinalizedOrdersByChildCategory = (childCategoryId) =>

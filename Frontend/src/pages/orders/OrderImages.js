@@ -49,6 +49,7 @@ import { resolveAssetUrl } from "../../utils/urlUtils";
 import R2StorageBadge from "../../components/R2StorageBadge";
 import ZipUploadModal from "../../components/ZipUploadModal";
 import ConfirmationModal from "../../components/ConfirmationModal";
+import { downloadOrderMediaFile } from "../../api/orderMedia.api";
 
 // Pure helpers outside component (stable reference, no closure over state)
 function formatMediaGroupDate(dateString) {
@@ -133,6 +134,24 @@ function getStatusInfo(status) {
   return STATUS_INFO[status] ?? { text: "Unknown", color: "text-muted" };
 }
 
+function getFilenameFromMediaUrl(mediaUrl, fallbackId = "media") {
+  if (!mediaUrl) return `${fallbackId}`;
+
+  try {
+    const parsed = JSON.parse(mediaUrl);
+    if (parsed?.filename) return String(parsed.filename);
+    if (parsed?.path) return String(parsed.path).split("/").pop() || `${fallbackId}`;
+    if (parsed?.name) return String(parsed.name);
+    if (parsed?.link) return String(parsed.link).split("/").pop() || `${fallbackId}`;
+  } catch {
+    if (typeof mediaUrl === "string") {
+      return mediaUrl.split("?")[0].split("/").pop() || `${fallbackId}`;
+    }
+  }
+
+  return `${fallbackId}`;
+}
+
 function OrderImages() {
   // Extract order ID from route parameters
   const { id } = useParams();
@@ -161,6 +180,7 @@ function OrderImages() {
   const [remarks, setRemarks] = useState("");
   const [zipUploadModalOpen, setZipUploadModalOpen] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [downloadingSelected, setDownloadingSelected] = useState(false);
   // Per-image orientation for collage: "default" | "left" | "right" | "up" (cycle on button click)
   const [imageOrientations, setImageOrientations] = useState({});
 
@@ -904,6 +924,81 @@ function OrderImages() {
     });
   };
 
+  const handleDownloadSelected = useCallback(async () => {
+    if (selectedImageSequence.length === 0) {
+      toast.error("Please select media files to download");
+      return;
+    }
+
+    const mediaList = media?.media || [];
+    const selectedMedia = selectedImageSequence
+      .map((mediaId) => mediaList.find((item) => item.id === mediaId))
+      .filter((item) => item?.media_url);
+
+    if (!selectedMedia.length) {
+      toast.error("No valid media files found");
+      return;
+    }
+
+    setDownloadingSelected(true);
+
+    try {
+      const JSZip = await import("jszip");
+      const zip = new JSZip.default();
+      const usedFilenames = new Set();
+      let successCount = 0;
+
+      for (const item of selectedMedia) {
+        try {
+          const response = await downloadOrderMediaFile(item.id);
+          const blob = new Blob([response.data], {
+            type:
+              response.headers?.["content-type"] || "application/octet-stream",
+          });
+
+          let filename = getFilenameFromMediaUrl(item.media_url, `media_${item.id}`);
+          if (usedFilenames.has(filename)) {
+            filename = `${item.id}_${filename}`;
+          }
+          usedFilenames.add(filename);
+
+          zip.file(filename, blob);
+          successCount++;
+        } catch (error) {
+          console.warn(`Failed to download media ${item.id}:`, error);
+        }
+      }
+
+      if (successCount === 0) {
+        toast.error("No media files could be downloaded");
+        return;
+      }
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(zipBlob);
+
+      link.href = url;
+      link.download = `${order?.order_number || "order"}_media_${
+        new Date().toISOString().split("T")[0]
+      }.zip`;
+      link.style.display = "none";
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      toast.success(`Downloaded ${successCount} media file(s)`);
+    } catch (error) {
+      console.error("ZIP creation failed:", error);
+      toast.error("Failed to create download archive");
+    } finally {
+      setDownloadingSelected(false);
+    }
+  }, [selectedImageSequence, media, order]);
+
   return (
     <section className="order-images-wrapper">
       <div className="row h-100">
@@ -926,6 +1021,17 @@ function OrderImages() {
                 >
                   {isAllSelected ? "Clear Selection" : "Select All"}
                 </button>
+                {selectedImageSequence.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleDownloadSelected}
+                    disabled={downloadingSelected}
+                    className="btn btn-primary tooltip-link ms-2"
+                    title="Download selected media as ZIP"
+                  >
+                    {downloadingSelected ? "Downloading..." : "Download Selected"}
+                  </button>
+                )}
                 {hasPermission(
                   allowedPermissions,
                   "generate_order_collage"

@@ -70,6 +70,16 @@ router.delete(
 );
 
 /**
+ * GET /api/order-media/download/:id
+ * Force download a single media file by id
+ */
+router.get(
+  "/download/:id",
+  checkPermission("view_order_media_files"),
+  orderMediaPortalController.downloadMediaById
+);
+
+/**
  * GET /api/order-media/:orderId
  * Get all media records for a specific order
  */

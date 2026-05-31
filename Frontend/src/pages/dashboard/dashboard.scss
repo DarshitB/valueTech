@@ -338,10 +338,33 @@
     margin-bottom: -10px;
     padding-bottom: 30px;
   }
+  .dashboard-order-summary-row {
+    > [class*="col-"] {
+      display: flex;
+      flex-direction: column;
+
+      > .padding-top-bottom,
+      > .sneak-peek-stacked {
+        flex: 1;
+        width: 100%;
+      }
+    }
+  }
   .padding-top-bottom {
     padding-bottom: 10px;
     padding-top: 10px;
     height: 100%;
+  }
+  .sneak-peek-stacked {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    height: 100%;
+
+    .sneak-peek-card {
+      height: auto;
+      flex: 1;
+    }
   }
   .sneak-peek-card {
     background-color: #ffffff;
@@ -380,6 +403,28 @@
     }
     &.order-status {
       min-height: 120px;
+      &.sneak-peek-card-inline {
+        min-height: 0;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 16px 20px;
+
+        h3 {
+          margin-bottom: 0;
+          text-align: left;
+          flex: 1;
+          min-width: 0;
+        }
+
+        p {
+          margin-bottom: 0;
+          text-align: right;
+          flex-shrink: 0;
+        }
+      }
       &.ongoing-orders {
         background: linear-gradient(to right, #009b68, #22c55e);
         /* background: linear-gradient(to right, #444468, #474f8f); */
@@ -393,6 +438,10 @@
         background: linear-gradient(to right, #047e8d, #25a1d1);
         color: $primary-font-color;
       }
+      &.price-pending-orders {
+        background: linear-gradient(to right, #4338ca, #6366f1);
+        color: $primary-font-color;
+      }
       &.re-validate-orders {
         background: linear-gradient(to right, #cc3e15, #f05f35);
         color: $primary-font-color;
@@ -404,6 +453,42 @@
       &.today-orders-card {
         background: linear-gradient(to right, #4751a0, #6b76c9);
         color: $primary-font-color;
+      }
+      &.sneak-peek-card-clickable {
+        padding: 0;
+
+        .sneak-peek-card-action {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          justify-content: center;
+          width: 100%;
+          height: 100%;
+          min-height: inherit;
+          padding: 20px;
+          border: none;
+          background: transparent;
+          color: inherit;
+          text-align: left;
+          cursor: pointer;
+          outline: none;
+          box-shadow: none;
+
+          &:focus,
+          &:focus-visible,
+          &:active {
+            outline: none;
+            box-shadow: none;
+            border: none;
+          }
+        }
+
+        &.sneak-peek-card-inline .sneak-peek-card-action {
+          flex-direction: row;
+          align-items: center;
+          justify-content: space-between;
+          padding: 16px 20px;
+        }
       }
     }
     &.center-vertical {

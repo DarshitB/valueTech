@@ -2010,65 +2010,23 @@ function OrderDetails() {
             </>
           )}
 
-        {/* Complete button - only show if:
-            1. Has permission to view complete button
-            2. Order status is 9
-            3. Has at least one approved report and one approved collage
-        */}
-        {(() => {
-          const hasCompletePermission = hasPermission(
-            allowedPermissions,
-            "view_order_complete_button"
-          );
-          const hasCorrectStatus = order?.current_status_id === 9;
-
-          // Get all documents from the Redux state
-          const allDocs =
-            orderMediaDocumentsState?.documents?.documents ||
-            orderMediaDocumentsState?.documents ||
-            [];
-
-          // Get all reports and collages first
-          const allReports = allDocs.filter(
-            (doc) => doc.document_type === "report"
-          );
-          const allCollages = allDocs.filter(
-            (doc) => doc.document_type === "collage"
-          );
-
-          // Then filter for approved ones
-          const approvedReports = allReports.filter(
-            (doc) => doc.status === "approved"
-          );
-          const approvedCollages = allCollages.filter(
-            (doc) => doc.status === "approved"
-          );
-
-          // Check if we have at least one of each
-          const hasApprovedReport = approvedReports.length > 0;
-          const hasApprovedCollage = approvedCollages.length > 0;
-
-          return (
-            hasCompletePermission &&
-            hasCorrectStatus &&
-            hasApprovedReport &&
-            hasApprovedCollage && (
-              <button
-                title="Complete"
-                className="tooltip-link button"
-                style={{
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                  cursor: "pointer",
-                }}
-                onClick={() => setShowCompleteConfirmation(true)}
-              >
-                <ValidateIcon />
-              </button>
-            )
-          );
-        })()}
+        {/* Complete button - only show if user has permission and order status is 8 */}
+        {hasPermission(allowedPermissions, "view_order_complete_button") &&
+          order?.current_status_id === 8 && (
+            <button
+              title="Complete"
+              className="tooltip-link button"
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+              }}
+              onClick={() => setShowCompleteConfirmation(true)}
+            >
+              <ValidateIcon />
+            </button>
+          )}
         {hasCollageAndReport &&
           hasPermission(
             allowedPermissions,

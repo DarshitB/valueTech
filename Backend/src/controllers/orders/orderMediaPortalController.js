@@ -863,6 +863,38 @@ async function getApprovedOrderMediaPublicByToken(req, res, next) {
   }
 }
 
+function resolveMediaUrlForDownload(mediaUrl) {
+  if (!mediaUrl || typeof mediaUrl !== "string") return "";
+  try {
+    const parsed = JSON.parse(mediaUrl);
+    if (parsed?.path) return String(parsed.path);
+    if (parsed?.link) return String(parsed.link);
+    return mediaUrl;
+  } catch {
+    return mediaUrl;
+  }
+}
+
+function getFilenameFromMediaUrl(mediaUrl) {
+  if (!mediaUrl || typeof mediaUrl !== "string") return "media-file";
+  try {
+    const parsed = JSON.parse(mediaUrl);
+    if (parsed && typeof parsed === "object") {
+      const candidate =
+        parsed.filename || parsed.path || parsed.name || parsed.link;
+      if (typeof candidate === "string" && candidate.trim()) {
+        const clean = candidate.split("?")[0].split("#")[0];
+        return path.basename(clean) || "media-file";
+      }
+    }
+  } catch (_) {
+    // Not JSON, handled below
+  }
+
+  const clean = mediaUrl.split("?")[0].split("#")[0];
+  return path.basename(clean) || "media-file";
+}
+
 function resolveAbsolutePathFromMediaUrl(mediaUrl) {
   if (!mediaUrl || typeof mediaUrl !== "string") return null;
   const uploadsPrefix = "/uploads/";
@@ -1012,6 +1044,46 @@ async function viewApprovedMediaPublicByToken(req, res, next) {
   }
 }
 
+/**
+ * Force-download a single order media file by id.
+ * GET /api/order-media/download/:id
+ */
+async function downloadMediaById(req, res, next) {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      throw new BadRequestError("Invalid media id");
+    }
+
+    const media = await orderMediaPortal.findById(id);
+    if (!media) {
+      throw new NotFoundError("Media not found");
+    }
+
+    const filename = getFilenameFromMediaUrl(media.media_url);
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Cache-Control", "no-store");
+
+    const mediaUrl = resolveMediaUrlForDownload(media.media_url);
+    if (typeof mediaUrl === "string" && /^https?:\/\//i.test(mediaUrl)) {
+      const upstream = await fetchRemoteWithRetry(mediaUrl, 5, 15000);
+      const contentType = upstream.headers.get("content-type");
+      if (contentType) res.setHeader("Content-Type", contentType);
+      const arrayBuffer = await upstream.arrayBuffer();
+      return res.send(Buffer.from(arrayBuffer));
+    }
+
+    const absolutePath = resolveAbsolutePathFromMediaUrl(mediaUrl);
+    if (!absolutePath || !fs.existsSync(absolutePath)) {
+      throw new NotFoundError("Media file not found on storage");
+    }
+
+    return res.download(absolutePath, filename);
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getOrderMedia,
   updateMediaStatus,
@@ -1024,4 +1096,5 @@ module.exports = {
   viewApprovedMediaPublic,
   viewApprovedMediaPublicByToken,
   getOrCreatePublicShareToken,
+  downloadMediaById,
 };

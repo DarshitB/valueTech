@@ -22,3 +22,7 @@ export const uploadZipFile = (formData) => axios.post(`${ENDPOINT}/upload-zip`, 
 
 // Soft delete order media by IDs (requires delete_order_media_files permission)
 export const deleteOrderMedia = (payload) => axios.patch(`${ENDPOINT}/delete`, payload);
+
+// Force download media file by id (backend streams as attachment)
+export const downloadOrderMediaFile = (mediaId) =>
+  axios.get(`${ENDPOINT}/download/${mediaId}`, { responseType: "blob" });

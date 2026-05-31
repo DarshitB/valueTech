@@ -16,17 +16,30 @@ const getTextFromReactNode = (node) => {
   return "";
 };
 
-const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = true }) => {
+const CustomDataTable = ({
+  children,
+  showEntriesSelector = true,
+  showFooter = true,
+  serverPagination = null,
+}) => {
   const { header, rows, footer, buttons, filters } = children;
+
+  const isServerPaginated = Boolean(serverPagination);
+  const isServerSearch =
+    isServerPaginated &&
+    typeof serverPagination?.onSearchChange === "function";
 
   // Load entries per page from localStorage or default to 10
   const [entriesPerPage, setEntriesPerPage] = useState(() => {
+    if (serverPagination?.limit) return serverPagination.limit;
     const saved = localStorage.getItem(STORAGE_KEY);
     return saved ? parseInt(saved, 10) : 10;
   });
 
   const [search, setSearch] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(
+    serverPagination?.page || 1
+  );
   const [sortConfig, setSortConfig] = useState({
     index: null,
     direction: "asc",
@@ -54,9 +67,9 @@ const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = tr
     return text.toLowerCase().replace(/[\s_\-.,;:\/\\|]/g, '');
   };
 
-  // Filter by search - robust search ignoring separators
+  // Filter by search - client-side only when not using server search
   const filteredData = useMemo(() => {
-    if (!search) return rawData;
+    if (isServerSearch || !search) return rawData;
     const normalizedSearch = normalizeForSearch(search);
     return rawData.filter(({ data }) =>
       data.some((value) => {
@@ -64,7 +77,7 @@ const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = tr
         return normalizedValue.includes(normalizedSearch);
       })
     );
-  }, [rawData, search]);
+  }, [rawData, search, isServerSearch]);
 
   // Sort
   const sortedData = useMemo(() => {
@@ -79,16 +92,57 @@ const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = tr
   }, [filteredData, sortConfig]);
 
   // Pagination
-  const totalPages = Math.ceil(sortedData.length / entriesPerPage);
-  const paginatedData = sortedData.slice(
-    (currentPage - 1) * entriesPerPage,
-    currentPage * entriesPerPage
-  );
+  const totalEntries = isServerPaginated
+    ? Number(serverPagination.total || 0)
+    : sortedData.length;
+  const activePage = isServerPaginated
+    ? Number(serverPagination.page || 1)
+    : currentPage;
+  const activeLimit = isServerPaginated
+    ? Number(serverPagination.limit || entriesPerPage)
+    : entriesPerPage;
+  const totalPages = Math.max(1, Math.ceil(totalEntries / activeLimit) || 1);
+  const paginatedData = isServerPaginated
+    ? sortedData
+    : sortedData.slice(
+        (currentPage - 1) * entriesPerPage,
+        currentPage * entriesPerPage
+      );
 
-  // Persist entriesPerPage to localStorage when it changes
   useEffect(() => {
+    if (isServerPaginated && serverPagination?.page) {
+      setCurrentPage(serverPagination.page);
+    }
+  }, [isServerPaginated, serverPagination?.page]);
+
+  useEffect(() => {
+    if (isServerPaginated && serverPagination?.limit) {
+      setEntriesPerPage(serverPagination.limit);
+    }
+  }, [isServerPaginated, serverPagination?.limit]);
+
+  const handlePageChange = (nextPage) => {
+    if (isServerPaginated && serverPagination?.onPageChange) {
+      serverPagination.onPageChange(nextPage);
+      return;
+    }
+    setCurrentPage(nextPage);
+  };
+
+  const handleEntriesPerPageChange = (nextLimit) => {
+    if (isServerPaginated && serverPagination?.onLimitChange) {
+      serverPagination.onLimitChange(nextLimit);
+      return;
+    }
+    setEntriesPerPage(nextLimit);
+    setCurrentPage(1);
+  };
+
+  // Persist entriesPerPage to localStorage when it changes (client-side mode only)
+  useEffect(() => {
+    if (isServerPaginated) return;
     localStorage.setItem(STORAGE_KEY, entriesPerPage.toString());
-  }, [entriesPerPage]);
+  }, [entriesPerPage, isServerPaginated]);
 
   // Sort handler
   const handleSort = (index) => {
@@ -146,11 +200,8 @@ const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = tr
             <div className="show-x-entries">
               Show &nbsp;
               <select
-                value={entriesPerPage}
-                onChange={(e) => {
-                  setEntriesPerPage(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
+                value={activeLimit}
+                onChange={(e) => handleEntriesPerPageChange(Number(e.target.value))}
                 className="count-of-page-selector"
               >
                 {[10, 25, 50, 100].map((num) => (
@@ -170,9 +221,14 @@ const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = tr
               type="text"
               placeholder="Search..."
               className="search-bar"
-              value={search}
+              value={isServerSearch ? serverPagination.search ?? "" : search}
               onChange={(e) => {
-                setSearch(e.target.value);
+                const value = e.target.value;
+                if (isServerSearch) {
+                  serverPagination.onSearchChange(value);
+                  return;
+                }
+                setSearch(value);
                 setCurrentPage(1);
               }}
             />
@@ -206,8 +262,8 @@ const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = tr
           </thead>
           <tbody>
             {paginatedData.map(({ element }, index) => {
-              // Calculate the actual sequential number based on current page and entries per page
-              const sequentialNumber = (currentPage - 1) * entriesPerPage + index + 1;
+              const sequentialNumber =
+                (activePage - 1) * activeLimit + index + 1;
               
               return React.cloneElement(element, {
                 className: "hover:bg-gray-50",
@@ -234,21 +290,24 @@ const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = tr
       {showFooter && (
         <div className="dataTable-footer">
           <div>
-            Showing {(currentPage - 1) * entriesPerPage + 1} to{" "}
-            {Math.min(currentPage * entriesPerPage, filteredData.length)} of{" "}
-            {filteredData.length} entries
+            Showing{" "}
+            {totalEntries === 0
+              ? 0
+              : (activePage - 1) * activeLimit + 1}{" "}
+            to {Math.min(activePage * activeLimit, totalEntries)} of{" "}
+            {totalEntries} entries
           </div>
 
           <div className="pagination-box flex items-center gap-1">
             <button
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((p) => p - 1)}
+              disabled={activePage === 1}
+              onClick={() => handlePageChange(activePage - 1)}
               className="pagination-button-nav"
             >
               ◀
             </button>
 
-            {getPageNumbers(currentPage, totalPages).map((page, i) =>
+            {getPageNumbers(activePage, totalPages).map((page, i) =>
               page === "..." ? (
                 <span key={i} className="px-2">
                   ...
@@ -256,9 +315,9 @@ const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = tr
               ) : (
                 <button
                   key={i}
-                  onClick={() => setCurrentPage(page)}
+                  onClick={() => handlePageChange(page)}
                   className={`pagination-button ${
-                    currentPage === page ? "active" : ""
+                    activePage === page ? "active" : ""
                   }`}
                 >
                   {page}
@@ -267,8 +326,8 @@ const CustomDataTable = ({ children, showEntriesSelector = true, showFooter = tr
             )}
 
             <button
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage((p) => p + 1)}
+              disabled={activePage === totalPages}
+              onClick={() => handlePageChange(activePage + 1)}
               className="pagination-button-nav"
             >
               ▶

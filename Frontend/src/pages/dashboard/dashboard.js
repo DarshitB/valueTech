@@ -33,6 +33,50 @@ import ConfirmationModal from "../../components/ConfirmationModal";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
+const SUMMARY_CARD_TABLE_FILTER = {
+  TODAY_ORDERS: "today_orders",
+  ORDER_CREATED: "order_created",
+  PHOTO_PENDING: "photo_pending",
+  DETAILS_PENDING: "details_pending",
+  PRICE_PENDING: "price_pending",
+  MAIL_PENDING: "mail_pending",
+};
+
+const isSameOrderDay = (d1, d2) =>
+  d1 &&
+  d2 &&
+  d1.getFullYear() === d2.getFullYear() &&
+  d1.getMonth() === d2.getMonth() &&
+  d1.getDate() === d2.getDate();
+
+const getOrderCreatedDate = (order) => {
+  const value = order?.created_at;
+  if (!value) return null;
+  const date = new Date(value);
+  return isNaN(date) ? null : date;
+};
+
+const matchesSummaryCardTableFilter = (order, filterKey) => {
+  if (!filterKey) return true;
+  const statusId = order?.current_status_id;
+  switch (filterKey) {
+    case SUMMARY_CARD_TABLE_FILTER.TODAY_ORDERS:
+      return isSameOrderDay(getOrderCreatedDate(order), new Date());
+    case SUMMARY_CARD_TABLE_FILTER.ORDER_CREATED:
+      return statusId != null && statusId <= 2;
+    case SUMMARY_CARD_TABLE_FILTER.PHOTO_PENDING:
+      return [2, 4, 5].includes(statusId);
+    case SUMMARY_CARD_TABLE_FILTER.DETAILS_PENDING:
+      return [7, 8].includes(statusId);
+    case SUMMARY_CARD_TABLE_FILTER.PRICE_PENDING:
+      return statusId === 10;
+    case SUMMARY_CARD_TABLE_FILTER.MAIL_PENDING:
+      return statusId === 12;
+    default:
+      return true;
+  }
+};
+
 function Dashboard() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -263,6 +307,9 @@ function Dashboard() {
     };
   });
 
+  // Ephemeral table filter from summary cards (not persisted)
+  const [summaryCardTableFilter, setSummaryCardTableFilter] = useState(null);
+
   // Get distinct filter values from orders
   const distinctBanks = useMemo(() => {
     const banks = orders
@@ -440,19 +487,9 @@ function Dashboard() {
   });
 
   // Helper: count today's orders (by created date)
-  const isSameDay = (d1, d2) =>
-    d1 &&
-    d2 &&
-    d1.getFullYear() === d2.getFullYear() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getDate() === d2.getDate();
+  const isSameDay = isSameOrderDay;
 
-  const getCreatedDate = (order) => {
-    const value = order?.created_at; // API provides created_at
-    if (!value) return null;
-    const date = new Date(value);
-    return isNaN(date) ? null : date;
-  };
+  const getCreatedDate = getOrderCreatedDate;
 
   const todaysOrdersCount = (orders || []).filter((o) =>
     isSameDay(getCreatedDate(o), new Date())
@@ -1496,7 +1533,7 @@ function Dashboard() {
                   } col-lg-12 col-md-12 col-sm-12 col-xs-12`}
               >
                 <div className="left-part-of-sneak-peek">
-                  <div className="row">
+                  <div className="row dashboard-order-summary-row">
                     {isBankAuthority ? (
                       <>
                         <div className="col-xl-4 col-lg-4 col-md-4 col-sm-12 col-xs-12">
@@ -1585,146 +1622,289 @@ function Dashboard() {
                     ) : (
                       <>
                         <div className="col-xl-2 col-lg-4 col-md-4 col-sm-12 col-xs-12">
-                          <div className="padding-top-bottom">
-                            <div className="sneak-peek-card order-status total-orders">
-                              <h3>Total Orders</h3>
-                              <p>{formatTwoDigits(filteredTableOrdersCount)}</p>
+                          <div className="padding-top-bottom sneak-peek-stacked">
+                            <div
+                              className={`sneak-peek-card order-status total-orders sneak-peek-card-inline sneak-peek-card-clickable${
+                                summaryCardTableFilter === null ? " is-active" : ""
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                className="sneak-peek-card-action"
+                                onClick={() => setSummaryCardTableFilter(null)}
+                                aria-pressed={summaryCardTableFilter === null}
+                              >
+                                <h3>Total Orders</h3>
+                                <p>{formatTwoDigits(filteredTableOrdersCount)}</p>
+                              </button>
+                            </div>
+                            <div
+                              className={`sneak-peek-card order-status today-orders-card sneak-peek-card-inline sneak-peek-card-clickable${
+                                summaryCardTableFilter ===
+                                SUMMARY_CARD_TABLE_FILTER.TODAY_ORDERS
+                                  ? " is-active"
+                                  : ""
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                className="sneak-peek-card-action"
+                                onClick={() =>
+                                  setSummaryCardTableFilter(
+                                    SUMMARY_CARD_TABLE_FILTER.TODAY_ORDERS
+                                  )
+                                }
+                                aria-pressed={
+                                  summaryCardTableFilter ===
+                                  SUMMARY_CARD_TABLE_FILTER.TODAY_ORDERS
+                                }
+                              >
+                                <h3>Today's Orders</h3>
+                                <p>{formatTwoDigits(todaysOrdersCount)}</p>
+                              </button>
                             </div>
                           </div>
                         </div>
-                        <div className="col-xl-2 col-lg-4 col-md-4 col-sm-12 col-xs-12">
-                          <div className="padding-top-bottom">
-                            <div className="sneak-peek-card order-status today-orders-card">
-                              <h3>Today's Orders</h3>
-                              <p>{formatTwoDigits(todaysOrdersCount)}</p>
+                        {isBankAuthority || isBankOfficer ? (
+                          <>
+                            <div className="col-xl-2 col-lg-4 col-md-4 col-sm-6 col-xs-12">
+                              <div className="padding-top-bottom">
+                                <div className="sneak-peek-card order-status ongoing-orders">
+                                  <h3>Total Orders</h3>
+                                  <p>{formatTwoDigits(orders.length)}</p>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                        <div className="col-xl-8 col-lg-8 col-md-8 col-sm-12 col-xs-12">
-                          <div className="row h-100">
-                            {/* For Bank Authority and Bank Officer users - custom layout */}
-                            {isBankAuthority || isBankOfficer ? (
-                              <>
-                                <div className="col-xl-3 col-lg-3 col-md-3 col-sm-3 col-xs-12">
-                                  <div className="padding-top-bottom">
-                                    <div className="sneak-peek-card order-status ongoing-orders">
-                                      <h3>Total Orders</h3>
-                                      <p>{formatTwoDigits(orders.length)}</p>
-                                    </div>
-                                  </div>
+                            <div className="col-xl-2 col-lg-4 col-md-4 col-sm-6 col-xs-12">
+                              <div className="padding-top-bottom">
+                                <div className="sneak-peek-card order-status re-validate-orders">
+                                  <h3>Ongoing</h3>
+                                  <p>
+                                    {formatTwoDigits(
+                                      orders.filter((order) => {
+                                        const status =
+                                          order.current_status_name?.toLowerCase();
+                                        return (
+                                          status &&
+                                          status !== "submitted" &&
+                                          status !== "completed"
+                                        );
+                                      }).length
+                                    )}
+                                  </p>
                                 </div>
-                                <div className="col-xl-3 col-lg-3 col-md-3 col-sm-3 col-xs-12">
-                                  <div className="padding-top-bottom">
-                                    <div className="sneak-peek-card order-status re-validate-orders">
-                                      <h3>Ongoing</h3>
-                                      <p>
-                                        {formatTwoDigits(
-                                          orders.filter((order) => {
-                                            const status =
-                                              order.current_status_name?.toLowerCase();
-                                            // Count orders that are not "submitted" or "completed"
-                                            return (
-                                              status &&
-                                              status !== "submitted" &&
-                                              status !== "completed"
-                                            );
-                                          }).length
-                                        )}
-                                      </p>
-                                    </div>
-                                  </div>
+                              </div>
+                            </div>
+                            <div className="col-xl-2 col-lg-4 col-md-4 col-sm-6 col-xs-12">
+                              <div className="padding-top-bottom">
+                                <div className="sneak-peek-card order-status submitted-orders">
+                                  <h3>Document Submitted</h3>
+                                  {formatTwoDigits(
+                                    orders.filter(
+                                      (order) => order.current_status_id === 7
+                                    ).length
+                                  )}
                                 </div>
-                                <div className="col-xl-3 col-lg-3 col-md-3 col-sm-3 col-xs-12">
-                                  <div className="padding-top-bottom">
-                                    <div className="sneak-peek-card order-status submitted-orders">
-                                      <h3>Document Submitted</h3>
+                              </div>
+                            </div>
+                            <div className="col-xl-2 col-lg-4 col-md-4 col-sm-6 col-xs-12">
+                              <div className="padding-top-bottom">
+                                <div className="sneak-peek-card order-status validate-orders">
+                                  <h3>Completed</h3>
+                                  <p>-</p>
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="col-xl-2 col-lg-4 col-md-4 col-sm-6 col-xs-12">
+                              <div className="padding-top-bottom">
+                                <div
+                                  className={`sneak-peek-card order-status ongoing-orders sneak-peek-card-clickable${
+                                    summaryCardTableFilter ===
+                                    SUMMARY_CARD_TABLE_FILTER.ORDER_CREATED
+                                      ? " is-active"
+                                      : ""
+                                  }`}
+                                >
+                                  <button
+                                    type="button"
+                                    className="sneak-peek-card-action"
+                                    onClick={() =>
+                                      setSummaryCardTableFilter(
+                                        SUMMARY_CARD_TABLE_FILTER.ORDER_CREATED
+                                      )
+                                    }
+                                    aria-pressed={
+                                      summaryCardTableFilter ===
+                                      SUMMARY_CARD_TABLE_FILTER.ORDER_CREATED
+                                    }
+                                  >
+                                    <h3>Order Created</h3>
+                                    <p>
                                       {formatTwoDigits(
                                         orders.filter(
                                           (order) =>
-                                            order.current_status_id === 7
+                                            order.current_status_id != null &&
+                                            order.current_status_id <= 2
                                         ).length
                                       )}
-                                    </div>
-                                  </div>
+                                    </p>
+                                  </button>
                                 </div>
-                                <div className="col-xl-3 col-lg-3 col-md-3 col-sm-3 col-xs-12">
-                                  <div className="padding-top-bottom">
-                                    <div className="sneak-peek-card order-status validate-orders">
-                                      <h3>Completed</h3>
-                                      <p>-</p>
-                                    </div>
-                                  </div>
+                              </div>
+                            </div>
+                            <div className="col-xl-2 col-lg-4 col-md-4 col-sm-6 col-xs-12">
+                              <div className="padding-top-bottom">
+                                <div
+                                  className={`sneak-peek-card order-status submitted-orders sneak-peek-card-clickable${
+                                    summaryCardTableFilter ===
+                                    SUMMARY_CARD_TABLE_FILTER.PHOTO_PENDING
+                                      ? " is-active"
+                                      : ""
+                                  }`}
+                                >
+                                  <button
+                                    type="button"
+                                    className="sneak-peek-card-action"
+                                    onClick={() =>
+                                      setSummaryCardTableFilter(
+                                        SUMMARY_CARD_TABLE_FILTER.PHOTO_PENDING
+                                      )
+                                    }
+                                    aria-pressed={
+                                      summaryCardTableFilter ===
+                                      SUMMARY_CARD_TABLE_FILTER.PHOTO_PENDING
+                                    }
+                                  >
+                                    <h3>Photo Pending</h3>
+                                    <p>
+                                      {formatTwoDigits(
+                                        orders.filter(
+                                          (order) =>
+                                            [2, 4, 5].includes(
+                                              order.current_status_id
+                                            )
+                                        ).length
+                                      )}
+                                    </p>
+                                  </button>
                                 </div>
-                              </>
-                            ) : (
-                              /* For other users - original layout */
-                              <>
-                                <div className="col-xl-3 col-lg-3 col-md-3 col-sm-3 col-xs-12">
-                                  <div className="padding-top-bottom">
-                                    <div className="sneak-peek-card order-status ongoing-orders">
-                                      <h3>Ongoing</h3>
-                                      <p>
-                                        {formatTwoDigits(
-                                          orders.filter(
-                                            (order) =>
-                                              order.current_status_id < 7
-                                          ).length
-                                        )}
-                                      </p>
-                                    </div>
-                                  </div>
+                              </div>
+                            </div>
+                            <div className="col-xl-2 col-lg-4 col-md-4 col-sm-6 col-xs-12">
+                              <div className="padding-top-bottom">
+                                <div
+                                  className={`sneak-peek-card order-status validate-orders sneak-peek-card-clickable${
+                                    summaryCardTableFilter ===
+                                    SUMMARY_CARD_TABLE_FILTER.DETAILS_PENDING
+                                      ? " is-active"
+                                      : ""
+                                  }`}
+                                >
+                                  <button
+                                    type="button"
+                                    className="sneak-peek-card-action"
+                                    onClick={() =>
+                                      setSummaryCardTableFilter(
+                                        SUMMARY_CARD_TABLE_FILTER.DETAILS_PENDING
+                                      )
+                                    }
+                                    aria-pressed={
+                                      summaryCardTableFilter ===
+                                      SUMMARY_CARD_TABLE_FILTER.DETAILS_PENDING
+                                    }
+                                  >
+                                    <h3>Details Pending</h3>
+                                    <p>
+                                      {formatTwoDigits(
+                                        orders.filter(
+                                          (order) =>
+                                            [7, 8].includes(
+                                              order.current_status_id
+                                            )
+                                        ).length
+                                      )}
+                                    </p>
+                                  </button>
                                 </div>
-                                <div className="col-xl-3 col-lg-3 col-md-3 col-sm-3 col-xs-12">
-                                  <div className="padding-top-bottom">
-                                    <div className="sneak-peek-card order-status submitted-orders">
-                                      <h3>Submitted</h3>
-                                      <p>
-                                        {formatTwoDigits(
-                                          orders.filter(
-                                            (order) =>
-                                              order.current_status_id === 7
-                                          ).length
-                                        )}
-                                      </p>
-                                    </div>
-                                  </div>
+                              </div>
+                            </div>
+                            <div className="col-xl-2 col-lg-4 col-md-4 col-sm-6 col-xs-12">
+                              <div className="padding-top-bottom">
+                                <div
+                                  className={`sneak-peek-card order-status price-pending-orders sneak-peek-card-clickable${
+                                    summaryCardTableFilter ===
+                                    SUMMARY_CARD_TABLE_FILTER.PRICE_PENDING
+                                      ? " is-active"
+                                      : ""
+                                  }`}
+                                >
+                                  <button
+                                    type="button"
+                                    className="sneak-peek-card-action"
+                                    onClick={() =>
+                                      setSummaryCardTableFilter(
+                                        SUMMARY_CARD_TABLE_FILTER.PRICE_PENDING
+                                      )
+                                    }
+                                    aria-pressed={
+                                      summaryCardTableFilter ===
+                                      SUMMARY_CARD_TABLE_FILTER.PRICE_PENDING
+                                    }
+                                  >
+                                    <h3>Price Pending</h3>
+                                    <p>
+                                      {formatTwoDigits(
+                                        orders.filter(
+                                          (order) =>
+                                            order.current_status_id === 10
+                                        ).length
+                                      )}
+                                    </p>
+                                  </button>
                                 </div>
-                                <div className="col-xl-3 col-lg-3 col-md-3 col-sm-3 col-xs-12">
-                                  <div className="padding-top-bottom">
-                                    <div className="sneak-peek-card order-status validate-orders">
-                                      <h3>Validate</h3>
-                                      <p>
-                                        {formatTwoDigits(
-                                          orders.filter(
-                                            (order) =>
-                                              order.current_status_id === 8
-                                          ).length
-                                        )}
-                                      </p>
-                                    </div>
-                                  </div>
+                              </div>
+                            </div>
+                            <div className="col-xl-2 col-lg-4 col-md-4 col-sm-6 col-xs-12">
+                              <div className="padding-top-bottom">
+                                <div
+                                  className={`sneak-peek-card order-status re-validate-orders sneak-peek-card-clickable${
+                                    summaryCardTableFilter ===
+                                    SUMMARY_CARD_TABLE_FILTER.MAIL_PENDING
+                                      ? " is-active"
+                                      : ""
+                                  }`}
+                                >
+                                  <button
+                                    type="button"
+                                    className="sneak-peek-card-action"
+                                    onClick={() =>
+                                      setSummaryCardTableFilter(
+                                        SUMMARY_CARD_TABLE_FILTER.MAIL_PENDING
+                                      )
+                                    }
+                                    aria-pressed={
+                                      summaryCardTableFilter ===
+                                      SUMMARY_CARD_TABLE_FILTER.MAIL_PENDING
+                                    }
+                                  >
+                                    <h3>Mail Pending</h3>
+                                    <p>
+                                      {formatTwoDigits(
+                                        orders.filter(
+                                          (order) =>
+                                            order.current_status_id === 12
+                                        ).length
+                                      )}
+                                    </p>
+                                  </button>
                                 </div>
-                                <div className="col-xl-3 col-lg-3 col-md-3 col-sm-3 col-xs-12">
-                                  <div className="padding-top-bottom">
-                                    <div className="sneak-peek-card order-status re-validate-orders">
-                                      <h3>re-validate</h3>
-                                      <p>
-                                        {formatTwoDigits(
-                                          orders.filter(
-                                            (order) =>
-                                              order.has_rejected_media ===
-                                              true ||
-                                              order.has_rejected_images === true
-                                          ).length
-                                        )}
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        </div>
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </>
                     )}
                   </div>
@@ -2545,6 +2725,10 @@ function Dashboard() {
 
                             // Filter by date if selected
                             const dateMatch = matchesDateFilter(order);
+                            const summaryCardMatch = matchesSummaryCardTableFilter(
+                              order,
+                              summaryCardTableFilter
+                            );
 
                             // Show order only if all filters match (or no filter is selected)
                             return (
@@ -2563,7 +2747,8 @@ function Dashboard() {
                               valuerMatch &&
                               statusMatch &&
                               paymentStatusMatch &&
-                              dateMatch
+                              dateMatch &&
+                              summaryCardMatch
                             );
                           })
                           .map((order) => (

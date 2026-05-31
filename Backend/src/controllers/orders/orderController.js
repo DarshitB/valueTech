@@ -96,7 +96,7 @@ exports.getAll = async (req, res, next) => {
 // Get All Orders that are finalized (status 13) or on hold (status 14) - based on user role
 exports.getAllWithWoStatus = async (req, res, next) => {
   try {
-    const orders = await Order.getAllOrdersWithWoStatus(req.user);
+    const orders = await Order.getAllOrdersWithWoStatus(req.user, req.query);
     res.json(orders);
   } catch (err) {
     next(err);

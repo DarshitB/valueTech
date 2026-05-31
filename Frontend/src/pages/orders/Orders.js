@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import "./order.scss";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -28,6 +28,33 @@ import { Link } from "react-router-dom";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
+const ORDERS_TABLE_ENTRIES_KEY = "customDataTable_entriesPerPage";
+
+const buildOrdersApiDateParams = (
+  selectedDatePreset,
+  selectedDateRange,
+  getDateRangeFromPreset
+) => {
+  if (selectedDatePreset && selectedDatePreset !== "fromTo") {
+    const range = getDateRangeFromPreset(selectedDatePreset);
+    if (range) {
+      return {
+        date_from: range.start.toISOString(),
+        date_to: range.end.toISOString(),
+      };
+    }
+  }
+
+  const params = {};
+  if (selectedDateRange.start) {
+    params.date_from = selectedDateRange.start.toISOString();
+  }
+  if (selectedDateRange.end) {
+    params.date_to = selectedDateRange.end.toISOString();
+  }
+  return params;
+};
+
 function Orders() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -39,7 +66,8 @@ function Orders() {
   const currentUser = useSelector((state) => state.auth.user);
 
   // Redux data
-  const { list: orders, loading } = useSelector((state) => state.orders);
+  const { list: orders, loading, woStatusPagination, woStatusFilterOptions } =
+    useSelector((state) => state.orders);
   const { list: officers } = useSelector((state) => state.officers);
   const { list: users } = useSelector((state) => state.users);
   const { list: allChildCategories } = useSelector(
@@ -49,13 +77,9 @@ function Orders() {
 
   // console.log("officers", officers);
   /*   console.log("orders", orders); */
-  // Fetch everything on mount - always fetch WO status orders (status 13 and 14) when component mounts
-  // This ensures we get the correct data even if Dashboard's orders are in the store
-  useEffect(() => {
-    // Always fetch WO status orders when Orders component mounts
-    dispatch(fetchOrdersWithWoStatus());
 
-    // Only fetch other data if not already loaded
+  // Fetch supporting data on mount (orders list uses paginated API below)
+  useEffect(() => {
     if (!officers || officers.length === 0) {
       dispatch(fetchOfficers());
     }
@@ -229,98 +253,154 @@ function Orders() {
     };
   });
 
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [ordersLimit, setOrdersLimit] = useState(() => {
+    const saved = localStorage.getItem(ORDERS_TABLE_ENTRIES_KEY);
+    return saved ? parseInt(saved, 10) : 10;
+  });
+  const [ordersSearch, setOrdersSearch] = useState("");
+  const [debouncedOrdersSearch, setDebouncedOrdersSearch] = useState("");
+  const prevOrdersFilterSignatureRef = useRef("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedOrdersSearch(ordersSearch.trim());
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [ordersSearch]);
+
   // Get distinct filter values from orders
   const distinctBanks = useMemo(() => {
+    if (woStatusFilterOptions?.banks?.length) {
+      return woStatusFilterOptions.banks;
+    }
     const banks = orders
       .map((order) => order.bank_name)
       .filter((name) => name && name.trim() !== "");
     return [...new Set(banks)].sort();
-  }, [orders]);
+  }, [woStatusFilterOptions, orders]);
 
   const distinctBranches = useMemo(() => {
+    if (woStatusFilterOptions?.branches?.length) {
+      return woStatusFilterOptions.branches;
+    }
     const branches = orders
       .map((order) => order.branch_name)
       .filter((name) => name && name.trim() !== "");
     return [...new Set(branches)].sort();
-  }, [orders]);
+  }, [woStatusFilterOptions, orders]);
 
   const distinctOfficers = useMemo(() => {
-    const officers = orders
+    if (woStatusFilterOptions?.officers?.length) {
+      return woStatusFilterOptions.officers;
+    }
+    const officerNames = orders
       .map((order) => order.officer_name)
       .filter((name) => name && name.trim() !== "");
-    return [...new Set(officers)].sort();
-  }, [orders]);
+    return [...new Set(officerNames)].sort();
+  }, [woStatusFilterOptions, orders]);
 
   const distinctManagers = useMemo(() => {
-    const managers = orders
+    if (woStatusFilterOptions?.managers?.length) {
+      return woStatusFilterOptions.managers;
+    }
+    const managersList = orders
       .map((order) => order.manager_name)
       .filter((name) => name && name.trim() !== "");
-    return [...new Set(managers)].sort();
-  }, [orders]);
+    return [...new Set(managersList)].sort();
+  }, [woStatusFilterOptions, orders]);
 
   const distinctFieldVerifiers = useMemo(() => {
-    const fieldVerifiers = orders
+    if (woStatusFilterOptions?.fieldVerifiers?.length) {
+      return woStatusFilterOptions.fieldVerifiers;
+    }
+    const verifierNames = orders
       .map((order) => order.field_verifier_name)
       .filter((name) => name && name.trim() !== "");
-    return [...new Set(fieldVerifiers)].sort();
-  }, [orders]);
+    return [...new Set(verifierNames)].sort();
+  }, [woStatusFilterOptions, orders]);
 
   const distinctValuerNames = useMemo(() => {
+    if (woStatusFilterOptions?.valuerNames?.length) {
+      return woStatusFilterOptions.valuerNames;
+    }
     const valuerNames = orders
       .map((order) => order.valuer_name)
       .filter((name) => name && name.trim() !== "");
     return [...new Set(valuerNames)].sort();
-  }, [orders]);
+  }, [woStatusFilterOptions, orders]);
 
   const distinctOrderStatuses = useMemo(() => {
+    if (woStatusFilterOptions?.orderStatuses?.length) {
+      return woStatusFilterOptions.orderStatuses;
+    }
     const statuses = orders
       .map((order) => order.current_status_name)
       .filter((name) => name && name.trim() !== "");
     return [...new Set(statuses)].sort();
-  }, [orders]);
+  }, [woStatusFilterOptions, orders]);
 
   const distinctPaymentStatuses = useMemo(() => {
+    if (woStatusFilterOptions?.paymentStatuses?.length) {
+      return woStatusFilterOptions.paymentStatuses;
+    }
     const paymentStatuses = orders
       .map((order) => order.payment_status)
       .filter((status) => status && status.trim() !== "");
     return [...new Set(paymentStatuses)].sort();
-  }, [orders]);
+  }, [woStatusFilterOptions, orders]);
 
   const distinctCategories = useMemo(() => {
+    if (woStatusFilterOptions?.categories?.length) {
+      return woStatusFilterOptions.categories;
+    }
     const categories = orders
       .map((order) => order.category_name)
       .filter((name) => name && name.trim() !== "");
     return [...new Set(categories)].sort();
-  }, [orders]);
+  }, [woStatusFilterOptions, orders]);
 
   const distinctAssetCategories = useMemo(() => {
+    if (woStatusFilterOptions?.assetCategories?.length) {
+      return woStatusFilterOptions.assetCategories;
+    }
     const assetCategories = orders
       .map((order) => order.sub_category_name)
       .filter((name) => name && name.trim() !== "");
     return [...new Set(assetCategories)].sort();
-  }, [orders]);
+  }, [woStatusFilterOptions, orders]);
 
   const distinctSubCategories = useMemo(() => {
+    if (woStatusFilterOptions?.subCategories?.length) {
+      return woStatusFilterOptions.subCategories;
+    }
     const subCategories = orders
       .map((order) => order.child_category_name)
       .filter((name) => name && name.trim() !== "");
     return [...new Set(subCategories)].sort();
-  }, [orders]);
+  }, [woStatusFilterOptions, orders]);
 
   const distinctCreatedBy = useMemo(() => {
+    if (woStatusFilterOptions?.createdBy?.length) {
+      return woStatusFilterOptions.createdBy;
+    }
     const createdByValues = orders
       .map((order) => order.created_by)
       .filter((name) => name && name.trim() !== "");
     return [...new Set(createdByValues)].sort();
-  }, [orders]);
+  }, [woStatusFilterOptions, orders]);
 
   const distinctUserAssigned = useMemo(() => {
+    if (woStatusFilterOptions?.userAssigned?.length) {
+      return woStatusFilterOptions.userAssigned;
+    }
     const assignedUserNames = orders
       .flatMap((order) => order.assigned_users || [])
       .map((user) => user.name)
       .filter((name) => name && name.trim() !== "");
     return [...new Set(assignedUserNames)].sort();
-  }, [orders]);
+  }, [woStatusFilterOptions, orders]);
 
   // Check if current user is TELECALLER (case-insensitive) - matches any role containing "TELECALLER"
   const isTelecaller = currentUser?.role.name
@@ -654,9 +734,14 @@ function Orders() {
     setConfirmDeleteName(name);
   };
 
-  const handleConfirmDelete = () => {
-    dispatch(removeOrder(confirmDeleteId));
-    setConfirmDeleteId(null);
+  const handleConfirmDelete = async () => {
+    try {
+      await dispatch(removeOrder(confirmDeleteId)).unwrap();
+      setConfirmDeleteId(null);
+      refetchOrdersList(ordersPage, ordersLimit);
+    } catch (_) {
+      /* error toasted in reducer */
+    }
   };
 
   // Open Order Attributes Modal
@@ -751,6 +836,7 @@ function Orders() {
         valuer_name: "",
         admin_user_ids: [],
       });
+      refetchOrdersList(ordersPage, ordersLimit);
     } catch (err) {
       toast.error(
         typeof err === "string" ? err : "Failed to update attributes"
@@ -823,59 +909,6 @@ function Orders() {
       default:
         return null;
     }
-  };
-
-  // Check if order date matches filter
-  const matchesDateFilter = (order) => {
-    if (
-      !selectedDatePreset &&
-      !selectedDateRange.start &&
-      !selectedDateRange.end
-    ) {
-      return true;
-    }
-
-    if (!order.created_at) return false;
-
-    const orderDate = new Date(order.created_at);
-    orderDate.setHours(0, 0, 0, 0);
-
-    // Check preset first (but not "fromTo" which uses date range)
-    if (selectedDatePreset && selectedDatePreset !== "fromTo") {
-      const range = getDateRangeFromPreset(selectedDatePreset);
-      if (range) {
-        return orderDate >= range.start && orderDate <= range.end;
-      }
-    }
-
-    // Check date range (for "fromTo" preset or manual date range)
-    if (
-      selectedDatePreset === "fromTo" ||
-      selectedDateRange.start ||
-      selectedDateRange.end
-    ) {
-      const startDate = selectedDateRange.start
-        ? new Date(selectedDateRange.start)
-        : null;
-      const endDate = selectedDateRange.end
-        ? new Date(selectedDateRange.end)
-        : null;
-
-      if (startDate) startDate.setHours(0, 0, 0, 0);
-      if (endDate) {
-        endDate.setHours(23, 59, 59, 999);
-      }
-
-      if (startDate && endDate) {
-        return orderDate >= startDate && orderDate <= endDate;
-      } else if (startDate) {
-        return orderDate >= startDate;
-      } else if (endDate) {
-        return orderDate <= endDate;
-      }
-    }
-
-    return true;
   };
 
   const monthNames = [
@@ -954,125 +987,170 @@ function Orders() {
     </div>
   );
 
-  // Memoize filtered orders to avoid recalculating on every render
-  const filteredOrders = useMemo(() => {
-    if (!orders || orders.length === 0) return [];
+  const ordersFilterSignature = useMemo(
+    () =>
+      JSON.stringify({
+        selectedOrderType,
+        selectedPriority,
+        selectedBank,
+        selectedBranch,
+        selectedOfficer,
+        selectedManager,
+        selectedFieldVerifier,
+        selectedValuerName,
+        selectedOrderStatus,
+        selectedPaymentStatus,
+        selectedCategory,
+        selectedAssetCategory,
+        selectedSubCategory,
+        selectedCreatedBy,
+        selectedUserAssigned,
+        selectedDatePreset,
+        selectedDateRangeStart: selectedDateRange.start
+          ? selectedDateRange.start.toISOString()
+          : "",
+        selectedDateRangeEnd: selectedDateRange.end
+          ? selectedDateRange.end.toISOString()
+          : "",
+        debouncedOrdersSearch,
+      }),
+    [
+      selectedOrderType,
+      selectedPriority,
+      selectedBank,
+      selectedBranch,
+      selectedOfficer,
+      selectedManager,
+      selectedFieldVerifier,
+      selectedValuerName,
+      selectedOrderStatus,
+      selectedPaymentStatus,
+      selectedCategory,
+      selectedAssetCategory,
+      selectedSubCategory,
+      selectedCreatedBy,
+      selectedUserAssigned,
+      selectedDatePreset,
+      selectedDateRange,
+      debouncedOrdersSearch,
+    ]
+  );
 
-    return orders.filter((order) => {
-      // Filter by order type if selected
-      const typeMatch =
-        !selectedOrderType || order.order_type === selectedOrderType;
+  const buildOrdersListQueryParams = useCallback(
+    (page, limit, includeFilterOptions = false) => {
+      const params = { page, limit };
 
-      // Filter by priority if selected
-      const priorityMatch =
-        !selectedPriority || order.order_priority === selectedPriority;
+      if (includeFilterOptions) {
+        params.include_filter_options = "1";
+      }
+      if (selectedOrderType) params.order_type = selectedOrderType;
+      if (selectedPriority) params.order_priority = selectedPriority;
+      if (selectedBank) params.bank_name = selectedBank;
+      if (selectedBranch) params.branch_name = selectedBranch;
+      if (selectedOfficer) params.officer_name = selectedOfficer;
+      if (selectedManager) params.manager_name = selectedManager;
+      if (selectedFieldVerifier) {
+        params.field_verifier_name = selectedFieldVerifier;
+      }
+      if (selectedValuerName) params.valuer_name = selectedValuerName;
+      if (selectedOrderStatus) {
+        params.current_status_name = selectedOrderStatus;
+      }
+      if (selectedPaymentStatus) params.payment_status = selectedPaymentStatus;
+      if (selectedCategory) params.category_name = selectedCategory;
+      if (selectedAssetCategory) params.sub_category_name = selectedAssetCategory;
+      if (selectedSubCategory) params.child_category_name = selectedSubCategory;
+      if (selectedCreatedBy) params.created_by = selectedCreatedBy;
+      if (selectedUserAssigned) params.user_assigned = selectedUserAssigned;
 
-      // Filter by bank if selected
-      const bankMatch = !selectedBank || order.bank_name === selectedBank;
-
-      // Filter by branch if selected
-      const branchMatch =
-        !selectedBranch || order.branch_name === selectedBranch;
-
-      // Filter by officer if selected
-      const officerMatch =
-        !selectedOfficer || order.officer_name === selectedOfficer;
-
-      // Filter by manager if selected
-      const managerMatch =
-        !selectedManager || order.manager_name === selectedManager;
-
-      // Filter by field verifier if selected
-      const fieldVerifierMatch =
-        !selectedFieldVerifier ||
-        order.field_verifier_name === selectedFieldVerifier;
-
-      // Filter by valuer name if selected
-      const valuerMatch =
-        !selectedValuerName || order.valuer_name === selectedValuerName;
-
-      // Filter by order status if selected
-      const statusMatch =
-        !selectedOrderStatus ||
-        order.current_status_name === selectedOrderStatus;
-
-      // Filter by payment status if selected
-      const paymentStatusMatch =
-        !selectedPaymentStatus ||
-        order.payment_status === selectedPaymentStatus;
-
-      // Filter by category if selected
-      const categoryMatch =
-        !selectedCategory || order.category_name === selectedCategory;
-
-      // Filter by asset category if selected
-      const assetCategoryMatch =
-        !selectedAssetCategory ||
-        order.sub_category_name === selectedAssetCategory;
-
-      // Filter by sub category if selected
-      const subCategoryMatch =
-        !selectedSubCategory ||
-        order.child_category_name === selectedSubCategory;
-
-      // Filter by created by if selected
-      const createdByMatch =
-        !selectedCreatedBy || order.created_by === selectedCreatedBy;
-
-      // Filter by user assigned if selected
-      const userAssignedMatch =
-        !selectedUserAssigned ||
-        (order.assigned_users &&
-          order.assigned_users.some((user) => user.name === selectedUserAssigned));
-
-      // Filter by date if selected
-      const dateMatch = matchesDateFilter(order);
-
-      // Show order only if all filters match (or no filter is selected)
-      return (
-        typeMatch &&
-        priorityMatch &&
-        categoryMatch &&
-        assetCategoryMatch &&
-        subCategoryMatch &&
-        createdByMatch &&
-        userAssignedMatch &&
-        bankMatch &&
-        branchMatch &&
-        officerMatch &&
-        managerMatch &&
-        fieldVerifierMatch &&
-        valuerMatch &&
-        statusMatch &&
-        paymentStatusMatch &&
-        dateMatch
+      Object.assign(
+        params,
+        buildOrdersApiDateParams(
+          selectedDatePreset,
+          selectedDateRange,
+          getDateRangeFromPreset
+        )
       );
-    });
-  }, [
-    orders,
-    selectedOrderType,
-    selectedPriority,
-    selectedBank,
-    selectedBranch,
-    selectedOfficer,
-    selectedManager,
-    selectedFieldVerifier,
-    selectedValuerName,
-    selectedOrderStatus,
-    selectedPaymentStatus,
-    selectedCategory,
-    selectedAssetCategory,
-    selectedSubCategory,
-    selectedCreatedBy,
-    selectedUserAssigned,
-    selectedDatePreset,
-    selectedDateRange,
-  ]);
 
-  // Memoize reversed orders (only reverse after filtering)
-  const reversedFilteredOrders = useMemo(() => {
-    return [...filteredOrders].reverse();
-  }, [filteredOrders]);
+      if (debouncedOrdersSearch) {
+        params.search = debouncedOrdersSearch;
+      }
+
+      return params;
+    },
+    [
+      selectedOrderType,
+      selectedPriority,
+      selectedBank,
+      selectedBranch,
+      selectedOfficer,
+      selectedManager,
+      selectedFieldVerifier,
+      selectedValuerName,
+      selectedOrderStatus,
+      selectedPaymentStatus,
+      selectedCategory,
+      selectedAssetCategory,
+      selectedSubCategory,
+      selectedCreatedBy,
+      selectedUserAssigned,
+      selectedDatePreset,
+      selectedDateRange,
+      debouncedOrdersSearch,
+    ]
+  );
+
+  const refetchOrdersList = useCallback(
+    (page = ordersPage, limit = ordersLimit) => {
+      dispatch(
+        fetchOrdersWithWoStatus(
+          buildOrdersListQueryParams(
+            page,
+            limit,
+            !woStatusFilterOptions && page === 1
+          )
+        )
+      );
+    },
+    [
+      dispatch,
+      ordersPage,
+      ordersLimit,
+      buildOrdersListQueryParams,
+      woStatusFilterOptions,
+    ]
+  );
+
+  useEffect(() => {
+    if (prevOrdersFilterSignatureRef.current !== ordersFilterSignature) {
+      prevOrdersFilterSignatureRef.current = ordersFilterSignature;
+      if (ordersPage !== 1) {
+        setOrdersPage(1);
+        return;
+      }
+    }
+
+    refetchOrdersList(ordersPage, ordersLimit);
+  }, [ordersFilterSignature, ordersPage, ordersLimit, refetchOrdersList]);
+
+  const handleOrdersPageChange = useCallback((nextPage) => {
+    setOrdersPage(nextPage);
+  }, []);
+
+  const handleOrdersLimitChange = useCallback((nextLimit) => {
+    localStorage.setItem(ORDERS_TABLE_ENTRIES_KEY, String(nextLimit));
+    setOrdersLimit(nextLimit);
+    setOrdersPage(1);
+  }, []);
+
+  const handleOrdersSearchChange = useCallback((value) => {
+    setOrdersSearch(value);
+  }, []);
+
+  const tableOrders = useMemo(() => orders || [], [orders]);
+
+  // Only replace table with full-page loader on first load; keep table mounted during search/filter/page refetch so search input keeps focus
+  const isInitialOrdersLoad = loading && !woStatusPagination;
 
   // Check if any filter is set
   const hasActiveFilters = useMemo(() => {
@@ -1627,7 +1705,7 @@ function Orders() {
       )}
 
       {/* Table Container */}
-      {loading ? (
+      {isInitialOrdersLoad ? (
         <p>Loading...</p>
       ) : (
         <div
@@ -1638,7 +1716,21 @@ function Orders() {
             flexDirection: "column",
           }}
         >
-          <CustomDataTable>
+          <CustomDataTable
+            serverPagination={
+              woStatusPagination
+                ? {
+                    page: woStatusPagination.page,
+                    limit: woStatusPagination.limit,
+                    total: woStatusPagination.total,
+                    onPageChange: handleOrdersPageChange,
+                    onLimitChange: handleOrdersLimitChange,
+                    search: ordersSearch,
+                    onSearchChange: handleOrdersSearchChange,
+                  }
+                : null
+            }
+          >
             {{
               buttons: (
                 <div
@@ -1749,7 +1841,7 @@ function Orders() {
                     )}
                 </tr>
               ),
-              rows: reversedFilteredOrders.map((order) => (
+              rows: tableOrders.map((order) => (
                 <tr
                   key={order.id}
                   className={
