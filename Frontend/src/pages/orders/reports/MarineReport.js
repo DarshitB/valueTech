@@ -433,7 +433,7 @@ function MarineReport() {
       branch_name: "",
       state_name: "MUM",
       state_initial: "MUM",
-      imo_or_regd_type: "IMO NO.",
+      imo_or_regd_type: "",
       imo_official_regd_no: "IMO No",
       execute_above: "Desktop Valuation",
       model_number: "",
@@ -514,7 +514,7 @@ function MarineReport() {
           report_title_type: prev.report_title_type || "VALUATION REPORT",
           report_title: prev.report_title || "Offshore Supply Vessel",
           state_initial: prev.state_initial || "MUM",
-          imo_or_regd_type: prev.imo_or_regd_type || "IMO NO.",
+          imo_or_regd_type: prev.imo_or_regd_type || "",
           imo_official_regd_no: prev.imo_official_regd_no || "IMO No",
           // Preserve execute_above default if not already set
           execute_above: prev.execute_above || "Desktop Valuation",
@@ -622,11 +622,6 @@ function MarineReport() {
       // Ensure state_initial has a default value if missing
       if (!updated.state_initial) {
         updated.state_initial = "MUM";
-      }
-
-      // Ensure imo_or_regd_type has a default value if missing
-      if (!updated.imo_or_regd_type) {
-        updated.imo_or_regd_type = "IMO NO.";
       }
 
       // Ensure imo_official_regd_no has a default value if missing
@@ -1926,9 +1921,6 @@ function MarineReport() {
     if (!reportFormData.state_initial) {
       formData.set("state_initial", "MUM");
     }
-    if (!reportFormData.imo_or_regd_type) {
-      formData.set("imo_or_regd_type", "IMO NO.");
-    }
     if (!reportFormData.imo_official_regd_no) {
       formData.set("imo_official_regd_no", "IMO No");
     }
@@ -2134,9 +2126,6 @@ function MarineReport() {
     }
     if (!reportFormData.state_initial) {
       formData.set("state_initial", "MUM");
-    }
-    if (!reportFormData.imo_or_regd_type) {
-      formData.set("imo_or_regd_type", "IMO NO.");
     }
     if (!reportFormData.imo_official_regd_no) {
       formData.set("imo_official_regd_no", "IMO No");
@@ -2544,9 +2533,7 @@ function MarineReport() {
                 </div>
                 <div className="col-md-6">
                   <div className="form-group">
-                    <label>
-                      Official No <span className="text-danger">*</span>
-                    </label>
+                    <label>Official No</label>
                     <input
                       type="text"
                       className="form-field"
@@ -2554,33 +2541,28 @@ function MarineReport() {
                       value={reportFormData.official_no}
                       onChange={handleFormChange}
                       placeholder="Enter Official No"
-                      required
                     />
                   </div>
                 </div>
                 <div className="col-md-6">
                   <div className="form-group">
-                    <label>
-                      IMO or Regd type <span className="text-danger">*</span>
-                    </label>
+                    <label>IMO or Regd type</label>
                     <SingleSearchSelect
                       options={[
+                        { value: "", label: "Select type" },
                         { value: "IMO NO.", label: "IMO NO." },
                         { value: "REGD. NO.", label: "REGD. NO." },
                       ]}
-                      value={reportFormData.imo_or_regd_type || "IMO NO."}
+                      value={reportFormData.imo_or_regd_type || ""}
                       onChange={(value) =>
                         handleSelectChange("imo_or_regd_type", value)
                       }
-                      required
                     />
                   </div>
                 </div>
                 <div className="col-md-6">
                   <div className="form-group">
-                    <label>
-                      IMO or Regd No <span className="text-danger">*</span>
-                    </label>
+                    <label>IMO or Regd No</label>
                     <input
                       type="text"
                       className="form-field"
@@ -2588,7 +2570,6 @@ function MarineReport() {
                       value={reportFormData.imo_or_regd_no}
                       onChange={handleFormChange}
                       placeholder="132132"
-                      required
                     />
                   </div>
                 </div>

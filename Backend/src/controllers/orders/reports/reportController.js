@@ -1084,7 +1084,7 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
 
       if (name === "V.K. ASSOCIATES") {
         bgImageFileName = "marine-vka.webp"; // Marine letterhead for VKA
-        stampPngFile = "marine-vs-stamp.png";
+        stampPngFile = "vka.png";
       } else if (name === "VALUETECH SOLUTIONS") {
         bgImageFileName = "marine-vs.webp"; // Marine letterhead for VTS
         stampPngFile = "marine-vs-stamp.png";

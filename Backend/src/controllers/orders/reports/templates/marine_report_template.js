@@ -34,6 +34,9 @@ function generateMarineReportHTML(
   // Helper function to get value safely
   const getValue = (field) => field || "";
 
+  const isVkaValuer =
+    String(formData.valuer_name || "").trim().toUpperCase() === "V.K. ASSOCIATES";
+
   // Helper function to convert number to word (e.g., 1 -> ONE, 2 -> TWO)
   const numberToWord = (num) => {
     const ones = [
@@ -362,6 +365,22 @@ function generateMarineReportHTML(
             width: 100%;
             height: 100%;
             object-fit: contain;
+        }
+
+        /* V.K. ASSOCIATES only — larger stamp (other valuers unchanged) */
+        body.valuer-vka .first-page .stamp-overlay {
+            width: 240px;
+            height: 240px;
+        }
+
+        body.valuer-vka .subsequent-page .stamp-overlay {
+            width: 165px;
+            height: 165px;
+        }
+
+        body.valuer-vka .last-page-declaration .stamp-signature .left-stamp {
+            width: 200px;
+            height: 200px;
         }
 
         /* Last page declaration section */
@@ -846,7 +865,7 @@ function generateMarineReportHTML(
         ` : ''}
     </style>
 </head>
-<body>
+<body${isVkaValuer ? ' class="valuer-vka"' : ""}>
     ${reportTypeSelection === "Rough" ? '<div class="watermark">Rough</div>' : ''}
     <!-- ============================================
          INSTRUCTIONS FOR HTML CONTENT:
@@ -898,12 +917,20 @@ function generateMarineReportHTML(
                         "<b>
                             ${getValue(formData.name_of_the_vessel)}
                         </b>"
-                        <br>
-                        "Official No. "<b>${getValue(formData.official_no)}</b>"
-                        <br>
-                        ${getValue(formData.imo_or_regd_type)} "<b>${getValue(
-    formData.imo_or_regd_no
-  )}</b>"
+                        ${
+                          getValue(formData.official_no)
+                            ? `<br>
+                        "Official No. "<b>${getValue(formData.official_no)}</b>`
+                            : ""
+                        }
+                        ${
+                          getValue(formData.imo_or_regd_no)
+                            ? `<br>
+                        ${
+                          getValue(formData.imo_or_regd_type) || "IMO/Regd No."
+                        } "<b>${getValue(formData.imo_or_regd_no)}</b>"`
+                            : ""
+                        }
                     </p>
                     <div style="width: 100%;height: 350px; max-height: 350px;margin-bottom: 20px;">
                         ${
@@ -933,13 +960,13 @@ function generateMarineReportHTML(
                     const lower = raw.toLowerCase();
                     const letter =
                       lower === "desktop valuation"
-                        ? `To execute above desktop valuation by marine valuer Valuetech Solutions (Viraj Kothari) with Licence No. CAT-VII-A-6019, CAT-XIII-A-6020 has been taken the task of desktop valuation for Marine Vessel - ${getValue(formData.name_of_the_vessel)} on the basis of desktop assessment, class certification, engine overhauling report & status survey report provided by client shared in soft copy. Also completed the study of entire vessel documents that was previously located ${getValue(formData.inspection_location_front_page)}, on ${getValue(formData.inspection_date_front_page)} information received from client. Above report has been furnished under his guidance & expertise only, kindly note that above valuation consists of their attestation as per international valuation standard. Above report has sign & stamp as required in the format.`
+                        ? `To execute above desktop valuation by marine valuer ${getValue(formData.valuer_name)} (Viraj Kothari) with Licence No. ${getValue(formData.license_no)} has been taken the task of desktop valuation for Marine Vessel - ${getValue(formData.name_of_the_vessel)} on the basis of desktop assessment, class certification, engine overhauling report & status survey report provided by client shared in soft copy. Also completed the study of entire vessel documents that was previously located ${getValue(formData.inspection_location_front_page)}, on ${getValue(formData.inspection_date_front_page)} information received from client. Above report has been furnished under his guidance & expertise only, kindly note that above valuation consists of their attestation as per international valuation standard. Above report has sign & stamp as required in the format.`
                         : lower === "physical survey & inspection"
-                        ? `To execute above physical survey & inspection valuation by valuer Valuetech Solutions (Viraj Kothari with Licence No. CAT-VII-A-6019, CAT-XIII-A-6020 has been taken the task of survey & inspection valuation for Marine Vessel - ${getValue(formData.name_of_the_vessel)} on the basis of physical survey & inspection, class reports, certification, engine overhauling report, status survey report provided by client and information shared in soft copy. Also completed the study of entire vessel located at ${getValue(formData.inspection_location_front_page)}, on ${getValue(formData.inspection_date_front_page)}. Above report has been furnished under his guidance & his expertise only, which kindly note that above valuation also consist their attestation as per international valuation standard. Above report has sign & stamp as required in the format.`
+                        ? `To execute above physical survey & inspection valuation by valuer ${getValue(formData.valuer_name)} (Viraj Kothari with Licence No. ${getValue(formData.license_no)} has been taken the task of survey & inspection valuation for Marine Vessel - ${getValue(formData.name_of_the_vessel)} on the basis of physical survey & inspection, class reports, certification, engine overhauling report, status survey report provided by client and information shared in soft copy. Also completed the study of entire vessel located at ${getValue(formData.inspection_location_front_page)}, on ${getValue(formData.inspection_date_front_page)}. Above report has been furnished under his guidance & his expertise only, which kindly note that above valuation also consist their attestation as per international valuation standard. Above report has sign & stamp as required in the format.`
                         : lower === "condition valuation"
-                        ? `To execute above condition valuation by valuer Valuetech Solutions (Viraj Kothari with Licence No. CAT-VII-A-6019, CAT-XIII-A-6020 has been taken the task of survey & inspection condition valuation for Marine Vessel - ${getValue(formData.name_of_the_vessel)} on the basis of physical survey & inspection, class reports, certification, engine overhauling report, status survey report provided by client and information shared in soft copy. Also completed the study of entire vessel located at ${getValue(formData.inspection_location_front_page)}, on ${getValue(formData.inspection_date_front_page)}. Above report has been furnished under his guidance & his expertise only, which kindly note that above conditional valuation also consist their attestation as per international valuation standard. Above report has sign & stamp as required in the format.`
+                        ? `To execute above condition valuation by valuer ${getValue(formData.valuer_name)} (Viraj Kothari with Licence No. ${getValue(formData.license_no)} has been taken the task of survey & inspection condition valuation for Marine Vessel - ${getValue(formData.name_of_the_vessel)} on the basis of physical survey & inspection, class reports, certification, engine overhauling report, status survey report provided by client and information shared in soft copy. Also completed the study of entire vessel located at ${getValue(formData.inspection_location_front_page)}, on ${getValue(formData.inspection_date_front_page)}. Above report has been furnished under his guidance & his expertise only, which kindly note that above conditional valuation also consist their attestation as per international valuation standard. Above report has sign & stamp as required in the format.`
                         : lower === "marine vessel verification (avr)"
-                        ? `To execute above marine asset verification by valuer Valuetech Solutions (Viraj Kothari with Licence No. CAT-VII-A-6019, CAT-XIII-A-6020 has been taken the task of survey & inspection asset verification for Marine Vessel - ${getValue(formData.name_of_the_vessel)} on the basis of physical survey & inspection, class reports, certification, engine overhauling report, status survey report provided by client and information shared in soft copy. Also completed the study of entire vessel located at ${getValue(formData.inspection_location_front_page)}, on ${getValue(formData.inspection_date_front_page)}. Above report has been furnished under his guidance & his expertise only, which kindly note that above conditional valuation also consist their attestation as per international valuation standard. Above report has sign & stamp as required in the format.`
+                        ? `To execute above marine asset verification by valuer ${getValue(formData.valuer_name)} (Viraj Kothari with Licence No. ${getValue(formData.license_no)} has been taken the task of survey & inspection asset verification for Marine Vessel - ${getValue(formData.name_of_the_vessel)} on the basis of physical survey & inspection, class reports, certification, engine overhauling report, status survey report provided by client and information shared in soft copy. Also completed the study of entire vessel located at ${getValue(formData.inspection_location_front_page)}, on ${getValue(formData.inspection_date_front_page)}. Above report has been furnished under his guidance & his expertise only, which kindly note that above conditional valuation also consist their attestation as per international valuation standard. Above report has sign & stamp as required in the format.`
                         : "";                    
                     return `
                     <p style="font-size: 13px;line-height: 1.2;text-align: center;margin-bottom: 0;margin-top: 0;">
@@ -964,22 +991,28 @@ function generateMarineReportHTML(
                    formData.purpose_of_valuation
                  )} OF
                 ${getValue(formData.type_or_description_of_vessel)} 
-                "${getValue(formData.name_of_the_vessel)}", OFFICIAL NO. : 
-                ${getValue(formData.official_no)}</h4>
+                "${getValue(formData.name_of_the_vessel)}"${
+                  getValue(formData.official_no)
+                    ? `, OFFICIAL NO. : ${getValue(formData.official_no)}`
+                    : ""
+                }</h4>
 
                 ${
                   (() => {
                     const raw = (getValue(formData.execute_above) || "").trim();
                     const lower = raw.toLowerCase();
+                    const officialNoText = getValue(formData.official_no)
+                      ? ` Official No.: ${getValue(formData.official_no)},`
+                      : ",";
                     const letter =
                       lower === "desktop valuation"
-                        ? `This is to certify that we, the undersigned surveyors did desktop valuation through desktop assessment through documents study, at the request of ${getValue(formData.client_name_with_full_address)}., for the “${getValue(formData.name_of_the_vessel)}” Official No.: ${getValue(formData.official_no)}, whilst she was previously in deep water at ${getValue(formData.inspection_location_front_page)} during day light hours for the purpose of desktop assessment to ascertain her estimated assumption Condition and determine desktop valuation for financial purpose / financial usage, to be hypothecated from ${getValue(formData.bank_name)}${formData.branch_name ? ", " + formData.branch_name : ""}${formData.state_name ? ", " + formData.state_name : ""}.`
+                        ? `This is to certify that we, the undersigned surveyors did desktop valuation through desktop assessment through documents study, at the request of ${getValue(formData.client_name_with_full_address)}., for the “${getValue(formData.name_of_the_vessel)}”${officialNoText} whilst she was previously in deep water at ${getValue(formData.inspection_location_front_page)} during day light hours for the purpose of desktop assessment to ascertain her estimated assumption Condition and determine desktop valuation for financial purpose / financial usage, to be hypothecated from ${getValue(formData.bank_name)}${formData.branch_name ? ", " + formData.branch_name : ""}${formData.state_name ? ", " + formData.state_name : ""}.`
                         : lower === "physical survey & inspection"
-                        ? `This is to certify that we, the undersigned surveyors did survey & inspection valuation through physical survey & inspection as well as documents study, at the request of ${getValue(formData.client_name_with_full_address)}, for the “${getValue(formData.name_of_the_vessel)}” Official No.: ${getValue(formData.official_no)}, whilst she is currently in deep water at ${getValue(formData.inspection_location_front_page)} during day light hours for the purpose of affecting a general inspection to ascertain her present Physical Condition and determine valuation for financial purpose / financial usage, to be hypothecate from ${getValue(formData.bank_name)}${formData.branch_name ? ", " + formData.branch_name : ""}${formData.state_name ? ", " + formData.state_name : ""}.`
+                        ? `This is to certify that we, the undersigned surveyors did survey & inspection valuation through physical survey & inspection as well as documents study, at the request of ${getValue(formData.client_name_with_full_address)}, for the “${getValue(formData.name_of_the_vessel)}”${officialNoText} whilst she is currently in deep water at ${getValue(formData.inspection_location_front_page)} during day light hours for the purpose of affecting a general inspection to ascertain her present Physical Condition and determine valuation for financial purpose / financial usage, to be hypothecate from ${getValue(formData.bank_name)}${formData.branch_name ? ", " + formData.branch_name : ""}${formData.state_name ? ", " + formData.state_name : ""}.`
                         : lower === "condition valuation"
-                        ? `This is to certify that we, the undersigned surveyors did condition valuation through physical survey & inspection as well as documents study, at the request of ${getValue(formData.client_name_with_full_address)}., for the “${getValue(formData.name_of_the_vessel)}” Official No.: ${getValue(formData.official_no)}, whilst she is currently in deep water at ${getValue(formData.inspection_location_front_page)} during day light hours for the purpose of affecting a general inspection to ascertain her present Physical Condition and determine valuation for financial purpose / financial usage, to be hypothecate from ${getValue(formData.bank_name)}${formData.branch_name ? ", " + formData.branch_name : ""}${formData.state_name ? ", " + formData.state_name : ""}.`
+                        ? `This is to certify that we, the undersigned surveyors did condition valuation through physical survey & inspection as well as documents study, at the request of ${getValue(formData.client_name_with_full_address)}., for the “${getValue(formData.name_of_the_vessel)}”${officialNoText} whilst she is currently in deep water at ${getValue(formData.inspection_location_front_page)} during day light hours for the purpose of affecting a general inspection to ascertain her present Physical Condition and determine valuation for financial purpose / financial usage, to be hypothecate from ${getValue(formData.bank_name)}${formData.branch_name ? ", " + formData.branch_name : ""}${formData.state_name ? ", " + formData.state_name : ""}.`
                         : lower === "marine vessel verification (avr)"
-                        ? `This is to certify that we, the undersigned surveyors did marine asset verification through physical survey & inspection as well as documents study, at the request of ${getValue(formData.client_name_with_full_address)}., for the “${getValue(formData.name_of_the_vessel)}” Official No.: ${getValue(formData.official_no)}, whilst she is currently in deep water at Vadinar Port, Vadinar, Gujarat during day light hours for the purpose of affecting a general inspection to ascertain & verify her present Physical Condition and determine valuation for financial purpose / financial usage, to be hypothecate from ${getValue(formData.bank_name)}${formData.branch_name ? ", " + formData.branch_name : ""}${formData.state_name ? ", " + formData.state_name : ""}.`
+                        ? `This is to certify that we, the undersigned surveyors did marine asset verification through physical survey & inspection as well as documents study, at the request of ${getValue(formData.client_name_with_full_address)}., for the “${getValue(formData.name_of_the_vessel)}”${officialNoText} whilst she is currently in deep water at Vadinar Port, Vadinar, Gujarat during day light hours for the purpose of affecting a general inspection to ascertain & verify her present Physical Condition and determine valuation for financial purpose / financial usage, to be hypothecate from ${getValue(formData.bank_name)}${formData.branch_name ? ", " + formData.branch_name : ""}${formData.state_name ? ", " + formData.state_name : ""}.`
                         : "";                     
                     return `
                     <p style="font-size: 14px;line-height: 1.2;text-align: justify;">
@@ -1080,8 +1113,11 @@ function generateMarineReportHTML(
             <p>
                 - As noted from the Certificate of Registry of the vessel dated 
                 ${getValue(formData.registry_vessel_date)} issued at 
-                ${getValue(formData.registry_vessel_location)} Port,
-                Official No: ${getValue(formData.official_no)}
+                ${getValue(formData.registry_vessel_location)} Port${
+                  getValue(formData.official_no)
+                    ? `, Official No: ${getValue(formData.official_no)}`
+                    : ""
+                }
             </p>
             <table>
                 ${tableRows}
@@ -3760,7 +3796,7 @@ function generateMarineReportHTML(
                         }
                     </div>
                     <div class="right-text">
-                        <div>VALUETECH SOLUTIONS,</div>
+                        <div>${getValue(formData.valuer_name)},</div>
                         <div>MUMBAI SURVEYOR</div>
                     </div>
                 </div>
