@@ -2027,8 +2027,7 @@ function OrderDetails() {
               <ValidateIcon />
             </button>
           )}
-        {hasCollageAndReport &&
-          hasPermission(
+        {hasPermission(
             allowedPermissions,
             "view_order_authenticate_button"
           ) &&
@@ -2062,7 +2061,7 @@ function OrderDetails() {
                 <RevalidateIcon />
               </button>
             </>
-          )}
+        )}
         {hasPermission(
           allowedPermissions,
           "view_order_payment_button"

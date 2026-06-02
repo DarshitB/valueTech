@@ -1083,7 +1083,7 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
       const name = nameField.toUpperCase().trim();
 
       if (name === "V.K. ASSOCIATES") {
-        bgImageFileName = "marine-vs.webp"; // Marine letterhead for VKA
+        bgImageFileName = "marine-vka.webp"; // Marine letterhead for VKA
         stampPngFile = "marine-vs-stamp.png";
       } else if (name === "VALUETECH SOLUTIONS") {
         bgImageFileName = "marine-vs.webp"; // Marine letterhead for VTS
