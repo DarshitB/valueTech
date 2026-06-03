@@ -1,25 +1,29 @@
 /**
  * PublicOrderDetails Component
  *
- * Public view that displays order details WITHOUT images and WITHOUT videos.
+ * Public view that displays reports, collages, and videos (no photos).
  * This component does not require authentication.
  *
  * Features:
- * - Displays reports and collages
- * - NO images shown (only photos are excluded)
+ * - Displays reports, collages, and approved videos
+ * - NO images shown (photos remain on PublicOrderImages only)
  * - Clean, simple view with navbar
  */
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchPublicOrderMedia } from "../../redux/reducers/orderReducer";
 import { FileText, Eye } from "lucide-react";
+import Lightbox from "yet-another-react-lightbox";
+import "yet-another-react-lightbox/styles.css";
 import "./PublicOrderImages.scss";
 import { resolveAssetUrl } from "../../utils/urlUtils";
 
 function PublicOrderDetails() {
   const { id, token } = useParams();
   const dispatch = useDispatch();
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
   
   // Get media data from Redux store
   const media = useSelector((state) => state.orders.media);
@@ -106,6 +110,22 @@ function PublicOrderDetails() {
     }
   };
 
+  // Check if media is a video (by file extension in media_url)
+  const isVideo = (mediaUrl) => {
+    if (!mediaUrl || typeof mediaUrl !== "string") return false;
+    try {
+      const parsed = JSON.parse(mediaUrl);
+      const path = parsed.path || parsed.link || "";
+      return String(path)
+        .toLowerCase()
+        .match(/\.(mp4|avi|mov|wmv|flv|webm|mkv)$/);
+    } catch {
+      return String(mediaUrl)
+        .toLowerCase()
+        .match(/\.(mp4|avi|mov|wmv|flv|webm|mkv)$/);
+    }
+  };
+
   // Get filename from media URL
   const getFilenameFromMediaUrl = (media_url) => {
     if (!media_url || typeof media_url !== "string") return "Document";
@@ -142,6 +162,45 @@ function PublicOrderDetails() {
     if (!media?.media) return [];
     return media.media.filter((item) => item.media_type === "collage");
   }, [media]);
+
+  // Approved videos only (images stay on PublicOrderImages)
+  const approvedVideos = React.useMemo(() => {
+    if (!media?.media) return [];
+    return media.media.filter((item) => isVideo(item.media_url));
+  }, [media]);
+
+  // Match PublicOrderImages: videos use media_url (not view_url proxy) for playback
+  const getVideoUrl = (item) => getImageUrl(item.media_url);
+
+  const videoLightboxSlides = React.useMemo(
+    () =>
+      approvedVideos.map((item) => ({
+        src: getImageUrl(item.media_url),
+        alt: `Video ${item.id}`,
+        type: "video",
+        mediaId: item.id,
+      })),
+    [approvedVideos]
+  );
+
+  const handleVideoLightboxOpen = (videoItem) => {
+    const slideIndex = videoLightboxSlides.findIndex(
+      (slide) => slide.mediaId === videoItem.id
+    );
+
+    if (slideIndex !== -1) {
+      setLightboxIndex(slideIndex);
+      setLightboxOpen(true);
+    }
+  };
+
+  const handleVideoLightboxClose = () => {
+    setLightboxOpen(false);
+  };
+
+  const handleVideoSlideTransition = ({ index }) => {
+    setLightboxIndex(index);
+  };
 
   // Fetch order media using Redux action (public endpoint - no authentication required)
   useEffect(() => {
@@ -226,7 +285,9 @@ function PublicOrderDetails() {
               <div className="col-12">
                 <div className="public-order-images-container">
                   <div className="public-order-images-content">
-                    {approvedReports.length > 0 || approvedCollages.length > 0 ? (
+                    {approvedReports.length > 0 ||
+                    approvedCollages.length > 0 ||
+                    approvedVideos.length > 0 ? (
                       <>
                         {/* Reports Section */}
                         {approvedReports.length > 0 && (
@@ -358,10 +419,107 @@ function PublicOrderDetails() {
                           </div>
                         )}
 
+                        {/* Videos Section */}
+                        {approvedVideos.length > 0 && (
+                          <div style={{ marginBottom: "40px" }}>
+                            <h2
+                              className="section-heading"
+                              style={{
+                                marginBottom: "20px",
+                                fontSize: "24px",
+                                fontWeight: "600",
+                              }}
+                            >
+                              Videos ({approvedVideos.length})
+                            </h2>
+                            <div className="public-order-images-grid">
+                              {approvedVideos.map((item) => {
+                                const videoUrl = getVideoUrl(item);
+                                const fileName =
+                                  item.file_name ||
+                                  item.name ||
+                                  getFilenameFromMediaUrl(item.media_url) ||
+                                  `Video ${item.id}`;
+
+                                return (
+                                  <div
+                                    key={item.id}
+                                    className="public-order-image-card"
+                                  >
+                                    <div
+                                      className="public-order-image-box"
+                                      onClick={() => handleVideoLightboxOpen(item)}
+                                      style={{
+                                        cursor: "pointer",
+                                      }}
+                                    >
+                                      <video
+                                        src={videoUrl}
+                                        preload="metadata"
+                                        style={{
+                                          width: "100%",
+                                          height: "100%",
+                                          objectFit: "cover",
+                                        }}
+                                      >
+                                        Your browser does not support the video
+                                        tag.
+                                      </video>
+                                      <div className="public-order-image-overlay">
+                                        <button
+                                          className="lightbox-btn"
+                                          title="View in lightbox"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleVideoLightboxOpen(item);
+                                          }}
+                                        >
+                                          <Eye size={20} />
+                                        </button>
+                                        <span
+                                          style={{
+                                            position: "absolute",
+                                            top: "10px",
+                                            right: "10px",
+                                            background: "rgba(0,0,0,0.7)",
+                                            color: "white",
+                                            padding: "4px 8px",
+                                            borderRadius: "4px",
+                                            fontSize: "12px",
+                                          }}
+                                        >
+                                          Video
+                                        </span>
+                                      </div>
+                                      <span
+                                        style={{
+                                          position: "absolute",
+                                          bottom: "8px",
+                                          left: "8px",
+                                          right: "8px",
+                                          fontSize: "12px",
+                                          color: "#fff",
+                                          fontWeight: "500",
+                                          textAlign: "center",
+                                          wordBreak: "break-word",
+                                          textShadow: "0 1px 2px rgba(0,0,0,0.8)",
+                                        }}
+                                        title={fileName}
+                                      >
+                                        {fileName}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
                       </>
                     ) : (
                       <div className="text-center text-muted" style={{ padding: "50px" }}>
-                        <p>No documents available for this order.</p>
+                        <p>No documents or videos available for this order.</p>
                       </div>
                     )}
                   </div>
@@ -371,6 +529,62 @@ function PublicOrderDetails() {
           </div>
         </section>
 
+        {/* Video lightbox (same UX as PublicOrderImages) */}
+        <Lightbox
+          open={lightboxOpen}
+          close={handleVideoLightboxClose}
+          index={lightboxIndex}
+          slides={videoLightboxSlides}
+          carousel={{
+            finite: true,
+            preload: 1,
+            padding: 0,
+          }}
+          render={{
+            iconNext: () => (
+              <span style={{ fontSize: "24px", color: "white" }}>›</span>
+            ),
+            iconPrev: () => (
+              <span style={{ fontSize: "24px", color: "white" }}>‹</span>
+            ),
+            iconClose: () => (
+              <span style={{ fontSize: "20px", color: "white" }}>×</span>
+            ),
+            slide: ({ slide }) => (
+              <div
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  height: "100%",
+                }}
+              >
+                <video
+                  src={slide.src}
+                  controls
+                  autoPlay
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                  }}
+                />
+              </div>
+            ),
+          }}
+          animation={{
+            fade: 150,
+            swipe: 150,
+          }}
+          controller={{
+            closeOnBackdropClick: true,
+            closeOnPullDown: true,
+            closeOnPinch: true,
+            closeOnEscape: true,
+          }}
+          on={{
+            view: handleVideoSlideTransition,
+          }}
+        />
       </div>
     </div>
   );
