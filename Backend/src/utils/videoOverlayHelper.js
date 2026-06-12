@@ -48,7 +48,7 @@ function computeFontSize(videoWidth, videoHeight) {
   }
   const minDim = Math.min(videoWidth, videoHeight);
   if (minDim <= 360) return 7;
-  if (minDim <= 480) return 9;
+  if (minDim <= 480) return 10;
   if (minDim <= 540) return 12;
   if (minDim <= 720) return 16;
   if (minDim <= 1080) return 25;
@@ -59,7 +59,6 @@ function overlayMetrics(fontSize) {
   return {
     lineGap: Math.round(fontSize * (5 / 14)),
     pad: Math.max(10, Math.round(fontSize * (10 / 14))),
-    boxBorder: Math.max(4, Math.round(fontSize * (4 / 14))),
   };
 }
 
@@ -104,7 +103,7 @@ function buildDrawtextFilters(text, fontSize) {
   const fontPart = FONT_FILE ? `fontfile='${FONT_FILE}':` : '';
   const lines = text.split('|').map((l) => l.trim()).filter(Boolean);
   const n = lines.length;
-  const { lineGap, pad, boxBorder } = overlayMetrics(fontSize);
+  const { lineGap, pad } = overlayMetrics(fontSize);
   const lineHeight = fontSize + lineGap;
 
   return lines.map((line, i) => {
@@ -117,10 +116,7 @@ function buildDrawtextFilters(text, fontSize) {
       `:fontcolor=white` +
       `:fontsize=${fontSize}` +
       `:x=w-tw-${pad}` +
-      `:y=h-th-${distFromBottom}` +
-      `:box=1` +
-      `:boxcolor=black@0.5` +
-      `:boxborderw=${boxBorder}`
+      `:y=h-th-${distFromBottom}`
     );
   });
 }
@@ -151,7 +147,7 @@ function probeVideoDimensions(inputPath) {
  * Burn `text` onto a video at the bottom-right corner.
  *  - Pipe characters (|) in the text become separate lines.
  *  - Roboto Medium (weight 500); 14px (480p), 16px (720p), 18px (1080p), 20px (4K+).
- *  - White text with a semi-transparent black box for readability.
+ *  - White text only (no background box).
  *  - Audio stream is copied as-is (no re-encode).
  *  - Pixel format is normalised to yuv420p for broad device compatibility.
  *
