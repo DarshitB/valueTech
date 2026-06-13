@@ -1388,6 +1388,39 @@ function OrderDetails() {
     }));
   };
 
+  const [copyingPublicLink, setCopyingPublicLink] = useState(null); // "documents" | "images" | null
+
+  const copyPublicOrderLink = async (type, label) => {
+    if (copyingPublicLink) return;
+    setCopyingPublicLink(type);
+    try {
+      // Use the existing public media endpoint — it already creates/returns the
+      // share token (same mechanism the mail-send flow uses internally).
+      const { getPublicOrderMedia } = await import("../../api/orderMedia.api");
+      const res = await getPublicOrderMedia(id);
+      const data = res.data?.data || res.data;
+
+      const tokenUrl =
+        type === "documents"
+          ? data.share_documents_url
+          : data.share_images_url;
+
+      if (!tokenUrl) throw new Error("Token URL not returned");
+
+      const fullUrl = tokenUrl.startsWith("http")
+        ? tokenUrl
+        : `${window.location.origin}${tokenUrl}`;
+
+      await navigator.clipboard.writeText(fullUrl);
+      toast.success(`${label} copied to clipboard`);
+    } catch (err) {
+      console.error("Failed to copy URL:", err);
+      toast.error("Failed to copy link. Please try again.");
+    } finally {
+      setCopyingPublicLink(null);
+    }
+  };
+
   // Handle form input changes with validation
   const handlePaymentFormChange = (e) => {
     const { name, value } = e.target;
@@ -3349,6 +3382,74 @@ function OrderDetails() {
                       </label>
                     </div>
                   )}
+
+                  <div className="form-group">
+                    <label>Public Links</label>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "10px",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="btn btn-outline-primary btn-sm"
+                        onClick={() =>
+                          copyPublicOrderLink(
+                            "documents",
+                            "Public order details link"
+                          )
+                        }
+                        disabled={isSendingMail || copyingPublicLink !== null}
+                        style={{ display: "flex", alignItems: "center", gap: "6px" }}
+                      >
+                        {copyingPublicLink === "documents" && (
+                          <span
+                            style={{
+                              display: "inline-block",
+                              width: "12px",
+                              height: "12px",
+                              border: "2px solid currentColor",
+                              borderTopColor: "transparent",
+                              borderRadius: "50%",
+                              animation: "spin 0.7s linear infinite",
+                              flexShrink: 0,
+                            }}
+                          />
+                        )}
+                        {copyingPublicLink === "documents" ? "Copying..." : "Copy Public Documents"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline-primary btn-sm"
+                        onClick={() =>
+                          copyPublicOrderLink(
+                            "images",
+                            "Public order images link"
+                          )
+                        }
+                        disabled={isSendingMail || copyingPublicLink !== null}
+                        style={{ display: "flex", alignItems: "center", gap: "6px" }}
+                      >
+                        {copyingPublicLink === "images" && (
+                          <span
+                            style={{
+                              display: "inline-block",
+                              width: "12px",
+                              height: "12px",
+                              border: "2px solid currentColor",
+                              borderTopColor: "transparent",
+                              borderRadius: "50%",
+                              animation: "spin 0.7s linear infinite",
+                              flexShrink: 0,
+                            }}
+                          />
+                        )}
+                        {copyingPublicLink === "images" ? "Copying..." : "Copy Public Documents with Images"}
+                      </button>
+                    </div>
+                  </div>
 
                   <div className="form-group">
                     <label>Selected Collage, Reports & Videos</label>

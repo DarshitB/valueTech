@@ -49,7 +49,7 @@ import { resolveAssetUrl } from "../../utils/urlUtils";
 import R2StorageBadge from "../../components/R2StorageBadge";
 import ZipUploadModal from "../../components/ZipUploadModal";
 import ConfirmationModal from "../../components/ConfirmationModal";
-import { downloadOrderMediaFile } from "../../api/orderMedia.api";
+import { downloadOrderMediaFile, getPublicOrderMedia } from "../../api/orderMedia.api";
 
 // Pure helpers outside component (stable reference, no closure over state)
 function formatMediaGroupDate(dateString) {
@@ -181,6 +181,7 @@ function OrderImages() {
   const [zipUploadModalOpen, setZipUploadModalOpen] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [downloadingSelected, setDownloadingSelected] = useState(false);
+  const [sharingPublicUrl, setSharingPublicUrl] = useState(false);
   // Per-image orientation for collage: "default" | "left" | "right" | "up" (cycle on button click)
   const [imageOrientations, setImageOrientations] = useState({});
 
@@ -555,15 +556,25 @@ function OrderImages() {
     }
   };
 
-  // Handle copying public share URL to clipboard
+  // Handle copying public share URL to clipboard (token-based, order ID not exposed)
   const handleShareUrl = async () => {
+    if (sharingPublicUrl) return;
+    setSharingPublicUrl(true);
     try {
-      const publicUrl = `${window.location.origin}/public/orders/${id}/images`;
-      await navigator.clipboard.writeText(publicUrl);
+      const res = await getPublicOrderMedia(id);
+      const data = res.data?.data || res.data;
+      const tokenUrl = data?.share_images_url;
+      if (!tokenUrl) throw new Error("Token URL not returned");
+      const fullUrl = tokenUrl.startsWith("http")
+        ? tokenUrl
+        : `${window.location.origin}${tokenUrl}`;
+      await navigator.clipboard.writeText(fullUrl);
       toast.success("Public URL copied to clipboard!");
     } catch (err) {
       console.error("Failed to copy URL:", err);
       toast.error("Failed to copy URL to clipboard");
+    } finally {
+      setSharingPublicUrl(false);
     }
   };
 
@@ -1078,10 +1089,26 @@ function OrderImages() {
                 ) && (
                   <button
                     onClick={handleShareUrl}
-                    title="Share Public URL"
+                    title={sharingPublicUrl ? "Copying..." : "Share Public URL"}
                     className="tooltip-link"
+                    disabled={sharingPublicUrl}
+                    style={{ opacity: sharingPublicUrl ? 0.5 : 1, cursor: sharingPublicUrl ? "not-allowed" : "pointer" }}
                   >
-                    <ShareIcon />
+                    {sharingPublicUrl ? (
+                      <span
+                        style={{
+                          display: "inline-block",
+                          width: "16px",
+                          height: "16px",
+                          border: "2px solid currentColor",
+                          borderTopColor: "transparent",
+                          borderRadius: "50%",
+                          animation: "spin 0.7s linear infinite",
+                        }}
+                      />
+                    ) : (
+                      <ShareIcon />
+                    )}
                   </button>
                 )}
                 {hasPermission(
