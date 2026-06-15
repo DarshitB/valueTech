@@ -6,6 +6,26 @@ const {
   applyRequestFilters,
   buildFilterOptions,
 } = require("../../utils/orderListQueryHelpers");
+const { computeR2CoverageForOrders } = require("../../utils/r2CoverageHelper");
+
+const VALID_R2_STATE_FILTERS = new Set(["full", "partial", "remaining"]);
+
+async function attachR2CoverageToOrders(orders) {
+  if (!Array.isArray(orders) || orders.length === 0) {
+    return orders;
+  }
+
+  const coverageMap = await computeR2CoverageForOrders(orders);
+  return orders.map((order) => ({
+    ...order,
+    ...(coverageMap.get(Number(order.id)) || {
+      r2_state: null,
+      has_local_files: false,
+      has_r2_content: false,
+      can_sync_r2: false,
+    }),
+  }));
+}
 
 // Helper: robust role parsing to distinguish ADMIN vs SUPER/DEVELOPER ADMIN variants
 function parseRole(roleNameRaw) {
@@ -480,13 +500,57 @@ const order = {
     if (!pagination) {
       baseQuery.orderBy("orders.created_at", "asc");
       const orders = await baseQuery;
-      return enrichOrdersWithAssignedUsersAndRefNo(orders);
+      const enriched = await enrichOrdersWithAssignedUsersAndRefNo(orders);
+      return attachR2CoverageToOrders(enriched);
     }
 
     const roleScopedQuery = baseQuery.clone();
     applyRequestFilters(roleScopedQuery, queryOptions);
 
-    const countRow = await roleScopedQuery
+    const r2StateFilter = String(queryOptions.r2_state || "")
+      .trim()
+      .toLowerCase();
+    let filteredQuery = roleScopedQuery.clone();
+
+    if (VALID_R2_STATE_FILTERS.has(r2StateFilter)) {
+      const candidateRows = await roleScopedQuery
+        .clone()
+        .clearSelect()
+        .clearOrder()
+        .select("orders.id", "orders.order_number", "orders.current_status_id");
+
+      const coverageMap = await computeR2CoverageForOrders(candidateRows);
+      const matchingIds = candidateRows
+        .filter((row) => coverageMap.get(Number(row.id))?.r2_state === r2StateFilter)
+        .map((row) => Number(row.id));
+
+      if (matchingIds.length === 0) {
+        const includeFilterOptionsEmpty =
+          queryOptions.include_filter_options === "1" ||
+          queryOptions.include_filter_options === "true" ||
+          queryOptions.include_filter_options === true;
+
+        const emptyResponse = {
+          data: [],
+          pagination: {
+            page: pagination.page,
+            limit: pagination.limit,
+            total: 0,
+            totalPages: 1,
+          },
+        };
+
+        if (includeFilterOptionsEmpty) {
+          emptyResponse.filterOptions = await buildFilterOptions(baseQuery);
+        }
+
+        return emptyResponse;
+      }
+
+      filteredQuery = roleScopedQuery.clone().whereIn("orders.id", matchingIds);
+    }
+
+    const countRow = await filteredQuery
       .clone()
       .clearSelect()
       .clearOrder()
@@ -494,13 +558,15 @@ const order = {
       .first();
     const total = Number(countRow?.total || 0);
 
-    const rows = await roleScopedQuery
+    const rows = await filteredQuery
       .clone()
       .orderBy("orders.created_at", "desc")
       .limit(pagination.limit)
       .offset(pagination.offset);
 
-    const data = await enrichOrdersWithAssignedUsersAndRefNo(rows);
+    const data = await attachR2CoverageToOrders(
+      await enrichOrdersWithAssignedUsersAndRefNo(rows)
+    );
 
     const includeFilterOptions =
       queryOptions.include_filter_options === "1" ||
@@ -867,10 +933,24 @@ const order = {
       .where("order_users.order_id", id)
       .whereNull("order_users.deleted_at");
 
+    const r2Coverage = await computeR2CoverageForOrders([
+      {
+        id: order.id,
+        order_number: order.order_number,
+        current_status_id: order.current_status_id,
+      },
+    ]);
+
     return {
       ...order,
       status_history: statusHistory,
       assigned_users: assignedUsers,
+      ...(r2Coverage.get(Number(order.id)) || {
+        r2_state: null,
+        has_local_files: false,
+        has_r2_content: false,
+        can_sync_r2: false,
+      }),
     };
   },
 

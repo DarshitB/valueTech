@@ -226,6 +226,9 @@ function OrderDetails() {
     "view_order_r2_sync_button"
   );
   const shouldShowR2SyncUi = shouldShowR2Status && canViewR2Sync;
+  const canSyncR2 = Boolean(
+    order?.can_sync_r2 ?? r2SyncStatus?.can_sync_r2
+  );
 
   // Complete order (status 13) via direct status update
   const handleCompleteOrder = async () => {
@@ -2119,8 +2122,7 @@ function OrderDetails() {
               <MailIcon />
             </Link>
           )}
-        {shouldShowR2SyncUi &&
-          statusValue !== "completed" && (
+        {shouldShowR2SyncUi && canSyncR2 && (
           <button
             type="button"
             title="Upload order files to R2 and update media URLs"
@@ -2196,6 +2198,7 @@ function OrderDetails() {
     r2SyncStatus,
     r2SyncLoading,
     shouldShowR2SyncUi,
+    canSyncR2,
     isStartingR2Sync,
     handleStartR2Sync,
   ]);

@@ -238,6 +238,16 @@ function Orders() {
     return saved || "";
   });
 
+  const [selectedR2State, setSelectedR2State] = useState(() => {
+    const saved = localStorage.getItem("filter_orders_r2State");
+    return saved || "";
+  });
+
+  const canViewOrderR2State = hasPermission(
+    allowedPermissions,
+    "view_order_r2_state_filter"
+  );
+
   // State for date filter
   const [selectedDatePreset, setSelectedDatePreset] = useState(() => {
     const saved = localStorage.getItem("filter_orders_datePreset");
@@ -861,6 +871,7 @@ function Orders() {
     setSelectedSubCategory("");
     setSelectedCreatedBy("");
     setSelectedUserAssigned("");
+    setSelectedR2State("");
     setSelectedDatePreset("");
     setSelectedDateRange({ start: null, end: null });
 
@@ -880,6 +891,7 @@ function Orders() {
     localStorage.removeItem("filter_orders_subCategory");
     localStorage.removeItem("filter_orders_createdBy");
     localStorage.removeItem("filter_orders_userAssigned");
+    localStorage.removeItem("filter_orders_r2State");
     localStorage.removeItem("filter_orders_datePreset");
     localStorage.removeItem("filter_orders_dateRangeStart");
     localStorage.removeItem("filter_orders_dateRangeEnd");
@@ -987,6 +999,47 @@ function Orders() {
     </div>
   );
 
+
+  const renderR2StateBadge = (r2State) => {
+    if (r2State === "full") {
+      return (
+        <span
+          style={{
+            display: "inline-block",
+            fontSize: "11px",
+            fontWeight: 600,
+            color: "#16a34a",
+            border: "1px solid #16a34a",
+            borderRadius: "999px",
+            padding: "3px 8px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          R2 100%
+        </span>
+      );
+    }
+    if (r2State === "partial") {
+      return (
+        <span
+          style={{
+            display: "inline-block",
+            fontSize: "11px",
+            fontWeight: 600,
+            color: "#f59e0b",
+            border: "1px solid #f59e0b",
+            borderRadius: "999px",
+            padding: "3px 8px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          R2 Partial
+        </span>
+      );
+    }
+    return null;
+  };
+
   const ordersFilterSignature = useMemo(
     () =>
       JSON.stringify({
@@ -1005,6 +1058,7 @@ function Orders() {
         selectedSubCategory,
         selectedCreatedBy,
         selectedUserAssigned,
+        selectedR2State,
         selectedDatePreset,
         selectedDateRangeStart: selectedDateRange.start
           ? selectedDateRange.start.toISOString()
@@ -1030,6 +1084,7 @@ function Orders() {
       selectedSubCategory,
       selectedCreatedBy,
       selectedUserAssigned,
+      selectedR2State,
       selectedDatePreset,
       selectedDateRange,
       debouncedOrdersSearch,
@@ -1062,6 +1117,7 @@ function Orders() {
       if (selectedSubCategory) params.child_category_name = selectedSubCategory;
       if (selectedCreatedBy) params.created_by = selectedCreatedBy;
       if (selectedUserAssigned) params.user_assigned = selectedUserAssigned;
+      if (selectedR2State) params.r2_state = selectedR2State;
 
       Object.assign(
         params,
@@ -1094,6 +1150,7 @@ function Orders() {
       selectedSubCategory,
       selectedCreatedBy,
       selectedUserAssigned,
+      selectedR2State,
       selectedDatePreset,
       selectedDateRange,
       debouncedOrdersSearch,
@@ -1170,6 +1227,7 @@ function Orders() {
       selectedSubCategory !== "" ||
       selectedCreatedBy !== "" ||
       selectedUserAssigned !== "" ||
+      selectedR2State !== "" ||
       selectedDatePreset !== "" ||
       selectedDateRange.start !== null ||
       selectedDateRange.end !== null
@@ -1190,6 +1248,7 @@ function Orders() {
     selectedSubCategory,
     selectedCreatedBy,
     selectedUserAssigned,
+    selectedR2State,
     selectedDatePreset,
     selectedDateRange,
   ]);
@@ -1680,6 +1739,24 @@ function Orders() {
                   placeholder="All Created By"
                 />
               )}
+              {canViewOrderR2State && (
+                <SingleSearchSelect
+                  className="search-selector"
+                  options={[
+                    { value: "", label: "All R2 States" },
+                    { value: "full", label: "R2 Full" },
+                    { value: "partial", label: "R2 Partial" },
+                    { value: "remaining", label: "R2 Remaining" },
+                  ]}
+                  value={selectedR2State || null}
+                  onChange={(value) => {
+                    const val = value || "";
+                    setSelectedR2State(val);
+                    localStorage.setItem("filter_orders_r2State", val);
+                  }}
+                  placeholder="All R2 States"
+                />
+              )}
               {hasPermission(allowedPermissions, "view_user_assigned_filter") && (
                 <SingleSearchSelect
                   className="search-selector"
@@ -1755,6 +1832,9 @@ function Orders() {
                     allowedPermissions,
                     "view_order_table_order_number"
                   ) && <th style={{ width: "150px" }}>Order Number</th>}
+                  {canViewOrderR2State && (
+                    <th style={{ width: "120px" }}>R2</th>
+                  )}
                   {hasPermission(
                     allowedPermissions,
                     "view_order_table_ref_id"
@@ -1831,6 +1911,7 @@ function Orders() {
                     allowedPermissions,
                     "view_order_table_status"
                   ) && <th style={{ width: "175px" }}>Status</th>}
+
                   {hasPermission(
                     allowedPermissions,
                     "view_order_table_action"
@@ -1884,6 +1965,11 @@ function Orders() {
                         {order.order_number}
                       </td>
                     )}
+                  {canViewOrderR2State && (
+                    <td onClick={(e) => e.stopPropagation()}>
+                      {renderR2StateBadge(order.r2_state)}
+                    </td>
+                  )}
                   {hasPermission(
                     allowedPermissions,
                     "view_order_table_ref_id"

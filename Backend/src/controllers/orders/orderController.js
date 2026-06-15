@@ -17,6 +17,7 @@ const {
   queueManualR2Sync,
   STATUSES_THAT_TRIGGER_SYNC,
 } = require("../../utils/r2Helper");
+const { computeR2CoverageForOrder } = require("../../utils/r2CoverageHelper");
 const { resolveOrderReportType } = require("../../utils/resolveOrderReportType");
 
 // Helper functions to get names by IDs
@@ -465,10 +466,19 @@ exports.getR2SyncStatus = async (req, res, next) => {
       throw new BadRequestError("Invalid order ID");
     }
 
+    const order = await Order.findById(orderId, req.user);
+    if (!order) {
+      throw new NotFoundError("Order not found");
+    }
+
     const status = await getOrderR2SyncStatus(orderId);
+    const coverage = await computeR2CoverageForOrder(order);
     res.json({
       success: true,
-      data: status,
+      data: {
+        ...status,
+        ...coverage,
+      },
     });
   } catch (err) {
     next(err);
