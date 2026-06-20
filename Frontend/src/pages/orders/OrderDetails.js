@@ -342,6 +342,9 @@ function OrderDetails() {
     public_link_with_image: false,
     all_documents_in_one: false,
     collage_compress: false,
+    show_table: false,
+    show_qrcode: false,
+    srNo: 1,
   });
 
   // Track removed documents (by ID) - documents user removes from mail attachments
@@ -484,7 +487,7 @@ function OrderDetails() {
         if (cancelled) return;
         const row = res?.data?.data;
         if (row) {
-          setMailFormData({
+          setMailFormData((prev) => ({
             to: Array.isArray(row.to) ? row.to : [],
             cc: Array.isArray(row.cc) ? row.cc : [],
             bcc: Array.isArray(row.bcc) ? row.bcc : [],
@@ -494,17 +497,23 @@ function OrderDetails() {
             comments: row.comments != null && String(row.comments).trim() !== ""
               ? String(row.comments)
               : "PLEASE FIND ATTACHED",
-            regards: row.regards != null ? String(row.regards) : "",
+            regards: prev.regards,
             mail_attachment: Boolean(row.mail_attachment),
             public_link_with_image: Boolean(row.public_link_with_image),
             all_documents_in_one: Boolean(row.all_documents_in_one),
             collage_compress: Boolean(row.collage_compress),
-          });
+            show_table: row.show_table !== undefined ? Boolean(row.show_table) : false,
+            show_qrcode: row.show_qrcode !== undefined ? Boolean(row.show_qrcode) : false,
+            srNo: 1,
+          }));
         } else {
           setMailFormData((prev) => ({
             ...prev,
             customerName: order?.customer_name_2 || "",
             comments: "PLEASE FIND ATTACHED",
+            show_table: false,
+            show_qrcode: false,
+            srNo: 1,
           }));
         }
       })
@@ -514,6 +523,9 @@ function OrderDetails() {
             ...prev,
             customerName: order?.customer_name_2 || "",
             comments: "PLEASE FIND ATTACHED",
+            show_table: false,
+            show_qrcode: false,
+            srNo: 1,
           }));
         }
       })
@@ -2474,6 +2486,9 @@ function OrderDetails() {
         : `${window.location.origin}/public/orders/${id}/documents`, // URL without images (reports/collages/videos only)
       customer_name: mailFormData.customerName?.trim() || "",
       asset_identification_number: mailFormData.assetIdentificationNumber?.trim() || "",
+      show_table: mailFormData.show_table ?? false,
+      show_qrcode: mailFormData.show_qrcode ?? false,
+      sr_no: Number(mailFormData.srNo || 1),
       document_ids: documentIds.map((doc) => doc.id), // Array of document IDs (collages and reports)
       // Add videos separately if there are any
       ...(videoIds.length > 0 && { video_ids: videoIds }), // Array of video IDs (only if videos exist)
@@ -2516,6 +2531,9 @@ function OrderDetails() {
           public_link_with_image: false,
           all_documents_in_one: false,
           collage_compress: false,
+          show_table: false,
+          show_qrcode: false,
+          srNo: 1,
         });
       }
     } catch (error) {
@@ -3362,7 +3380,22 @@ function OrderDetails() {
                   </div>
 
                   <div style={{ display: "flex", gap: "16px", marginBottom: "16px" }}>
-                    <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                    <div className="form-group" style={{ flex: "0 0 80px", width: "80px", minWidth: "80px", maxWidth: "80px", marginBottom: 0 }}>
+                      <label htmlFor="srNo">Sr No</label>
+                      <input
+                        type="number"
+                        className="form-field"
+                        id="srNo"
+                        name="srNo"
+                        value={mailFormData.srNo ?? 1}
+                        onChange={handleMailFormChange}
+                        placeholder="1"
+                        disabled={isSendingMail}
+                        style={{ textAlign: "center" }}
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ flex: 2, marginBottom: 0 }}>
                       <label htmlFor="customerName">Customer Name</label>
                       <input
                         type="text"
@@ -3376,7 +3409,7 @@ function OrderDetails() {
                       />
                     </div>
 
-                    <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                    <div className="form-group" style={{ flex: 2, marginBottom: 0 }}>
                       <label htmlFor="assetIdentificationNumber">Asset Identification Number</label>
                       <input
                         type="text"
@@ -3515,6 +3548,52 @@ function OrderDetails() {
                           disabled={isSendingMail}
                         />
                         Public link With image
+                      </label>
+                    </div>
+                  )}
+
+                  {hasPermission(allowedPermissions, "show_mail_table_checkbox") && (
+                    <div className="form-group">
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={mailFormData.show_table ?? false}
+                          onChange={(e) => {
+                            setMailFormData((prev) => ({
+                              ...prev,
+                              show_table: e.target.checked,
+                            }));
+                          }}
+                          disabled={isSendingMail}
+                          style={{
+                            marginRight: "8px",
+                            cursor: isSendingMail ? "not-allowed" : "pointer",
+                          }}
+                        />
+                        Show Table
+                      </label>
+                    </div>
+                  )}
+
+                  {hasPermission(allowedPermissions, "show_mail_qrcode_checkbox") && (
+                    <div className="form-group">
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={mailFormData.show_qrcode ?? false}
+                          onChange={(e) => {
+                            setMailFormData((prev) => ({
+                              ...prev,
+                              show_qrcode: e.target.checked,
+                            }));
+                          }}
+                          disabled={isSendingMail}
+                          style={{
+                            marginRight: "8px",
+                            cursor: isSendingMail ? "not-allowed" : "pointer",
+                          }}
+                        />
+                        Show QR Code
                       </label>
                     </div>
                   )}

@@ -1662,6 +1662,9 @@ exports.sendMail = async (req, res, next) => {
       public_link_with_image,
       customer_name,
       asset_identification_number,
+      show_table,
+      show_qrcode,
+      sr_no,
     } =
       req.body;
     /* console.log("public_url", req.body.public_url); */
@@ -2287,58 +2290,70 @@ exports.sendMail = async (req, res, next) => {
       typeof resolvedPublicUrl === "string" &&
       resolvedPublicUrl.trim() !== "";
 
+    const safeSrNo = sr_no != null && String(sr_no).trim() !== "" ? String(sr_no).trim() : "1";
+
     let qrCodeCid = "";
     if (hasPublicUrl) {
       const safePublicUrl = resolvedPublicUrl.trim();
       const showCustomer = customer_name && customer_name.trim() !== "";
       const showAsset = asset_identification_number && asset_identification_number.trim() !== "";
 
-      // Generate QR Code Buffer dynamically and attach it
-      try {
-        const QRCode = require("qrcode");
-        const qrBuffer = await QRCode.toBuffer(safePublicUrl, {
-          width: 120,
-          margin: 1,
-          errorCorrectionLevel: "M",
-        });
-        const tempDir = path.join(process.cwd(), "uploads", "temp_email");
-        if (!fs.existsSync(tempDir)) {
-          fs.mkdirSync(tempDir, { recursive: true });
+      const shouldShowTable = typeof show_table === "boolean" ? show_table : false;
+      const shouldShowQr = typeof show_qrcode === "boolean" ? show_qrcode : false;
+
+      // Generate QR Code Buffer dynamically and attach it (only if qr is enabled)
+      if (shouldShowQr) {
+        try {
+          const QRCode = require("qrcode");
+          const qrBuffer = await QRCode.toBuffer(safePublicUrl, {
+            width: 120,
+            margin: 1,
+            errorCorrectionLevel: "M",
+          });
+          const tempDir = path.join(process.cwd(), "uploads", "temp_email");
+          if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+          }
+          const tempPath = path.join(tempDir, `qr_${uuidv4()}.png`);
+          fs.writeFileSync(tempPath, qrBuffer);
+          tempAttachmentPaths.push(tempPath);
+
+          qrCodeCid = `qrcode_${Date.now()}`;
+          attachments.push({
+            path: tempPath,
+            filename: "qrcode.png",
+            cid: qrCodeCid,
+          });
+        } catch (qrError) {
+          console.error("Failed to generate QR code:", qrError.message);
         }
-        const tempPath = path.join(tempDir, `qr_${uuidv4()}.png`);
-        fs.writeFileSync(tempPath, qrBuffer);
-        tempAttachmentPaths.push(tempPath);
-
-        qrCodeCid = `qrcode_${Date.now()}`;
-        attachments.push({
-          path: tempPath,
-          filename: "qrcode.png",
-          cid: qrCodeCid,
-        });
-      } catch (qrError) {
-        console.error("Failed to generate QR code:", qrError.message);
       }
 
-      emailBody += `${emailBody ? "\n\n" : ""}`;
+      if (shouldShowTable) {
+        emailBody += `${emailBody ? "\n\n" : ""}`;
 
-      let textHeaders = ["No"];
-      let textValues = ["1"];
+        let textHeaders = ["No"];
+        let textValues = [safeSrNo];
 
-      if (showCustomer) {
-        textHeaders.push("Customer");
-        textValues.push(customer_name.trim());
+        if (showCustomer) {
+          textHeaders.push("Customer");
+          textValues.push(customer_name.trim());
+        }
+
+        if (showAsset) {
+          textHeaders.push("Asset Identification Number");
+          textValues.push(asset_identification_number.trim());
+        }
+
+        textHeaders.push("Link");
+        textValues.push(safePublicUrl);
+
+        emailBody += textHeaders.join(" | ") + "\n";
+        emailBody += textValues.join(" | ");
+      } else {
+        // Just add the plain text URL link
+        emailBody += `${emailBody ? "\n\n" : ""}Link: ${safePublicUrl}`;
       }
-
-      if (showAsset) {
-        textHeaders.push("Asset Identification Number");
-        textValues.push(asset_identification_number.trim());
-      }
-
-      textHeaders.push("Link");
-      textValues.push(safePublicUrl);
-
-      emailBody += textHeaders.join(" | ") + "\n";
-      emailBody += textValues.join(" | ");
     } else {
       // If no public_url, use existing behavior (document links and video links)
       if (!document_as_attachment && documentLinkGroups.size > 0) {
@@ -2376,63 +2391,76 @@ exports.sendMail = async (req, res, next) => {
       const showCustomer = customer_name && customer_name.trim() !== "";
       const showAsset = asset_identification_number && asset_identification_number.trim() !== "";
 
-      let headers = [];
-      let spacerRowCells = [];
-      let dataRowCells = [];
+      const shouldShowTable = typeof show_table === "boolean" ? show_table : false;
+      const shouldShowQr = typeof show_qrcode === "boolean" ? show_qrcode : false;
 
-      // "No" is always shown
-      headers.push('<th style="border: 1px solid #7f7f7f; padding: 2px 1px; text-align: center; font-weight: bold; width: 5%;">No</th>');
-      spacerRowCells.push('<td style="border: 1px solid #7f7f7f; padding: 2px 1px;">&nbsp;</td>');
-      dataRowCells.push('<td style="border: 1px solid #7f7f7f; padding: 2px 1px; text-align: center;">1</td>');
+      if (shouldShowTable) {
+        let headers = [];
+        let spacerRowCells = [];
+        let dataRowCells = [];
 
-      if (showCustomer) {
-        headers.push(`<th style="border: 1px solid #7f7f7f; padding: 2px 1px; text-align: center; font-weight: bold; width: ${showAsset ? "20%" : "30%"};">Customer</th>`);
+        // "No" is always shown
+        headers.push('<th style="border: 1px solid #7f7f7f; padding: 2px 1px; text-align: center; font-weight: bold; width: 5%;">No</th>');
         spacerRowCells.push('<td style="border: 1px solid #7f7f7f; padding: 2px 1px;">&nbsp;</td>');
-        dataRowCells.push(`<td style="border: 1px solid #7f7f7f; padding: 2px 1px;">${customer_name.trim()}</td>`);
+        dataRowCells.push(`<td style="border: 1px solid #7f7f7f; padding: 2px 1px; text-align: center;">${safeSrNo}</td>`);
+
+        if (showCustomer) {
+          headers.push(`<th style="border: 1px solid #7f7f7f; padding: 2px 1px; text-align: center; font-weight: bold; width: ${showAsset ? "20%" : "30%"};">Customer</th>`);
+          spacerRowCells.push('<td style="border: 1px solid #7f7f7f; padding: 2px 1px;">&nbsp;</td>');
+          dataRowCells.push(`<td style="border: 1px solid #7f7f7f; padding: 2px 1px;">${customer_name.trim()}</td>`);
+        }
+
+        if (showAsset) {
+          headers.push(`<th style="border: 1px solid #7f7f7f; padding: 2px 1px; text-align: center; font-weight: bold; width: ${showCustomer ? "15%" : "25%"};">Asset Identification Number</th>`);
+          spacerRowCells.push('<td style="border: 1px solid #7f7f7f; padding: 2px 1px;">&nbsp;</td>');
+          dataRowCells.push(`<td style="border: 1px solid #7f7f7f; padding: 2px 1px; text-align: center;">${asset_identification_number.trim()}</td>`);
+        }
+
+        // "Link" is always shown
+        let linkWidth = "60%";
+        if (!showCustomer && !showAsset) linkWidth = "95%";
+        else if (!showCustomer) linkWidth = "70%";
+        else if (!showAsset) linkWidth = "65%";
+
+        headers.push(`<th style="border: 1px solid #7f7f7f; padding: 2px 1px; text-align: center; font-weight: bold; width: ${linkWidth};">Link</th>`);
+        spacerRowCells.push('<td style="border: 1px solid #7f7f7f; padding: 2px 1px;">&nbsp;</td>');
+        dataRowCells.push(`
+          <td style="border: 1px solid #7f7f7f; padding: 2px 1px;">
+            <a href="${safePublicUrl}" target="_blank" rel="noopener noreferrer" style="color: #0066cc; text-decoration: underline;">
+              ${safePublicUrl}
+            </a>
+          </td>
+        `);
+
+        htmlEmailBody += `${htmlEmailBody ? "<br><br>" : ""}`;
+        htmlEmailBody += `
+          <table style="border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 13px; border: 1px solid #7f7f7f;">
+            <thead>
+              <tr style="background-color: #f2f2f2;">
+                ${headers.join("\n")}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                ${spacerRowCells.join("\n")}
+              </tr>
+              <tr>
+                ${dataRowCells.join("\n")}
+              </tr>
+            </tbody>
+          </table>
+        `;
+      } else {
+        // Just add the styled link directly
+        htmlEmailBody += `${htmlEmailBody ? "<br><br>" : ""}`;
+        htmlEmailBody += `
+          <div style="font-family: Arial, sans-serif; font-size: 13px;">
+            <strong>Link:</strong> <a href="${safePublicUrl}" target="_blank" rel="noopener noreferrer" style="color: #0066cc; text-decoration: underline;">${safePublicUrl}</a>
+          </div>
+        `;
       }
 
-      if (showAsset) {
-        headers.push(`<th style="border: 1px solid #7f7f7f; padding: 2px 1px; text-align: center; font-weight: bold; width: ${showCustomer ? "15%" : "25%"};">Asset Identification Number</th>`);
-        spacerRowCells.push('<td style="border: 1px solid #7f7f7f; padding: 2px 1px;">&nbsp;</td>');
-        dataRowCells.push(`<td style="border: 1px solid #7f7f7f; padding: 2px 1px; text-align: center;">${asset_identification_number.trim()}</td>`);
-      }
-
-      // "Link" is always shown
-      let linkWidth = "60%";
-      if (!showCustomer && !showAsset) linkWidth = "95%";
-      else if (!showCustomer) linkWidth = "70%";
-      else if (!showAsset) linkWidth = "65%";
-
-      headers.push(`<th style="border: 1px solid #7f7f7f; padding: 2px 1px; text-align: center; font-weight: bold; width: ${linkWidth};">Link</th>`);
-      spacerRowCells.push('<td style="border: 1px solid #7f7f7f; padding: 2px 1px;">&nbsp;</td>');
-      dataRowCells.push(`
-        <td style="border: 1px solid #7f7f7f; padding: 2px 1px;">
-          <a href="${safePublicUrl}" target="_blank" rel="noopener noreferrer" style="color: #0066cc; text-decoration: underline;">
-            ${safePublicUrl}
-          </a>
-        </td>
-      `);
-
-      htmlEmailBody += `${htmlEmailBody ? "<br><br>" : ""}`;
-      htmlEmailBody += `
-        <table style="border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 13px; border: 1px solid #7f7f7f;">
-          <thead>
-            <tr style="background-color: #f2f2f2;">
-              ${headers.join("\n")}
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              ${spacerRowCells.join("\n")}
-            </tr>
-            <tr>
-              ${dataRowCells.join("\n")}
-            </tr>
-          </tbody>
-        </table>
-      `;
-
-      if (qrCodeCid) {
+      if (shouldShowQr && qrCodeCid) {
         htmlEmailBody += `
           <div style="margin-top: 16px;">
             <p style="font-family: Arial, sans-serif; font-size: 13px; font-weight: bold; color: #595959; margin-bottom: 8px;">Scan QR Code to access:</p>
@@ -2571,6 +2599,8 @@ exports.sendMail = async (req, res, next) => {
         typeof public_link_with_image === "boolean"
           ? public_link_with_image
           : Boolean(public_link_with_image),
+      show_table: typeof show_table === "boolean" ? show_table : false,
+      show_qrcode: typeof show_qrcode === "boolean" ? show_qrcode : false,
       updated_at: new Date(),
     };
     await db("order_last_mail")
@@ -2585,6 +2615,8 @@ exports.sendMail = async (req, res, next) => {
         "regards",
         "mail_attachment",
         "public_link_with_image",
+        "show_table",
+        "show_qrcode",
         "updated_at",
       ]);
 
@@ -2639,6 +2671,8 @@ exports.getLastMail = async (req, res, next) => {
       regards: row.regards,
       mail_attachment: Boolean(row.mail_attachment),
       public_link_with_image: Boolean(row.public_link_with_image),
+      show_table: row.show_table !== null && row.show_table !== undefined ? Boolean(row.show_table) : false,
+      show_qrcode: row.show_qrcode !== null && row.show_qrcode !== undefined ? Boolean(row.show_qrcode) : false,
       updated_at: row.updated_at,
     };
     return res.status(200).json({ success: true, data });
