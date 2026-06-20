@@ -141,52 +141,74 @@ function applyRequestFilters(queryBuilder, query = {}) {
   };
 
   const orderType = text("order_type");
-  if (orderType) queryBuilder.andWhere("orders.order_type", orderType);
+  if (orderType) {
+    queryBuilder.andWhereRaw("LOWER(TRIM(orders.order_type)) = LOWER(?)", [orderType]);
+  }
 
   const orderPriority = text("order_priority");
-  if (orderPriority) queryBuilder.andWhere("orders.order_priority", orderPriority);
+  if (orderPriority) {
+    queryBuilder.andWhereRaw("LOWER(TRIM(orders.order_priority)) = LOWER(?)", [orderPriority]);
+  }
 
   const bankName = text("bank_name");
-  if (bankName) queryBuilder.andWhere("bank.name", bankName);
+  if (bankName) {
+    queryBuilder.andWhereRaw("LOWER(TRIM(bank.name)) = LOWER(?)", [bankName]);
+  }
 
   const branchName = text("branch_name");
-  if (branchName) queryBuilder.andWhere("bank_branch.name", branchName);
+  if (branchName) {
+    queryBuilder.andWhereRaw("LOWER(TRIM(bank_branch.name)) = LOWER(?)", [branchName]);
+  }
 
   const officerName = text("officer_name");
-  if (officerName) queryBuilder.andWhere("officer_user.name", officerName);
+  if (officerName) {
+    queryBuilder.andWhereRaw("LOWER(TRIM(officer_user.name)) = LOWER(?)", [officerName]);
+  }
 
   const managerName = text("manager_name");
-  if (managerName) queryBuilder.andWhere("manager.name", managerName);
+  if (managerName) {
+    queryBuilder.andWhereRaw("LOWER(TRIM(manager.name)) = LOWER(?)", [managerName]);
+  }
 
   const fieldVerifierName = text("field_verifier_name");
   if (fieldVerifierName) {
-    queryBuilder.andWhere("field_verifiers.name", fieldVerifierName);
+    queryBuilder.andWhereRaw("LOWER(TRIM(field_verifiers.name)) = LOWER(?)", [fieldVerifierName]);
   }
 
   const valuerName = text("valuer_name");
-  if (valuerName) queryBuilder.andWhere("orders.valuer_name", valuerName);
+  if (valuerName) {
+    queryBuilder.andWhereRaw("LOWER(TRIM(orders.valuer_name)) = LOWER(?)", [valuerName]);
+  }
 
   const currentStatusName = text("current_status_name");
   if (currentStatusName) {
-    queryBuilder.andWhere("order_status_master.name", currentStatusName);
+    queryBuilder.andWhereRaw("LOWER(TRIM(order_status_master.name)) = LOWER(?)", [currentStatusName]);
   }
 
   const paymentStatus = text("payment_status");
-  if (paymentStatus) queryBuilder.andWhere("orders.payment_status", paymentStatus);
+  if (paymentStatus) {
+    queryBuilder.andWhereRaw("LOWER(TRIM(orders.payment_status)) = LOWER(?)", [paymentStatus]);
+  }
 
   const categoryName = text("category_name");
-  if (categoryName) queryBuilder.andWhere("category.name", categoryName);
+  if (categoryName) {
+    queryBuilder.andWhereRaw("LOWER(TRIM(category.name)) = LOWER(?)", [categoryName]);
+  }
 
   const subCategoryName = text("sub_category_name");
-  if (subCategoryName) queryBuilder.andWhere("sub_category.name", subCategoryName);
+  if (subCategoryName) {
+    queryBuilder.andWhereRaw("LOWER(TRIM(sub_category.name)) = LOWER(?)", [subCategoryName]);
+  }
 
   const childCategoryName = text("child_category_name");
   if (childCategoryName) {
-    queryBuilder.andWhere("child_category.name", childCategoryName);
+    queryBuilder.andWhereRaw("LOWER(TRIM(child_category.name)) = LOWER(?)", [childCategoryName]);
   }
 
   const createdBy = text("created_by");
-  if (createdBy) queryBuilder.andWhere("created_user.name", createdBy);
+  if (createdBy) {
+    queryBuilder.andWhereRaw("LOWER(TRIM(created_user.name)) = LOWER(?)", [createdBy]);
+  }
 
   const userAssigned = text("user_assigned");
   if (userAssigned) {
@@ -196,7 +218,7 @@ function applyRequestFilters(queryBuilder, query = {}) {
         .join("users", "order_users.user_id", "users.id")
         .whereRaw("order_users.order_id = orders.id")
         .whereNull("order_users.deleted_at")
-        .where("users.name", userAssigned);
+        .whereRaw("LOWER(TRIM(users.name)) = LOWER(?)", [userAssigned]);
     });
   }
 
@@ -244,9 +266,11 @@ async function distinctNonEmpty(queryBuilder, columnExpr, alias) {
     .whereNotNull(columnExpr)
     .orderBy(alias, "asc");
 
-  return rows
-    .map((row) => row[alias])
-    .filter((value) => value != null && String(value).trim() !== "");
+  const trimmed = rows
+    .map((row) => (row[alias] != null ? String(row[alias]).trim() : ""))
+    .filter((value) => value !== "");
+
+  return [...new Set(trimmed)];
 }
 
 async function buildFilterOptions(roleFilteredQuery) {
@@ -294,9 +318,11 @@ async function buildFilterOptions(roleFilteredQuery) {
     .whereNotNull("assigned_user.name")
     .orderBy("user_assigned", "asc");
 
-  const userAssigned = assignedRows
-    .map((row) => row.user_assigned)
-    .filter((value) => value != null && String(value).trim() !== "");
+  const userAssignedTrimmed = assignedRows
+    .map((row) => (row.user_assigned != null ? String(row.user_assigned).trim() : ""))
+    .filter((value) => value !== "");
+
+  const userAssigned = [...new Set(userAssignedTrimmed)];
 
   return {
     banks,
