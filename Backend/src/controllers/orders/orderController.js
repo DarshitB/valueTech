@@ -1660,9 +1660,11 @@ exports.sendMail = async (req, res, next) => {
       collage_compress,
       public_url,
       public_link_with_image,
+      customer_name,
+      asset_identification_number,
     } =
       req.body;
-      /* console.log("public_url", req.body.public_url); */
+    /* console.log("public_url", req.body.public_url); */
 
     // Validate order exists
     const order = await Order.findById(orderId, req.user);
@@ -1711,7 +1713,7 @@ exports.sendMail = async (req, res, next) => {
     const path = require("path");
     const os = require("os");
     const { v4: uuidv4 } = require("uuid");
-    const { 
+    const {
       isImageFile,
       isPdfFile,
       compressImageForEmail,
@@ -1918,7 +1920,7 @@ exports.sendMail = async (req, res, next) => {
     );
     const collageCompressTargetMb =
       Number.isFinite(collageCompressTargetMbRaw) &&
-      collageCompressTargetMbRaw > 0
+        collageCompressTargetMbRaw > 0
         ? collageCompressTargetMbRaw
         : 0.3; // Default 300KB target
     const document_as_attachment =
@@ -2036,7 +2038,7 @@ exports.sendMail = async (req, res, next) => {
           }
           const fullPath = prepared.path;
 
-          const isMergeable = 
+          const isMergeable =
             document.document_type === "report" || document.document_type === "collage";
           const shouldCompressCollageIndividually =
             document.document_type === "collage" &&
@@ -2276,9 +2278,7 @@ exports.sendMail = async (req, res, next) => {
       }
     }
 
-    attachments.push(...documentAttachments);
-
-    let emailBody = comments ? `${comments.trim()}` : "";
+    attachments.push(...documentAttachments); let emailBody = comments ? `${comments.trim()}` : "";
 
     const resolvedPublicUrl = await toMaskedPublicUrl(public_url);
     // Check if public_url is provided and not null
@@ -2287,9 +2287,58 @@ exports.sendMail = async (req, res, next) => {
       typeof resolvedPublicUrl === "string" &&
       resolvedPublicUrl.trim() !== "";
 
+    let qrCodeCid = "";
     if (hasPublicUrl) {
-      // If public_url exists, add only public_url to email body
-      emailBody += `${emailBody ? "\n\n" : ""}${resolvedPublicUrl.trim()}`;
+      const safePublicUrl = resolvedPublicUrl.trim();
+      const showCustomer = customer_name && customer_name.trim() !== "";
+      const showAsset = asset_identification_number && asset_identification_number.trim() !== "";
+
+      // Generate QR Code Buffer dynamically and attach it
+      try {
+        const QRCode = require("qrcode");
+        const qrBuffer = await QRCode.toBuffer(safePublicUrl, {
+          width: 120,
+          margin: 1,
+          errorCorrectionLevel: "M",
+        });
+        const tempDir = path.join(process.cwd(), "uploads", "temp_email");
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+        const tempPath = path.join(tempDir, `qr_${uuidv4()}.png`);
+        fs.writeFileSync(tempPath, qrBuffer);
+        tempAttachmentPaths.push(tempPath);
+
+        qrCodeCid = `qrcode_${Date.now()}`;
+        attachments.push({
+          path: tempPath,
+          filename: "qrcode.png",
+          cid: qrCodeCid,
+        });
+      } catch (qrError) {
+        console.error("Failed to generate QR code:", qrError.message);
+      }
+
+      emailBody += `${emailBody ? "\n\n" : ""}`;
+
+      let textHeaders = ["No"];
+      let textValues = ["1"];
+
+      if (showCustomer) {
+        textHeaders.push("Customer");
+        textValues.push(customer_name.trim());
+      }
+
+      if (showAsset) {
+        textHeaders.push("Asset Identification Number");
+        textValues.push(asset_identification_number.trim());
+      }
+
+      textHeaders.push("Link");
+      textValues.push(safePublicUrl);
+
+      emailBody += textHeaders.join(" | ") + "\n";
+      emailBody += textValues.join(" | ");
     } else {
       // If no public_url, use existing behavior (document links and video links)
       if (!document_as_attachment && documentLinkGroups.size > 0) {
@@ -2322,10 +2371,75 @@ exports.sendMail = async (req, res, next) => {
     let htmlEmailBody = comments ? comments.replace(/\n/g, "<br>") : "";
 
     if (hasPublicUrl) {
-      // If public_url exists, add only public_url to HTML email body
+      // If public_url exists, construct a styled HTML table dynamically based on field presence
       const safePublicUrl = resolvedPublicUrl.trim();
-      htmlEmailBody += `${htmlEmailBody ? "<br><br>" : ""
-        }Documents: <a href="${safePublicUrl}" target="_blank" rel="noopener noreferrer">Click here to view</a>`;
+      const showCustomer = customer_name && customer_name.trim() !== "";
+      const showAsset = asset_identification_number && asset_identification_number.trim() !== "";
+
+      let headers = [];
+      let spacerRowCells = [];
+      let dataRowCells = [];
+
+      // "No" is always shown
+      headers.push('<th style="border: 1px solid #7f7f7f; padding: 2px 1px; text-align: center; font-weight: bold; width: 5%;">No</th>');
+      spacerRowCells.push('<td style="border: 1px solid #7f7f7f; padding: 2px 1px;">&nbsp;</td>');
+      dataRowCells.push('<td style="border: 1px solid #7f7f7f; padding: 2px 1px; text-align: center;">1</td>');
+
+      if (showCustomer) {
+        headers.push(`<th style="border: 1px solid #7f7f7f; padding: 2px 1px; text-align: center; font-weight: bold; width: ${showAsset ? "20%" : "30%"};">Customer</th>`);
+        spacerRowCells.push('<td style="border: 1px solid #7f7f7f; padding: 2px 1px;">&nbsp;</td>');
+        dataRowCells.push(`<td style="border: 1px solid #7f7f7f; padding: 2px 1px;">${customer_name.trim()}</td>`);
+      }
+
+      if (showAsset) {
+        headers.push(`<th style="border: 1px solid #7f7f7f; padding: 2px 1px; text-align: center; font-weight: bold; width: ${showCustomer ? "15%" : "25%"};">Asset Identification Number</th>`);
+        spacerRowCells.push('<td style="border: 1px solid #7f7f7f; padding: 2px 1px;">&nbsp;</td>');
+        dataRowCells.push(`<td style="border: 1px solid #7f7f7f; padding: 2px 1px; text-align: center;">${asset_identification_number.trim()}</td>`);
+      }
+
+      // "Link" is always shown
+      let linkWidth = "60%";
+      if (!showCustomer && !showAsset) linkWidth = "95%";
+      else if (!showCustomer) linkWidth = "70%";
+      else if (!showAsset) linkWidth = "65%";
+
+      headers.push(`<th style="border: 1px solid #7f7f7f; padding: 2px 1px; text-align: center; font-weight: bold; width: ${linkWidth};">Link</th>`);
+      spacerRowCells.push('<td style="border: 1px solid #7f7f7f; padding: 2px 1px;">&nbsp;</td>');
+      dataRowCells.push(`
+        <td style="border: 1px solid #7f7f7f; padding: 2px 1px;">
+          <a href="${safePublicUrl}" target="_blank" rel="noopener noreferrer" style="color: #0066cc; text-decoration: underline;">
+            ${safePublicUrl}
+          </a>
+        </td>
+      `);
+
+      htmlEmailBody += `${htmlEmailBody ? "<br><br>" : ""}`;
+      htmlEmailBody += `
+        <table style="border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 13px; border: 1px solid #7f7f7f;">
+          <thead>
+            <tr style="background-color: #f2f2f2;">
+              ${headers.join("\n")}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              ${spacerRowCells.join("\n")}
+            </tr>
+            <tr>
+              ${dataRowCells.join("\n")}
+            </tr>
+          </tbody>
+        </table>
+      `;
+
+      if (qrCodeCid) {
+        htmlEmailBody += `
+          <div style="margin-top: 16px;">
+            <p style="font-family: Arial, sans-serif; font-size: 13px; font-weight: bold; color: #595959; margin-bottom: 8px;">Scan QR Code to access:</p>
+            <img src="cid:${qrCodeCid}" alt="QR Code" width="100" height="100" style="display: block; border: 1px solid #dcdcdc;" />
+          </div>
+        `;
+      }
     } else {
       // If no public_url, use existing behavior (document links and video links)
       if (!document_as_attachment && documentLinkGroups.size > 0) {
@@ -2395,16 +2509,16 @@ exports.sendMail = async (req, res, next) => {
       // (Only merge-artifact temp files are cleaned up here; original PDFs remain unchanged.)
       for (const mergedPath of tempMergedPdfPaths) {
         // fs.unlink from `fs` (callback API) requires a callback, so use promises here.
-        fs.promises.unlink(mergedPath).catch(() => {});
+        fs.promises.unlink(mergedPath).catch(() => { });
       }
       for (const tempPath of tempAttachmentPaths) {
-        fs.promises.unlink(tempPath).catch(() => {});
+        fs.promises.unlink(tempPath).catch(() => { });
       }
       for (const sourcePath of tempMergeSourcePaths) {
-        fs.promises.unlink(sourcePath).catch(() => {});
+        fs.promises.unlink(sourcePath).catch(() => { });
       }
       for (const helperPath of tempCompressionHelperPaths) {
-        fs.promises.unlink(helperPath).catch(() => {});
+        fs.promises.unlink(helperPath).catch(() => { });
       }
     }
 

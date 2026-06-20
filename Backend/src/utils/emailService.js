@@ -125,6 +125,7 @@ const sendEmail = async (options) => {
         return {
           filename: attachment.filename || path.basename(attachment.path),
           path: filePath,
+          cid: attachment.cid,
         };
       });
     }

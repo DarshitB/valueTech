@@ -334,7 +334,9 @@ function OrderDetails() {
     cc: [],
     bcc: [],
     subject: "",
-    comments: "",
+    customerName: "",
+    assetIdentificationNumber: "",
+    comments: "PLEASE FIND ATTACHED",
     regards: "",
     mail_attachment: false,
     public_link_with_image: false,
@@ -399,6 +401,16 @@ function OrderDetails() {
           order?.category_report_type === "report_summarized"
             ? "report_summarized"
             : "report_machinery";
+      } else if (
+        order?.category_name === "MARINE" ||
+        order?.category_report_type === "report_marine"
+      ) {
+        reportType = "report_marine";
+      } else if (
+        (order?.category_name && order.category_name.toUpperCase().includes("AVR")) ||
+        order?.category_report_type === "report_avr"
+      ) {
+        reportType = "report_avr";
       }
 
       if (reportType) {
@@ -477,18 +489,32 @@ function OrderDetails() {
             cc: Array.isArray(row.cc) ? row.cc : [],
             bcc: Array.isArray(row.bcc) ? row.bcc : [],
             subject: row.subject != null ? String(row.subject) : "",
-            comments: row.comments != null ? String(row.comments) : "",
+            customerName: order?.customer_name_2 || "",
+            assetIdentificationNumber: "",
+            comments: row.comments != null && String(row.comments).trim() !== ""
+              ? String(row.comments)
+              : "PLEASE FIND ATTACHED",
             regards: row.regards != null ? String(row.regards) : "",
             mail_attachment: Boolean(row.mail_attachment),
             public_link_with_image: Boolean(row.public_link_with_image),
             all_documents_in_one: Boolean(row.all_documents_in_one),
             collage_compress: Boolean(row.collage_compress),
           });
+        } else {
+          setMailFormData((prev) => ({
+            ...prev,
+            customerName: order?.customer_name_2 || "",
+            comments: "PLEASE FIND ATTACHED",
+          }));
         }
       })
       .catch(() => {
         if (!cancelled) {
-          // Keep existing or default form state on error
+          setMailFormData((prev) => ({
+            ...prev,
+            customerName: order?.customer_name_2 || "",
+            comments: "PLEASE FIND ATTACHED",
+          }));
         }
       })
       .finally(() => {
@@ -497,7 +523,7 @@ function OrderDetails() {
     return () => {
       cancelled = true;
     };
-  }, [showMailModal, id]);
+  }, [showMailModal, id, order?.customer_name_2]);
 
   // Fetch users for mentions with error handling
   useEffect(() => {
@@ -642,6 +668,79 @@ function OrderDetails() {
     currentReport?.report,
     mailFormData.subject,
     formatRegistrationNumber,
+  ]);
+
+  // Prefill Asset Identification Number when report data is fetched
+  useEffect(() => {
+    if (
+      showMailModal &&
+      currentReport?.order_id === Number(id) &&
+      currentReport?.report
+    ) {
+      const report = currentReport.report;
+      let reportType = "";
+      if (
+        order?.category_name === "COMMERCIAL VEHICLE" ||
+        order?.category_report_type === "report_cv"
+      ) {
+        reportType = "report_cv";
+      } else if (
+        order?.category_name === "CONSTRUCTION EQUIPMENT" ||
+        order?.category_name === "CONSTRUCTION EQUIPMENTS" ||
+        order?.category_report_type === "report_ce"
+      ) {
+        reportType = "report_ce";
+      } else if (
+        order?.category_name === "MACHINERY" ||
+        order?.category_report_type === "report_machinery" ||
+        order?.category_report_type === "report_summarized"
+      ) {
+        reportType =
+          order?.category_report_type === "report_summarized"
+            ? "report_summarized"
+            : "report_machinery";
+      } else if (
+        order?.category_name === "MARINE" ||
+        order?.category_report_type === "report_marine"
+      ) {
+        reportType = "report_marine";
+      } else if (
+        (order?.category_name && order.category_name.toUpperCase().includes("AVR")) ||
+        order?.category_report_type === "report_avr"
+      ) {
+        reportType = "report_avr";
+      }
+
+      let assetIdVal = "";
+      if (reportType === "report_cv") {
+        assetIdVal = report.registration_no || "";
+      } else if (reportType === "report_ce") {
+        assetIdVal = report.crane_chassis_no || "";
+      } else if (
+        reportType === "report_machinery" ||
+        reportType === "report_summarized"
+      ) {
+        assetIdVal = report.machine_serial_no || "";
+      } else if (reportType === "report_marine") {
+        assetIdVal = report.imo_or_regd_no || "";
+      } else if (reportType === "report_avr") {
+        assetIdVal = report.chassis_no || "";
+      }
+
+      if (assetIdVal && !mailFormData.assetIdentificationNumber) {
+        setMailFormData((prev) => ({
+          ...prev,
+          assetIdentificationNumber: assetIdVal,
+        }));
+      }
+    }
+  }, [
+    showMailModal,
+    id,
+    currentReport,
+    order?.category_name,
+    order?.category_report_type,
+    mailFormData.assetIdentificationNumber,
   ]);
 
   // Prefill regards field based on valuer_name
@@ -2373,6 +2472,8 @@ function OrderDetails() {
       public_url: mailFormData.public_link_with_image
         ? `${window.location.origin}/public/orders/${id}/images` // URL with images (reports/collages/videos + images)
         : `${window.location.origin}/public/orders/${id}/documents`, // URL without images (reports/collages/videos only)
+      customer_name: mailFormData.customerName?.trim() || "",
+      asset_identification_number: mailFormData.assetIdentificationNumber?.trim() || "",
       document_ids: documentIds.map((doc) => doc.id), // Array of document IDs (collages and reports)
       // Add videos separately if there are any
       ...(videoIds.length > 0 && { video_ids: videoIds }), // Array of video IDs (only if videos exist)
@@ -2407,7 +2508,9 @@ function OrderDetails() {
           cc: [],
           bcc: [],
           subject: "",
-          comments: "",
+          customerName: "",
+          assetIdentificationNumber: "",
+          comments: "PLEASE FIND ATTACHED",
           regards: "",
           mail_attachment: false,
           public_link_with_image: false,
@@ -3256,6 +3359,36 @@ function OrderDetails() {
                       aria-label="Comments"
                       disabled={isSendingMail}
                     />
+                  </div>
+
+                  <div style={{ display: "flex", gap: "16px", marginBottom: "16px" }}>
+                    <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                      <label htmlFor="customerName">Customer Name</label>
+                      <input
+                        type="text"
+                        className="form-field"
+                        id="customerName"
+                        name="customerName"
+                        value={mailFormData.customerName || ""}
+                        onChange={handleMailFormChange}
+                        placeholder="Enter customer name"
+                        disabled={isSendingMail}
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                      <label htmlFor="assetIdentificationNumber">Asset Identification Number</label>
+                      <input
+                        type="text"
+                        className="form-field"
+                        id="assetIdentificationNumber"
+                        name="assetIdentificationNumber"
+                        value={mailFormData.assetIdentificationNumber || ""}
+                        onChange={handleMailFormChange}
+                        placeholder="Enter asset identification number"
+                        disabled={isSendingMail}
+                      />
+                    </div>
                   </div>
 
                   <div className="form-group">
