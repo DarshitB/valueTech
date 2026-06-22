@@ -2615,21 +2615,29 @@ function SummarizedReport() {
           }
         }
 
+        const fetchedMachineDescription = String(
+          matchedOrder?.child_category_name ?? ""
+        ).trim();
+        const fetchedSupplierName = String(
+          matchedOrder?.sub_category_name ?? ""
+        ).trim();
+
         const nextRows = rows.map((row, idx) => {
           if (idx !== rowIndex) return row;
+
+          const keepIfPresent = (existing, fetched) => {
+            const current = String(existing ?? "").trim();
+            return current ? existing : fetched;
+          };
 
           const updatedRow = {
             ...row,
             source_order_number: matchedOrder.order_number || sourceOrderNumber,
-            machine_description:
-              report?.asset_make_name ||
-              report?.new_asset_make ||
-              report?.asset_make ||
-              "",
-            /* asset_serial_no:
-              report?.machine_serial_no || report?.owner_serial_no || report?.serial_no || "",
-            yom: report?.manufacture_year || "", */
-            supplier_name: report?.supplier_names || report?.supplier_name || "",
+            machine_description: keepIfPresent(
+              row.machine_description,
+              fetchedMachineDescription
+            ),
+            supplier_name: keepIfPresent(row.supplier_name, fetchedSupplierName),
             invoice_no: parsedInvoiceNo,
             invoice_date: parsedInvoiceDate,
             total_invoice_cost: currencyOrBlank(
@@ -4757,7 +4765,7 @@ function SummarizedReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="date_of_inspection">
-                      Date of Inspection <span class="text-danger">*</span>
+                      Date of Inspection
                     </label>
                     <input
                       type="text"
@@ -4765,10 +4773,9 @@ function SummarizedReport() {
                       id="date_of_inspection"
                       name="date_of_inspection"
                       value={reportFormData.date_of_inspection}
-                      onChange={handleDateChange}
-                      placeholder="DD-MM-YYYY"
-                      maxLength="10"
-                      required
+                      onChange={handleFormChange}
+                      placeholder="e.g. DD-MM-YYYY or text"
+                      maxLength="255"
                     />
                   </div>
                 </div>
@@ -5066,7 +5073,7 @@ function SummarizedReport() {
                 <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="owner_serial_no">
-                      Owner Serial No <span class="text-danger">*</span>
+                      Owner Serial No
                     </label>
                     <SingleSearchSelect
                       options={[
@@ -5080,12 +5087,12 @@ function SummarizedReport() {
                         { value: "8TH OWNER", label: "8TH OWNER" },
                         { value: "9TH OWNER", label: "9TH OWNER" },
                         { value: "10TH OWNER", label: "10TH OWNER" },
+                        { value: "AS PER ANIXTURE", label: "AS PER ANIXTURE" },
                       ]}
                       value={reportFormData.owner_serial_no}
                       onChange={(value) =>
                         handleSelectChange("owner_serial_no", value)
                       }
-                      required
                     />
                   </div>
                 </div>
@@ -5926,7 +5933,7 @@ function SummarizedReport() {
                 <div className="col-md-4">
                   <div className="form-group">
                     <label htmlFor="tax_invoice_copy">
-                      Tax Invoice Copy <span class="text-danger">*</span>
+                      Tax Invoice Copy
                     </label>
                     <div className="d-flex gap-2 align-items-center mb-2 drop-down-w-100">
                       <div style={{ width: "100px", flexShrink: 0 }}>
@@ -5966,12 +5973,12 @@ function SummarizedReport() {
                               value: "COPY NOT AVAILABLE",
                               label: "COPY NOT AVAILABLE",
                             },
+                            { value: "AS PER ANIXTURE", label: "AS PER ANIXTURE" },
                           ]}
                           value={reportFormData.tax_invoice_copy}
                           onChange={(value) =>
                             handleSelectChange("tax_invoice_copy", value)
                           }
-                          required
                         />
                       </div>
                     </div>
@@ -6423,7 +6430,7 @@ function SummarizedReport() {
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="no_of_photograph">
-                      No of Photographs <span class="text-danger">*</span>
+                      No of Photographs
                     </label>
                     <input
                       type="text"
@@ -6439,14 +6446,13 @@ function SummarizedReport() {
                         handleFormChange(e);
                       }}
                       placeholder="e.g., 10 or 1+3+6 or 5-2"
-                      required
                     />
                   </div>
                 </div>
                 <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="no_of_collage">
-                      No of Collages <span class="text-danger">*</span>
+                      No of Collages
                     </label>
                     <input
                       type="text"
@@ -6462,7 +6468,6 @@ function SummarizedReport() {
                         handleFormChange(e);
                       }}
                       placeholder="e.g., 2 or 1+1"
-                      required
                     />
                   </div>
                 </div>

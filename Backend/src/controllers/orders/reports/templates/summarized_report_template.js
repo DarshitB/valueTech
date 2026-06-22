@@ -743,7 +743,7 @@ function generateSummarizedNormalFieldsHTML(
             <td>PLACE OF INSPECTION:</td>
             <td colspan="3">${renderFieldValue(formData.place_of_inspection)}</td>
             <td>DATE OF INSPECTION:</td>
-            <td>${formData.date_of_inspection}</td>
+            <td>${renderFieldValue(formData.date_of_inspection) || "-"}</td>
         </tr>
         <tr>
             <td>REGISTERED OWNER NAME:</td>
@@ -770,7 +770,7 @@ function generateSummarizedNormalFieldsHTML(
         </tr>
         <tr>
             <td>OWNER SERIAL NO:</td>
-            <td colspan="2">${formData.owner_serial_no}</td>
+            <td colspan="2">${renderFieldValue(formData.owner_serial_no) || "-"}</td>
             <td>MANUFACTURE YEAR:</td>
             <td colspan="2">${formData.manufacture_year}</td>
             <td>ASSET MAKE &amp; SUPPLIER:</td>
@@ -919,13 +919,13 @@ function generateSummarizedNormalFieldsHTML(
         </tr>
         <tr>
             <td>NO OF PHOTOGRAPH:</td>
-            <td colspan="3">${formData.no_of_photograph} PHOTOS</td>
+            <td colspan="3">${renderFieldValue(formData.no_of_photograph) ? `${renderFieldValue(formData.no_of_photograph)} PHOTOS` : "-"}</td>
             <td>FAIR MARKET VALUE:</td>
             <th colspan="4">Rs. ${formData.fair_market_value}</th>
         </tr>
         <tr>
             <td>NO OF COLLAGE:</td>
-            <td colspan="3">${formData.no_of_collage} COLLAGE</td>
+            <td colspan="3">${renderFieldValue(formData.no_of_collage) ? `${renderFieldValue(formData.no_of_collage)} COLLAGE` : "-"}</td>
             <td>AMOUNT IN WORDS:</td>
             <th colspan="4">${formData.amount_in_words}</th>
         </tr>
