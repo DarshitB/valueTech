@@ -382,7 +382,41 @@ const SUMMARIZED_FETCH_ALLOWED_REPORT_TYPES = new Set([
   "report_ce",
   "report_cv",
   "report_machinery",
+  "report_avr",
+  "report_marine",
 ]);
+
+const getSummarizedAssetSerialFromReport = (reportType, report = {}) => {
+  switch (String(reportType || "").trim()) {
+    case "report_machinery":
+      return String(report.machine_serial_no ?? "").trim();
+    case "report_ce":
+      return String(report.crane_chassis_no ?? "").trim();
+    case "report_avr":
+      return String(report.machine_serial_no ?? "").trim();
+    case "report_marine":
+      return String(report.imo_or_regd_no ?? "").trim();
+    case "report_cv":
+      return String(report.registration_no ?? "").trim();
+    default:
+      return "";
+  }
+};
+
+const getSummarizedYomFromReport = (reportType, report = {}) => {
+  switch (String(reportType || "").trim()) {
+    case "report_cv":
+    case "report_ce":
+    case "report_machinery":
+      return String(report.manufacture_year ?? "").trim();
+    case "report_avr":
+      return String(report.year_of_mfg ?? "").trim();
+    case "report_marine":
+      return String(report.year_of_built ?? "").trim();
+    default:
+      return "";
+  }
+};
 
 const buildEmptySummarizedRow = (dynamicColumns = []) => {
   const base = {};
@@ -2567,7 +2601,7 @@ function SummarizedReport() {
         if (!reportType || !SUMMARIZED_FETCH_ALLOWED_REPORT_TYPES.has(reportType)) {
           toast.error(
             reportType
-              ? `Report type "${reportType}" is not allowed. Allowed: report_ce, report_cv, report_machinery.`
+              ? `Report type "${reportType}" is not allowed. Allowed: report_ce, report_cv, report_machinery, report_avr, report_marine.`
               : "This order does not have an allowed report type."
           );
           return;
@@ -2621,6 +2655,22 @@ function SummarizedReport() {
         const fetchedSupplierName = String(
           matchedOrder?.sub_category_name ?? ""
         ).trim();
+        const fetchedAssetSerialNo = getSummarizedAssetSerialFromReport(
+          reportType,
+          report
+        );
+        const fetchedYom = getSummarizedYomFromReport(reportType, report);
+        const verticalMergedColumnIds =
+          summarizedTableData.verticalMergedColumnIds || [];
+        const nextVerticalMergeValues = {
+          ...(summarizedTableData.verticalMergeValues || {}),
+        };
+        if (verticalMergedColumnIds.includes("asset_serial_no")) {
+          nextVerticalMergeValues.asset_serial_no = fetchedAssetSerialNo;
+        }
+        if (verticalMergedColumnIds.includes("yom")) {
+          nextVerticalMergeValues.yom = fetchedYom;
+        }
 
         const nextRows = rows.map((row, idx) => {
           if (idx !== rowIndex) return row;
@@ -2638,6 +2688,8 @@ function SummarizedReport() {
               fetchedMachineDescription
             ),
             supplier_name: keepIfPresent(row.supplier_name, fetchedSupplierName),
+            asset_serial_no: fetchedAssetSerialNo,
+            yom: fetchedYom,
             invoice_no: parsedInvoiceNo,
             invoice_date: parsedInvoiceDate,
             total_invoice_cost: currencyOrBlank(
@@ -2661,6 +2713,7 @@ function SummarizedReport() {
         handleSummarizedTableDataChange({
           ...summarizedTableData,
           rows: nextRows,
+          verticalMergeValues: nextVerticalMergeValues,
         });
         toast.success(
           `Row filled from order ${matchedOrder.order_number || sourceOrderNumber} (${reportType}).`

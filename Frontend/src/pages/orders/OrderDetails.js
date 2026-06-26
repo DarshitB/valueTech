@@ -144,6 +144,8 @@ function formatActivityTime(dateString) {
  * @version 2.0.0
  */
 
+const MAIL_REGARDS_PHONE = "+91 99209 88549";
+
 // Main component for displaying order details
 function OrderDetails() {
   // Extract order ID from route parameters
@@ -492,7 +494,6 @@ function OrderDetails() {
             cc: Array.isArray(row.cc) ? row.cc : [],
             bcc: Array.isArray(row.bcc) ? row.bcc : [],
             subject: row.subject != null ? String(row.subject) : "",
-            customerName: order?.customer_name_2 || "",
             assetIdentificationNumber: "",
             comments: row.comments != null && String(row.comments).trim() !== ""
               ? String(row.comments)
@@ -509,7 +510,6 @@ function OrderDetails() {
         } else {
           setMailFormData((prev) => ({
             ...prev,
-            customerName: order?.customer_name_2 || "",
             comments: "PLEASE FIND ATTACHED",
             show_table: false,
             show_qrcode: false,
@@ -521,7 +521,6 @@ function OrderDetails() {
         if (!cancelled) {
           setMailFormData((prev) => ({
             ...prev,
-            customerName: order?.customer_name_2 || "",
             comments: "PLEASE FIND ATTACHED",
             show_table: false,
             show_qrcode: false,
@@ -535,7 +534,7 @@ function OrderDetails() {
     return () => {
       cancelled = true;
     };
-  }, [showMailModal, id, order?.customer_name_2]);
+  }, [showMailModal, id]);
 
   // Fetch users for mentions with error handling
   useEffect(() => {
@@ -682,7 +681,7 @@ function OrderDetails() {
     formatRegistrationNumber,
   ]);
 
-  // Prefill Asset Identification Number when report data is fetched
+  // Prefill Customer Name and Asset Identification Number when report data is fetched
   useEffect(() => {
     if (
       showMailModal &&
@@ -739,10 +738,20 @@ function OrderDetails() {
         assetIdVal = report.chassis_no || "";
       }
 
+      const updates = {};
       if (assetIdVal && !mailFormData.assetIdentificationNumber) {
+        updates.assetIdentificationNumber = assetIdVal;
+      }
+
+      const proposedOwnerName = String(report.proposed_owner_name ?? "").trim();
+      if (proposedOwnerName && !mailFormData.customerName) {
+        updates.customerName = proposedOwnerName;
+      }
+
+      if (Object.keys(updates).length > 0) {
         setMailFormData((prev) => ({
           ...prev,
-          assetIdentificationNumber: assetIdVal,
+          ...updates,
         }));
       }
     }
@@ -753,6 +762,7 @@ function OrderDetails() {
     order?.category_name,
     order?.category_report_type,
     mailFormData.assetIdentificationNumber,
+    mailFormData.customerName,
   ]);
 
   // Prefill regards field based on valuer_name
@@ -772,7 +782,7 @@ function OrderDetails() {
       if (regardsText) {
         setMailFormData((prev) => ({
           ...prev,
-          regards: regardsText,
+          regards: `${regardsText}\n${MAIL_REGARDS_PHONE}`,
         }));
       }
     }
@@ -3379,50 +3389,52 @@ function OrderDetails() {
                     />
                   </div>
 
-                  <div style={{ display: "flex", gap: "16px", marginBottom: "16px" }}>
-                    <div className="form-group" style={{ flex: "0 0 80px", width: "80px", minWidth: "80px", maxWidth: "80px", marginBottom: 0 }}>
-                      <label htmlFor="srNo">Sr No</label>
-                      <input
-                        type="number"
-                        className="form-field"
-                        id="srNo"
-                        name="srNo"
-                        value={mailFormData.srNo ?? 1}
-                        onChange={handleMailFormChange}
-                        placeholder="1"
-                        disabled={isSendingMail}
-                        style={{ textAlign: "center" }}
-                      />
-                    </div>
+                  {hasPermission(allowedPermissions, "show_mail_table_checkbox") && (
+                    <div style={{ display: "flex", gap: "16px", marginBottom: "16px" }}>
+                      <div className="form-group" style={{ flex: "0 0 80px", width: "80px", minWidth: "80px", maxWidth: "80px", marginBottom: 0 }}>
+                        <label htmlFor="srNo">Sr No</label>
+                        <input
+                          type="number"
+                          className="form-field"
+                          id="srNo"
+                          name="srNo"
+                          value={mailFormData.srNo ?? 1}
+                          onChange={handleMailFormChange}
+                          placeholder="1"
+                          disabled={isSendingMail}
+                          style={{ textAlign: "center" }}
+                        />
+                      </div>
 
-                    <div className="form-group" style={{ flex: 2, marginBottom: 0 }}>
-                      <label htmlFor="customerName">Customer Name</label>
-                      <input
-                        type="text"
-                        className="form-field"
-                        id="customerName"
-                        name="customerName"
-                        value={mailFormData.customerName || ""}
-                        onChange={handleMailFormChange}
-                        placeholder="Enter customer name"
-                        disabled={isSendingMail}
-                      />
-                    </div>
+                      <div className="form-group" style={{ flex: 2, marginBottom: 0 }}>
+                        <label htmlFor="customerName">Customer Name</label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="customerName"
+                          name="customerName"
+                          value={mailFormData.customerName || ""}
+                          onChange={handleMailFormChange}
+                          placeholder="Enter customer name"
+                          disabled={isSendingMail}
+                        />
+                      </div>
 
-                    <div className="form-group" style={{ flex: 2, marginBottom: 0 }}>
-                      <label htmlFor="assetIdentificationNumber">Asset Identification Number</label>
-                      <input
-                        type="text"
-                        className="form-field"
-                        id="assetIdentificationNumber"
-                        name="assetIdentificationNumber"
-                        value={mailFormData.assetIdentificationNumber || ""}
-                        onChange={handleMailFormChange}
-                        placeholder="Enter asset identification number"
-                        disabled={isSendingMail}
-                      />
+                      <div className="form-group" style={{ flex: 2, marginBottom: 0 }}>
+                        <label htmlFor="assetIdentificationNumber">Asset Identification Number</label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="assetIdentificationNumber"
+                          name="assetIdentificationNumber"
+                          value={mailFormData.assetIdentificationNumber || ""}
+                          onChange={handleMailFormChange}
+                          placeholder="Enter asset identification number"
+                          disabled={isSendingMail}
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="form-group">
                     <label htmlFor="regards">Regards</label>
