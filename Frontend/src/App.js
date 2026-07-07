@@ -17,7 +17,7 @@ function App() {
 
   // ⬇️ Show loading spinner/splash until user data is fetched
   if (token && !user && loading) {
-    return <div className="p-4 text-center text-lg">Loading user...</div>;
+    return <div className="app-standalone-page p-4 text-center text-lg">Loading user...</div>;
   }
 
   return (

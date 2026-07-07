@@ -27,7 +27,7 @@ import { hasPermission } from "../../utils/permissionUtils";
 import { toast } from "react-toastify";
 import CustomDataTable from "../../components/CustomDataTable";
 import "./dashboard.scss";
-import { DashboardIcon, CheckinIcon } from "../../components/icons/Icons";
+import { DashboardIcon } from "../../components/icons/Icons";
 import { DeleteIcon, EditIcon, MoreIcon } from "../../components/icons";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import DatePicker from "react-datepicker";
@@ -901,10 +901,30 @@ function Dashboard() {
   const openAttributesModal = (order) => {
     setAttributesOrderId(order.id);
 
-    // Map assigned_users to admin_user_ids for pre-selection
-    const assignedUserIds = order.assigned_users
-      ? order.assigned_users.map((user) => user.id)
-      : [];
+    // Map assigned_users to admin_user_ids for pre-selection (exclude deleted/unassignable users)
+    const assignableUserIds = new Set(
+      (Array.isArray(users) ? users : [])
+        .filter((u) => {
+          const roleName = String(u.role_name || "").toUpperCase();
+          const excludedRoles = [
+            "DEVELOPER_ADMIN",
+            "SUPER ADMIN",
+            "MANAGER",
+            "TELECALLER",
+            "BANK AUTHORITY",
+            "BANK OFFICER",
+          ];
+          return !excludedRoles.some((excludedRole) => {
+            const normalizedRoleName = roleName.replace(/\s+/g, "");
+            const normalizedExcludedRole = excludedRole.replace(/\s+/g, "");
+            return normalizedRoleName.includes(normalizedExcludedRole);
+          });
+        })
+        .map((u) => u.id)
+    );
+    const assignedUserIds = (order.assigned_users || [])
+      .map((user) => user.id)
+      .filter((id) => assignableUserIds.has(id));
 
     setAttributesFormData({
       order_priority: order.order_priority || "",

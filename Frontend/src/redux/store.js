@@ -19,6 +19,7 @@ import collageReducer from "./reducers/collageReducer";
 import assetMakesReducer from "./reducers/assetMakesReducer";
 import attendanceReducer from "./reducers/attendanceReducer";
 import notificationReducer from "./reducers/notificationReducer";
+import spreadsheetReducer from "./reducers/spreadsheetReducer";
 
 const store = configureStore({
   reducer: {
@@ -42,6 +43,7 @@ const store = configureStore({
     assetMakes: assetMakesReducer,
     attendance: attendanceReducer,
     notifications: notificationReducer,
+    spreadsheets: spreadsheetReducer,
   },
 });
 

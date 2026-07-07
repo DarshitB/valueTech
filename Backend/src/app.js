@@ -46,6 +46,9 @@ const reportCollageUploadRoutes = require("./routes/orders/reportCollageUploadRo
 // Notifications routes
 const notificationRoutes = require("./routes/notifications/notificationRoutes");
 
+// Spreadsheets routes
+const spreadsheetRoutes = require("./routes/spreadsheets/spreadsheetRoutes");
+
 // Field Verifier routes
 const fieldVerifierPortalOperationsRoutes = require("./routes/fieldVerifier/portalOperationsRoutes");
 const mobileAuthRoutes = require("./routes/fieldVerifier/authRoutes");
@@ -172,6 +175,7 @@ app.use("/api/collage-generator", collageGeneratorRoutes);
 app.use("/api/order-media-document", orderMediaDocumentRoutes);
 app.use("/api/asset-makes-of-reports", assetMakesOfReportsRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/spreadsheets", spreadsheetRoutes);
 
 /* mobile APIs */
 app.use("/api/mobile/auth", mobileAuthRoutes);

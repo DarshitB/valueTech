@@ -218,6 +218,7 @@ function applyRequestFilters(queryBuilder, query = {}) {
         .join("users", "order_users.user_id", "users.id")
         .whereRaw("order_users.order_id = orders.id")
         .whereNull("order_users.deleted_at")
+        .whereNull("users.deleted_at")
         .whereRaw("LOWER(TRIM(users.name)) = LOWER(?)", [userAssigned]);
     });
   }
@@ -315,6 +316,7 @@ async function buildFilterOptions(roleFilteredQuery) {
     })
     .join("users as assigned_user", "order_users.user_id", "assigned_user.id")
     .distinct("assigned_user.name as user_assigned")
+    .whereNull("assigned_user.deleted_at")
     .whereNotNull("assigned_user.name")
     .orderBy("user_assigned", "asc");
 

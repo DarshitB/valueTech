@@ -1,7 +1,15 @@
 @use "./variables" as *;
-html {
-  zoom: 0.8;
+
+// Standalone pages (outside Layout): login, OTP, public share, 404, landing iframe
+.login-page-wrapper,
+.public-navbar,
+.public-main-content,
+.app-standalone-page,
+.public-landing-shell,
+.Toastify {
+  zoom: $app-zoom;
 }
+
 .height-full-occupied {
   height: 100%;
   position: relative;

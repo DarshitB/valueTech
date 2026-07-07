@@ -1,6 +1,9 @@
 # Ignore node modules
 node_modules/
 
+# Ignore packages spreadsheet
+packages/spreadsheet/
+
 # Ignore environment config
 .env
 
@@ -12,6 +15,7 @@ service-account.json
 
 # Ignore build
 /build
+/dist
 
 # Ignore package-lock.json
 package-lock.json

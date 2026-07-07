@@ -35,6 +35,9 @@ import MachineryReport from "../pages/orders/reports/MachineryReport";
 import SummarizedReport from "../pages/orders/reports/SummarizedReport";
 import CEReport from "../pages/orders/reports/CEReport";
 import MarineReport from "../pages/orders/reports/MarineReport";
+import Spreadsheets from "../pages/spreadsheets/Spreadsheets";
+import SpreadsheetEditor from "../pages/spreadsheets/SpreadsheetEditor";
+import Spreadsheet from "../pages/SpreadsheetTest/Spreadsheet";
 
 const AppRoutes = () => {
   return (
@@ -42,10 +45,7 @@ const AppRoutes = () => {
       <Route path="/login" element={<Login />} />
       <Route path="/otp-verify" element={<OTPPage />} />
       {/* Public routes (no authentication required) */}
-      <Route
-        path="/public/orders/:id/images"
-        element={<PublicOrderImages />}
-      />
+      <Route path="/public/orders/:id/images" element={<PublicOrderImages />} />
       <Route
         path="/public/share/:token/images"
         element={<PublicOrderImages />}
@@ -264,6 +264,30 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute permission="view_cities">
               <Cities />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="spreadsheettest"
+          element={
+            <ProtectedRoute>
+              <Spreadsheet />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="spreadsheet"
+          element={
+            <ProtectedRoute>
+              <Spreadsheets />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="spreadsheet/:id"
+          element={
+            <ProtectedRoute>
+              <SpreadsheetEditor />
             </ProtectedRoute>
           }
         />

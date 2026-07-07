@@ -25,6 +25,7 @@ function RootLayoutGate() {
      */
     return (
       <div
+        className="public-landing-shell"
         style={{
           position: "fixed",
           top: 0,

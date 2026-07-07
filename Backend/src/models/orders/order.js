@@ -126,8 +126,10 @@ async function applyNonPrivilegedOrderAssignmentFilter(baseQuery, userId) {
     const noActiveAssignmentSubquery = function () {
       this.select(db.raw("1"))
         .from("order_users")
+        .join("users", "order_users.user_id", "users.id")
         .whereRaw("order_users.order_id = orders.id")
-        .whereNull("order_users.deleted_at");
+        .whereNull("order_users.deleted_at")
+        .whereNull("users.deleted_at");
     };
 
     if (assignedOrderIds.length > 0) {
@@ -150,7 +152,7 @@ async function enrichOrdersWithAssignedUsersAndRefNo(orders) {
   }
 
   const assignedUsers = await db("order_users")
-    .leftJoin("users", "order_users.user_id", "users.id")
+    .join("users", "order_users.user_id", "users.id")
     .leftJoin("roles", "users.role_id", "roles.id")
     .select(
       "order_users.order_id",
@@ -161,9 +163,11 @@ async function enrichOrdersWithAssignedUsersAndRefNo(orders) {
       "roles.name as role_name"
     )
     .whereIn("order_users.order_id", orderIds)
-    .whereNull("order_users.deleted_at");
+    .whereNull("order_users.deleted_at")
+    .whereNull("users.deleted_at");
 
   const assignedUsersMap = assignedUsers.reduce((acc, user) => {
+    if (!user.id) return acc;
     if (!acc[user.order_id]) {
       acc[user.order_id] = [];
     }
@@ -814,10 +818,12 @@ const order = {
         .whereNull("deleted_at")
         .first();
 
-      // Check if this order has ANY user assignments
+      // Check if this order has ANY active user assignments (exclude deleted users)
       const hasAnyAssignment = await db("order_users")
+        .join("users", "order_users.user_id", "users.id")
         .where({ order_id: id })
-        .whereNull("deleted_at")
+        .whereNull("order_users.deleted_at")
+        .whereNull("users.deleted_at")
         .first();
 
       // If order has assignments but user is not assigned, deny access
@@ -919,9 +925,9 @@ const order = {
       .where("order_status_history.order_id", id)
       .orderBy("order_status_history.id", "desc");
 
-    // Get assigned users for this order
+    // Get assigned users for this order (exclude soft-deleted users)
     const assignedUsers = await db("order_users")
-      .leftJoin("users", "order_users.user_id", "users.id")
+      .join("users", "order_users.user_id", "users.id")
       .leftJoin("roles", "users.role_id", "roles.id")
       .select(
         "users.id",
@@ -931,7 +937,8 @@ const order = {
         "roles.name as role_name"
       )
       .where("order_users.order_id", id)
-      .whereNull("order_users.deleted_at");
+      .whereNull("order_users.deleted_at")
+      .whereNull("users.deleted_at");
 
     const r2Coverage = await computeR2CoverageForOrders([
       {
@@ -1141,10 +1148,10 @@ const order = {
     return await trx("order_users").insert(newUserData).returning("*");
   },
 
-  // Get assigned users for an order
+  // Get assigned users for an order (exclude soft-deleted users)
   getOrderUsers: async (orderId) => {
     const users = await db("order_users")
-      .leftJoin("users", "order_users.user_id", "users.id")
+      .join("users", "order_users.user_id", "users.id")
       .leftJoin("roles", "users.role_id", "roles.id")
       .select(
         "users.id",
@@ -1154,7 +1161,8 @@ const order = {
         "roles.name as role_name"
       )
       .where("order_users.order_id", orderId)
-      .whereNull("order_users.deleted_at");
+      .whereNull("order_users.deleted_at")
+      .whereNull("users.deleted_at");
     return users;
   },
 };

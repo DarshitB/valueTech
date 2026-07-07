@@ -72,6 +72,10 @@ function Layout() {
     dispatch(logout());
   };
 
+  const isSpreadsheetRoute =
+    location.pathname.startsWith("/spreadsheet/") &&
+    location.pathname.length > "/spreadsheet/".length;
+
   return (
     <>
       <div className="main-wrapper main-wrapper-1">
@@ -291,7 +295,11 @@ function Layout() {
             onClick={() => setSidebarOpen(false)}
           />
         )}
-        <div className="main-content">
+        <div
+          className={`main-content${
+            isSpreadsheetRoute ? " main-content--no-zoom" : ""
+          }`}
+        >
           <Outlet />
         </div>
       </div>
