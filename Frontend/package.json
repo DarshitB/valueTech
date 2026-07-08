@@ -31,6 +31,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "postinstall": "npm install --prefix packages/spreadsheet-wrapper --no-audit --no-fund",
     "start:cra": "react-scripts start",
     "build:cra": "react-scripts build",
     "dev:vite": "vite",

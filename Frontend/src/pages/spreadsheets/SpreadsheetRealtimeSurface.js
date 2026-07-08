@@ -9,6 +9,7 @@ import {
   resolveUserInitials,
 } from "./spreadsheetPresenceColors";
 import { useSpreadsheetSessionColors } from "./SpreadsheetSessionColorContext";
+import { databaseDropdownFetchers } from "./databaseDropdownFetchers";
 
 /**
  * Realtime-aware surface for the spreadsheet editor.
@@ -150,6 +151,7 @@ function SpreadsheetRealtimeSurface({
         ref={spreadsheetRef}
         workbookName={workbookName}
         workbookData={workbookData}
+        databaseProviderFetchers={databaseDropdownFetchers}
         onWorkbookChange={onWorkbookChange}
         onWorkbookRealtimeChange={publishWorkbookUpdate}
         onActiveCellChange={publishActiveCell}

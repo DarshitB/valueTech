@@ -49,6 +49,7 @@ const MARINE_ALWAYS_SEND_FORM_KEYS = [
   "how_many_grades_products_can_vessel_load_discharge_with_double",
   "proposed_owner",
   "proposed_owner_address",
+  "report_title_other",
 ];
 
 const appendMissingMarineFormFields = (formData, formState) => {
@@ -110,9 +111,33 @@ const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "
 
   const handlePaste = (e) => {
     e.preventDefault();
-    const text = e.clipboardData.getData("text/html") || e.clipboardData.getData("text/plain");
-    document.execCommand("insertHTML", false, text);
+    const html = e.clipboardData.getData("text/html");
+    const text = e.clipboardData.getData("text/plain");
+  
+    if (html) {
+      document.execCommand("insertHTML", false, sanitizePastedHtml(html));
+    } else {
+      document.execCommand("insertText", false, text);
+    }
   };
+
+  function sanitizePastedHtml(html) {
+    const temp = document.createElement("div");
+    temp.innerHTML = html;
+    temp.querySelectorAll("*").forEach((el) => {
+      Array.from(el.attributes).forEach((attr) => {
+        if (
+          attr.name === "style" ||
+          attr.name === "class" ||
+          attr.name === "id" ||
+          attr.name.startsWith("data-")
+        ) {
+          el.removeAttribute(attr.name);
+        }
+      });
+    });
+    return temp.innerHTML;
+  }
 
   // Handle placeholder display
   useEffect(() => {
@@ -248,6 +273,7 @@ function MarineReport() {
     report_type: "report_marine",
     report_title_type: "VALUATION REPORT",
     report_title: "Offshore Supply Vessel",
+    report_title_other: "",
     ref_no_year: new Date().getFullYear().toString(),
     ref_no_bank: "",
     ref_no_code: "VKM",
@@ -421,6 +447,7 @@ function MarineReport() {
       report_type: "report_marine",
       report_title_type: "VALUATION REPORT",
       report_title: "Offshore Supply Vessel",
+      report_title_other: "",
       ref_no_year: new Date().getFullYear().toString(),
       ref_no_bank: "",
       ref_no_code: "VKM",
@@ -513,6 +540,7 @@ function MarineReport() {
           // Preserve default values for SingleSearchSelect fields if not already set
           report_title_type: prev.report_title_type || "VALUATION REPORT",
           report_title: prev.report_title || "Offshore Supply Vessel",
+          report_title_other: prev.report_title_other || "",
           state_initial: prev.state_initial || "MUM",
           imo_or_regd_type: prev.imo_or_regd_type || "",
           imo_official_regd_no: prev.imo_official_regd_no || "IMO No",
@@ -2498,6 +2526,7 @@ function MarineReport() {
                         { value: "Chemical Tanker", label: "Chemical Tanker" },
                         { value: "Accommodation Work Barge (AWB)", label: "Accommodation Work Barge (AWB)" },
                         { value: "River Cruise Ship", label: "River Cruise Ship" },
+                        { value: "other", label: "Other" },
                       ]}
                       value={
                         reportFormData.report_title || "Offshore Supply Vessel"
@@ -2507,6 +2536,18 @@ function MarineReport() {
                       }
                       required
                     />
+                    {reportFormData.report_title === "other" && (
+                      <input
+                        type="text"
+                        className="form-field"
+                        name="report_title_other"
+                        style={{ marginTop: "8px" }}
+                        value={reportFormData.report_title_other || ""}
+                        placeholder="Enter report title"
+                        required
+                        onChange={handleFormChange}
+                      />
+                    )}
                   </div>
                 </div>
                 <div className="col-md-6">
@@ -3114,6 +3155,23 @@ function MarineReport() {
                       onChange={handleFormChange}
                       placeholder="0000/000000000"
                       required
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>International Maritime Number</label>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      className="form-field"
+                      name="international_maritime_number"
+                      value={reportFormData.international_maritime_number}
+                      onChange={handleFormChange}
+                      placeholder="Enter International Maritime Number"
                     />
                   </div>
                 </div>

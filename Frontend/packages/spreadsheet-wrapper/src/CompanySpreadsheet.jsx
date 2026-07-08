@@ -9,6 +9,10 @@ import {
 import { createCompanyUniver } from "./createUniver";
 import { getActiveCellAddress, getActiveCellFromUniver, restoreActiveCellSelection } from "./cellAddress";
 import { resolveWorkbookSnapshot } from "./workbookData";
+import {
+  createDatabaseProviderRegistry,
+  installDatabaseDropdown,
+} from "./dropdown";
 import "./styles.css";
 
 function PresenceMarkerLabel({ popup }) {
@@ -40,40 +44,23 @@ function PresenceMarkerLabel({ popup }) {
 
 function resolvePresenceRange(worksheet, cellA1) {
   const baseRange = worksheet.getRange(cellA1);
-  if (!baseRange || typeof baseRange.getCell !== "function") {
-    return baseRange;
+  if (!baseRange) {
+    return null;
   }
 
-  let cellInfo;
-  try {
-    cellInfo = baseRange.getCell();
-  } catch {
-    return baseRange;
+  // Avoid FRange.getCell() — it requires an active render skeleton and logs
+  // errors when presence resync runs during context-menu / metadata updates.
+  if (typeof worksheet.getCellMergeData === "function") {
+    const mergeRange = worksheet.getCellMergeData(
+      baseRange.getRow(),
+      baseRange.getColumn()
+    );
+    if (mergeRange) {
+      return mergeRange;
+    }
   }
 
-  const mergeInfo = cellInfo?.mergeInfo;
-  if (
-    !mergeInfo ||
-    typeof mergeInfo.startRow !== "number" ||
-    typeof mergeInfo.endRow !== "number" ||
-    typeof mergeInfo.startColumn !== "number" ||
-    typeof mergeInfo.endColumn !== "number"
-  ) {
-    return baseRange;
-  }
-
-  const rowCount = mergeInfo.endRow - mergeInfo.startRow + 1;
-  const columnCount = mergeInfo.endColumn - mergeInfo.startColumn + 1;
-  if (rowCount <= 1 && columnCount <= 1) {
-    return baseRange;
-  }
-
-  return worksheet.getRange(
-    mergeInfo.startRow,
-    mergeInfo.startColumn,
-    rowCount,
-    columnCount
-  );
+  return baseRange;
 }
 
 const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
@@ -87,6 +74,7 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
     onActiveCellChange,
     isApplyingRemoteWorkbookRef,
     onApplyingRemoteWorkbookChange,
+    databaseProviderFetchers = null,
   },
   ref
 ) {
@@ -553,6 +541,7 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
     let isDisposed = false;
     let univerAPI;
     const changeEventDisposables = [];
+    let databaseDropdownDisposable = () => {};
 
     setIsInitializing(true);
 
@@ -613,6 +602,14 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
         });
       }
 
+      if (databaseProviderFetchers) {
+        const registry = createDatabaseProviderRegistry(databaseProviderFetchers);
+        databaseDropdownDisposable = installDatabaseDropdown(univerAPI, {
+          registry,
+          onWorkbookDataChange: notifyWorkbookChange,
+        });
+      }
+
       const snapshot = resolveWorkbookSnapshot(workbookName, workbookData);
       const mutableSnapshot =
         typeof structuredClone === "function"
@@ -664,11 +661,12 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
       }
       clearPresenceMarkers();
       changeEventDisposables.forEach((disposable) => disposable?.dispose?.());
+      databaseDropdownDisposable?.();
       workbookRef.current = null;
       univerApiRef.current = null;
       univerAPI?.dispose();
     };
-  }, [workbookName, workbookData]);
+  }, [workbookName, workbookData, databaseProviderFetchers]);
 
   return (
     <div ref={rootRef} className="company-spreadsheet">

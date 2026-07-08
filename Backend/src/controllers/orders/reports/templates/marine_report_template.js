@@ -34,6 +34,13 @@ function generateMarineReportHTML(
   // Helper function to get value safely
   const getValue = (field) => field || "";
 
+  // When "Other" is selected for report_title, report_title_other holds the
+  // actual title and must be used everywhere report_title would normally appear.
+  const resolvedReportTitle =
+    String(formData.report_title || "").trim().toLowerCase() === "other"
+      ? formData.report_title_other || ""
+      : formData.report_title;
+
   const isVkaValuer =
     String(formData.valuer_name || "").trim().toUpperCase() === "V.K. ASSOCIATES";
 
@@ -386,7 +393,7 @@ function generateMarineReportHTML(
         /* Last page declaration section */
         .last-page-declaration {
             margin-top: 30px;
-            margin-bottom: 20px;
+            margin-bottom: 0;
             position: relative;
             z-index: 2;
         }
@@ -908,11 +915,11 @@ function generateMarineReportHTML(
                     <h2
                         style="text-align: center;font-size: 25px;font-weight: bold;text-transform: uppercase;text-decoration: underline;margin-bottom: 15px;">
                         ${getValue(
-                          formData.report_title_type || formData.report_title
+                          formData.report_title_type || resolvedReportTitle
                         )}</h2>
                     <p
                         style="text-align: center;font-size: 25px;text-decoration: underline;line-height: 1.2;margin-bottom: 15px;">
-                        ${getValue(formData.report_title)}
+                        ${getValue(resolvedReportTitle)}
                         <br>
                         "<b>
                             ${getValue(formData.name_of_the_vessel)}
@@ -1051,7 +1058,7 @@ function generateMarineReportHTML(
                 generateTableRow("Marine Vessel Name", formData.name_of_the_vessel || formData.marine_vessel_name),
                 generateTableRow("Type or Description of Vessel", formData.type_or_description_of_vessel),
                 generateTableRow("Official Number / MMSI No.", formData.mmsi_no),
-                generateTableRow("International Maritime Number", formData.imo_or_regd_no),
+                generateTableRow("International Maritime Number", formData.international_maritime_number),
                 generateTableRow("Class Notation", formData.class_notation),
                 generateTableRow("Call Sign / Class Notation Machinery", formData.call_sign_class_notation_machinery),
                 generateTableRow("Current Registry Port", formData.current_registry_port),
@@ -3782,7 +3789,7 @@ function generateMarineReportHTML(
             )}
 
             <h2>DISCLAIMER</h2>
-            <p>${getValue(formData.disclaimer)}</p>
+             <p class="splittable-description" data-splittable="true">${renderFieldValue(formData.disclaimer)}</p>
 
             <!-- Last Page Declaration -->
             <div class="last-page-declaration">
@@ -3829,17 +3836,140 @@ function generateMarineReportHTML(
     -->
     
      <script>
+        // ============================================
+        // Generic HTML-aware, height-based text splitter.
+        // Used ONLY for long WYSIWYG description paragraphs
+        // (marked data-splittable="true"). When a description
+        // doesn't fit remaining page space, only the overflow
+        // part moves to the next page — the rest stays put,
+        // exactly like normal text reflow.
+        // ============================================
+        function splitContentByHeight(sourceElement, liveContainer, pageContentHeight) {
+            function fits(node) {
+                liveContainer.appendChild(node);
+                void liveContainer.offsetHeight;
+                const ok = liveContainer.scrollHeight <= pageContentHeight;
+                liveContainer.removeChild(node);
+                return ok;
+            }
+
+            const wholeClone = sourceElement.cloneNode(true);
+            if (fits(wholeClone)) {
+                return { first: wholeClone, remainder: null };
+            }
+
+            const firstRoot = sourceElement.cloneNode(false);
+            const remainderRoot = sourceElement.cloneNode(false);
+            let splitDone = false;
+
+            function recurse(origNode, firstParent, remainderParent) {
+                if (splitDone) {
+                    remainderParent.appendChild(origNode.cloneNode(true));
+                    return;
+                }
+
+                if (origNode.nodeType === Node.TEXT_NODE) {
+                    const words = origNode.textContent.split(/(\s+)/).filter(w => w.length > 0);
+                    let buffer = '';
+                    for (let i = 0; i < words.length; i++) {
+                        const testBuffer = buffer + words[i];
+                        const testNode = document.createTextNode(testBuffer);
+                        firstParent.appendChild(testNode);
+                        if (fits(firstRoot)) {
+                            firstParent.removeChild(testNode);
+                            buffer = testBuffer;
+                        } else {
+                            firstParent.removeChild(testNode);
+                            if (buffer) firstParent.appendChild(document.createTextNode(buffer));
+                            const remainderText = words.slice(i).join('').replace(/^\s+/, '');
+                            if (remainderText) {
+                                remainderParent.appendChild(document.createTextNode(remainderText));
+                            }
+                            splitDone = true;
+                            return;
+                        }
+                    }
+                    if (buffer) firstParent.appendChild(document.createTextNode(buffer));
+                    return;
+                }
+
+                const wholeChildClone = origNode.cloneNode(true);
+                firstParent.appendChild(wholeChildClone);
+                if (fits(firstRoot)) {
+                    return;
+                }
+                firstParent.removeChild(wholeChildClone);
+
+                if (origNode.childNodes && origNode.childNodes.length > 0) {
+                    const firstChildShell = origNode.cloneNode(false);
+                    const remainderChildShell = origNode.cloneNode(false);
+                    firstParent.appendChild(firstChildShell);
+
+                    for (const child of Array.from(origNode.childNodes)) {
+                        recurse(child, firstChildShell, remainderChildShell);
+                    }
+
+                    if (firstChildShell.childNodes.length === 0) {
+                        firstParent.removeChild(firstChildShell);
+                    }
+                    if (remainderChildShell.childNodes.length > 0) {
+                        remainderParent.appendChild(remainderChildShell);
+                    }
+                } else {
+                    remainderParent.appendChild(origNode.cloneNode(true));
+                    splitDone = true;
+                }
+            }
+
+            for (const child of Array.from(sourceElement.childNodes)) {
+                recurse(child, firstRoot, remainderRoot);
+            }
+
+            function hasVisibleContent(node) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    return node.textContent.trim().length > 0;
+                }
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    if (node.tagName === 'IMG') return true;
+                    if (node.tagName === 'BR') return false;
+                    return Array.from(node.childNodes).some(hasVisibleContent);
+                }
+                return false;
+            }
+
+            const remainderHasContent = Array.from(remainderRoot.childNodes).some(hasVisibleContent);
+
+            return {
+                first: firstRoot.childNodes.length > 0 ? firstRoot : null,
+                remainder: remainderHasContent ? remainderRoot : null
+            };
+        }
+          function getUsedContentHeight(container) {
+              let maxBottom = 0;
+              Array.from(container.children).forEach((child) => {
+                  const bottom = child.offsetTop + child.offsetHeight;
+                  if (bottom > maxBottom) maxBottom = bottom;
+              });
+              return maxBottom;
+          }
          // Auto-pagination system
         function autoPaginate() {
             // Step 1: Collect all content elements from all pages
             const allPages = document.querySelectorAll('.page');
             const allContentElements = [];
 
+             let lastPageDeclarationEl = null;
+
             allPages.forEach(page => {
                 const pageContent = page.querySelector('.page-content');
                 if (pageContent) {
                     const heroPage = pageContent.querySelector('.report-hero-page');
                     const reportInfo = pageContent.querySelector('.report-info');
+                    const declaration = pageContent.querySelector('.last-page-declaration');
+
+                    if (declaration && !lastPageDeclarationEl) {
+                        lastPageDeclarationEl = declaration;
+                    }
 
                     if (heroPage) {
                         allContentElements.push(heroPage);
@@ -3860,7 +3990,7 @@ function generateMarineReportHTML(
                     });
 
                     contentElements.forEach(el => {
-                        if (el !== heroPage && el !== reportInfo) {
+                        if (el !== heroPage && el !== reportInfo && el !== declaration) {
                             if (el.tagName === 'TABLE') {
                                 let rows = [];
                                 if (el.querySelector('tbody')) {
@@ -3919,6 +4049,7 @@ function generateMarineReportHTML(
             if (!currentPageContent) return;
 
             const pageContentHeight = currentPageContent.offsetHeight;
+
             const heroPage = currentPageContent.querySelector('.report-hero-page');
             const reportInfo = currentPageContent.querySelector('.report-info');
 
@@ -4102,9 +4233,90 @@ function generateMarineReportHTML(
                         currentTable.appendChild(tbody);
                         currentPageContent.appendChild(currentTable);
                         currentTable.querySelector('tbody').appendChild(element);
-                    } else {
-                        element.remove();
-                        currentTable = null;
+                      } else {
+                          element.remove();
+                          currentTable = null;
+
+                          // Flexible-section images (HEADING_DESCRIPTION_IMAGE,
+                          // _2, _3 only — tagged with data-fill-remaining):
+                          // if there's meaningful leftover space on the current
+                          // page, resize the image to exactly fill it instead of
+                          // pushing it whole to a new page. Below the threshold,
+                          // it moves to the next page with default sizing.
+                          if (element.tagName === 'IMG' && element.hasAttribute('data-fill-remaining')) {
+                            void currentPageContent.offsetHeight;
+                            const usedHeight = getUsedContentHeight(currentPageContent);
+                            const remainingSpace = pageContentHeight - usedHeight;
+                            const MIN_IMAGE_FILL_SPACE = 150; // px
+
+                              if (remainingSpace >= MIN_IMAGE_FILL_SPACE) {
+                                  element.style.width = '100%';
+                                  element.style.height = remainingSpace + 'px';
+                                  element.style.objectFit = 'contain';
+                                  currentPageContent.appendChild(element);
+                                  void currentPageContent.offsetHeight;
+                              } else {
+                                  element.style.width = '100%';
+                                  element.style.height = 'auto';
+                                  element.style.objectFit = '';
+                                  currentPageNum++;
+                                  const newPage = createNewPage(currentPageNum);
+                                  currentPage.insertAdjacentElement('afterend', newPage);
+                                  currentPage = newPage;
+                                  currentPageContent = currentPage.querySelector('.page-content');
+                                  currentPageContent.appendChild(element);
+                                  void currentPageContent.offsetHeight;
+                              }
+                              continue;
+                          }
+
+                          // Robust reflow-style splitting — ONLY for marked
+                          // WYSIWYG description paragraphs. Everything else
+                          // (headings, images, tables, other <p>) keeps the
+                          // original all-or-nothing move-to-next-page behaviour.
+                          if (element.tagName === 'P' && element.hasAttribute('data-splittable')) {
+                            let remainingNode = element;
+                            let safetyCounter = 0;
+
+                            while (remainingNode && safetyCounter < 500) {
+                                safetyCounter++;
+
+                                const pageIsEmpty = currentPageContent.children.length === 0;
+
+                                const { first, remainder } = splitContentByHeight(
+                                    remainingNode,
+                                    currentPageContent,
+                                    pageContentHeight
+                                );
+
+                                if (first) {
+                                    currentPageContent.appendChild(first);
+                                    void currentPageContent.offsetHeight;
+                                } else if (pageIsEmpty) {
+                                    // Nothing fits even on a blank page (extreme edge case) —
+                                    // force it in so we never loop forever.
+                                    currentPageContent.appendChild(remainingNode);
+                                    void currentPageContent.offsetHeight;
+                                    remainingNode = null;
+                                    break;
+                                }
+
+                                if (!remainder) {
+                                    remainingNode = null;
+                                    break;
+                                }
+
+                                currentPageNum++;
+                                const newPage = createNewPage(currentPageNum);
+                                currentPage.insertAdjacentElement('afterend', newPage);
+                                currentPage = newPage;
+                                currentPageContent = currentPage.querySelector('.page-content');
+
+                                remainingNode = remainder;
+                            }
+
+                            continue;
+                        }
 
                         const contentOnCurrentPage = Array.from(currentPageContent.children);
                         if (contentOnCurrentPage.length === 0) {
@@ -4126,7 +4338,27 @@ function generateMarineReportHTML(
                 }
             }
 
+             // Force-place the declaration block explicitly and reliably —
+            // never route it through the generic overflow branch, which is
+            // what silently dropped it before.
+            if (lastPageDeclarationEl) {
+                currentPageContent.appendChild(lastPageDeclarationEl);
+                void currentPageContent.offsetHeight;
+
+                if (currentPageContent.scrollHeight > pageContentHeight &&
+                    currentPageContent.children.length > 1) {
+                    lastPageDeclarationEl.remove();
+                    currentPageNum++;
+                    const newPage = createNewPage(currentPageNum);
+                    currentPage.insertAdjacentElement('afterend', newPage);
+                    currentPage = newPage;
+                    currentPageContent = currentPage.querySelector('.page-content');
+                    currentPageContent.appendChild(lastPageDeclarationEl);
+                }
+            }
+
             updatePageNumbers();
+            window.__marinePaginationComplete = true;
         }
 
         function createNewPage(pageNum) {
@@ -4191,14 +4423,29 @@ function generateMarineReportHTML(
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function () {
-            // Wait for content to render
-            setTimeout(() => {
-                // console.log('Starting auto-pagination...');
-                autoPaginate();
-                // console.log('Pagination complete. Total pages:', document.querySelectorAll('.page').length);
-                // Auto-check status
-                checkPaginationStatus();
-            }, 100);
+            // Run pagination only after layout-affecting assets are ready.
+            // Otherwise late font/image reflow can push the final declaration
+            // below the page boundary after pagination has already finished.
+            const imagePromises = Array.from(document.images || []).map((img) => {
+                if (img.complete) return Promise.resolve();
+                return new Promise((resolve) => {
+                    img.addEventListener('load', resolve, { once: true });
+                    img.addEventListener('error', resolve, { once: true });
+                    setTimeout(resolve, 8000);
+                });
+            });
+
+            const fontsReady =
+                document.fonts && document.fonts.ready
+                    ? document.fonts.ready.catch(() => undefined)
+                    : Promise.resolve();
+
+            Promise.all([Promise.all(imagePromises), fontsReady]).then(() => {
+                setTimeout(() => {
+                    autoPaginate();
+                    checkPaginationStatus();
+                }, 50);
+            });
         });
 
         // Re-paginate on window resize
@@ -4316,7 +4563,7 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName, getNextMa
         if (description) {
           // Render description with HTML support
           const renderedDescription = renderFieldValue(description);
-          html += `<p>${renderedDescription}</p>`;
+          html += `<p class="splittable-description" data-splittable="true">${renderedDescription}</p>`;
         }
         if (imageUrl) {
           // Convert relative URLs to absolute if needed
@@ -4331,7 +4578,7 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName, getNextMa
             const baseUrl = process.env.BASE_URL || "http://localhost:5000";
             fullImageUrl = `${baseUrl}/${imageUrl}`;
           }
-          html += `<img src="${fullImageUrl}" style="width: 100%; height: auto;" alt="${heading}">`;
+          html += `<img src="${fullImageUrl}" class="flexible-section-image" data-fill-remaining="true" style="width: 100%; height: auto;" alt="${heading}">`;
         }
       }
     });

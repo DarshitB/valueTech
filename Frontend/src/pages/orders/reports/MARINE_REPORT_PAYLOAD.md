@@ -247,7 +247,11 @@ All fields from the main form are included in the payload, even if empty:
   "fwa_tpc_at_summer_draft_Displacement_dimensions": "",
   
   // Report Title (selected from dropdown)
-  "report_title": "Offshore Supply Vessel"
+  // If the dropdown value is "other", the actual title must be provided in
+  // "report_title_other" - it is used everywhere report_title would be used
+  // (e.g. in the generated report/template).
+  "report_title": "Offshore Supply Vessel",
+  "report_title_other": ""
 }
 ```
 

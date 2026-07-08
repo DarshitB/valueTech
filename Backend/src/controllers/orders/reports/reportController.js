@@ -1203,6 +1203,9 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
     stampImageBase64,
     templateFormData.report_type_selection
   );
+  /* const debugPath = path.join(process.cwd(), 'debug_marine.html');
+  fs.writeFileSync(debugPath, htmlContent);
+  console.log('DEBUG HTML WRITTEN TO:', debugPath); */
 
   // Launch Puppeteer with optimized settings
   const executablePath =
@@ -1258,6 +1261,8 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
       waitUntil: waitStrategy,
       timeout: isMarineReport ? 60000 : 10000,
     });
+    /* page.on('console', msg => console.log('PAGE LOG:', msg.text())); */
+
 
     // For marine reports, add additional wait to ensure JavaScript pagination completes
     if (isMarineReport) {
@@ -1292,19 +1297,18 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
       try {
         await page
           .waitForFunction(
-            () => {
-              // Check if autoPaginate has run by looking for multiple pages or updated content
-              const pages = document.querySelectorAll(".page");
-              return pages.length > 0;
-            },
-            { timeout: 5000 }
+            () => window.__marinePaginationComplete === true,
+            { timeout: 20000 }
           )
           .catch(() => {
             // If it times out, just continue - the content is already loaded
+            console.warn(
+              "Marine pagination did not signal completion within timeout"
+            );
           });
 
-        // Additional delay using Promise
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        // Small settle delay for final layout/paint
+        await new Promise((resolve) => setTimeout(resolve, 300));
       } catch (error) {
         // Continue even if wait fails
         console.warn(
@@ -4127,6 +4131,7 @@ function filterValidReportFields(formData, reportType) {
       // Vessel Details Section
       "report_title_type",
       "report_title",
+      "report_title_other",
       "name_of_the_vessel",
       "official_no",
       "imo_or_regd_type",
@@ -4160,6 +4165,7 @@ function filterValidReportFields(formData, reportType) {
       "marine_vessel_name",
       "type_or_description_of_vessel",
       "mmsi_no",
+      "international_maritime_number",
       "class_notation",
       "call_sign_class_notation_machinery",
       "current_registry_port",
