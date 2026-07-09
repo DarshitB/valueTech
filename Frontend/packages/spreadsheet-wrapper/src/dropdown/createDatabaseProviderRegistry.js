@@ -76,5 +76,14 @@ export function createDatabaseProviderRegistry(fetchers = {}) {
     });
   }
 
+  if (typeof fetchers.fieldVerifier === "function") {
+    providers.push({
+      id: DATABASE_PROVIDER_IDS.FIELD_VERIFIER,
+      label: "Field Verifier",
+      fetchRecords: fetchers.fieldVerifier,
+      optionFields: { labelField: "name", valueField: "name" },
+    });
+  }
+
   return createProviderRegistry(providers);
 }

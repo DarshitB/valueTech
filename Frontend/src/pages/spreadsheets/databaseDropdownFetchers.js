@@ -6,6 +6,7 @@ import { getOfficers } from "../../api/officers.api";
 import { getCategories } from "../../api/category.api";
 import { getSubCategories } from "../../api/subcategory.api";
 import { getChildCategories } from "../../api/childCategory.api";
+import { getFieldVerifiers } from "../../api/fieldVerifier.api";
 
 /**
  * API fetchers for spreadsheet Database Dropdown providers.
@@ -20,4 +21,5 @@ export const databaseDropdownFetchers = {
   category: async () => (await getCategories()).data,
   assetCategory: async () => (await getSubCategories()).data,
   subCategory: async () => (await getChildCategories()).data,
+  fieldVerifier: async () => (await getFieldVerifiers()).data,
 };
