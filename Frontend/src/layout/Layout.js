@@ -76,6 +76,24 @@ function Layout() {
     location.pathname.startsWith("/spreadsheet/") &&
     location.pathname.length > "/spreadsheet/".length;
 
+  const resolvedTitle = title || pageTitle;
+
+  const renderPageHeading = () => {
+    if (!isSpreadsheetRoute) {
+      return resolvedTitle;
+    }
+
+    return (
+      <>
+        <Link to="/spreadsheet" className="page-title-breadcrumb-link">
+          Spreadsheets
+        </Link>
+        <span className="mx-2">&gt;</span>
+        <span>{resolvedTitle}</span>
+      </>
+    );
+  };
+
   return (
     <>
       <div className="main-wrapper main-wrapper-1">
@@ -87,7 +105,7 @@ function Layout() {
             >
               <AlignJustify size={20} />
             </button>
-            <h1 className="page-title-heading">{title || pageTitle}</h1>
+            <h1 className="page-title-heading">{renderPageHeading()}</h1>
           </div>
           <ul className="navbar-nav navbar-right">
             {hasPermission(allowedPermissions, "view_notification") && (

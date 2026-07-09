@@ -12,6 +12,7 @@ import { SpreadsheetRealtimeProvider } from "../../realtime/spreadsheet";
 import { SpreadsheetSessionColorProvider } from "./SpreadsheetSessionColorContext";
 import SpreadsheetPresencePanel from "./SpreadsheetPresencePanel";
 import SpreadsheetRealtimeSurface from "./SpreadsheetRealtimeSurface";
+import { useSpreadsheetKeyboardShortcuts } from "./spreadsheetKeyboardShortcuts";
 import { toast } from "react-toastify";
 import NotFound from "../NotFound";
 
@@ -37,6 +38,7 @@ function SpreadsheetRealtimeEditorContent({
   onManualSave,
 }) {
   const { localCell, publishActiveCell } = useSpreadsheetActiveCellPublisher();
+  useSpreadsheetKeyboardShortcuts({ spreadsheetRef, onManualSave });
 
   return (
     <div className="height-full-occupied spreadsheet-editor-container">

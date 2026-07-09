@@ -33,31 +33,30 @@ function SpreadsheetRealtimeSurface({
   const currentUserId = currentUser?.id;
   const currentUserName = currentUser?.name || "You";
   const [isSpreadsheetReady, setIsSpreadsheetReady] = useState(false);
-  const [isApplyingRemoteWorkbook, setIsApplyingRemoteWorkbook] = useState(false);
-  const isApplyingRemoteWorkbookRef = useRef(false);
+  const [isApplyingRemoteCommand, setIsApplyingRemoteCommand] = useState(false);
+  const isApplyingRemoteCommandRef = useRef(false);
   const syncCoordinatorRef = useRef(null);
 
   if (!syncCoordinatorRef.current) {
     syncCoordinatorRef.current = createWorkbookSyncCoordinator();
   }
 
-  const handleApplyingRemoteWorkbookChange = useCallback((isApplying) => {
-    isApplyingRemoteWorkbookRef.current = isApplying;
-    setIsApplyingRemoteWorkbook(isApplying);
+  const handleApplyingRemoteCommandChange = useCallback((isApplying) => {
+    isApplyingRemoteCommandRef.current = isApplying;
+    setIsApplyingRemoteCommand(isApplying);
   }, []);
 
   const { publishWorkbookUpdate } = useSpreadsheetWorkbookPublisher({
-    spreadsheetRef,
     isSpreadsheetReady,
-    isApplyingRemoteWorkbook,
-    isApplyingRemoteWorkbookRef,
+    isApplyingRemoteCommand,
+    isApplyingRemoteCommandRef,
     syncCoordinator: syncCoordinatorRef.current,
   });
 
   useSpreadsheetWorkbookSubscriber({
     spreadsheetRef,
     isSpreadsheetReady,
-    isApplyingRemoteWorkbook,
+    isApplyingRemoteCommand,
     syncCoordinator: syncCoordinatorRef.current,
   });
 
@@ -157,8 +156,8 @@ function SpreadsheetRealtimeSurface({
         onActiveCellChange={publishActiveCell}
         onReady={handleSpreadsheetReady}
         onError={handleSpreadsheetError}
-        isApplyingRemoteWorkbookRef={isApplyingRemoteWorkbookRef}
-        onApplyingRemoteWorkbookChange={handleApplyingRemoteWorkbookChange}
+        isApplyingRemoteCommandRef={isApplyingRemoteCommandRef}
+        onApplyingRemoteCommandChange={handleApplyingRemoteCommandChange}
       />
     </>
   );

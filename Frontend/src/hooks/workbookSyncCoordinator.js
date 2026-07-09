@@ -33,6 +33,8 @@ export function createWorkbookSyncCoordinator() {
     appliedSequences: new Set(),
     /** Remote snapshots waiting to be applied, sorted by ascending sequence. */
     remoteQueue: [],
+    /** Local commands waiting to be published in order. */
+    localCommandQueue: [],
     /** Assigned by the subscriber — drains the remote queue in order. */
     flushRemoteQueue: async () => false,
   };
@@ -167,6 +169,26 @@ export function enqueueRemoteWorkbookUpdate(coordinator, update) {
 }
 
 /**
+ * Queue a local command for realtime publishing.
+ *
+ * @param {ReturnType<typeof createWorkbookSyncCoordinator>} coordinator
+ * @param {{ commandId: string, commandParams?: any }} command
+ * @returns {boolean}
+ */
+export function enqueueLocalCommand(coordinator, command) {
+  const commandId = String(command?.commandId ?? "").trim();
+  if (!commandId) {
+    return false;
+  }
+
+  coordinator.localCommandQueue.push({
+    commandId,
+    commandParams: command?.commandParams ?? null,
+  });
+  return true;
+}
+
+/**
  * Clear a publish lock that was left behind by an unexpected failure.
  *
  * @param {ReturnType<typeof createWorkbookSyncCoordinator>} coordinator
@@ -216,4 +238,5 @@ export function resetWorkbookSyncCoordinator(coordinator) {
   coordinator.lastAppliedSequence = 0;
   coordinator.appliedSequences.clear();
   coordinator.remoteQueue.length = 0;
+  coordinator.localCommandQueue.length = 0;
 }

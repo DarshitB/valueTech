@@ -4075,6 +4075,70 @@ function generateMarineReportHTML(
 
                 if (element === heroPage) continue;
 
+                // Custom Media Block (heading + description + image) must always
+                // stay together as ONE unbreakable unit: either the whole block
+                // fits on the current page, or the whole block (not just the
+                // image) moves to the next page. This does not affect any other
+                // heading/paragraph/table/image in the report.
+                const cmbGroupId = element.getAttribute && element.getAttribute('data-cmb-group');
+                if (cmbGroupId && !element._cmbForceIndividual) {
+                    const groupIndices = [i];
+                    let j = i + 1;
+                    while (
+                        j < allContentElements.length &&
+                        allContentElements[j].getAttribute &&
+                        allContentElements[j].getAttribute('data-cmb-group') === cmbGroupId
+                    ) {
+                        groupIndices.push(j);
+                        j++;
+                    }
+                    const groupElements = groupIndices.map(idx => allContentElements[idx]);
+
+                    currentTable = null;
+
+                    const measureGroupFits = (container, els) => {
+                        const clones = els.map(el => el.cloneNode(true));
+                        clones.forEach(c => container.appendChild(c));
+                        void container.offsetHeight;
+                        const fits = container.scrollHeight <= pageContentHeight;
+                        clones.forEach(c => c.remove());
+                        return fits;
+                    };
+
+                    if (measureGroupFits(currentPageContent, groupElements)) {
+                        groupElements.forEach(el => currentPageContent.appendChild(el));
+                        void currentPageContent.offsetHeight;
+                        i = j - 1;
+                        continue;
+                    }
+
+                    const pageHasContent = currentPageContent.children.length > 0;
+
+                    if (pageHasContent) {
+                        currentPageNum++;
+                        const newPage = createNewPage(currentPageNum);
+                        currentPage.insertAdjacentElement('afterend', newPage);
+                        currentPage = newPage;
+                        currentPageContent = currentPage.querySelector('.page-content');
+                    }
+
+                    if (measureGroupFits(currentPageContent, groupElements)) {
+                        groupElements.forEach(el => currentPageContent.appendChild(el));
+                        void currentPageContent.offsetHeight;
+                        i = j - 1;
+                        continue;
+                    }
+
+                    // Extreme fallback: the block is too large to fit even on a
+                    // fresh, empty page (e.g. a huge description/image). In this
+                    // rare case, fall through to the normal per-element rules
+                    // below (heading grouping / splittable description /
+                    // image fill-remaining) so nothing is lost.
+                    groupElements.forEach(el => { el._cmbForceIndividual = true; });
+                    i = i - 1;
+                    continue;
+                }
+
                 // Check if this is a heading
                 const isHeading = element.tagName && element.tagName.match(/^H[1-6]$/);
 
@@ -4549,7 +4613,7 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName, getNextMa
 
   // HEADING_DESCRIPTION_IMAGE sections - render as heading, description, image
   if (sectionName.includes("HEADING_DESCRIPTION_IMAGE")) {
-    sectionFields.forEach((field) => {
+    sectionFields.forEach((field, fieldIdx) => {
       const heading = field.field_1 || "";
       const description = field.field_2 || "";
       const imageUrl = field.field_3 || "";
@@ -4557,13 +4621,16 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName, getNextMa
 
       if (heading || description || imageUrl) {
         const counterValue = getNextMainCounter ? getNextMainCounter() : (field.field_order || "");
+        // Shared group id so the pagination script keeps heading + description +
+        // image of this custom media block together as a single unbreakable unit.
+        const cmbGroupId = `${sectionName}-${fieldIdx}`;
         // Render heading with HTML support
         const renderedHeading = renderFieldValue(heading);
-        html += `<h2><span class="main-counter">${counterValue}</span>. ${renderedHeading}</h2>`;
+        html += `<h2 data-cmb-group="${cmbGroupId}"><span class="main-counter">${counterValue}</span>. ${renderedHeading}</h2>`;
         if (description) {
           // Render description with HTML support
           const renderedDescription = renderFieldValue(description);
-          html += `<p class="splittable-description" data-splittable="true">${renderedDescription}</p>`;
+          html += `<p class="splittable-description" data-splittable="true" data-cmb-group="${cmbGroupId}">${renderedDescription}</p>`;
         }
         if (imageUrl) {
           // Convert relative URLs to absolute if needed
@@ -4578,7 +4645,7 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName, getNextMa
             const baseUrl = process.env.BASE_URL || "http://localhost:5000";
             fullImageUrl = `${baseUrl}/${imageUrl}`;
           }
-          html += `<img src="${fullImageUrl}" class="flexible-section-image" data-fill-remaining="true" style="width: 100%; height: auto;" alt="${heading}">`;
+          html += `<img src="${fullImageUrl}" class="flexible-section-image" data-fill-remaining="true" data-cmb-group="${cmbGroupId}" style="width: 100%; height: auto;" alt="${heading}">`;
         }
       }
     });

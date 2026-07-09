@@ -32,6 +32,25 @@ const spreadsheet = {
         updated_by: updatedBy,
       }),
 
+  updateLatestVersionWorkbookData: async (spreadsheetId, workbookData, trx = db) => {
+    const latestVersion = await trx("spreadsheet_versions")
+      .select("id")
+      .where({ spreadsheet_id: spreadsheetId })
+      .orderBy("version", "desc")
+      .first();
+
+    if (!latestVersion) {
+      return null;
+    }
+
+    const [updated] = await trx("spreadsheet_versions")
+      .where({ id: latestVersion.id })
+      .update({ workbook_data: workbookData })
+      .returning(["id", "version", "workbook_data"]);
+
+    return updated || null;
+  },
+
   create: (data, trx = db) =>
     trx("spreadsheets")
       .insert(data)

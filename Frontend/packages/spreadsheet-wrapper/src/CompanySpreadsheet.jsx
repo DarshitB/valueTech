@@ -72,8 +72,8 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
     onWorkbookChange,
     onWorkbookRealtimeChange,
     onActiveCellChange,
-    isApplyingRemoteWorkbookRef,
-    onApplyingRemoteWorkbookChange,
+    isApplyingRemoteCommandRef,
+    onApplyingRemoteCommandChange,
     databaseProviderFetchers = null,
   },
   ref
@@ -90,6 +90,9 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
   const lastPublishedActiveCellRef = useRef(null);
   const selectionReadyRef = useRef(false);
   const remoteApplyDepthRef = useRef(0);
+  const isApplyingRemoteCommandLocalRef = useRef(false);
+  const lastRealtimeWorkbookSignatureRef = useRef(null);
+  const lastRealtimeActiveCellRef = useRef(null);
   const presenceMarkerStateRef = useRef(new Map());
   const latestPresenceMarkersRef = useRef([]);
   const presenceResyncRafRef = useRef(0);
@@ -117,11 +120,44 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
   }, [onReady]);
 
   const shouldSkipLocalWorkbookSync = () => {
-    return remoteApplyDepthRef.current > 0;
+    return (
+      remoteApplyDepthRef.current > 0 ||
+      isApplyingRemoteCommandLocalRef.current ||
+      Boolean(isApplyingRemoteCommandRef?.current)
+    );
   };
 
   const shouldIgnoreSyntheticSelectionEvent = () => {
-    return !selectionReadyRef.current || remoteApplyDepthRef.current > 0;
+    return (
+      !selectionReadyRef.current ||
+      remoteApplyDepthRef.current > 0 ||
+      isApplyingRemoteCommandLocalRef.current ||
+      Boolean(isApplyingRemoteCommandRef?.current)
+    );
+  };
+
+  const shouldSkipLocalRealtimeCommandPublish = () => {
+    return (
+      isApplyingRemoteCommandLocalRef.current ||
+      Boolean(isApplyingRemoteCommandRef?.current)
+    );
+  };
+
+  const captureRealtimeState = (univerAPI) => {
+    const workbook =
+      workbookRef.current || univerAPI?.getActiveWorkbook?.() || null;
+
+    let workbookSignature = null;
+    if (workbook?.save) {
+      try {
+        workbookSignature = JSON.stringify(workbook.save());
+      } catch {
+        workbookSignature = null;
+      }
+    }
+
+    const activeCell = getActiveCellFromUniver(univerAPI);
+    return { workbookSignature, activeCell };
   };
 
   const runPresenceSyncSafely = (callback) => {
@@ -482,10 +518,11 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
         mutableSnapshot.id = unitId;
 
         const setApplyingRemoteWorkbook = (isApplying) => {
-          if (isApplyingRemoteWorkbookRef) {
-            isApplyingRemoteWorkbookRef.current = isApplying;
+          isApplyingRemoteCommandLocalRef.current = Boolean(isApplying);
+          if (isApplyingRemoteCommandRef) {
+            isApplyingRemoteCommandRef.current = Boolean(isApplying);
           }
-          onApplyingRemoteWorkbookChange?.(isApplying);
+          onApplyingRemoteCommandChange?.(Boolean(isApplying));
         };
 
         const finishRemoteWorkbookApply = () => {
@@ -529,9 +566,65 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
           finishRemoteWorkbookApply();
         }
       },
+      executeRealtimeCommand: async (commandId, commandParams = null) => {
+        const univerAPI = univerApiRef.current;
+        if (!univerAPI?.executeCommand || typeof commandId !== "string") {
+          return false;
+        }
+
+        const normalizedCommandId = commandId.trim();
+        if (!normalizedCommandId) {
+          return false;
+        }
+
+        isApplyingRemoteCommandLocalRef.current = true;
+        if (isApplyingRemoteCommandRef) {
+          isApplyingRemoteCommandRef.current = true;
+        }
+        onApplyingRemoteCommandChange?.(true);
+
+        try {
+          const result = await Promise.resolve(
+            univerAPI.executeCommand(normalizedCommandId, commandParams ?? undefined)
+          );
+
+          const stateAfterReplay = captureRealtimeState(univerAPI);
+          lastRealtimeWorkbookSignatureRef.current =
+            stateAfterReplay.workbookSignature;
+          lastRealtimeActiveCellRef.current = stateAfterReplay.activeCell;
+
+          return Boolean(result);
+        } catch {
+          return false;
+        } finally {
+          isApplyingRemoteCommandLocalRef.current = false;
+          if (isApplyingRemoteCommandRef) {
+            isApplyingRemoteCommandRef.current = false;
+          }
+          onApplyingRemoteCommandChange?.(false);
+        }
+      },
+      redo: () => {
+        const univerAPI = univerApiRef.current;
+        if (!univerAPI?.executeCommand) {
+          return false;
+        }
+
+        return Boolean(univerAPI.executeCommand("univer.command.redo"));
+      },
+      isFocused: () => {
+        const root = rootRef.current;
+        const activeElement = document.activeElement;
+        return Boolean(
+          root &&
+            activeElement &&
+            activeElement instanceof Node &&
+            root.contains(activeElement)
+        );
+      },
       syncPresenceMarkers,
     }),
-    [workbookName, isApplyingRemoteWorkbookRef, onApplyingRemoteWorkbookChange]
+    [workbookName, isApplyingRemoteCommandRef, onApplyingRemoteCommandChange]
   );
 
   useEffect(() => {
@@ -555,8 +648,69 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
         }
 
         onWorkbookChangeRef.current?.();
-        onWorkbookRealtimeChangeRef.current?.();
         schedulePresenceResync();
+      };
+
+      const notifyRealtimeCommand = (event = {}) => {
+        const stateAfterCommand = captureRealtimeState(univerAPI);
+        const previousWorkbookSignature = lastRealtimeWorkbookSignatureRef.current;
+        const previousActiveCell = lastRealtimeActiveCellRef.current;
+        const workbookChanged =
+          previousWorkbookSignature != null &&
+          stateAfterCommand.workbookSignature != null
+            ? previousWorkbookSignature !== stateAfterCommand.workbookSignature
+            : false;
+        const selectionChanged =
+          previousActiveCell != null || stateAfterCommand.activeCell != null
+            ? previousActiveCell !== stateAfterCommand.activeCell
+            : false;
+
+        lastRealtimeWorkbookSignatureRef.current =
+          stateAfterCommand.workbookSignature;
+        lastRealtimeActiveCellRef.current = stateAfterCommand.activeCell;
+
+        if (shouldSkipLocalRealtimeCommandPublish()) {
+          return;
+        }
+
+        const commandId = String(event?.id ?? "").trim();
+        if (!commandId) {
+          return;
+        }
+
+        const commandType = event?.type;
+        const enumCommandType = univerAPI?.Enum?.CommandType;
+        const OPERATION_TYPE =
+          enumCommandType?.OPERATION != null ? enumCommandType.OPERATION : 1;
+        const COMMAND_TYPE =
+          enumCommandType?.COMMAND != null ? enumCommandType.COMMAND : 0;
+        const MUTATION_TYPE =
+          enumCommandType?.MUTATION != null ? enumCommandType.MUTATION : 2;
+
+        const category =
+          commandType === OPERATION_TYPE
+            ? "selection/navigation"
+            : commandType === MUTATION_TYPE || commandType === COMMAND_TYPE
+              ? "workbook-mutation"
+              : "unknown";
+
+        const commandParams =
+          event?.params &&
+          typeof event.params === "object" &&
+          !Array.isArray(event.params)
+            ? event.params
+            : {};
+
+        // Publish only commands that actually changed workbook contents.
+        // This keeps cursor/selection/focus/viewport commands local.
+        if (!workbookChanged) {
+          return;
+        }
+
+        onWorkbookRealtimeChangeRef.current?.({
+          commandId,
+          commandParams,
+        });
       };
 
       // Reset so a re-initialized workbook does not inherit a stale active cell.
@@ -600,6 +754,15 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
             univerAPI.addEvent(eventName, notifyWorkbookChange)
           );
         });
+
+        if (univerAPI.Event.CommandExecuted) {
+          changeEventDisposables.push(
+            univerAPI.addEvent(
+              univerAPI.Event.CommandExecuted,
+              notifyRealtimeCommand
+            )
+          );
+        }
       }
 
       if (databaseProviderFetchers) {
@@ -616,6 +779,11 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
           ? structuredClone(snapshot)
           : JSON.parse(JSON.stringify(snapshot));
       workbookRef.current = univerAPI.createWorkbook(mutableSnapshot);
+
+      const initialRealtimeState = captureRealtimeState(univerAPI);
+      lastRealtimeWorkbookSignatureRef.current =
+        initialRealtimeState.workbookSignature;
+      lastRealtimeActiveCellRef.current = initialRealtimeState.activeCell;
 
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -651,6 +819,12 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
       isDisposed = true;
       selectionReadyRef.current = false;
       remoteApplyDepthRef.current = 0;
+      isApplyingRemoteCommandLocalRef.current = false;
+      lastRealtimeWorkbookSignatureRef.current = null;
+      lastRealtimeActiveCellRef.current = null;
+      if (isApplyingRemoteCommandRef) {
+        isApplyingRemoteCommandRef.current = false;
+      }
       if (presenceResyncRafRef.current) {
         cancelAnimationFrame(presenceResyncRafRef.current);
         presenceResyncRafRef.current = 0;

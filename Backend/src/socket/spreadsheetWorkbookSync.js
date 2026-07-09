@@ -1,30 +1,37 @@
 /**
- * Spreadsheet workbook realtime sync handlers (Phase 2.4).
+ * Spreadsheet Univer command realtime relay (Phase 2.4).
  *
  * Events (client → server):
- *   spreadsheet:workbook-update { spreadsheet_id, workbook_data, client_sequence? }
+ *   spreadsheet:command { spreadsheet_id, command_id, command_params, client_sequence }
  *
  * Events (server → client):
- *   spreadsheet:workbook-update {
+ *   spreadsheet:command {
  *     spreadsheet_id,
  *     userId,
  *     userName,
- *     workbook_data,
+ *     command_id,
+ *     command_params,
  *     sequence,
- *     client_sequence?
+ *     client_sequence
  *   }
  *   spreadsheet:error { message }
  *
- * Relay-only: no database writes, no REST calls, no workbook persistence.
+ * Relay-only: no database writes, no REST calls, no server-side command execution.
  * Independent from Phase 2.1 presence and Phase 2.2 active-cell.
  *
- * Workbook payloads are opaque IWorkbookData snapshots produced by the
- * public Univer Facade API (workbook.save() on the client).
+ * Commands are opaque Univer command envelopes produced by the public Facade API
+ * (univerAPI.executeCommand / onCommandExecuted) on the client.
  */
 
 const { validate: isUuid } = require("uuid");
 const { roomName } = require("./spreadsheetPresence");
 const { nextSequence, clearSequence } = require("./workbookSyncSequence");
+const {
+  isDuplicateClientSequence,
+  clearSpreadsheetDedup,
+} = require("./commandRelayDedup");
+
+const COMMAND_ID_PATTERN = /^[a-zA-Z][a-zA-Z0-9._-]{0,254}$/;
 
 function validateSpreadsheetId(spreadsheetId) {
   return (
@@ -34,44 +41,29 @@ function validateSpreadsheetId(spreadsheetId) {
   );
 }
 
-function validateWorkbookData(workbookData) {
-  if (
-    workbookData === null ||
-    workbookData === undefined ||
-    typeof workbookData !== "object" ||
-    Array.isArray(workbookData)
-  ) {
-    return false;
-  }
+function validateCommandId(commandId) {
+  return (
+    typeof commandId === "string" &&
+    commandId.trim().length > 0 &&
+    COMMAND_ID_PATTERN.test(commandId.trim())
+  );
+}
 
-  // Minimum IWorkbookData shape from Univer workbook.save() — O(1) checks only
-  if (typeof workbookData.id !== "string" || workbookData.id.length === 0) {
-    return false;
-  }
+function validateCommandParams(commandParams) {
+  return (
+    commandParams !== null &&
+    commandParams !== undefined &&
+    typeof commandParams === "object" &&
+    !Array.isArray(commandParams)
+  );
+}
 
-  const { sheets, sheetOrder, styles } = workbookData;
-
-  if (
-    typeof sheets !== "object" ||
-    sheets === null ||
-    Array.isArray(sheets)
-  ) {
-    return false;
-  }
-
-  if (!Array.isArray(sheetOrder)) {
-    return false;
-  }
-
-  if (
-    typeof styles !== "object" ||
-    styles === null ||
-    Array.isArray(styles)
-  ) {
-    return false;
-  }
-
-  return true;
+function validateClientSequence(clientSequence) {
+  return (
+    typeof clientSequence === "number" &&
+    Number.isFinite(clientSequence) &&
+    clientSequence > 0
+  );
 }
 
 function isInSpreadsheetRoom(socket, spreadsheetId) {
@@ -83,54 +75,53 @@ function emitSpreadsheetError(socket, message) {
 }
 
 /**
- * Broadcast a workbook update to every other socket in the spreadsheet room.
+ * Broadcast a Univer command to every other socket in the spreadsheet room.
  *
  * @param {import("socket.io").Socket} socket
  * @param {string} spreadsheetId
- * @param {object} workbookData
+ * @param {string} commandId
+ * @param {object} commandParams
  * @param {number} sequence
- * @param {number|undefined} clientSequence
+ * @param {number} clientSequence
  */
-function broadcastWorkbookUpdate(
+function broadcastCommand(
   socket,
   spreadsheetId,
-  workbookData,
+  commandId,
+  commandParams,
   sequence,
   clientSequence
 ) {
-  const payload = {
+  socket.to(roomName(spreadsheetId)).emit("spreadsheet:command", {
     spreadsheet_id: spreadsheetId,
     userId: socket.user.id,
     userName: socket.user.name,
-    workbook_data: workbookData,
+    command_id: commandId,
+    command_params: commandParams,
     sequence,
-  };
-
-  if (typeof clientSequence === "number" && Number.isFinite(clientSequence)) {
-    payload.client_sequence = clientSequence;
-  }
-
-  socket.to(roomName(spreadsheetId)).emit("spreadsheet:workbook-update", payload);
+    client_sequence: clientSequence,
+  });
 }
 
 /**
- * Remove the sequence counter when the Socket.IO room has no members.
+ * Remove relay state when the Socket.IO room has no members.
  * Deferred so presence leave handlers finish updating room membership first.
  *
  * @param {import("socket.io").Server} io
  * @param {string} spreadsheetId
  */
-function scheduleSequenceCleanupIfRoomEmpty(io, spreadsheetId) {
+function scheduleRelayCleanupIfRoomEmpty(io, spreadsheetId) {
   setImmediate(() => {
     const room = io.sockets.adapter.rooms.get(roomName(spreadsheetId));
     if (!room || room.size === 0) {
       clearSequence(spreadsheetId);
+      clearSpreadsheetDedup(spreadsheetId);
     }
   });
 }
 
 /**
- * Register workbook realtime sync handlers on a connected socket.
+ * Register command relay handlers on a connected socket.
  *
  * @param {import("socket.io").Server} io
  * @param {import("socket.io").Socket} socket
@@ -138,9 +129,11 @@ function scheduleSequenceCleanupIfRoomEmpty(io, spreadsheetId) {
 function registerSpreadsheetWorkbookSync(io, socket) {
   let trackedSpreadsheetId = null;
 
-  socket.on("spreadsheet:workbook-update", (payload = {}) => {
+  socket.on("spreadsheet:command", (payload = {}) => {
     const spreadsheetId = payload.spreadsheet_id;
-    const workbookData = payload.workbook_data;
+    const commandId = payload.command_id;
+    const commandParams = payload.command_params;
+    const clientSequence = payload.client_sequence;
 
     if (!socket.user?.id) {
       emitSpreadsheetError(socket, "Authentication required");
@@ -152,32 +145,52 @@ function registerSpreadsheetWorkbookSync(io, socket) {
       return;
     }
 
-    if (!validateWorkbookData(workbookData)) {
-      emitSpreadsheetError(socket, "workbook_data must be a valid Univer workbook snapshot");
+    if (!validateCommandId(commandId)) {
+      emitSpreadsheetError(socket, "Valid command_id is required");
+      return;
+    }
+
+    if (!validateCommandParams(commandParams)) {
+      emitSpreadsheetError(socket, "command_params must be an object");
+      return;
+    }
+
+    if (!validateClientSequence(clientSequence)) {
+      emitSpreadsheetError(socket, "Valid client_sequence is required");
       return;
     }
 
     if (!isInSpreadsheetRoom(socket, spreadsheetId)) {
       emitSpreadsheetError(
         socket,
-        "You must join the spreadsheet room before publishing workbook updates"
+        "You must join the spreadsheet room before publishing commands"
       );
       return;
     }
 
-    const sequence = nextSequence(spreadsheetId);
-    const clientSequence = payload.client_sequence;
+    if (
+      isDuplicateClientSequence(
+        spreadsheetId,
+        socket.user.id,
+        clientSequence
+      )
+    ) {
+      return;
+    }
 
-    broadcastWorkbookUpdate(
+    const sequence = nextSequence(spreadsheetId);
+
+    broadcastCommand(
       socket,
       spreadsheetId,
-      workbookData,
+      commandId.trim(),
+      commandParams,
       sequence,
       clientSequence
     );
   });
 
-  // Sequence cleanup — independent from the workbook-update relay flow
+  // Relay cleanup — independent from the command relay flow
   socket.on("spreadsheet:join", (payload = {}) => {
     const spreadsheetId = payload.spreadsheet_id;
     if (!validateSpreadsheetId(spreadsheetId)) return;
@@ -186,7 +199,7 @@ function registerSpreadsheetWorkbookSync(io, socket) {
     trackedSpreadsheetId = spreadsheetId;
 
     if (previousSpreadsheetId && previousSpreadsheetId !== spreadsheetId) {
-      scheduleSequenceCleanupIfRoomEmpty(io, previousSpreadsheetId);
+      scheduleRelayCleanupIfRoomEmpty(io, previousSpreadsheetId);
     }
   });
 
@@ -198,7 +211,7 @@ function registerSpreadsheetWorkbookSync(io, socket) {
       trackedSpreadsheetId = null;
     }
 
-    scheduleSequenceCleanupIfRoomEmpty(io, spreadsheetId);
+    scheduleRelayCleanupIfRoomEmpty(io, spreadsheetId);
   });
 
   socket.on("disconnect", () => {
@@ -206,7 +219,7 @@ function registerSpreadsheetWorkbookSync(io, socket) {
     trackedSpreadsheetId = null;
 
     if (spreadsheetId) {
-      scheduleSequenceCleanupIfRoomEmpty(io, spreadsheetId);
+      scheduleRelayCleanupIfRoomEmpty(io, spreadsheetId);
     }
   });
 }

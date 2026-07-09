@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useSpreadsheetRealtime } from "../realtime/spreadsheet";
 import {
   beginPublishInFlight,
+  enqueueLocalCommand,
   endPublishInFlight,
   recoverStuckPublish,
   shouldHoldRemoteApplies,
@@ -15,10 +16,9 @@ import {
  * so unpublished local edits are never overwritten by remote applies.
  */
 export function useSpreadsheetWorkbookPublisher({
-  spreadsheetRef,
   isSpreadsheetReady,
-  isApplyingRemoteWorkbook,
-  isApplyingRemoteWorkbookRef,
+  isApplyingRemoteCommand,
+  isApplyingRemoteCommandRef,
   syncCoordinator,
 }) {
   const { socket, spreadsheetId, isRoomReady } = useSpreadsheetRealtime();
@@ -48,8 +48,8 @@ export function useSpreadsheetWorkbookPublisher({
 
   const canPublish = useCallback(() => {
     const isApplyingRemote =
-      Boolean(isApplyingRemoteWorkbookRef?.current) ||
-      Boolean(isApplyingRemoteWorkbook);
+      Boolean(isApplyingRemoteCommandRef?.current) ||
+      Boolean(isApplyingRemoteCommand);
 
     return (
       isSpreadsheetReady &&
@@ -63,8 +63,8 @@ export function useSpreadsheetWorkbookPublisher({
     isRoomReady,
     socket,
     spreadsheetId,
-    isApplyingRemoteWorkbook,
-    isApplyingRemoteWorkbookRef,
+    isApplyingRemoteCommand,
+    isApplyingRemoteCommandRef,
   ]);
 
   const processPendingPublish = useCallback(async () => {
@@ -102,16 +102,29 @@ export function useSpreadsheetWorkbookPublisher({
         return;
       }
 
-      const workbookData =
-        spreadsheetRef.current?.getWorkbookDataForSync?.() ?? null;
+      while (coordinator.localCommandQueue.length > 0) {
+        if (!canPublish()) {
+          pendingPublishRef.current = true;
+          break;
+        }
 
-      if (workbookData) {
+        const nextCommand = coordinator.localCommandQueue.shift();
+        if (!nextCommand?.commandId) {
+          continue;
+        }
+
         clientSequenceRef.current += 1;
         coordinator.lastPublishedClientSequence = clientSequenceRef.current;
 
-        socket.emit("spreadsheet:workbook-update", {
+        socket.emit("spreadsheet:command", {
           spreadsheet_id: spreadsheetId,
-          workbook_data: workbookData,
+          command_id: nextCommand.commandId,
+          command_params:
+            nextCommand.commandParams &&
+            typeof nextCommand.commandParams === "object" &&
+            !Array.isArray(nextCommand.commandParams)
+              ? nextCommand.commandParams
+              : {},
           client_sequence: clientSequenceRef.current,
         });
       }
@@ -140,12 +153,27 @@ export function useSpreadsheetWorkbookPublisher({
         void coordinator.flushRemoteQueue();
       }
     }
-  }, [canPublish, spreadsheetRef, socket, spreadsheetId, syncCoordinator]);
+  }, [canPublish, socket, spreadsheetId, syncCoordinator]);
 
   processPendingPublishRef.current = processPendingPublish;
 
-  const publishWorkbookUpdate = useCallback(() => {
+  const publishWorkbookUpdate = useCallback((commandPayload) => {
     if (!syncCoordinator) {
+      return;
+    }
+
+    if (
+      Boolean(isApplyingRemoteCommandRef?.current) ||
+      Boolean(isApplyingRemoteCommand)
+    ) {
+      return;
+    }
+
+    const queued = enqueueLocalCommand(syncCoordinator, {
+      commandId: commandPayload?.commandId,
+      commandParams: commandPayload?.commandParams ?? null,
+    });
+    if (!queued) {
       return;
     }
 
@@ -153,7 +181,12 @@ export function useSpreadsheetWorkbookPublisher({
     syncCoordinator.localChangesPending = true;
     pendingPublishRef.current = true;
     void processPendingPublish();
-  }, [processPendingPublish, syncCoordinator]);
+  }, [
+    processPendingPublish,
+    syncCoordinator,
+    isApplyingRemoteCommand,
+    isApplyingRemoteCommandRef,
+  ]);
 
   useEffect(() => {
     resumePendingPublish();
@@ -162,7 +195,7 @@ export function useSpreadsheetWorkbookPublisher({
     isRoomReady,
     socket?.connected,
     spreadsheetId,
-    isApplyingRemoteWorkbook,
+    isApplyingRemoteCommand,
     processPendingPublish,
     resumePendingPublish,
   ]);

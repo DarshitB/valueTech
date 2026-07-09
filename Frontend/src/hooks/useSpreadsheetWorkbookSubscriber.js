@@ -18,7 +18,7 @@ import {
 export function useSpreadsheetWorkbookSubscriber({
   spreadsheetRef,
   isSpreadsheetReady,
-  isApplyingRemoteWorkbook,
+  isApplyingRemoteCommand,
   syncCoordinator,
 }) {
   const { socket, spreadsheetId } = useSpreadsheetRealtime();
@@ -27,9 +27,9 @@ export function useSpreadsheetWorkbookSubscriber({
   const applyInFlightSinceRef = useRef(0);
   const flushRemoteQueueRef = useRef(async () => false);
   const flushRetryRafRef = useRef(0);
-  const isApplyingRemoteWorkbookRef = useRef(isApplyingRemoteWorkbook);
+  const isApplyingRemoteCommandRef = useRef(isApplyingRemoteCommand);
 
-  isApplyingRemoteWorkbookRef.current = isApplyingRemoteWorkbook;
+  isApplyingRemoteCommandRef.current = isApplyingRemoteCommand;
 
   const recoverStuckApply = useCallback(() => {
     if (!applyInFlightRef.current) {
@@ -69,11 +69,11 @@ export function useSpreadsheetWorkbookSubscriber({
       }
 
       const isHeld = () =>
-        isApplyingRemoteWorkbookRef.current ||
+        isApplyingRemoteCommandRef.current ||
         (!integrateBeforePublish &&
           shouldHoldRemoteApplies(
             coordinator,
-            isApplyingRemoteWorkbookRef.current
+            isApplyingRemoteCommandRef.current
           ));
 
       if (isHeld()) {
@@ -111,9 +111,11 @@ export function useSpreadsheetWorkbookSubscriber({
             beginApplyInFlight();
 
             try {
-              const applied = await spreadsheetRef.current?.applyWorkbookData?.(
-                catchUpUpdate.workbookData
-              );
+              const applied =
+                await spreadsheetRef.current?.executeRealtimeCommand?.(
+                  catchUpUpdate.commandId,
+                  catchUpUpdate.commandParams
+                );
 
               if (applied) {
                 coordinator.lastAppliedSequence = catchUpUpdate.sequence;
@@ -145,17 +147,29 @@ export function useSpreadsheetWorkbookSubscriber({
         beginApplyInFlight();
 
         try {
-          const applied = await spreadsheetRef.current?.applyWorkbookData?.(
-            nextUpdate.workbookData
+          const applied = await spreadsheetRef.current?.executeRealtimeCommand?.(
+            nextUpdate.commandId,
+            nextUpdate.commandParams
           );
 
           if (applied) {
             coordinator.lastAppliedSequence = nextUpdate.sequence;
             recordAppliedSequence(coordinator, nextUpdate.sequence);
             appliedAny = true;
+          } else {
+            console.error("[RealtimeCommand] remote replay returned false", {
+              sequence: nextUpdate.sequence,
+              commandId: nextUpdate.commandId,
+              commandParams: nextUpdate.commandParams,
+            });
           }
-        } catch {
-          // Best-effort apply; a newer update may arrive next.
+        } catch (error) {
+          console.error("[RealtimeCommand] remote replay threw error", {
+            sequence: nextUpdate.sequence,
+            commandId: nextUpdate.commandId,
+            commandParams: nextUpdate.commandParams,
+            error,
+          });
         } finally {
           endApplyInFlight();
         }
@@ -190,7 +204,7 @@ export function useSpreadsheetWorkbookSubscriber({
       if (
         shouldHoldRemoteApplies(
           coordinator,
-          isApplyingRemoteWorkbookRef.current
+          isApplyingRemoteCommandRef.current
         )
       ) {
         flushRetryRafRef.current = requestAnimationFrame(retry);
@@ -230,7 +244,12 @@ export function useSpreadsheetWorkbookSubscriber({
       if (!isActive) return;
       if (payload.spreadsheet_id !== spreadsheetId) return;
 
-      const { userId, workbook_data: workbookData, sequence } = payload;
+      const {
+        userId,
+        command_id: commandId,
+        command_params: commandParams,
+        sequence,
+      } = payload;
 
       if (
         userId != null &&
@@ -240,17 +259,19 @@ export function useSpreadsheetWorkbookSubscriber({
         return;
       }
 
-      if (
-        workbookData == null ||
-        typeof workbookData !== "object" ||
-        Array.isArray(workbookData)
-      ) {
+      if (typeof commandId !== "string" || !commandId.trim()) {
         return;
       }
 
       const queued = enqueueRemoteWorkbookUpdate(syncCoordinator, {
         sequence,
-        workbookData,
+        commandId: commandId.trim(),
+        commandParams:
+          commandParams &&
+          typeof commandParams === "object" &&
+          !Array.isArray(commandParams)
+            ? commandParams
+            : {},
       });
 
       if (!queued && sequence <= syncCoordinator.lastAppliedSequence) {
@@ -260,7 +281,7 @@ export function useSpreadsheetWorkbookSubscriber({
       if (
         shouldHoldRemoteApplies(
           syncCoordinator,
-          isApplyingRemoteWorkbookRef.current
+          isApplyingRemoteCommandRef.current
         )
       ) {
         scheduleFlushRetry();
@@ -270,7 +291,7 @@ export function useSpreadsheetWorkbookSubscriber({
       void flushRemoteQueueRef.current();
     };
 
-    socket.on("spreadsheet:workbook-update", handleWorkbookUpdate);
+    socket.on("spreadsheet:command", handleWorkbookUpdate);
 
     return () => {
       isActive = false;
@@ -278,7 +299,7 @@ export function useSpreadsheetWorkbookSubscriber({
         cancelAnimationFrame(flushRetryRafRef.current);
         flushRetryRafRef.current = 0;
       }
-      socket.off("spreadsheet:workbook-update", handleWorkbookUpdate);
+      socket.off("spreadsheet:command", handleWorkbookUpdate);
       resetWorkbookSyncCoordinator(syncCoordinator);
     };
   }, [
@@ -300,7 +321,7 @@ export function useSpreadsheetWorkbookSubscriber({
     }
 
     if (
-      shouldHoldRemoteApplies(syncCoordinator, isApplyingRemoteWorkbook)
+      shouldHoldRemoteApplies(syncCoordinator, isApplyingRemoteCommand)
     ) {
       scheduleFlushRetry();
       return;
@@ -308,7 +329,7 @@ export function useSpreadsheetWorkbookSubscriber({
 
     void flushRemoteQueueRef.current();
   }, [
-    isApplyingRemoteWorkbook,
+    isApplyingRemoteCommand,
     isSpreadsheetReady,
     syncCoordinator,
     scheduleFlushRetry,

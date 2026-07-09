@@ -71,7 +71,7 @@ export async function openDatabaseDropdownForCell({
                 : "";
 
               range.setValue(selectedValue);
-              syncDatabaseDropdownShell(univerAPI, range);
+              syncDatabaseDropdownShell(univerAPI, range, providerId);
               onWorkbookDataChange?.();
               disposeActiveDropdown?.();
               return true;

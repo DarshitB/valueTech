@@ -4,7 +4,7 @@ import {
 import {
   applyDatabaseDropdownShell,
   clearDatabaseDropdownShell,
-  syncDatabaseDropdownShell,
+  getDatabaseProviderFromShell,
   repairExistingDatabaseDropdownShells,
   SHOW_DATA_VALIDATION_DROPDOWN_COMMAND_ID,
 } from "./dataValidationShell.js";
@@ -119,16 +119,21 @@ function attachDatabaseDropdownOpenHandlers(
   const disposables = [];
 
   const openAt = async ({ workbook, worksheet, row, column }) => {
+    const range = worksheet.getRange(row, column);
     const providerId =
       getDatabaseProviderAt(worksheet, row, column) ??
-      getDatabaseProviderId(worksheet.getRange(row, column));
+      getDatabaseProviderId(range) ??
+      getDatabaseProviderFromShell(range);
 
     if (!providerId) {
       return false;
     }
 
-    const range = worksheet.getRange(row, column);
-    syncDatabaseDropdownShell(univerAPI, range);
+    // Drag/fill can duplicate DV while dropping cell custom metadata.
+    // Restore provider metadata so downstream handlers keep working.
+    if (!getDatabaseProviderAt(worksheet, row, column)) {
+      setDatabaseProviderId(range, providerId);
+    }
 
     return openDatabaseDropdownForCell({
       univerAPI,
@@ -171,7 +176,11 @@ function attachDatabaseDropdownOpenHandlers(
           return;
         }
 
-        const providerId = getDatabaseProviderAt(worksheet, row, column);
+        const range = worksheet.getRange(row, column);
+        const providerId =
+          getDatabaseProviderAt(worksheet, row, column) ??
+          getDatabaseProviderId(range) ??
+          getDatabaseProviderFromShell(range);
         if (!providerId || !registry.has(providerId)) {
           return;
         }

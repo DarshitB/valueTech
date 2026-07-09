@@ -3,6 +3,10 @@ const { validate: isUuid } = require("uuid");
 const Spreadsheet = require("../../models/spreadsheets/spreadsheet");
 const db = require("../../../db");
 const {
+  updateSpreadsheet,
+  createSpreadsheetVersion,
+} = require("../../services/spreadsheets/spreadsheetService");
+const {
   BadRequestError,
   NotFoundError,
 } = require("../../utils/customErrors");
@@ -132,20 +136,14 @@ exports.save = async (req, res, next) => {
       throw new NotFoundError("Spreadsheet not found");
     }
 
-    const latestVersion = await Spreadsheet.findLatestVersion(id, trx);
-    const nextVersion = latestVersion ? latestVersion.version + 1 : 1;
-
-    await Spreadsheet.createVersion(
+    await updateSpreadsheet(
+      id,
       {
-        spreadsheet_id: id,
-        version: nextVersion,
         workbook_data,
-        created_by: userId,
+        updated_by: userId,
       },
       trx
     );
-
-    await Spreadsheet.updateAuditFields(id, userId, trx);
 
     await trx.commit();
 
@@ -180,12 +178,12 @@ exports.create = async (req, res, next) => {
       trx
     );
 
-    await Spreadsheet.createVersion(
+    await createSpreadsheetVersion(
+      spreadsheet.id,
       {
-        spreadsheet_id: spreadsheet.id,
         workbook_data: createEmptyWorkbookData(name),
-        version: 1,
         created_by: userId,
+        version: 1,
       },
       trx
     );
