@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchSpreadsheets,
@@ -9,12 +9,14 @@ import {
 import CustomDataTable from "../../components/CustomDataTable";
 import FormModel from "../../components/FormModel";
 import ConfirmationModal from "../../components/ConfirmationModal";
+import SingleSearchSelect from "../../components/SingleSearchSelect";
 import { DeleteIcon, EditIcon } from "../../components/icons";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
 import { hasPermission } from "../../utils/permissionUtils";
 import { usePageTitle } from "../../context/PageTitleContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import { getUsers } from "../../api/user.api";
 
 function Spreadsheets() {
   const dispatch = useDispatch();
@@ -25,11 +27,28 @@ function Spreadsheets() {
     (state) => state.spreadsheets
   );
   const allowedPermissions = useSelector(selectPermissions);
+  const currentUser = useSelector((state) => state.auth.user);
+  const canAddSpreadsheet = hasPermission(allowedPermissions, "add_spreadsheet");
+  const roleName = currentUser?.role?.name || "";
+  const isDeveloperAdmin = roleName.toLowerCase() === "developer_admin";
+
+  const isSpreadsheetCreator = (spreadsheet) =>
+    Number(spreadsheet?.created_by) === Number(currentUser?.id);
+
+  const canEditSpreadsheet = (spreadsheet) =>
+    hasPermission(allowedPermissions, "edit_spreadsheet") ||
+    isSpreadsheetCreator(spreadsheet);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [formData, setFormData] = useState({ name: "", description: "" });
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+    assigned_user_ids: [],
+  });
+  const [assignableUsers, setAssignableUsers] = useState([]);
   const [editSpreadsheetId, setEditSpreadsheetId] = useState(null);
+  const [canEditAssignments, setCanEditAssignments] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [confirmDeleteName, setConfirmDeleteName] = useState("");
 
@@ -40,6 +59,35 @@ function Spreadsheets() {
   useEffect(() => {
     dispatch(fetchSpreadsheets());
   }, [dispatch]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadUsers = async () => {
+      try {
+        const res = await getUsers();
+        if (!mounted) return;
+        const users = Array.isArray(res.data) ? res.data : [];
+        setAssignableUsers(users);
+      } catch {
+        if (mounted) {
+          setAssignableUsers([]);
+        }
+      }
+    };
+    loadUsers();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const assignableUserOptions = useMemo(
+    () =>
+      assignableUsers.map((user) => ({
+        value: user.id,
+        label: `${user.name} (${user.email || user.mobile || user.role_name || "No contact"})`,
+      })),
+    [assignableUsers]
+  );
 
   const formatDate = (dateString) => {
     if (!dateString) return "-";
@@ -62,10 +110,13 @@ function Spreadsheets() {
   };
 
   const resetForm = () => {
-    setFormData({ name: "", description: "" });
+    setFormData({ name: "", description: "", assigned_user_ids: [] });
   };
 
   const openCreateModal = () => {
+    if (!canAddSpreadsheet) {
+      return;
+    }
     resetForm();
     setShowCreateModal(true);
   };
@@ -76,17 +127,27 @@ function Spreadsheets() {
   };
 
   const openEditModal = (spreadsheet) => {
+    if (!canEditSpreadsheet(spreadsheet)) {
+      return;
+    }
+
     setEditSpreadsheetId(spreadsheet.id);
     setFormData({
       name: spreadsheet.name || "",
       description: spreadsheet.description || "",
+      assigned_user_ids: Array.isArray(spreadsheet.assigned_user_ids)
+        ? spreadsheet.assigned_user_ids
+        : [],
     });
+    const isCreator = Number(spreadsheet.created_by) === Number(currentUser?.id);
+    setCanEditAssignments(isDeveloperAdmin || isCreator);
     setShowEditModal(true);
   };
 
   const closeEditModal = () => {
     setShowEditModal(false);
     setEditSpreadsheetId(null);
+    setCanEditAssignments(false);
     resetForm();
   };
 
@@ -94,12 +155,25 @@ function Spreadsheets() {
     navigate(`/spreadsheet/${spreadsheetId}`);
   };
 
-  const buildPayload = () => ({
-    name: formData.name.trim(),
-    description: formData.description.trim() || null,
-  });
+  const buildPayload = () => {
+    const payload = {
+      name: formData.name.trim(),
+      description: formData.description.trim() || null,
+    };
+
+    if (showCreateModal || canEditAssignments) {
+      payload.assigned_user_ids = formData.assigned_user_ids;
+    }
+
+    return payload;
+  };
 
   const handleCreateSubmit = async () => {
+    if (!canAddSpreadsheet) {
+      toast.error("You don't have permission to create spreadsheets.");
+      return;
+    }
+
     if (!formData.name.trim()) {
       toast.error("Spreadsheet name is required.");
       return;
@@ -118,6 +192,13 @@ function Spreadsheets() {
   };
 
   const handleEditSubmit = async () => {
+    const spreadsheet = spreadsheets.find((item) => item.id === editSpreadsheetId);
+
+    if (!spreadsheet || !canEditSpreadsheet(spreadsheet)) {
+      toast.error("You don't have permission to edit this spreadsheet.");
+      return;
+    }
+
     if (!formData.name.trim()) {
       toast.error("Spreadsheet name is required.");
       return;
@@ -193,6 +274,27 @@ function Spreadsheets() {
             disabled={saving}
           />
         </div>
+        {(showCreateModal || canEditAssignments) && (
+          <div className="form-group">
+            <label>Assign Users</label>
+            <SingleSearchSelect
+              className="search-selector"
+              options={assignableUserOptions}
+              value={formData.assigned_user_ids}
+              onChange={(values) =>
+                setFormData({
+                  ...formData,
+                  assigned_user_ids: (values || []).filter(
+                    (id) => Number.isInteger(id) && id > 0
+                  ),
+                })
+              }
+              placeholder="Select users..."
+              isMulti
+              disabled={saving}
+            />
+          </div>
+        )}
         <div className="form-buttons">
           <button className="submit-button" type="submit" disabled={saving}>
             {saving ? submittingLabel : submitLabel}
@@ -210,15 +312,18 @@ function Spreadsheets() {
         <CustomDataTable>
           {{
             buttons: (
-              <button className="btn" type="button" onClick={openCreateModal}>
-                New Spreadsheet
-              </button>
+              canAddSpreadsheet && (
+                <button className="btn" type="button" onClick={openCreateModal}>
+                  New Spreadsheet
+                </button>
+              )
             ),
             header: (
               <tr>
                 <th style={{ width: "52px" }}>ID</th>
                 <th style={{ width: "250px" }}>Name</th>
                 <th>Description</th>
+                <th style={{ width: "160px" }}>Created By</th>
                 <th style={{ width: "180px" }}>Created At</th>
                 <th style={{ width: "180px" }}>Updated At</th>
                 <th style={{ width: "120px", textAlign: "center" }}>Action</th>
@@ -228,7 +333,7 @@ function Spreadsheets() {
               spreadsheets.length === 0
                 ? [
                     <tr key="empty">
-                      <td colSpan={6} className="text-center">
+                      <td colSpan={7} className="text-center">
                         No spreadsheets found
                       </td>
                     </tr>,
@@ -242,13 +347,11 @@ function Spreadsheets() {
                       <td className="sequential-number">{index + 1}</td>
                       <td>{spreadsheet.name}</td>
                       <td>{spreadsheet.description || "-"}</td>
+                      <td>{spreadsheet.created_by_name || "-"}</td>
                       <td>{formatDate(spreadsheet.created_at)}</td>
                       <td>{formatDate(spreadsheet.updated_at)}</td>
                       <td style={{ textAlign: "center" }}>
-                        {hasPermission(
-                          allowedPermissions,
-                          "edit_spreadsheet"
-                        ) && (
+                        {canEditSpreadsheet(spreadsheet) && (
                           <button
                             className="action-icons"
                             type="button"

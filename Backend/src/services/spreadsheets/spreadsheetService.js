@@ -55,7 +55,57 @@ async function createSpreadsheetVersion(
   );
 }
 
+/**
+ * Replace active spreadsheet assignments with the provided user IDs.
+ * Soft-deletes removed users and restores previously deleted rows.
+ *
+ * @param {string} spreadsheetId
+ * @param {number[]} assignedUserIds
+ * @param {number} actorId
+ * @param {import("knex").Knex.Transaction} trx
+ */
+async function syncSpreadsheetAssignments(
+  spreadsheetId,
+  assignedUserIds,
+  actorId,
+  trx
+) {
+  const targetIds = Array.from(new Set((assignedUserIds || []).map(Number))).filter(
+    (id) => Number.isInteger(id) && id > 0
+  );
+
+  const existingRows = await Spreadsheet.getAllAssignments(spreadsheetId, trx);
+  const existingByUserId = new Map(existingRows.map((row) => [Number(row.user_id), row]));
+
+  const toRestore = targetIds.filter((id) => {
+    const row = existingByUserId.get(id);
+    return row && row.deleted_at != null;
+  });
+
+  if (toRestore.length > 0) {
+    await Spreadsheet.restoreAssignments(spreadsheetId, toRestore, actorId, trx);
+  }
+
+  const toInsert = targetIds
+    .filter((id) => !existingByUserId.has(id))
+    .map((userId) => ({
+      spreadsheet_id: spreadsheetId,
+      user_id: userId,
+      created_by: actorId,
+      created_at: trx.fn.now(),
+      deleted_at: null,
+      deleted_by: null,
+    }));
+
+  if (toInsert.length > 0) {
+    await Spreadsheet.insertAssignments(toInsert, trx);
+  }
+
+  await Spreadsheet.softDeleteAssignmentsExcept(spreadsheetId, targetIds, actorId, trx);
+}
+
 module.exports = {
   updateSpreadsheet,
   createSpreadsheetVersion,
+  syncSpreadsheetAssignments,
 };

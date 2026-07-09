@@ -1,3 +1,5 @@
+import { isLocalOnlyRealtimeCommand } from "@spreadsheet-wrapper";
+
 /** Max applied sequence IDs retained for duplicate detection. */
 const MAX_APPLIED_SEQUENCES = 1000;
 
@@ -177,7 +179,7 @@ export function enqueueRemoteWorkbookUpdate(coordinator, update) {
  */
 export function enqueueLocalCommand(coordinator, command) {
   const commandId = String(command?.commandId ?? "").trim();
-  if (!commandId) {
+  if (!commandId || isLocalOnlyRealtimeCommand(commandId)) {
     return false;
   }
 

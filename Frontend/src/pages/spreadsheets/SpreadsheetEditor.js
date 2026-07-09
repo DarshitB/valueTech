@@ -13,6 +13,7 @@ import { SpreadsheetSessionColorProvider } from "./SpreadsheetSessionColorContex
 import SpreadsheetPresencePanel from "./SpreadsheetPresencePanel";
 import SpreadsheetRealtimeSurface from "./SpreadsheetRealtimeSurface";
 import { useSpreadsheetKeyboardShortcuts } from "./spreadsheetKeyboardShortcuts";
+import { useSpreadsheetUnsavedNavigationGuard } from "../../hooks/useSpreadsheetUnsavedNavigationGuard";
 import { toast } from "react-toastify";
 import NotFound from "../NotFound";
 
@@ -121,6 +122,12 @@ function SpreadsheetEditor() {
   const saveProcessorRunningRef = useRef(false);
   const [saveStatus, setSaveStatus] = useState("idle");
   const [isDirty, setIsDirty] = useState(false);
+  const [isSavingInProgress, setIsSavingInProgress] = useState(false);
+
+  const setSavingInProgress = useCallback((inProgress) => {
+    savingInProgressRef.current = inProgress;
+    setIsSavingInProgress(inProgress);
+  }, []);
 
   const markDirty = useCallback(() => {
     dirtyRef.current = true;
@@ -173,7 +180,7 @@ function SpreadsheetEditor() {
       }
 
       saveProcessorRunningRef.current = true;
-      savingInProgressRef.current = true;
+      setSavingInProgress(true);
 
       let force = initialForce;
 
@@ -227,11 +234,11 @@ function SpreadsheetEditor() {
           }
         }
       } finally {
-        savingInProgressRef.current = false;
+        setSavingInProgress(false);
         saveProcessorRunningRef.current = false;
       }
     },
-    [dispatch, id, markClean, showFailedStatus, showSavedStatus, showSavingStatus]
+    [dispatch, id, markClean, setSavingInProgress, showFailedStatus, showSavedStatus, showSavingStatus]
   );
 
   const saveWorkbook = useCallback(
@@ -300,25 +307,19 @@ function SpreadsheetEditor() {
       markClean();
       changeGenerationRef.current = 0;
       pendingSaveRef.current = false;
+      setSavingInProgress(false);
+      saveProcessorRunningRef.current = false;
       clearSavedStatusTimer();
       setSaveStatus("idle");
     }
-  }, [selected?.id, clearSavedStatusTimer, markClean]);
+  }, [selected?.id, clearSavedStatusTimer, markClean, setSavingInProgress]);
 
-  useEffect(() => {
-    const handleBeforeUnload = (event) => {
-      if (dirtyRef.current || savingInProgressRef.current) {
-        event.preventDefault();
-        event.returnValue = "";
-      }
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, []);
+  const shouldGuardNavigation =
+    Boolean(selected?.id) && (isDirty || isSavingInProgress);
+  useSpreadsheetUnsavedNavigationGuard({
+    shouldBlockNavigation: shouldGuardNavigation,
+    isSavingInProgress,
+  });
 
   useEffect(() => {
     return () => {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useSelector } from "react-redux";
+import { isLocalOnlyRealtimeCommand } from "@spreadsheet-wrapper";
 import { useSpreadsheetRealtime } from "../realtime/spreadsheet";
 import {
   enqueueRemoteWorkbookUpdate,
@@ -263,9 +264,21 @@ export function useSpreadsheetWorkbookSubscriber({
         return;
       }
 
+      const normalizedCommandId = commandId.trim();
+
+      if (isLocalOnlyRealtimeCommand(normalizedCommandId)) {
+        if (typeof sequence === "number" && Number.isFinite(sequence)) {
+          if (sequence > syncCoordinator.lastAppliedSequence) {
+            syncCoordinator.lastAppliedSequence = sequence;
+            recordAppliedSequence(syncCoordinator, sequence);
+          }
+        }
+        return;
+      }
+
       const queued = enqueueRemoteWorkbookUpdate(syncCoordinator, {
         sequence,
-        commandId: commandId.trim(),
+        commandId: normalizedCommandId,
         commandParams:
           commandParams &&
           typeof commandParams === "object" &&

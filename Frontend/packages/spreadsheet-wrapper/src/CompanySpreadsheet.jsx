@@ -9,10 +9,12 @@ import {
 import { createCompanyUniver } from "./createUniver";
 import { getActiveCellAddress, getActiveCellFromUniver, getActiveSheetIdFromUniver, restoreActiveCellSelection } from "./cellAddress";
 import { resolveWorkbookSnapshot } from "./workbookData";
+import { sanitizeWorkbookSnapshotForPersistence } from "./workbookSnapshotSanitizer";
 import {
   createDatabaseProviderRegistry,
   installDatabaseDropdown,
 } from "./dropdown";
+import { isLocalOnlyRealtimeCommand } from "./realtime/localOnlyCommands";
 import "./styles.css";
 
 function PresenceMarkerLabel({ popup }) {
@@ -462,7 +464,9 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
           await workbook.endEditingAsync(true);
         }
 
-        const workbookData = workbook.save();
+        const workbookData = sanitizeWorkbookSnapshotForPersistence(
+          workbook.save()
+        );
         return workbookData;
       },
       getWorkbookDataForSync: () => {
@@ -475,7 +479,7 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
           return null;
         }
 
-        return workbook.save();
+        return sanitizeWorkbookSnapshotForPersistence(workbook.save());
       },
       applyWorkbookData: async (incomingWorkbookData) => {
         const univerAPI = univerApiRef.current;
@@ -581,6 +585,10 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
           return false;
         }
 
+        if (isLocalOnlyRealtimeCommand(normalizedCommandId)) {
+          return true;
+        }
+
         isApplyingRemoteCommandLocalRef.current = true;
         if (isApplyingRemoteCommandRef) {
           isApplyingRemoteCommandRef.current = true;
@@ -679,6 +687,10 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
 
         const commandId = String(event?.id ?? "").trim();
         if (!commandId) {
+          return;
+        }
+
+        if (isLocalOnlyRealtimeCommand(commandId)) {
           return;
         }
 
