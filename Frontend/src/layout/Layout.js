@@ -15,6 +15,7 @@ import {
   NotificationBellIcon,
   OfficerIcon,
   OrderHistoryIcon,
+  SpreadsheetIcon,
   OrderIcon,
   PermissionIcon,
   UsersIcon,
@@ -199,6 +200,21 @@ function Layout() {
                   >
                     <OrderHistoryIcon className="feather feather-monitor" />
                     Order History
+                  </Link>
+                </li>
+              )}
+              {hasPermission(allowedPermissions, "view_spreadsheet") && (
+                <li
+                  className={`${
+                    location.pathname === "/spreadsheet" ||
+                    location.pathname.startsWith("/spreadsheet/")
+                      ? "active"
+                      : ""
+                  } dropdown`}
+                >
+                  <Link to="spreadsheet" onClick={() => setSidebarOpen(false)}>
+                    <SpreadsheetIcon className="feather feather-monitor" />
+                    Spreadsheets
                   </Link>
                 </li>
               )}

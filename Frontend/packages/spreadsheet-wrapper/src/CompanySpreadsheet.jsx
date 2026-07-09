@@ -7,7 +7,7 @@ import {
 } from "react";
 
 import { createCompanyUniver } from "./createUniver";
-import { getActiveCellAddress, getActiveCellFromUniver, restoreActiveCellSelection } from "./cellAddress";
+import { getActiveCellAddress, getActiveCellFromUniver, getActiveSheetIdFromUniver, restoreActiveCellSelection } from "./cellAddress";
 import { resolveWorkbookSnapshot } from "./workbookData";
 import {
   createDatabaseProviderRegistry,
@@ -88,6 +88,7 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
   const onErrorRef = useRef(onError);
   const onReadyRef = useRef(onReady);
   const lastPublishedActiveCellRef = useRef(null);
+  const lastPublishedWorksheetIdRef = useRef(null);
   const selectionReadyRef = useRef(false);
   const remoteApplyDepthRef = useRef(0);
   const isApplyingRemoteCommandLocalRef = useRef(false);
@@ -186,6 +187,7 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
 
     return [
       String(marker?.userId ?? ""),
+      String(marker?.worksheetId ?? ""),
       cell,
       String(marker?.userName ?? ""),
       marker?.isCurrentUser ? "1" : "0",
@@ -552,6 +554,8 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
           if (preservedActiveCell && activeSheet) {
             restoreActiveCellSelection(activeSheet, preservedActiveCell);
             lastPublishedActiveCellRef.current = preservedActiveCell;
+            lastPublishedWorksheetIdRef.current =
+              activeSheet.getSheetId?.() ?? activeSheetId;
           }
 
           // Reattach in the same synchronous turn as createWorkbook so the
@@ -715,14 +719,50 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
 
       // Reset so a re-initialized workbook does not inherit a stale active cell.
       lastPublishedActiveCellRef.current = null;
+      lastPublishedWorksheetIdRef.current = null;
       selectionReadyRef.current = false;
       clearPresenceMarkers();
 
-      const publishActiveCell = (cell) => {
-        if (!cell || cell === lastPublishedActiveCellRef.current) return;
+      const publishActiveCell = (cell, worksheetId) => {
+        const normalizedCell =
+          typeof cell === "string" && cell.trim().length > 0
+            ? cell.trim()
+            : null;
+        const normalizedWorksheetId =
+          typeof worksheetId === "string" && worksheetId.trim().length > 0
+            ? worksheetId.trim()
+            : null;
 
-        lastPublishedActiveCellRef.current = cell;
-        onActiveCellChangeRef.current?.(cell);
+        if (!normalizedCell || !normalizedWorksheetId) {
+          return;
+        }
+
+        if (
+          normalizedCell === lastPublishedActiveCellRef.current &&
+          normalizedWorksheetId === lastPublishedWorksheetIdRef.current
+        ) {
+          return;
+        }
+
+        lastPublishedActiveCellRef.current = normalizedCell;
+        lastPublishedWorksheetIdRef.current = normalizedWorksheetId;
+        onActiveCellChangeRef.current?.({
+          cell: normalizedCell,
+          worksheetId: normalizedWorksheetId,
+        });
+      };
+
+      const resolveActiveWorksheetId = (params) => {
+        const fromParams =
+          params?.activeSheet?.getSheetId?.() ??
+          params?.worksheet?.getSheetId?.() ??
+          null;
+
+        if (typeof fromParams === "string" && fromParams.trim().length > 0) {
+          return fromParams.trim();
+        }
+
+        return getActiveSheetIdFromUniver(univerAPI);
       };
 
       // Read from the event payload first — getActiveCell() can lag behind SelectionChanged.
@@ -731,8 +771,18 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
 
         const cell =
           getActiveCellAddress(params) || getActiveCellFromUniver(univerAPI);
-        publishActiveCell(cell);
+        const worksheetId = resolveActiveWorksheetId(params);
+        publishActiveCell(cell, worksheetId);
         schedulePresenceResync();
+      };
+
+      const notifyActiveSheetChange = (params) => {
+        if (shouldIgnoreSyntheticSelectionEvent()) return;
+
+        const worksheetId = resolveActiveWorksheetId(params);
+        const cell = getActiveCellFromUniver(univerAPI);
+        publishActiveCell(cell, worksheetId);
+        schedulePresenceResync({ force: true });
       };
 
       const subscribeSelectionEvent = (eventName) => {
@@ -794,14 +844,24 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
             subscribeSelectionEvent(univerAPI.Event.SelectionChanged);
             subscribeSelectionEvent(univerAPI.Event.SelectionMoveEnd);
             subscribeSelectionEvent(univerAPI.Event.CellPointerUp);
+
+            if (univerAPI.Event.ActiveSheetChanged) {
+              changeEventDisposables.push(
+                univerAPI.addEvent(
+                  univerAPI.Event.ActiveSheetChanged,
+                  notifyActiveSheetChange
+                )
+              );
+            }
           }
 
           selectionReadyRef.current = true;
 
           // Publish the default selection (e.g. A1) once the sheet is interactive.
           const initialCell = getActiveCellFromUniver(univerAPI);
-          if (initialCell) {
-            publishActiveCell(initialCell);
+          const initialWorksheetId = getActiveSheetIdFromUniver(univerAPI);
+          if (initialCell && initialWorksheetId) {
+            publishActiveCell(initialCell, initialWorksheetId);
           }
 
           setIsInitializing(false);

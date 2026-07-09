@@ -99,16 +99,14 @@ exports.getById = async (req, res, next) => {
       throw new NotFoundError("Spreadsheet not found");
     }
 
-    const latestVersion = await Spreadsheet.findLatestVersion(id);
-
     res.json({
       success: true,
       data: {
         id: spreadsheet.id,
         name: spreadsheet.name,
         description: spreadsheet.description,
-        workbook_data: latestVersion?.workbook_data ?? null,
-        version: latestVersion?.version ?? 0,
+        workbook_data: spreadsheet.workbook_data,
+        version: spreadsheet.current_version,
         created_at: spreadsheet.created_at,
         updated_at: spreadsheet.updated_at,
       },
@@ -166,11 +164,14 @@ exports.create = async (req, res, next) => {
   try {
     const { name, description } = validateCreatePayload(req.body);
     const { id: userId } = req.user;
+    const initialWorkbookData = createEmptyWorkbookData(name);
 
     const [spreadsheet] = await Spreadsheet.create(
       {
         name,
         description,
+        workbook_data: initialWorkbookData,
+        current_version: 1,
         created_by: userId,
         updated_by: null,
         deleted_by: null,
@@ -181,7 +182,7 @@ exports.create = async (req, res, next) => {
     await createSpreadsheetVersion(
       spreadsheet.id,
       {
-        workbook_data: createEmptyWorkbookData(name),
+        workbook_data: initialWorkbookData,
         created_by: userId,
         version: 1,
       },
@@ -201,6 +202,62 @@ exports.create = async (req, res, next) => {
     });
   } catch (error) {
     await trx.rollback();
+    next(error);
+  }
+};
+
+/**
+ * PUT /api/spreadsheets/:id
+ */
+exports.update = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    validateSpreadsheetId(id);
+
+    const { name, description } = validateCreatePayload(req.body);
+    const { id: userId } = req.user;
+
+    const spreadsheet = await Spreadsheet.findById(id);
+    if (!spreadsheet) {
+      throw new NotFoundError("Spreadsheet not found");
+    }
+
+    const [updated] = await Spreadsheet.updateMetadata(id, {
+      name,
+      description,
+      updated_by: userId,
+    });
+
+    res.json({
+      success: true,
+      message: "Spreadsheet updated successfully.",
+      data: updated,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * DELETE /api/spreadsheets/:id
+ */
+exports.softDelete = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    validateSpreadsheetId(id);
+
+    const spreadsheet = await Spreadsheet.findById(id);
+    if (!spreadsheet) {
+      throw new NotFoundError("Spreadsheet not found");
+    }
+
+    await Spreadsheet.softDelete(id, req.user.id);
+
+    res.status(204).json({
+      success: true,
+      message: "Spreadsheet deleted successfully.",
+    });
+  } catch (error) {
     next(error);
   }
 };

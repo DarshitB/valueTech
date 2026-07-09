@@ -6,5 +6,7 @@ const ENDPOINT = "/api/spreadsheets"; // Base endpoint for all spreadsheet-relat
 export const getSpreadsheets = () => axios.get(ENDPOINT); // Fetch all spreadsheets
 export const getSpreadsheetById = (id) => axios.get(`${ENDPOINT}/${id}`); // Get spreadsheet by ID
 export const createSpreadsheet = (data) => axios.post(ENDPOINT, data); // Create new spreadsheet
+export const updateSpreadsheet = (id, data) => axios.put(`${ENDPOINT}/${id}`, data); // Update spreadsheet metadata
+export const deleteSpreadsheet = (id) => axios.delete(`${ENDPOINT}/${id}`); // Soft delete spreadsheet
 export const saveSpreadsheet = (id, data) =>
   axios.post(`${ENDPOINT}/${id}/save`, data); // Save spreadsheet workbook snapshot

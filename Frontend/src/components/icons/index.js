@@ -19,6 +19,7 @@ export {
   FieldVerifierIcon,
   OrderIcon,
   OrderHistoryIcon,
+  SpreadsheetIcon,
   ViewIcon,
   RevalidateIcon,
   ValidateIcon,

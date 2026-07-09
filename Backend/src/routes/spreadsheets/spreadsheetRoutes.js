@@ -7,8 +7,10 @@ const auth = require("../../middleware/auth");
 router.use(auth);
 
 router.get("/", spreadsheetController.getAll);
-router.get("/:id", spreadsheetController.getById);
-router.post("/:id/save", spreadsheetController.save);
 router.post("/", spreadsheetController.create);
+router.get("/:id", spreadsheetController.getById);
+router.put("/:id", spreadsheetController.update);
+router.delete("/:id", spreadsheetController.softDelete);
+router.post("/:id/save", spreadsheetController.save);
 
 module.exports = router;

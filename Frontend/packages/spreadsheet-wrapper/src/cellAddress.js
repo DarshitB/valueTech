@@ -30,6 +30,20 @@ export function toCellAddress(rowIndex, columnIndex) {
 }
 
 /**
+ * Read the active worksheet id from a Univer API instance.
+ */
+export function getActiveSheetIdFromUniver(univerAPI) {
+  const sheetId = univerAPI
+    ?.getActiveWorkbook?.()
+    ?.getActiveSheet?.()
+    ?.getSheetId?.();
+
+  return typeof sheetId === "string" && sheetId.trim().length > 0
+    ? sheetId.trim()
+    : null;
+}
+
+/**
  * Read the current active cell A1 notation from a Univer API instance.
  */
 export function getActiveCellFromUniver(univerAPI) {

@@ -25,6 +25,7 @@ function SpreadsheetRealtimeSurface({
   onWorkbookChange,
   onError,
   localCell,
+  localWorksheetId,
   publishActiveCell,
 }) {
   const activeCellsByUserId = useSpreadsheetActiveCells();
@@ -61,9 +62,25 @@ function SpreadsheetRealtimeSurface({
   });
 
   const presenceMarkers = useMemo(() => {
+    const normalizedActiveWorksheetId =
+      typeof localWorksheetId === "string" ? localWorksheetId.trim() : "";
+
+    const isOnActiveWorksheet = (worksheetId) => {
+      if (!normalizedActiveWorksheetId) {
+        return true;
+      }
+
+      if (typeof worksheetId !== "string" || worksheetId.trim().length === 0) {
+        return false;
+      }
+
+      return worksheetId.trim() === normalizedActiveWorksheetId;
+    };
+
     const remoteEntries = Object.values(activeCellsByUserId).filter(
       (entry) => {
         if (!entry?.cell) return false;
+        if (!isOnActiveWorksheet(entry.worksheetId)) return false;
         if (currentUserId == null) return true;
         return String(entry.userId) !== String(currentUserId);
       }
@@ -76,7 +93,11 @@ function SpreadsheetRealtimeSurface({
       userName: entry.userName,
     }));
 
-    if (currentUserId != null && normalizedLocalCell) {
+    if (
+      currentUserId != null &&
+      normalizedLocalCell &&
+      isOnActiveWorksheet(localWorksheetId)
+    ) {
       markerUsers.push({
         userId: currentUserId,
         userName: currentUserName,
@@ -89,6 +110,7 @@ function SpreadsheetRealtimeSurface({
       userId: entry.userId,
       userName: entry.userName,
       cell: entry.cell,
+      worksheetId: entry.worksheetId,
       identity: getUserIdentity(
         entry.userId,
         entry.userName,
@@ -97,11 +119,16 @@ function SpreadsheetRealtimeSurface({
       isCurrentUser: false,
     }));
 
-    if (currentUserId != null && normalizedLocalCell) {
+    if (
+      currentUserId != null &&
+      normalizedLocalCell &&
+      isOnActiveWorksheet(localWorksheetId)
+    ) {
       markers.push({
         userId: currentUserId,
         userName: currentUserName,
         cell: normalizedLocalCell,
+        worksheetId: localWorksheetId,
         identity: getUserIdentity(
           currentUserId,
           currentUserName,
@@ -112,7 +139,14 @@ function SpreadsheetRealtimeSurface({
     }
 
     return markers;
-  }, [activeCellsByUserId, currentUserId, currentUserName, localCell, getUserIdentity]);
+  }, [
+    activeCellsByUserId,
+    currentUserId,
+    currentUserName,
+    localCell,
+    localWorksheetId,
+    getUserIdentity,
+  ]);
 
   const handleSpreadsheetReady = useCallback(() => {
     setIsSpreadsheetReady(true);

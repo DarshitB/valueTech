@@ -2,7 +2,7 @@
  * In-memory active-cell store for spreadsheet rooms (Phase 2.2).
  *
  * Structure:
- *   rooms: Map<spreadsheetId, Map<userId, { userId, userName, socketId, cell }>>
+ *   rooms: Map<spreadsheetId, Map<userId, { userId, userName, socketId, worksheetId, cell }>>
  *   socketIndex: Map<socketId, { spreadsheetId, userId }>
  *
  * One active-cell entry per user per room. Cleared on leave / disconnect.
@@ -16,10 +16,10 @@ const socketIndex = new Map();
  * Set or replace a user's active cell in a spreadsheet room.
  *
  * @param {string} spreadsheetId
- * @param {{ userId: number|string, userName: string, socketId: string, cell: string }} entry
+ * @param {{ userId: number|string, userName: string, socketId: string, worksheetId: string, cell: string }} entry
  */
 function set(spreadsheetId, entry) {
-  const { userId, userName, socketId, cell } = entry;
+  const { userId, userName, socketId, worksheetId, cell } = entry;
 
   // Drop any previous active-cell entry for this socket
   clearBySocket(socketId);
@@ -35,7 +35,7 @@ function set(spreadsheetId, entry) {
     socketIndex.delete(existing.socketId);
   }
 
-  room.set(userId, { userId, userName, socketId, cell });
+  room.set(userId, { userId, userName, socketId, worksheetId, cell });
   socketIndex.set(socketId, { spreadsheetId, userId });
 }
 
@@ -44,7 +44,7 @@ function set(spreadsheetId, entry) {
  * Only clears if this socket is still the active entry for that user.
  *
  * @param {string} socketId
- * @returns {{ spreadsheetId: string, userId: number|string, userName: string, cell: string }|null}
+ * @returns {{ spreadsheetId: string, userId: number|string, userName: string, worksheetId: string, cell: string }|null}
  */
 function clearBySocket(socketId) {
   const mapping = socketIndex.get(socketId);
@@ -73,7 +73,7 @@ function clearBySocket(socketId) {
  * Get all active-cell entries for a spreadsheet room.
  *
  * @param {string} spreadsheetId
- * @returns {Array<{ userId: number|string, userName: string, socketId: string, cell: string }>}
+ * @returns {Array<{ userId: number|string, userName: string, socketId: string, worksheetId: string, cell: string }>}
  */
 function getCells(spreadsheetId) {
   const room = rooms.get(spreadsheetId);

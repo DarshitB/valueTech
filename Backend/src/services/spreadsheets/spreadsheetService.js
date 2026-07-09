@@ -10,16 +10,15 @@ const { NotFoundError } = require("../../utils/customErrors");
  * @param {import("knex").Knex.Transaction} trx
  */
 async function updateSpreadsheet(spreadsheetId, { workbook_data, updated_by }, trx) {
-  await Spreadsheet.updateAuditFields(spreadsheetId, updated_by, trx);
-
-  const updated = await Spreadsheet.updateLatestVersionWorkbookData(
+  const [updated] = await Spreadsheet.updateWorkbookData(
     spreadsheetId,
     workbook_data,
+    updated_by,
     trx
   );
 
   if (!updated) {
-    throw new NotFoundError("Spreadsheet workbook version not found");
+    throw new NotFoundError("Spreadsheet not found");
   }
 
   return updated;

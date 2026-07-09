@@ -1389,3 +1389,32 @@ export const SendIcon = ({
     </svg>
   );
 };
+
+export const SpreadsheetIcon = ({
+  color = "currentColor",
+  className = "",
+  ...props
+}) => {
+  return (
+    <svg
+      viewBox="0 0 50 50"
+      width="30"
+      height="30"
+      fill="none"
+      stroke={color}
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`icon ${className}`}
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
+      <rect x="9" y="7" width="32" height="36" rx="2.5" />
+      <line x1="9" y1="17" x2="41" y2="17" />
+      <line x1="9" y1="27" x2="41" y2="27" />
+      <line x1="9" y1="37" x2="41" y2="37" />
+      <line x1="20" y1="7" x2="20" y2="43" />
+      <line x1="31" y1="7" x2="31" y2="43" />
+    </svg>
+  );
+};

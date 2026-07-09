@@ -37,7 +37,6 @@ import CEReport from "../pages/orders/reports/CEReport";
 import MarineReport from "../pages/orders/reports/MarineReport";
 import Spreadsheets from "../pages/spreadsheets/Spreadsheets";
 import SpreadsheetEditor from "../pages/spreadsheets/SpreadsheetEditor";
-import Spreadsheet from "../pages/SpreadsheetTest/Spreadsheet";
 
 const AppRoutes = () => {
   return (
@@ -268,17 +267,9 @@ const AppRoutes = () => {
           }
         />
         <Route
-          path="spreadsheettest"
-          element={
-            <ProtectedRoute>
-              <Spreadsheet />
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="spreadsheet"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute permission="view_spreadsheet">
               <Spreadsheets />
             </ProtectedRoute>
           }
@@ -286,7 +277,7 @@ const AppRoutes = () => {
         <Route
           path="spreadsheet/:id"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute permission="view_spreadsheet">
               <SpreadsheetEditor />
             </ProtectedRoute>
           }

@@ -2,10 +2,10 @@
  * Spreadsheet active-cell handlers (Phase 2.2).
  *
  * Events (client → server):
- *   spreadsheet:active-cell { spreadsheet_id, cell }
+ *   spreadsheet:active-cell { spreadsheet_id, worksheet_id, cell }
  *
  * Events (server → client):
- *   spreadsheet:active-cell { spreadsheet_id, userId, userName, cell }
+ *   spreadsheet:active-cell { spreadsheet_id, userId, userName, worksheet_id, cell }
  *   spreadsheet:error       { message }
  *
  * On spreadsheet:join, the joining socket receives one spreadsheet:active-cell
@@ -31,6 +31,10 @@ function validateCell(cell) {
   return typeof cell === "string" && cell.trim().length > 0;
 }
 
+function validateWorksheetId(worksheetId) {
+  return typeof worksheetId === "string" && worksheetId.trim().length > 0;
+}
+
 function isInSpreadsheetRoom(socket, spreadsheetId) {
   return socket.rooms.has(roomName(spreadsheetId));
 }
@@ -40,13 +44,14 @@ function isInSpreadsheetRoom(socket, spreadsheetId) {
  *
  * @param {import("socket.io").Socket} socket
  * @param {string} spreadsheetId
- * @param {{ userId: number|string, userName: string, cell: string|null }} payload
+ * @param {{ userId: number|string, userName: string, worksheetId: string|null, cell: string|null }} payload
  */
 function broadcastActiveCell(socket, spreadsheetId, payload) {
   socket.to(roomName(spreadsheetId)).emit("spreadsheet:active-cell", {
     spreadsheet_id: spreadsheetId,
     userId: payload.userId,
     userName: payload.userName,
+    worksheet_id: payload.worksheetId,
     cell: payload.cell,
   });
 }
@@ -63,6 +68,7 @@ function clearAndBroadcast(socket) {
   broadcastActiveCell(socket, cleared.spreadsheetId, {
     userId: cleared.userId,
     userName: cleared.userName,
+    worksheetId: cleared.worksheetId,
     cell: null,
   });
 }
@@ -84,6 +90,7 @@ function emitActiveCellsSnapshot(socket, spreadsheetId) {
       spreadsheet_id: spreadsheetId,
       userId: entry.userId,
       userName: entry.userName,
+      worksheet_id: entry.worksheetId,
       cell: entry.cell,
     });
   }
@@ -99,11 +106,19 @@ function registerSpreadsheetActiveCell(io, socket) {
   // Publish the user's currently focused cell
   socket.on("spreadsheet:active-cell", (payload = {}) => {
     const spreadsheetId = payload.spreadsheet_id;
+    const worksheetId = payload.worksheet_id;
     const cell = payload.cell;
 
     if (!validateSpreadsheetId(spreadsheetId)) {
       socket.emit("spreadsheet:error", {
         message: "Valid spreadsheet_id is required",
+      });
+      return;
+    }
+
+    if (!validateWorksheetId(worksheetId)) {
+      socket.emit("spreadsheet:error", {
+        message: "worksheet_id must be a non-empty string",
       });
       return;
     }
@@ -124,17 +139,20 @@ function registerSpreadsheetActiveCell(io, socket) {
     }
 
     const trimmedCell = cell.trim();
+    const trimmedWorksheetId = worksheetId.trim();
 
     activeCellStore.set(spreadsheetId, {
       userId: socket.user.id,
       userName: socket.user.name,
       socketId: socket.id,
+      worksheetId: trimmedWorksheetId,
       cell: trimmedCell,
     });
 
     broadcastActiveCell(socket, spreadsheetId, {
       userId: socket.user.id,
       userName: socket.user.name,
+      worksheetId: trimmedWorksheetId,
       cell: trimmedCell,
     });
   });

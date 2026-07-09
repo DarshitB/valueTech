@@ -37,7 +37,8 @@ function SpreadsheetRealtimeEditorContent({
   isDirty,
   onManualSave,
 }) {
-  const { localCell, publishActiveCell } = useSpreadsheetActiveCellPublisher();
+  const { localCell, localWorksheetId, publishActiveCell } =
+    useSpreadsheetActiveCellPublisher();
   useSpreadsheetKeyboardShortcuts({ spreadsheetRef, onManualSave });
 
   return (
@@ -90,6 +91,7 @@ function SpreadsheetRealtimeEditorContent({
         onWorkbookChange={onWorkbookChange}
         onError={onError}
         localCell={localCell}
+        localWorksheetId={localWorksheetId}
         publishActiveCell={publishActiveCell}
       />
     </div>

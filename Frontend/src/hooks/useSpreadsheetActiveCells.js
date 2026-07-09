@@ -3,7 +3,7 @@ import { useSpreadsheetRealtime } from "../realtime/spreadsheet";
 
 /**
  * Subscribe to remote active-cell updates on the shared realtime connection.
- * Returns a map of userId → { userId, userName, cell }.
+ * Returns a map of userId → { userId, userName, cell, worksheetId }.
  *
  * Does not create its own Socket.IO connection.
  * Cleared when a user leaves (server sends cell: null) or the session ends.
@@ -24,7 +24,12 @@ export function useSpreadsheetActiveCells() {
       if (!isActive) return;
       if (payload.spreadsheet_id !== spreadsheetId) return;
 
-      const { userId, userName, cell } = payload;
+      const {
+        userId,
+        userName,
+        cell,
+        worksheet_id: worksheetId,
+      } = payload;
       if (userId == null) return;
 
       setActiveCellsByUserId((current) => {
@@ -37,7 +42,15 @@ export function useSpreadsheetActiveCells() {
 
         return {
           ...current,
-          [userId]: { userId, userName, cell },
+          [userId]: {
+            userId,
+            userName,
+            cell,
+            worksheetId:
+              typeof worksheetId === "string" && worksheetId.trim().length > 0
+                ? worksheetId.trim()
+                : null,
+          },
         };
       });
     };

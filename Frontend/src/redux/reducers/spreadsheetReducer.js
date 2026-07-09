@@ -40,6 +40,32 @@ export const addSpreadsheet = createAsyncThunk(
   }
 );
 
+// Update spreadsheet metadata
+export const editSpreadsheet = createAsyncThunk(
+  "spreadsheets/edit",
+  async ({ id, data }, { rejectWithValue }) => {
+    try {
+      const res = await spreadsheetApi.updateSpreadsheet(id, data);
+      return res.data.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+// Soft delete spreadsheet
+export const removeSpreadsheet = createAsyncThunk(
+  "spreadsheets/delete",
+  async (id, { rejectWithValue }) => {
+    try {
+      await spreadsheetApi.deleteSpreadsheet(id);
+      return id;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
 // Save spreadsheet workbook snapshot
 export const saveSpreadsheetById = createAsyncThunk(
   "spreadsheets/saveById",
@@ -121,6 +147,32 @@ const spreadsheetSlice = createSlice({
       .addCase(addSpreadsheet.rejected, (state, action) => {
         state.saving = false;
         toast.error(`Failed to create spreadsheet: ${action.payload}`);
+      })
+
+      // Update metadata
+      .addCase(editSpreadsheet.pending, (state) => {
+        state.saving = true;
+      })
+      .addCase(editSpreadsheet.fulfilled, (state, action) => {
+        state.saving = false;
+        const index = state.list.findIndex((item) => item.id === action.payload.id);
+        if (index !== -1) {
+          state.list[index] = action.payload;
+        }
+        toast.success("Spreadsheet updated successfully");
+      })
+      .addCase(editSpreadsheet.rejected, (state, action) => {
+        state.saving = false;
+        toast.error(`Failed to update spreadsheet: ${action.payload}`);
+      })
+
+      // Soft delete
+      .addCase(removeSpreadsheet.fulfilled, (state, action) => {
+        state.list = state.list.filter((item) => item.id !== action.payload);
+        toast.success("Spreadsheet deleted successfully");
+      })
+      .addCase(removeSpreadsheet.rejected, (state, action) => {
+        toast.error(`Failed to delete spreadsheet: ${action.payload}`);
       })
 
       // Save workbook snapshot
