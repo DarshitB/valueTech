@@ -2350,9 +2350,6 @@ exports.sendMail = async (req, res, next) => {
 
         emailBody += textHeaders.join(" | ") + "\n";
         emailBody += textValues.join(" | ");
-      } else {
-        // Just add the plain text URL link
-        emailBody += `${emailBody ? "\n\n" : ""}Link: ${safePublicUrl}`;
       }
     } else {
       // If no public_url, use existing behavior (document links and video links)
@@ -2449,14 +2446,6 @@ exports.sendMail = async (req, res, next) => {
               </tr>
             </tbody>
           </table>
-        `;
-      } else {
-        // Just add the styled link directly
-        htmlEmailBody += `${htmlEmailBody ? "<br><br>" : ""}`;
-        htmlEmailBody += `
-          <div style="font-family: Arial, sans-serif; font-size: 13px;">
-            <strong>Link:</strong> <a href="${safePublicUrl}" target="_blank" rel="noopener noreferrer" style="color: #0066cc; text-decoration: underline;">${safePublicUrl}</a>
-          </div>
         `;
       }
 
