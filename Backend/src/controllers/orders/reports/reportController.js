@@ -2439,22 +2439,37 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
             .filter(Boolean);
         };
 
-        /** Merged-column metadata from row 0 (rowspan cells) — used when splitting across pages. */
+        /** Merged-column metadata from first non-title rowspan cells — used when splitting across pages. */
+        const isSummarizedMergedTitleRowEl = (row) =>
+          Boolean(
+            row &&
+              (row.classList.contains("summary-merged-row") ||
+                row.querySelector("td.summary-title"))
+          );
+
         const extractSummarizedVerticalMergeMeta = (rows, columnIds) => {
           if (!rows.length) return [];
           const meta = [];
-          rows[0].querySelectorAll("td").forEach((td, colIndex) => {
-            const rowSpan = parseInt(td.getAttribute("rowspan"), 10);
-            if (!Number.isFinite(rowSpan) || rowSpan <= 1) return;
-            const colId =
-              td.getAttribute("data-col-id") ||
-              (Array.isArray(columnIds) ? columnIds[colIndex] : null);
-            if (colId) {
-              meta.push({ colId, innerHTML: td.innerHTML });
-              return;
-            }
-            meta.push({ colIndex, innerHTML: td.innerHTML });
-          });
+          const seen = new Set();
+          for (const row of rows) {
+            if (isSummarizedMergedTitleRowEl(row)) continue;
+            row.querySelectorAll("td").forEach((td, colIndex) => {
+              const rowSpan = parseInt(td.getAttribute("rowspan"), 10);
+              if (!Number.isFinite(rowSpan) || rowSpan <= 1) return;
+              const colId =
+                td.getAttribute("data-col-id") ||
+                (Array.isArray(columnIds) ? columnIds[colIndex] : null);
+              const key = colId || `idx:${colIndex}`;
+              if (seen.has(key)) return;
+              seen.add(key);
+              if (colId) {
+                meta.push({ colId, innerHTML: td.innerHTML });
+                return;
+              }
+              meta.push({ colIndex, innerHTML: td.innerHTML });
+            });
+            if (meta.length > 0) break;
+          }
           return meta;
         };
 
@@ -2523,62 +2538,83 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
             }
           });
 
+          const allRows = Array.from(tbody.querySelectorAll("tr")).filter(
+            (row) => !row.classList.contains("summary-grand-total-row")
+          );
+          if (allRows.length === 0) return;
+
           if (mergedByColId.size === 0) {
             const legacyMeta = mergeMeta.filter(
               (entry) => Number.isFinite(entry.colIndex)
             );
             if (legacyMeta.length === 0) return;
 
-            const dataRows = Array.from(tbody.querySelectorAll("tr")).filter(
-              (row) => !row.classList.contains("summary-grand-total-row")
-            );
-            const dataRowCount = dataRows.length;
-            if (dataRowCount === 0) return;
-
-            const sortedMeta = [...legacyMeta].sort((a, b) => b.colIndex - a.colIndex);
-            sortedMeta.forEach(({ colIndex, innerHTML }) => {
-              const firstRow = dataRows[0];
-              const cells = firstRow.querySelectorAll("td");
-              const existing = cells[colIndex];
-              const existingRowspan = existing
-                ? parseInt(existing.getAttribute("rowspan"), 10)
-                : 0;
-
-              if (existingRowspan > 1) {
-                existing.setAttribute("rowspan", String(dataRowCount));
-                existing.style.verticalAlign = "middle";
-                existing.style.textAlign = "center";
-                return;
+            // Legacy index-based path: only apply within contiguous non-title segments.
+            let i = 0;
+            while (i < allRows.length) {
+              if (isSummarizedMergedTitleRowEl(allRows[i])) {
+                i += 1;
+                continue;
               }
-
-              const newTd = document.createElement("td");
-              newTd.setAttribute("rowspan", String(dataRowCount));
-              newTd.className = "summarized-vertical-merged-cell";
-              newTd.style.verticalAlign = "middle";
-              newTd.style.textAlign = "center";
-              newTd.innerHTML = innerHTML;
-
-              if (colIndex >= cells.length) {
-                firstRow.appendChild(newTd);
-              } else {
-                firstRow.insertBefore(newTd, cells[colIndex]);
+              let j = i;
+              while (j < allRows.length && !isSummarizedMergedTitleRowEl(allRows[j])) {
+                j += 1;
               }
-            });
+              const segment = allRows.slice(i, j);
+              const dataRowCount = segment.length;
+              const sortedMeta = [...legacyMeta].sort((a, b) => b.colIndex - a.colIndex);
+              sortedMeta.forEach(({ colIndex, innerHTML }) => {
+                const firstRow = segment[0];
+                const cells = firstRow.querySelectorAll("td");
+                const existing = cells[colIndex];
+                const existingRowspan = existing
+                  ? parseInt(existing.getAttribute("rowspan"), 10)
+                  : 0;
+
+                if (existingRowspan > 1) {
+                  existing.setAttribute("rowspan", String(dataRowCount));
+                  existing.style.verticalAlign = "middle";
+                  existing.style.textAlign = "center";
+                  return;
+                }
+
+                const newTd = document.createElement("td");
+                newTd.setAttribute("rowspan", String(dataRowCount));
+                newTd.className = "summarized-vertical-merged-cell";
+                newTd.style.verticalAlign = "middle";
+                newTd.style.textAlign = "center";
+                newTd.innerHTML = innerHTML;
+
+                if (colIndex >= cells.length) {
+                  firstRow.appendChild(newTd);
+                } else {
+                  firstRow.insertBefore(newTd, cells[colIndex]);
+                }
+              });
+              i = j;
+            }
             return;
           }
 
-          const dataRows = Array.from(tbody.querySelectorAll("tr")).filter(
-            (row) => !row.classList.contains("summary-grand-total-row")
-          );
-          const dataRowCount = dataRows.length;
-          if (dataRowCount === 0) return;
-
-          dataRows.forEach((row, rowIndex) => {
-            normalizeSummarizedChunkRow(row, columnIds, mergedByColId, {
-              isFirstDataRow: rowIndex === 0,
-              dataRowCount,
+          let i = 0;
+          while (i < allRows.length) {
+            if (isSummarizedMergedTitleRowEl(allRows[i])) {
+              i += 1;
+              continue;
+            }
+            let j = i;
+            while (j < allRows.length && !isSummarizedMergedTitleRowEl(allRows[j])) {
+              j += 1;
+            }
+            const segment = allRows.slice(i, j);
+            segment.forEach((row, rowIndex) => {
+              normalizeSummarizedChunkRow(row, columnIds, mergedByColId, {
+                isFirstDataRow: rowIndex === 0,
+                dataRowCount: segment.length,
+              });
             });
-          });
+            i = j;
+          }
         };
 
         const summarizedColumnIds = getSummarizedAppendixColumnIds(originalTable);

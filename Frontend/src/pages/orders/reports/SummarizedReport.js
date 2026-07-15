@@ -279,6 +279,56 @@ const SUMMARIZED_TRAILING_COLUMNS = [
 /** Hidden in table UI and Columns picker for now; data key kept on rows for later. */
 const SUMMARIZED_UI_HIDDEN_COLUMN_IDS = new Set(["subcategory_id"]);
 
+/**
+ * Developer-only allowlist (comma-separated fixed column ids).
+ * Only these fixed column headings are editable in the Summarized table UI.
+ * Users cannot change this — edit this string in code only.
+ *
+ * Example: "machine_description,yom,supplier_name,estimated_fair_value"
+ *
+ * Available ids:
+ * sr_no, source_order_number, machine_description, asset_serial_no, yom,
+ * supplier_name, invoice_no, invoice_date, subcategory_id,
+ * total_invoice_cost, estimated_current_replacement_cost, residual_life_of_asset,
+ * depr_rate, amount_post_depreciation, appraisal_value, estimated_fair_value
+ */
+const SUMMARIZED_EDITABLE_FIXED_HEADER_COLUMN_IDS = "total_invoice_cost";
+
+const parseSummarizedEditableFixedHeaderColumnIds = (raw) =>
+  String(raw || "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+
+const SUMMARIZED_EDITABLE_FIXED_HEADER_COLUMN_ID_SET = new Set(
+  parseSummarizedEditableFixedHeaderColumnIds(
+    SUMMARIZED_EDITABLE_FIXED_HEADER_COLUMN_IDS
+  )
+);
+
+const isSummarizedFixedHeaderEditable = (colId) =>
+  Boolean(colId && SUMMARIZED_EDITABLE_FIXED_HEADER_COLUMN_ID_SET.has(colId));
+
+const getSummarizedFixedHeaderInputValue = (col, fixedColumnHeaders = {}) => {
+  if (
+    col?.id &&
+    fixedColumnHeaders &&
+    Object.prototype.hasOwnProperty.call(fixedColumnHeaders, col.id)
+  ) {
+    return String(fixedColumnHeaders[col.id] ?? "");
+  }
+  return col?.header || "";
+};
+
+/** Display / PDF: use saved override when non-empty, else default header. */
+const resolveSummarizedFixedHeader = (col, fixedColumnHeaders = {}) => {
+  const override = fixedColumnHeaders?.[col?.id];
+  if (typeof override === "string" && override.trim() !== "") {
+    return override;
+  }
+  return col?.header || "";
+};
+
 /** Default tbody vertical padding for summarized appendix table in generated PDF. */
 const SUMMARIZED_APPENDIX_DEFAULT_ROW_PADDING_PX = 5;
 const SUMMARIZED_APPENDIX_MAX_ROW_PADDING_PX = 100;
@@ -355,6 +405,11 @@ const SUMMARIZED_CURRENCY_COLUMN_IDS = new Set([
   "estimated_fair_value",
 ]);
 
+/** Full-row merge (title row spanning all columns) — stored on each row in table JSON. */
+const isSummarizedMergedTitleRow = (row) => Boolean(row?.isMergedRow);
+
+const getSummarizedMergedRowText = (row) => String(row?.mergedRowText ?? "");
+
 /** General fields always driven by summarized table grand totals when table has values. */
 const SUMMARIZED_TABLE_DERIVED_GENERAL_FIELDS = new Set([
   "tax_invoice_cost",
@@ -365,13 +420,15 @@ const SUMMARIZED_TABLE_DERIVED_GENERAL_FIELDS = new Set([
 ]);
 
 const summarizedRowsHaveValuationTotals = (rows = []) =>
-  rows.some(
-    (row) =>
+  rows.some((row) => {
+    if (isSummarizedMergedTitleRow(row)) return false;
+    return (
       parseFloat(String(row?.total_invoice_cost ?? "").replace(/,/g, "")) > 0 ||
       parseFloat(String(row?.amount_post_depreciation ?? "").replace(/,/g, "")) > 0 ||
       parseFloat(String(row?.appraisal_value ?? "").replace(/,/g, "")) > 0 ||
       parseFloat(String(row?.estimated_fair_value ?? "").replace(/,/g, "")) > 0
-  );
+    );
+  });
 
 const SUMMARIZED_DIGITS_ONLY_COLUMN_IDS = new Set([
   "residual_life_of_asset",
@@ -419,7 +476,10 @@ const getSummarizedYomFromReport = (reportType, report = {}) => {
 };
 
 const buildEmptySummarizedRow = (dynamicColumns = []) => {
-  const base = {};
+  const base = {
+    isMergedRow: false,
+    mergedRowText: "",
+  };
   [
     SUMMARIZED_SR_NO_COLUMN,
     ...SUMMARIZED_FIXED_START_COLUMNS,
@@ -439,7 +499,12 @@ const normalizeSummarizedRows = (rows, dynamicColumns = []) => {
     return [buildEmptySummarizedRow(dynamicColumns)];
   }
   const emptyRow = buildEmptySummarizedRow(dynamicColumns);
-  return rows.map((row) => ({ ...emptyRow, ...(row || {}) }));
+  return rows.map((row) => ({
+    ...emptyRow,
+    ...(row || {}),
+    isMergedRow: Boolean(row?.isMergedRow),
+    mergedRowText: String(row?.mergedRowText ?? ""),
+  }));
 };
 
 const getDefaultSummarizedTableData = () => ({
@@ -448,6 +513,8 @@ const getDefaultSummarizedTableData = () => ({
   verticalMergedColumnIds: [],
   verticalMergeValues: {},
   manualEstimatedFairValueGrandTotal: "",
+  /** Saved custom labels for fixed columns (keyed by column id). */
+  fixedColumnHeaders: {},
 });
 
 const SUMMARIZED_VERTICAL_MERGE_BLOCKLIST = new Set([
@@ -466,8 +533,35 @@ const canVerticallyMergeSummarizedColumn = (colId) =>
 const getSummarizedVerticalMergeRowSpan = (dataRowCount) =>
   dataRowCount > 0 ? dataRowCount * 2 - 1 : 1;
 
-const getSummarizedColumnLabel = (col, dynamicColumns = []) => {
+/**
+ * Contiguous segment of non-title rows containing rowIndex (for vertical column merge).
+ * Title / full-merged rows break the segment so rowspan never crosses them.
+ */
+const findSummarizedNonTitleSegmentBounds = (rows, rowIndex) => {
+  if (!Array.isArray(rows) || rowIndex < 0 || rowIndex >= rows.length) return null;
+  if (isSummarizedMergedTitleRow(rows[rowIndex])) return null;
+  let start = rowIndex;
+  while (start > 0 && !isSummarizedMergedTitleRow(rows[start - 1])) start -= 1;
+  let end = rowIndex;
+  while (end < rows.length - 1 && !isSummarizedMergedTitleRow(rows[end + 1])) {
+    end += 1;
+  }
+  return { start, end, count: end - start + 1 };
+};
+
+const getSummarizedColumnLabel = (
+  col,
+  dynamicColumns = [],
+  fixedColumnHeaders = {}
+) => {
   if (!col) return "";
+  if (
+    fixedColumnHeaders &&
+    Object.prototype.hasOwnProperty.call(fixedColumnHeaders, col.id) &&
+    String(fixedColumnHeaders[col.id] ?? "").trim() !== ""
+  ) {
+    return String(fixedColumnHeaders[col.id]);
+  }
   if (col.header) return col.header;
   const dynamic = dynamicColumns.find((c) => c.id === col.id);
   return dynamic?.header || col.id || "";
@@ -481,11 +575,21 @@ const SUMMARIZED_NAV_SKIP_COLUMN_IDS = new Set([
   "source_order_number",
 ]);
 
-const isSummarizedNavCellActive = (rowIndex, colIndex, columns, mergedColumnIds) => {
+const isSummarizedNavCellActive = (
+  rowIndex,
+  colIndex,
+  columns,
+  mergedColumnIds,
+  rows = []
+) => {
   const col = columns[colIndex];
   if (!col) return false;
+  if (isSummarizedMergedTitleRow(rows[rowIndex])) return false;
   if (SUMMARIZED_NAV_SKIP_COLUMN_IDS.has(col.id)) return false;
-  if (isVerticallyMergedColumn(col.id, mergedColumnIds) && rowIndex > 0) return false;
+  if (isVerticallyMergedColumn(col.id, mergedColumnIds)) {
+    const segment = findSummarizedNonTitleSegmentBounds(rows, rowIndex);
+    if (!segment || rowIndex !== segment.start) return false;
+  }
   return true;
 };
 
@@ -497,7 +601,8 @@ const findSummarizedNavCell = (
   rowCount,
   colCount,
   columns,
-  mergedColumnIds
+  mergedColumnIds,
+  rows = []
 ) => {
   let row = startRow + dRow;
   let col = startCol + dCol;
@@ -506,7 +611,7 @@ const findSummarizedNavCell = (
     if (row < 0 || row >= rowCount || col < 0 || col >= colCount) {
       return null;
     }
-    if (isSummarizedNavCellActive(row, col, columns, mergedColumnIds)) {
+    if (isSummarizedNavCellActive(row, col, columns, mergedColumnIds, rows)) {
       return { row, col };
     }
     row += dRow;
@@ -627,6 +732,7 @@ function SummarizedRowInsertZone({ insertIndex, colSpan, onInsert }) {
 function SummarizedVerticalColumnMergeDropdown({
   columns,
   dynamicColumns,
+  fixedColumnHeaders,
   verticalMergedColumnIds,
   onToggleColumnMerge,
 }) {
@@ -710,7 +816,7 @@ function SummarizedVerticalColumnMergeDropdown({
                   opacity: blocked ? 0.45 : 1,
                 }}
               >
-                {getSummarizedColumnLabel(col, dynamicColumns)}
+                {getSummarizedColumnLabel(col, dynamicColumns, fixedColumnHeaders)}
               </button>
             );
           })}
@@ -1377,6 +1483,7 @@ function SummarizedReport() {
         estimated_fair_value: 0,
       };
       rows.forEach((row) => {
+        if (isSummarizedMergedTitleRow(row)) return;
         totals.total_invoice_cost += parseCurrency(String(row?.total_invoice_cost ?? ""));
         totals.estimated_current_replacement_cost += parseCurrency(
           String(row?.estimated_current_replacement_cost ?? "")
@@ -1433,10 +1540,15 @@ function SummarizedReport() {
   }, []);
 
   const areAllSummarizedFairValueRowsDashOnly = useCallback(
-    (rows = []) =>
-      Array.isArray(rows) &&
-      rows.length > 0 &&
-      rows.every((row) => isDashOnlySummarizedFairValue(row?.estimated_fair_value)),
+    (rows = []) => {
+      const dataRows = (Array.isArray(rows) ? rows : []).filter(
+        (row) => !isSummarizedMergedTitleRow(row)
+      );
+      return (
+        dataRows.length > 0 &&
+        dataRows.every((row) => isDashOnlySummarizedFairValue(row?.estimated_fair_value))
+      );
+    },
     [isDashOnlySummarizedFairValue]
   );
 
@@ -2296,6 +2408,12 @@ function SummarizedReport() {
         verticalMergedColumnIds,
         verticalMergeValues,
         manualEstimatedFairValueGrandTotal: parsed?.manualEstimatedFairValueGrandTotal || "",
+        fixedColumnHeaders:
+          parsed?.fixedColumnHeaders &&
+          typeof parsed.fixedColumnHeaders === "object" &&
+          !Array.isArray(parsed.fixedColumnHeaders)
+            ? parsed.fixedColumnHeaders
+            : {},
       });
     } catch (err) {
       setSummarizedTableData(getDefaultSummarizedTableData());
@@ -2400,12 +2518,6 @@ function SummarizedReport() {
     [summarizedTableData?.verticalMergeValues]
   );
 
-  const summarizedDataRowCount = (summarizedTableData.rows || []).length;
-  const summarizedDataRowSpan = useMemo(
-    () => getSummarizedVerticalMergeRowSpan(summarizedDataRowCount),
-    [summarizedDataRowCount]
-  );
-
   const getSummarizedColumnWidth = useCallback((colId) => {
     if (colId === "sr_no") return 90;
     if (colId === "subcategory_id") return 200;
@@ -2429,7 +2541,7 @@ function SummarizedReport() {
       summarizedDisplayOrderedColumns.reduce(
         (total, col) => total + getSummarizedColumnWidth(col.id),
         0
-      ) + 110, // Action column
+      ) + 160, // Action column (delete + merge checkbox)
     [summarizedDisplayOrderedColumns, getSummarizedColumnWidth]
   );
 
@@ -2478,6 +2590,7 @@ function SummarizedReport() {
       if (!col.allowSum) return;
       let sum = 0;
       rows.forEach((row) => {
+        if (isSummarizedMergedTitleRow(row)) return;
         const raw = String(row?.[col.id] ?? "").replace(/\D/g, "");
         sum += raw ? parseInt(raw, 10) || 0 : 0;
       });
@@ -2750,6 +2863,45 @@ function SummarizedReport() {
     [summarizedTableData, handleSummarizedTableDataChange]
   );
 
+  const handleSummarizedFixedHeaderChange = useCallback(
+    (columnId, value) => {
+      if (!isSummarizedFixedHeaderEditable(columnId)) return;
+      handleSummarizedTableDataChange({
+        ...summarizedTableData,
+        fixedColumnHeaders: {
+          ...(summarizedTableData.fixedColumnHeaders || {}),
+          [columnId]: value,
+        },
+      });
+    },
+    [summarizedTableData, handleSummarizedTableDataChange]
+  );
+
+  const renderSummarizedFixedHeaderContent = useCallback(
+    (col) => {
+      const fixedColumnHeaders = summarizedTableData.fixedColumnHeaders || {};
+      if (isSummarizedFixedHeaderEditable(col.id)) {
+        return (
+          <AutoGrowTextarea
+            className="form-field mb-0"
+            style={summarizedInputStyle}
+            value={getSummarizedFixedHeaderInputValue(col, fixedColumnHeaders)}
+            onChange={(e) =>
+              handleSummarizedFixedHeaderChange(col.id, e.target.value)
+            }
+            placeholder={col.header || "Enter column heading"}
+          />
+        );
+      }
+      return resolveSummarizedFixedHeader(col, fixedColumnHeaders);
+    },
+    [
+      summarizedTableData.fixedColumnHeaders,
+      summarizedInputStyle,
+      handleSummarizedFixedHeaderChange,
+    ]
+  );
+
   const handleAddSummarizedRow = useCallback(() => {
     const dynamicCols = summarizedTableData.dynamicColumns || [];
     const nextRows = [...(summarizedTableData.rows || []), buildEmptySummarizedRow(dynamicCols)];
@@ -2811,6 +2963,39 @@ function SummarizedReport() {
       // Keep the first row as the base fixed row.
       if (rowIndex === 0 || existingRows.length <= 1) return;
       const nextRows = existingRows.filter((_, idx) => idx !== rowIndex);
+      handleSummarizedTableDataChange({
+        ...summarizedTableData,
+        rows: nextRows,
+      });
+    },
+    [summarizedTableData, handleSummarizedTableDataChange]
+  );
+
+  const handleToggleSummarizedRowMerge = useCallback(
+    (rowIndex, shouldMerge) => {
+      const nextRows = (summarizedTableData.rows || []).map((row, idx) => {
+        if (idx !== rowIndex) return row;
+        return {
+          ...row,
+          isMergedRow: Boolean(shouldMerge),
+          mergedRowText: shouldMerge
+            ? String(row.mergedRowText ?? "")
+            : String(row.mergedRowText ?? ""),
+        };
+      });
+      handleSummarizedTableDataChange({
+        ...summarizedTableData,
+        rows: nextRows,
+      });
+    },
+    [summarizedTableData, handleSummarizedTableDataChange]
+  );
+
+  const handleSummarizedMergedRowTextChange = useCallback(
+    (rowIndex, value) => {
+      const nextRows = (summarizedTableData.rows || []).map((row, idx) =>
+        idx === rowIndex ? { ...row, mergedRowText: value } : row
+      );
       handleSummarizedTableDataChange({
         ...summarizedTableData,
         rows: nextRows,
@@ -2943,7 +3128,8 @@ function SummarizedReport() {
         rowCount,
         colCount,
         columns,
-        mergedColumnIds
+        mergedColumnIds,
+        summarizedTableData.rows || []
       );
       if (!target) return;
 
@@ -2959,9 +3145,18 @@ function SummarizedReport() {
   );
 
   const renderSummarizedDataCell = (col, row, rowIndex, colIndex) => {
+    if (isSummarizedMergedTitleRow(row)) {
+      return null;
+    }
+
     const columnId = col.id;
     const verticallyMerged = summarizedVerticalMergedSet.has(columnId);
-    if (verticallyMerged && rowIndex > 0) {
+    const rows = summarizedTableData.rows || [];
+    const segment = verticallyMerged
+      ? findSummarizedNonTitleSegmentBounds(rows, rowIndex)
+      : null;
+
+    if (verticallyMerged && (!segment || rowIndex !== segment.start)) {
       return null;
     }
 
@@ -2971,7 +3166,7 @@ function SummarizedReport() {
     };
     const mergedTdProps = verticallyMerged
       ? {
-          rowSpan: summarizedDataRowSpan,
+          rowSpan: getSummarizedVerticalMergeRowSpan(segment?.count || 1),
           className: "summarized-merged-cell",
           style: { ...cellStyle, verticalAlign: "top", textAlign: "center" },
         }
@@ -3128,13 +3323,13 @@ function SummarizedReport() {
 
     const isNavCell =
       !SUMMARIZED_NAV_SKIP_COLUMN_IDS.has(columnId) &&
-      (!verticallyMerged || rowIndex === 0);
+      (!verticallyMerged || (segment && rowIndex === segment.start));
 
     return (
       <td
         key={
           verticallyMerged
-            ? `${columnId}-merged-rows-${summarizedDataRowSpan}`
+            ? `${columnId}-merged-rows-${segment?.start ?? 0}-${segment?.count ?? 1}`
             : `${rowIndex}-${columnId}`
         }
         {...mergedTdProps}
@@ -6692,6 +6887,7 @@ function SummarizedReport() {
                         <SummarizedVerticalColumnMergeDropdown
                           columns={summarizedVerticalMergeEligibleColumns}
                           dynamicColumns={summarizedTableData.dynamicColumns || []}
+                          fixedColumnHeaders={summarizedTableData.fixedColumnHeaders || {}}
                           verticalMergedColumnIds={summarizedVerticalMergedColumnIds}
                           onToggleColumnMerge={handleToggleVerticalColumnMerge}
                         />
@@ -6760,7 +6956,7 @@ function SummarizedReport() {
                                   width: `${getSummarizedColumnWidth(SUMMARIZED_SR_NO_COLUMN.id)}px`,
                                 }}
                               >
-                                {SUMMARIZED_SR_NO_COLUMN.header}
+                                {renderSummarizedFixedHeaderContent(SUMMARIZED_SR_NO_COLUMN)}
                               </th>
                             )}
                             {SUMMARIZED_TRAILING_COLUMNS.filter((col) =>
@@ -6773,7 +6969,7 @@ function SummarizedReport() {
                                   width: `${getSummarizedColumnWidth(col.id)}px`,
                                 }}
                               >
-                                {col.header}
+                                {renderSummarizedFixedHeaderContent(col)}
                               </th>
                             ))}
                             {SUMMARIZED_FIXED_START_COLUMNS.filter((col) =>
@@ -6786,7 +6982,7 @@ function SummarizedReport() {
                                   width: `${getSummarizedColumnWidth(col.id)}px`,
                                 }}
                               >
-                                {col.header}
+                                {renderSummarizedFixedHeaderContent(col)}
                               </th>
                             ))}
                             {(summarizedTableData.dynamicColumns || []).map((col) => (
@@ -6844,10 +7040,10 @@ function SummarizedReport() {
                                   width: `${getSummarizedColumnWidth(col.id)}px`,
                                 }}
                               >
-                                {col.header}
+                                {renderSummarizedFixedHeaderContent(col)}
                               </th>
                             ))}
-                            <th style={{ minWidth: "110px", width: "110px" }}>Action</th>
+                            <th style={{ minWidth: "160px", width: "160px" }}>Action</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -6861,27 +7057,79 @@ function SummarizedReport() {
                                 />
                               ) : null}
                             <tr key={`sum-row-${rowIndex}`}>
-                              {summarizedDisplayOrderedColumns
-                                .map((col, colIndex) =>
-                                  renderSummarizedDataCell(col, row, rowIndex, colIndex)
-                                )
-                                .filter(Boolean)}
-                              <td>
-                                {rowIndex > 0 ? (
-                                  <button
-                                    type="button"
-                                    className="flexible-field-remove-button"
-                                    onClick={() => handleRemoveSummarizedRow(rowIndex)}
-                                    style={{ position: "static" }}
-                                    title="Remove this row"
+                              {isSummarizedMergedTitleRow(row) ? (
+                                <td
+                                  colSpan={summarizedDisplayOrderedColumns.length}
+                                  className="summarized-merged-title-cell"
+                                  style={{ textAlign: "center", verticalAlign: "middle" }}
+                                >
+                                  <AutoGrowTextarea
+                                    className="form-field mb-0"
+                                    style={summarizedInputStyle}
+                                    value={getSummarizedMergedRowText(row)}
+                                    onChange={(e) =>
+                                      handleSummarizedMergedRowTextChange(
+                                        rowIndex,
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="Enter merged row title"
+                                  />
+                                </td>
+                              ) : (
+                                summarizedDisplayOrderedColumns
+                                  .map((col, colIndex) =>
+                                    renderSummarizedDataCell(col, row, rowIndex, colIndex)
+                                  )
+                                  .filter(Boolean)
+                              )}
+                              <td style={{ minWidth: "160px", width: "160px" }}>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "flex-start",
+                                    gap: "8px",
+                                  }}
+                                >
+                                  <label
+                                    className="d-flex align-items-center gap-2 mb-0"
+                                    style={{
+                                      fontSize: "12px",
+                                      fontWeight: 500,
+                                      cursor: "pointer",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                    title="Merge all columns in this row into one title cell"
                                   >
-                                    <DeleteIcon />
-                                  </button>
-                                ) : (
-                                  <span style={{ color: "#9ca3af", fontSize: "12px" }}>
-                                    Base Row
-                                  </span>
-                                )}
+                                    <input
+                                      type="checkbox"
+                                      checked={isSummarizedMergedTitleRow(row)}
+                                      onChange={(e) =>
+                                        handleToggleSummarizedRowMerge(
+                                          rowIndex,
+                                          e.target.checked
+                                        )
+                                      }
+                                    />
+                                    Merge row
+                                  </label>
+                                  {rowIndex > 0 ? (
+                                    <button
+                                      type="button"
+                                      className="flexible-field-remove-button"
+                                      onClick={() => handleRemoveSummarizedRow(rowIndex)}
+                                      style={{ position: "static" }}
+                                      title="Remove this row"
+                                    >
+                                      <DeleteIcon />
+                                    </button>
+                                  ) : (
+                                    <span style={{ color: "#9ca3af", fontSize: "12px" }}>
+                                      Base Row
+                                    </span>
+                                  )}
+                                </div>
                               </td>
                             </tr>
                             </React.Fragment>

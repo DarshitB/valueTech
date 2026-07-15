@@ -76,6 +76,27 @@ function isVerticallyMergedColumn(colId, mergedColumnIds) {
   return Boolean(colId && mergedColumnIds.includes(colId));
 }
 
+function isSummarizedMergedTitleRow(row) {
+  return Boolean(row?.isMergedRow);
+}
+
+function getSummarizedMergedRowText(row) {
+  return String(row?.mergedRowText ?? "");
+}
+
+/** Contiguous non-title rows for vertical merge rowspan (titles break the segment). */
+function findSummarizedNonTitleSegmentBounds(rows, rowIndex) {
+  if (!Array.isArray(rows) || rowIndex < 0 || rowIndex >= rows.length) return null;
+  if (isSummarizedMergedTitleRow(rows[rowIndex])) return null;
+  let start = rowIndex;
+  while (start > 0 && !isSummarizedMergedTitleRow(rows[start - 1])) start -= 1;
+  let end = rowIndex;
+  while (end < rows.length - 1 && !isSummarizedMergedTitleRow(rows[end + 1])) {
+    end += 1;
+  }
+  return { start, end, count: end - start + 1 };
+}
+
 function parseSummarizedTable(raw) {
   if (!raw) return { dynamicColumns: [], rows: [] };
   if (typeof raw === "object") return raw;
@@ -90,7 +111,27 @@ function getOrderedColumns(tableData) {
   const dynamic = Array.isArray(tableData?.dynamicColumns)
     ? tableData.dynamicColumns.filter((c) => c && c.id).map((c) => ({ id: c.id, header: c.header || "" }))
     : [];
-  return [SUMMARIZED_SR_NO_COLUMN, ...FIXED_START, ...dynamic, ...FIXED_END];
+  const overrides =
+    tableData?.fixedColumnHeaders &&
+    typeof tableData.fixedColumnHeaders === "object" &&
+    !Array.isArray(tableData.fixedColumnHeaders)
+      ? tableData.fixedColumnHeaders
+      : {};
+
+  const applyFixedHeaderOverride = (col) => {
+    const override = overrides[col.id];
+    if (typeof override === "string" && override.trim() !== "") {
+      return { ...col, header: override };
+    }
+    return col;
+  };
+
+  return [
+    applyFixedHeaderOverride(SUMMARIZED_SR_NO_COLUMN),
+    ...FIXED_START.map(applyFixedHeaderOverride),
+    ...dynamic,
+    ...FIXED_END.map(applyFixedHeaderOverride),
+  ];
 }
 
 const SUMMARIZED_FIXED_START_IDS = new Set(FIXED_START.map((c) => c.id));
@@ -108,7 +149,7 @@ function hasSummarizedColumnData(rows, colId, tableData) {
   }
   if (!Array.isArray(rows) || rows.length === 0) return false;
   for (const row of rows) {
-    if (!row) continue;
+    if (!row || isSummarizedMergedTitleRow(row)) continue;
     const trimmed = String(getCellValue(row, colId) ?? "").trim();
     if (trimmed !== "") return true;
   }
@@ -140,7 +181,9 @@ function getVisibleOrderedColumns(tableData) {
   const all = getOrderedColumns(tableData);
   const rows = Array.isArray(tableData?.rows) ? tableData.rows : [];
   if (rows.length === 0) return all;
-  return all.filter((col) => hasSummarizedColumnData(rows, col.id, tableData));
+  const visible = all.filter((col) => hasSummarizedColumnData(rows, col.id, tableData));
+  // Keep full header set when only title/merged rows exist (no per-column cell data yet).
+  return visible.length > 0 ? visible : all;
 }
 
 function parseCurrencyValue(val) {
@@ -155,10 +198,12 @@ function isDashOnlySummarizedFairValue(value) {
 }
 
 function areAllSummarizedFairValueRowsDashOnly(rows) {
+  const dataRows = (Array.isArray(rows) ? rows : []).filter(
+    (row) => !isSummarizedMergedTitleRow(row)
+  );
   return (
-    Array.isArray(rows) &&
-    rows.length > 0 &&
-    rows.every((row) => isDashOnlySummarizedFairValue(row?.estimated_fair_value))
+    dataRows.length > 0 &&
+    dataRows.every((row) => isDashOnlySummarizedFairValue(row?.estimated_fair_value))
   );
 }
 
@@ -193,7 +238,7 @@ function computeSummarizedGrandTotals(rows) {
   };
   if (!Array.isArray(rows)) return totals;
   for (const row of rows) {
-    if (!row) continue;
+    if (!row || isSummarizedMergedTitleRow(row)) continue;
     totals.total_invoice_cost += parseCurrencyValue(row.total_invoice_cost);
     totals.estimated_current_replacement_cost += parseCurrencyValue(
       row.estimated_current_replacement_cost
@@ -210,7 +255,7 @@ function computeSummarizedDynamicAllowSumTotal(rows, colId) {
   if (!Array.isArray(rows) || !colId) return 0;
   let sum = 0;
   for (const row of rows) {
-    if (!row) continue;
+    if (!row || isSummarizedMergedTitleRow(row)) continue;
     const raw = String(row[colId] ?? "").replace(/\D/g, "");
     if (raw) sum += parseInt(raw, 10) || 0;
   }
@@ -313,38 +358,49 @@ function resolveSummarizedBodyCellValue(colId, row, tableData, mergedColumnIds) 
   return getCellValue(row, colId);
 }
 
-function renderSummarizedBodyCell(colId, row, rowIndex, tableData, mergedColumnIds, dataRowCount) {
-  if (isVerticallyMergedColumn(colId, mergedColumnIds) && rowIndex > 0) {
+function renderSummarizedBodyCell(colId, row, rowIndex, tableData, mergedColumnIds, rows) {
+  if (isSummarizedMergedTitleRow(row)) {
     return "";
   }
-  const rawValue = resolveSummarizedBodyCellValue(colId, row, tableData, mergedColumnIds);
-  const inner = renderFieldValue(formatSummarizedCellDisplay(colId, rawValue));
-  if (isVerticallyMergedColumn(colId, mergedColumnIds) && rowIndex === 0) {
-    const rowSpan = Math.max(dataRowCount, 1);
+
+  if (isVerticallyMergedColumn(colId, mergedColumnIds)) {
+    const segment = findSummarizedNonTitleSegmentBounds(rows, rowIndex);
+    if (!segment || rowIndex !== segment.start) {
+      return "";
+    }
+    const rawValue = resolveSummarizedBodyCellValue(colId, row, tableData, mergedColumnIds);
+    const inner = renderFieldValue(formatSummarizedCellDisplay(colId, rawValue));
+    const rowSpan = Math.max(segment.count, 1);
     return `<td rowspan="${rowSpan}" class="summarized-vertical-merged-cell" data-col-id="${colId}">${inner}</td>`;
   }
+
+  const rawValue = resolveSummarizedBodyCellValue(colId, row, tableData, mergedColumnIds);
+  const inner = renderFieldValue(formatSummarizedCellDisplay(colId, rawValue));
   return `<td data-col-id="${colId}">${inner}</td>`;
 }
 
 function renderSummarizedDataRowsHtml(rows, orderedColumns, tableData) {
   const mergedColumnIds = getVerticalMergedColumnIds(tableData);
-  const dataRowCount = rows.length;
+  const colSpan = orderedColumns.length || 1;
   return rows
-    .map(
-      (row, rowIndex) =>
-        `<tr>${orderedColumns
-          .map((col) =>
-            renderSummarizedBodyCell(
-              col.id,
-              row,
-              rowIndex,
-              tableData,
-              mergedColumnIds,
-              dataRowCount
-            )
+    .map((row, rowIndex) => {
+      if (isSummarizedMergedTitleRow(row)) {
+        const text = renderFieldValue(getSummarizedMergedRowText(row));
+        return `<tr class="summary-merged-row"><td colspan="${colSpan}" class="summary-title">${text || "-"}</td></tr>`;
+      }
+      return `<tr>${orderedColumns
+        .map((col) =>
+          renderSummarizedBodyCell(
+            col.id,
+            row,
+            rowIndex,
+            tableData,
+            mergedColumnIds,
+            rows
           )
-          .join("")}</tr>`
-    )
+        )
+        .join("")}</tr>`;
+    })
     .join("");
 }
 
@@ -1081,7 +1137,8 @@ function generateSummarizedTableAppendixHTML(formData, stampImageBase64) {
     line-height: 180px !important;
     background: transparent !important;
   }
-  .summary-table th.summary-title {
+  .summary-table th.summary-title,
+  .summary-table td.summary-title {
     font-size: 10px;
     font-weight: 700;
     text-align: center !important;
