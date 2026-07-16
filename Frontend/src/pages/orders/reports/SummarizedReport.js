@@ -20,9 +20,7 @@ import {
   clearCurrentReport,
 } from "../../../redux/reducers/orderReportReducer";
 import { fetchAssetMakesForReports } from "../../../redux/reducers/assetMakesReducer";
-import {
-  fetchChildCategories,
-} from "../../../redux/reducers/childCategoryReducer";
+import { fetchChildCategories } from "../../../redux/reducers/childCategoryReducer";
 import { usePageTitle } from "../../../context/PageTitleContext";
 import { resolveAssetUrl } from "../../../utils/urlUtils";
 import SingleSearchSelect from "../../../components/SingleSearchSelect";
@@ -53,7 +51,6 @@ const WysiwygTextarea = ({
 }) => {
   const editorRef = useRef(null);
   const isUpdatingRef = useRef(false);
-  
 
   // Normalize empty WYSIWYG HTML created by contentEditable.
   // contentEditable often produces "<br>" / "<div><br></div>" when visually empty.
@@ -269,7 +266,7 @@ const SUMMARIZED_FIXED_END_COLUMNS = [
 ];
 
 const SUMMARIZED_FIXED_END_COLUMN_IDS = new Set(
-  SUMMARIZED_FIXED_END_COLUMNS.map((col) => col.id)
+  SUMMARIZED_FIXED_END_COLUMNS.map((col) => col.id),
 );
 
 const SUMMARIZED_TRAILING_COLUMNS = [
@@ -302,8 +299,8 @@ const parseSummarizedEditableFixedHeaderColumnIds = (raw) =>
 
 const SUMMARIZED_EDITABLE_FIXED_HEADER_COLUMN_ID_SET = new Set(
   parseSummarizedEditableFixedHeaderColumnIds(
-    SUMMARIZED_EDITABLE_FIXED_HEADER_COLUMN_IDS
-  )
+    SUMMARIZED_EDITABLE_FIXED_HEADER_COLUMN_IDS,
+  ),
 );
 
 const isSummarizedFixedHeaderEditable = (colId) =>
@@ -341,19 +338,20 @@ const SUMMARIZED_TOGGLEABLE_FIXED_COLUMNS = [
 ];
 
 const SUMMARIZED_TOGGLEABLE_FIXED_COLUMN_IDS = new Set(
-  SUMMARIZED_TOGGLEABLE_FIXED_COLUMNS.map((col) => col.id)
+  SUMMARIZED_TOGGLEABLE_FIXED_COLUMNS.map((col) => col.id),
 );
 
-const SUMMARIZED_COLUMNS_FOR_VISIBILITY_UI = SUMMARIZED_TOGGLEABLE_FIXED_COLUMNS.filter(
-  (col) => !SUMMARIZED_UI_HIDDEN_COLUMN_IDS.has(col.id)
-);
+const SUMMARIZED_COLUMNS_FOR_VISIBILITY_UI =
+  SUMMARIZED_TOGGLEABLE_FIXED_COLUMNS.filter(
+    (col) => !SUMMARIZED_UI_HIDDEN_COLUMN_IDS.has(col.id),
+  );
 
 /** Shared across all summarized reports (same idea as dashboard filter_* localStorage keys). */
 const SUMMARIZED_REPORT_VISIBLE_COLUMNS_STORAGE_KEY =
   "summarized_report_visible_column_ids";
 
 const SUMMARIZED_COLUMNS_FOR_VISIBILITY_UI_IDS = new Set(
-  SUMMARIZED_COLUMNS_FOR_VISIBILITY_UI.map((col) => col.id)
+  SUMMARIZED_COLUMNS_FOR_VISIBILITY_UI.map((col) => col.id),
 );
 
 const getDefaultSummarizedVisibleColumnIds = () =>
@@ -361,7 +359,9 @@ const getDefaultSummarizedVisibleColumnIds = () =>
 
 const loadSummarizedVisibleColumnIdsFromStorage = () => {
   try {
-    const raw = localStorage.getItem(SUMMARIZED_REPORT_VISIBLE_COLUMNS_STORAGE_KEY);
+    const raw = localStorage.getItem(
+      SUMMARIZED_REPORT_VISIBLE_COLUMNS_STORAGE_KEY,
+    );
     if (!raw) {
       return getDefaultSummarizedVisibleColumnIds();
     }
@@ -373,7 +373,7 @@ const loadSummarizedVisibleColumnIdsFromStorage = () => {
       (id) =>
         typeof id === "string" &&
         SUMMARIZED_COLUMNS_FOR_VISIBILITY_UI_IDS.has(id) &&
-        !SUMMARIZED_UI_HIDDEN_COLUMN_IDS.has(id)
+        !SUMMARIZED_UI_HIDDEN_COLUMN_IDS.has(id),
     );
     const visible = new Set(ids);
     visible.add("source_order_number");
@@ -386,11 +386,11 @@ const loadSummarizedVisibleColumnIdsFromStorage = () => {
 const saveSummarizedVisibleColumnIdsToStorage = (visibleIds) => {
   try {
     const ids = [...visibleIds].filter((id) =>
-      SUMMARIZED_COLUMNS_FOR_VISIBILITY_UI_IDS.has(id)
+      SUMMARIZED_COLUMNS_FOR_VISIBILITY_UI_IDS.has(id),
     );
     localStorage.setItem(
       SUMMARIZED_REPORT_VISIBLE_COLUMNS_STORAGE_KEY,
-      JSON.stringify(ids)
+      JSON.stringify(ids),
     );
   } catch {
     /* private mode / quota — ignore */
@@ -424,7 +424,9 @@ const summarizedRowsHaveValuationTotals = (rows = []) =>
     if (isSummarizedMergedTitleRow(row)) return false;
     return (
       parseFloat(String(row?.total_invoice_cost ?? "").replace(/,/g, "")) > 0 ||
-      parseFloat(String(row?.amount_post_depreciation ?? "").replace(/,/g, "")) > 0 ||
+      parseFloat(
+        String(row?.amount_post_depreciation ?? "").replace(/,/g, ""),
+      ) > 0 ||
       parseFloat(String(row?.appraisal_value ?? "").replace(/,/g, "")) > 0 ||
       parseFloat(String(row?.estimated_fair_value ?? "").replace(/,/g, "")) > 0
     );
@@ -525,8 +527,8 @@ const SUMMARIZED_VERTICAL_MERGE_BLOCKLIST = new Set([
 const canVerticallyMergeSummarizedColumn = (colId) =>
   Boolean(
     colId &&
-      !SUMMARIZED_FIXED_END_COLUMN_IDS.has(colId) &&
-      !SUMMARIZED_VERTICAL_MERGE_BLOCKLIST.has(colId)
+    !SUMMARIZED_FIXED_END_COLUMN_IDS.has(colId) &&
+    !SUMMARIZED_VERTICAL_MERGE_BLOCKLIST.has(colId),
   );
 
 /** Rowspan must cover every data row plus hover-insert <tr>s between them (2n - 1). */
@@ -538,7 +540,8 @@ const getSummarizedVerticalMergeRowSpan = (dataRowCount) =>
  * Title / full-merged rows break the segment so rowspan never crosses them.
  */
 const findSummarizedNonTitleSegmentBounds = (rows, rowIndex) => {
-  if (!Array.isArray(rows) || rowIndex < 0 || rowIndex >= rows.length) return null;
+  if (!Array.isArray(rows) || rowIndex < 0 || rowIndex >= rows.length)
+    return null;
   if (isSummarizedMergedTitleRow(rows[rowIndex])) return null;
   let start = rowIndex;
   while (start > 0 && !isSummarizedMergedTitleRow(rows[start - 1])) start -= 1;
@@ -552,7 +555,7 @@ const findSummarizedNonTitleSegmentBounds = (rows, rowIndex) => {
 const getSummarizedColumnLabel = (
   col,
   dynamicColumns = [],
-  fixedColumnHeaders = {}
+  fixedColumnHeaders = {},
 ) => {
   if (!col) return "";
   if (
@@ -580,7 +583,7 @@ const isSummarizedNavCellActive = (
   colIndex,
   columns,
   mergedColumnIds,
-  rows = []
+  rows = [],
 ) => {
   const col = columns[colIndex];
   if (!col) return false;
@@ -602,7 +605,7 @@ const findSummarizedNavCell = (
   colCount,
   columns,
   mergedColumnIds,
-  rows = []
+  rows = [],
 ) => {
   let row = startRow + dRow;
   let col = startCol + dCol;
@@ -623,7 +626,8 @@ const findSummarizedNavCell = (
 /** Plain ↑/↓: navigate between rows unless user is moving inside a multi-line textarea. */
 const shouldSummarizedVerticalNavFromField = (el, direction) => {
   if (!el) return false;
-  if (el.tagName === "INPUT" && el.getAttribute("role") !== "combobox") return true;
+  if (el.tagName === "INPUT" && el.getAttribute("role") !== "combobox")
+    return true;
   if (el.tagName !== "TEXTAREA") return false;
 
   const value = typeof el.value === "string" ? el.value : "";
@@ -648,7 +652,7 @@ const shouldSummarizedVerticalNavFromField = (el, direction) => {
 const focusSummarizedNavCell = (scrollRoot, row, col) => {
   if (!scrollRoot) return false;
   const td = scrollRoot.querySelector(
-    `tbody td[data-summarized-nav-row="${row}"][data-summarized-nav-col="${col}"]`
+    `tbody td[data-summarized-nav-row="${row}"][data-summarized-nav-col="${col}"]`,
   );
   if (!td) return false;
   const focusable =
@@ -738,12 +742,18 @@ function SummarizedVerticalColumnMergeDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
-  const mergedSet = useMemo(() => new Set(verticalMergedColumnIds || []), [verticalMergedColumnIds]);
+  const mergedSet = useMemo(
+    () => new Set(verticalMergedColumnIds || []),
+    [verticalMergedColumnIds],
+  );
 
   useEffect(() => {
     if (!open) return undefined;
     const handleClickOutside = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target)
+      ) {
         setOpen(false);
       }
     };
@@ -761,7 +771,11 @@ function SummarizedVerticalColumnMergeDropdown({
         type="button"
         className="btn btn-outline-secondary"
         onClick={() => setOpen((prev) => !prev)}
-        style={{ width: "fit-content", display: "inline-flex", whiteSpace: "nowrap" }}
+        style={{
+          width: "fit-content",
+          display: "inline-flex",
+          whiteSpace: "nowrap",
+        }}
         aria-expanded={open}
       >
         Merge column rows
@@ -816,7 +830,11 @@ function SummarizedVerticalColumnMergeDropdown({
                   opacity: blocked ? 0.45 : 1,
                 }}
               >
-                {getSummarizedColumnLabel(col, dynamicColumns, fixedColumnHeaders)}
+                {getSummarizedColumnLabel(
+                  col,
+                  dynamicColumns,
+                  fixedColumnHeaders,
+                )}
               </button>
             );
           })}
@@ -826,14 +844,21 @@ function SummarizedVerticalColumnMergeDropdown({
   );
 }
 
-function SummarizedFixedColumnVisibilityDropdown({ columns, visibleIds, onVisibleIdsChange }) {
+function SummarizedFixedColumnVisibilityDropdown({
+  columns,
+  visibleIds,
+  onVisibleIdsChange,
+}) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
 
   useEffect(() => {
     if (!open) return undefined;
     const handleClickOutside = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target)
+      ) {
         setOpen(false);
       }
     };
@@ -938,14 +963,19 @@ function SummarizedReport() {
 
   // Get asset makes data from Redux store
   const { list: assetMakes, loading: assetMakesLoading } = useSelector(
-    (state) => state.assetMakes
+    (state) => state.assetMakes,
   );
   const allowedPermissions = useSelector(selectPermissions);
-  const childCategories = useSelector((state) => state.childcategories?.list || []);
-  const canEditRefNoId = hasPermission(allowedPermissions, "edit_report_ref_no_id");
+  const childCategories = useSelector(
+    (state) => state.childcategories?.list || [],
+  );
+  const canEditRefNoId = hasPermission(
+    allowedPermissions,
+    "edit_report_ref_no_id",
+  );
   const canViewSubCategoryOrders = hasPermission(
     allowedPermissions,
-    "view_finalized_sub_category_orders"
+    "view_finalized_sub_category_orders",
   );
   const [showOtherAssetMake, setShowOtherAssetMake] = useState(false);
   const [otherAssetMake, setOtherAssetMake] = useState("");
@@ -954,7 +984,8 @@ function SummarizedReport() {
   // State for registration field options (Not Available / Not Applicable)
   const [registrationNoOption, setRegistrationNoOption] = useState(null); // null, "NOT_AVAILABLE", "NOT_APPLICABLE"
   const [registrationDateOption, setRegistrationDateOption] = useState(null);
-  const [locationOfMachineryOption, setLocationOfMachineryOption] = useState(null);
+  const [locationOfMachineryOption, setLocationOfMachineryOption] =
+    useState(null);
   // Ref to track if we've seen the report loading state (to ensure we wait for the fetch to actually happen)
   const reportLoadingStartedRef = useRef(false);
   // Set page title using custom hook
@@ -967,21 +998,27 @@ function SummarizedReport() {
   const [summarizedAppendixRowPaddingPx, setSummarizedAppendixRowPaddingPx] =
     useState(String(SUMMARIZED_APPENDIX_DEFAULT_ROW_PADDING_PX));
   const [summarizedTableData, setSummarizedTableData] = useState(
-    getDefaultSummarizedTableData
+    getDefaultSummarizedTableData,
   );
   const summarizedTableScrollRef = useRef(null);
   const scrollSummarizedTableToBottomRef = useRef(false);
-  const [summarizedVisibleFixedColumnIds, setSummarizedVisibleFixedColumnIds] = useState(
-    loadSummarizedVisibleColumnIdsFromStorage
-  );
+  const [summarizedVisibleFixedColumnIds, setSummarizedVisibleFixedColumnIds] =
+    useState(loadSummarizedVisibleColumnIdsFromStorage);
 
-  const handleSummarizedVisibleColumnIdsChange = useCallback((nextVisibleIds) => {
-    const nextSet =
-      nextVisibleIds instanceof Set ? nextVisibleIds : new Set(nextVisibleIds);
-    setSummarizedVisibleFixedColumnIds(nextSet);
-    saveSummarizedVisibleColumnIdsToStorage(nextSet);
-  }, []);
-  const [summarizedChildCategories, setSummarizedChildCategories] = useState([]);
+  const handleSummarizedVisibleColumnIdsChange = useCallback(
+    (nextVisibleIds) => {
+      const nextSet =
+        nextVisibleIds instanceof Set
+          ? nextVisibleIds
+          : new Set(nextVisibleIds);
+      setSummarizedVisibleFixedColumnIds(nextSet);
+      saveSummarizedVisibleColumnIdsToStorage(nextSet);
+    },
+    [],
+  );
+  const [summarizedChildCategories, setSummarizedChildCategories] = useState(
+    [],
+  );
   const tabButtonStyle = useCallback(
     (tab) => ({
       backgroundColor: activeReportTab === tab ? "#e8edff" : "#ffffff",
@@ -993,7 +1030,7 @@ function SummarizedReport() {
       fontWeight: 500,
       flex: 1,
     }),
-    [activeReportTab]
+    [activeReportTab],
   );
   const reportButtonsStyle = {
     display: "flex",
@@ -1013,12 +1050,14 @@ function SummarizedReport() {
   // Fetch finalized orders for current child category (table summary at bottom)
   const [finalizedReportRows, setFinalizedReportRows] = useState([]);
   const [finalizedReportsLoading, setFinalizedReportsLoading] = useState(false);
-  const [summarizedOrderFetchLoadingByRow, setSummarizedOrderFetchLoadingByRow] =
-    useState({});
+  const [
+    summarizedOrderFetchLoadingByRow,
+    setSummarizedOrderFetchLoadingByRow,
+  ] = useState({});
   const [entriesToShow, setEntriesToShow] = useState(5);
   const visibleFinalizedRows = useMemo(
     () => finalizedReportRows.slice(0, entriesToShow),
-    [finalizedReportRows, entriesToShow]
+    [finalizedReportRows, entriesToShow],
   );
 
   // Clear report data when component mounts or order changes
@@ -1042,7 +1081,7 @@ function SummarizedReport() {
           orderId: id,
           reportType: "report_summarized",
           silent: true,
-        })
+        }),
       );
       // Fetch asset makes for Machinery report
       dispatch(fetchAssetMakesForReports("report_summarized"));
@@ -1080,12 +1119,13 @@ function SummarizedReport() {
       try {
         setFinalizedReportsLoading(true);
 
-        const finalizedRes = await getFinalizedOrdersByChildCategory(childCategoryId);
+        const finalizedRes =
+          await getFinalizedOrdersByChildCategory(childCategoryId);
         const finalizedOrders = (finalizedRes?.data?.data?.orders || []).filter(
           (orderItem) =>
             String(orderItem?.id) !== String(id) &&
             String(orderItem?.order_number || "").trim() !==
-              String(order?.order_number || "").trim()
+              String(order?.order_number || "").trim(),
         );
 
         if (!Array.isArray(finalizedOrders) || finalizedOrders.length === 0) {
@@ -1096,7 +1136,10 @@ function SummarizedReport() {
         const rows = await Promise.all(
           finalizedOrders.map(async (orderItem) => {
             try {
-              const reportRes = await getOrderReport(orderItem.id, "report_summarized");
+              const reportRes = await getOrderReport(
+                orderItem.id,
+                "report_summarized",
+              );
               const report = reportRes?.data?.data?.report || {};
 
               return {
@@ -1109,6 +1152,7 @@ function SummarizedReport() {
                   "-",
                 manufacture_year: report.manufacture_year || "-",
                 current_invoice_cost:
+                  report.invoice_cost ||
                   report.tax_invoice_cost ||
                   report.current_invoice_cost ||
                   "-",
@@ -1131,7 +1175,7 @@ function SummarizedReport() {
                 fair_market_value: "-",
               };
             }
-          })
+          }),
         );
 
         setFinalizedReportRows(rows);
@@ -1143,7 +1187,12 @@ function SummarizedReport() {
     };
 
     fetchFinalizedRows();
-  }, [order?.child_category_id, order?.order_number, id, canViewSubCategoryOrders]);
+  }, [
+    order?.child_category_id,
+    order?.order_number,
+    id,
+    canViewSubCategoryOrders,
+  ]);
 
   // Reset form data when component mounts or order ID changes
   useEffect(() => {
@@ -1318,7 +1367,7 @@ function SummarizedReport() {
 
       return `The aforesaid ${category}${subCategory}${childCategory} inspected by us & found in ${DEFAULT_DECLARATION_CONDITION} on the date of my inspection. This Report issued for ${valuationPurpose} of ${bank}, ${branch}, ${state} Only.`;
     },
-    [DEFAULT_DECLARATION_CONDITION]
+    [DEFAULT_DECLARATION_CONDITION],
   );
 
   // Build disclaimer text directly with valuer name and bank/branch/city from order
@@ -1327,10 +1376,12 @@ function SummarizedReport() {
       const name = valuerName?.trim();
       const bank = orderForDisclaimer?.bank_name?.trim();
       const branch = orderForDisclaimer?.branch_name?.trim();
-      const city = (orderForDisclaimer?.city || orderForDisclaimer?.city_name)?.trim();
+      const city = (
+        orderForDisclaimer?.city || orderForDisclaimer?.city_name
+      )?.trim();
       return `THIS REPORT IS GENERATED BY THE ${name} AT THE SOLE REQUEST OF ${bank}, ${branch}, ${city} WHOM, THIS VALUATION REPORT IS ADDRESSED AND IS TO BE USED SOLELY BY THE SAID PARTY FOR THE STATED PURPOSE ONLY. ${name} WILL NOT BE HELD LIABLE FOR ANY LOSS OR LIABLITY SUSTAINED BY ANY PARTY RELYING ON THIS VALUATION REPORT. ${name} HAS RELIED ON THE DATA PROVIDED BY THE CLIENT & HAS NOT VERIFIED GENUINESS THEREOFF. AS THERE IS NO STANDARD PRICE LIST FOR PRE-OWNED/USED MACHINERY / CRANE, THIS VALUATION INDICATED IN THE REPORT IS OUR PROFESSIONAL OPINION ONLY ON THE MARKET VALUE OF THE PRODUCT SHOWN IN COLLAGE OR IN DETAILS BASED ON STANDARD VALUATION METHODOLOGY & PROCEDURES CALCULATING FLUCTUATIONS & LIMITATIONS OF VALUATED PRODUCTS. ACTUAL REALISATION MAY DIFFER FROM THE VALUATION INDICATED IN THE REPORT. ${name} (SIGNATORY & EMPLOYEES WILL NOT BE HELD LIABLE FOR ANY DIRECT, INDIRECT CONSEQUENTIAL OR EXEMPLARY DAMAGES FOR ANY LOSS RESULTING FROM THE USE OF THIS REPORT. ${name} IS NOT RESPONSIBLE FOR VERIFYING THE GENUINENESS OF THE PROVIDED DOCUMENTS. THE VALUATION OF ASSET IS PRIMARILY BASED ON THE CONDITION OF THE MACHINERY AT THE TIME OF INSPECTION & SURVEY. TO GIVE LOAN TO THE APPLICANT IS THE RESPONSIBILITY OF THE FINANCE COMPANY/BANK. WE ARE NOT RESPONSIBLE OR CONCERNED FOR THE SAME.`;
     },
-    []
+    [],
   );
 
   // Function to get license number based on valuer name
@@ -1388,17 +1439,26 @@ function SummarizedReport() {
       if (parts.length === 2) return `${parts[0]} / ${parts[1]}`;
       return `${parts[0]} / ${parts[1]} ${parts[2]}`;
     },
-    []
+    [],
   );
 
   // Helper: true when Valuation Purpose is Repo Purpose (case-insensitive)
-  const isRepoPurpose = useCallback((vp) => (String(vp || "").toUpperCase().trim() === "REPO PURPOSE"), []);
+  const isRepoPurpose = useCallback(
+    (vp) =>
+      String(vp || "")
+        .toUpperCase()
+        .trim() === "REPO PURPOSE",
+    [],
+  );
 
   // Helper to build valuation report heading with optional (REPOSSESSION) when is_repo is true
-  const buildValuationReportHeading = useCallback((categorySuffixUpper, isRepo) => {
-    if (!categorySuffixUpper) return "";
-    return `VALUATION REPORT${isRepo ? " (REPOSSESSION)" : ""} FOR ${categorySuffixUpper}`;
-  }, []);
+  const buildValuationReportHeading = useCallback(
+    (categorySuffixUpper, isRepo) => {
+      if (!categorySuffixUpper) return "";
+      return `VALUATION REPORT${isRepo ? " (REPOSSESSION)" : ""} FOR ${categorySuffixUpper}`;
+    },
+    [],
+  );
 
   // Helper function to check if valueation_report_for_heading matches auto-generated pattern (with or without REPOSSESSION)
   const isAutoGeneratedHeading = useCallback((heading, categorySuffix) => {
@@ -1484,43 +1544,53 @@ function SummarizedReport() {
       };
       rows.forEach((row) => {
         if (isSummarizedMergedTitleRow(row)) return;
-        totals.total_invoice_cost += parseCurrency(String(row?.total_invoice_cost ?? ""));
+        totals.total_invoice_cost += parseCurrency(
+          String(row?.total_invoice_cost ?? ""),
+        );
         totals.estimated_current_replacement_cost += parseCurrency(
-          String(row?.estimated_current_replacement_cost ?? "")
+          String(row?.estimated_current_replacement_cost ?? ""),
         );
         totals.amount_post_depreciation += parseCurrency(
-          String(row?.amount_post_depreciation ?? "")
+          String(row?.amount_post_depreciation ?? ""),
         );
-        totals.appraisal_value += parseCurrency(String(row?.appraisal_value ?? ""));
+        totals.appraisal_value += parseCurrency(
+          String(row?.appraisal_value ?? ""),
+        );
         totals.estimated_fair_value += parseCurrency(
-          String(row?.estimated_fair_value ?? "")
+          String(row?.estimated_fair_value ?? ""),
         );
       });
       return totals;
     },
-    [parseCurrency]
+    [parseCurrency],
   );
 
   const formatGrandTotalForGeneralField = useCallback(
     (numeric) => {
       const n = Number(numeric) || 0;
       return handleCurrencyFormatting(
-        (Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2)
+        (Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2),
       );
     },
-    [handleCurrencyFormatting]
+    [handleCurrencyFormatting],
   );
 
   /** Map summarized table grand totals → general valuation fields. */
   const getGeneralFieldsFromTableTotals = useCallback(
     (totals, convertToWordsIndian) => {
       const fields = {
-        tax_invoice_cost: formatGrandTotalForGeneralField(totals.total_invoice_cost),
-        depreciation_value: formatGrandTotalForGeneralField(
-          totals.amount_post_depreciation
+        tax_invoice_cost: formatGrandTotalForGeneralField(
+          totals.total_invoice_cost,
         ),
-        appraiser_value: formatGrandTotalForGeneralField(totals.appraisal_value),
-        fair_market_value: formatGrandTotalForGeneralField(totals.estimated_fair_value),
+        depreciation_value: formatGrandTotalForGeneralField(
+          totals.amount_post_depreciation,
+        ),
+        appraiser_value: formatGrandTotalForGeneralField(
+          totals.appraisal_value,
+        ),
+        fair_market_value: formatGrandTotalForGeneralField(
+          totals.estimated_fair_value,
+        ),
       };
       const fmvNum = Number(totals.estimated_fair_value) || 0;
       if (fmvNum > 0 && convertToWordsIndian) {
@@ -1531,7 +1601,7 @@ function SummarizedReport() {
       }
       return fields;
     },
-    [formatGrandTotalForGeneralField]
+    [formatGrandTotalForGeneralField],
   );
 
   const isDashOnlySummarizedFairValue = useCallback((value) => {
@@ -1542,14 +1612,16 @@ function SummarizedReport() {
   const areAllSummarizedFairValueRowsDashOnly = useCallback(
     (rows = []) => {
       const dataRows = (Array.isArray(rows) ? rows : []).filter(
-        (row) => !isSummarizedMergedTitleRow(row)
+        (row) => !isSummarizedMergedTitleRow(row),
       );
       return (
         dataRows.length > 0 &&
-        dataRows.every((row) => isDashOnlySummarizedFairValue(row?.estimated_fair_value))
+        dataRows.every((row) =>
+          isDashOnlySummarizedFairValue(row?.estimated_fair_value),
+        )
       );
     },
-    [isDashOnlySummarizedFairValue]
+    [isDashOnlySummarizedFairValue],
   );
 
   const getSummarizedResolvedFairValueGrandTotal = useCallback(
@@ -1560,7 +1632,7 @@ function SummarizedReport() {
         return computedFairValueTotal;
       }
       const manualValue = parseCurrency(
-        String(tableData?.manualEstimatedFairValueGrandTotal ?? "")
+        String(tableData?.manualEstimatedFairValueGrandTotal ?? ""),
       );
       return manualValue > 0 ? manualValue : computedFairValueTotal;
     },
@@ -1569,7 +1641,7 @@ function SummarizedReport() {
       computeSummarizedGrandTotalsFromRows,
       areAllSummarizedFairValueRowsDashOnly,
       parseCurrency,
-    ]
+    ],
   );
 
   // Form data state for Machinery report generation
@@ -1747,10 +1819,10 @@ function SummarizedReport() {
                 ...computeSummarizedGrandTotalsFromRows(rows),
                 estimated_fair_value: getSummarizedResolvedFairValueGrandTotal(
                   rows,
-                  nextData
+                  nextData,
                 ),
               },
-              convertNumberToWordsIndian
+              convertNumberToWordsIndian,
             )
           : {};
       setReportFormData((prev) => ({
@@ -1765,7 +1837,7 @@ function SummarizedReport() {
       getGeneralFieldsFromTableTotals,
       getSummarizedResolvedFairValueGrandTotal,
       convertNumberToWordsIndian,
-    ]
+    ],
   );
 
   // Auto-populate form data when order data is available
@@ -1775,7 +1847,7 @@ function SummarizedReport() {
       const categorySuffix = buildCategorySuffix(
         order?.category_name,
         order?.sub_category_name,
-        order?.child_category_name
+        order?.child_category_name,
       );
 
       setReportFormData((prev) => {
@@ -1803,7 +1875,9 @@ function SummarizedReport() {
         const shouldPrefillHeadings =
           (!hasSavedReport || !hasSavedHeadingValues) && categorySuffix;
 
-        const categorySuffixUpper = categorySuffix ? categorySuffix.toUpperCase().trim() : "";
+        const categorySuffixUpper = categorySuffix
+          ? categorySuffix.toUpperCase().trim()
+          : "";
 
         return {
           ...prev,
@@ -1812,8 +1886,7 @@ function SummarizedReport() {
           ref_no_code: order?.valuer_name
             ? getRefNoCode(order.valuer_name)
             : "",
-          initiated_by:
-            buildInitiatedBy() || "",
+          initiated_by: buildInitiatedBy() || "",
           model:
             order?.sub_category_name && order?.child_category_name
               ? `${order.sub_category_name}, ${order.child_category_name}`
@@ -1833,7 +1906,10 @@ function SummarizedReport() {
               : prev.category_suffix || "",
           // Prefill headings when shouldPrefillHeadings is true (initially when no data saved)
           ...(shouldPrefillHeadings && {
-            valueation_report_for_heading: buildValuationReportHeading(categorySuffixUpper, isRepoPurpose(prev.valuation_purpose)),
+            valueation_report_for_heading: buildValuationReportHeading(
+              categorySuffixUpper,
+              isRepoPurpose(prev.valuation_purpose),
+            ),
             general_details_heading: categorySuffixUpper
               ? `GENERAL DETAILS OF THE INSPECTED ${categorySuffixUpper}`
               : "",
@@ -1851,7 +1927,10 @@ function SummarizedReport() {
               : "",
           }),
           // Disclaimer: always set from getDisclaimer (rollback point if we need DB-stored value later)
-          disclaimer: getDisclaimer(order?.valuer_name || "VALUETECH SOLUTIONS", order),
+          disclaimer: getDisclaimer(
+            order?.valuer_name || "VALUETECH SOLUTIONS",
+            order,
+          ),
           declaration:
             hasSavedReport || !isDeclarationEmpty(prev.declaration)
               ? prev.declaration
@@ -1979,7 +2058,7 @@ function SummarizedReport() {
         String(report.general_details_heading).trim() !== ""
       ) {
         const match = String(report.general_details_heading).match(
-          /GENERAL DETAILS OF THE INSPECTED (.+)/i
+          /GENERAL DETAILS OF THE INSPECTED (.+)/i,
         );
         if (match && match[1]) {
           extractedCategorySuffix = match[1].trim();
@@ -1991,7 +2070,7 @@ function SummarizedReport() {
         extractedCategorySuffix = buildCategorySuffix(
           order?.category_name,
           order?.sub_category_name,
-          order?.child_category_name
+          order?.child_category_name,
         );
       }
 
@@ -2008,7 +2087,11 @@ function SummarizedReport() {
         // Use saved value from database exactly as saved - don't modify it
         updated.valueation_report_for_heading =
           report.valueation_report_for_heading;
-        if (String(report.valueation_report_for_heading).includes("(REPOSSESSION)")) {
+        if (
+          String(report.valueation_report_for_heading).includes(
+            "(REPOSSESSION)",
+          )
+        ) {
           updated.valuation_purpose = "REPO PURPOSE";
         }
       } else {
@@ -2016,8 +2099,15 @@ function SummarizedReport() {
         const categorySuffixUpper = extractedCategorySuffix
           ? extractedCategorySuffix.toUpperCase().trim()
           : "";
-        const isRepo = (report.valuation_purpose && String(report.valuation_purpose).toUpperCase().trim() === "REPO PURPOSE") || report.is_repo === true;
-        updated.valueation_report_for_heading = buildValuationReportHeading(categorySuffixUpper, isRepo);
+        const isRepo =
+          (report.valuation_purpose &&
+            String(report.valuation_purpose).toUpperCase().trim() ===
+              "REPO PURPOSE") ||
+          report.is_repo === true;
+        updated.valueation_report_for_heading = buildValuationReportHeading(
+          categorySuffixUpper,
+          isRepo,
+        );
         if (isRepo) updated.valuation_purpose = "REPO PURPOSE";
       }
 
@@ -2055,10 +2145,10 @@ function SummarizedReport() {
                 ...computeSummarizedGrandTotalsFromRows(rows),
                 estimated_fair_value: getSummarizedResolvedFairValueGrandTotal(
                   rows,
-                  parsed
+                  parsed,
                 ),
               },
-              convertNumberToWordsIndian
+              convertNumberToWordsIndian,
             );
           }
         } catch (_) {
@@ -2169,7 +2259,10 @@ function SummarizedReport() {
       });
 
       // Disclaimer: always use getDisclaimer (never override with saved data)
-      updated.disclaimer = getDisclaimer(order?.valuer_name || "VALUETECH SOLUTIONS", order);
+      updated.disclaimer = getDisclaimer(
+        order?.valuer_name || "VALUETECH SOLUTIONS",
+        order,
+      );
 
       if (isDeclarationEmpty(updated.declaration)) {
         updated.declaration = getDefaultDeclaration(order, updated);
@@ -2275,7 +2368,12 @@ function SummarizedReport() {
       ...prev,
       proposed_owner_name: customerName2,
     }));
-  }, [reportFetchCompleted, reportLoading, order?.customer_name_2, reportFormData.proposed_owner_name]);
+  }, [
+    reportFetchCompleted,
+    reportLoading,
+    order?.customer_name_2,
+    reportFormData.proposed_owner_name,
+  ]);
 
   // Set page title with breadcrumb navigation
   useLayoutEffect(() => {
@@ -2292,7 +2390,7 @@ function SummarizedReport() {
           {order && order.order_number ? order.order_number : "-"}
         </Link>{" "}
         &gt; Summarized Report
-      </>
+      </>,
     );
   }, [id, order, setTitle]);
 
@@ -2318,10 +2416,16 @@ function SummarizedReport() {
       const shouldUpdateValuationHeading =
         !prev.valueation_report_for_heading ||
         prev.valueation_report_for_heading.trim() === "" ||
-        isAutoGeneratedHeading(prev.valueation_report_for_heading, prev.category_suffix || "");
+        isAutoGeneratedHeading(
+          prev.valueation_report_for_heading,
+          prev.category_suffix || "",
+        );
 
       if (shouldUpdateValuationHeading) {
-        updated.valueation_report_for_heading = buildValuationReportHeading(categorySuffixUpper, isRepoPurpose(prev.valuation_purpose));
+        updated.valueation_report_for_heading = buildValuationReportHeading(
+          categorySuffixUpper,
+          isRepoPurpose(prev.valuation_purpose),
+        );
       }
       // Always update other headings (they are not editable)
       updated.general_details_heading = categorySuffixUpper
@@ -2342,7 +2446,13 @@ function SummarizedReport() {
 
       return updated;
     });
-  }, [reportFormData.category_suffix, reportFormData.valuation_purpose, isAutoGeneratedHeading, buildValuationReportHeading, isRepoPurpose]);
+  }, [
+    reportFormData.category_suffix,
+    reportFormData.valuation_purpose,
+    isAutoGeneratedHeading,
+    buildValuationReportHeading,
+    isRepoPurpose,
+  ]);
 
   // Handle registration field option buttons
   const handleRegistrationOption = useCallback((fieldName, option) => {
@@ -2370,7 +2480,11 @@ function SummarizedReport() {
   // Capture a clean snapshot the first time initial loading finishes.
   // Any change after this point is considered "dirty".
   useEffect(() => {
-    if (!reportLoading && initialFormDataRef.current === null && reportFetchCompleted) {
+    if (
+      !reportLoading &&
+      initialFormDataRef.current === null &&
+      reportFetchCompleted
+    ) {
       initialFormDataRef.current = reportFormData;
       initialFlexibleFieldsRef.current = flexibleFields;
     }
@@ -2395,11 +2509,16 @@ function SummarizedReport() {
             }))
         : [];
       const rows = Array.isArray(parsed?.rows) ? parsed.rows : [];
-      const verticalMergedColumnIds = Array.isArray(parsed?.verticalMergedColumnIds)
-        ? parsed.verticalMergedColumnIds.filter((id) => canVerticallyMergeSummarizedColumn(id))
+      const verticalMergedColumnIds = Array.isArray(
+        parsed?.verticalMergedColumnIds,
+      )
+        ? parsed.verticalMergedColumnIds.filter((id) =>
+            canVerticallyMergeSummarizedColumn(id),
+          )
         : [];
       const verticalMergeValues =
-        parsed?.verticalMergeValues && typeof parsed.verticalMergeValues === "object"
+        parsed?.verticalMergeValues &&
+        typeof parsed.verticalMergeValues === "object"
           ? parsed.verticalMergeValues
           : {};
       setSummarizedTableData({
@@ -2407,7 +2526,8 @@ function SummarizedReport() {
         rows: normalizeSummarizedRows(rows, dynamicColumns),
         verticalMergedColumnIds,
         verticalMergeValues,
-        manualEstimatedFairValueGrandTotal: parsed?.manualEstimatedFairValueGrandTotal || "",
+        manualEstimatedFairValueGrandTotal:
+          parsed?.manualEstimatedFairValueGrandTotal || "",
         fixedColumnHeaders:
           parsed?.fixedColumnHeaders &&
           typeof parsed.fixedColumnHeaders === "object" &&
@@ -2431,10 +2551,10 @@ function SummarizedReport() {
         ...computeSummarizedGrandTotalsFromRows(rows),
         estimated_fair_value: getSummarizedResolvedFairValueGrandTotal(
           rows,
-          summarizedTableData
+          summarizedTableData,
         ),
       },
-      convertNumberToWordsIndian
+      convertNumberToWordsIndian,
     );
     setReportFormData((prev) => ({
       ...prev,
@@ -2462,7 +2582,7 @@ function SummarizedReport() {
         value: item?.id,
         label: item?.name || "",
       })),
-    [summarizedChildCategories]
+    [summarizedChildCategories],
   );
 
   const summarizedOrderedColumns = useMemo(
@@ -2473,7 +2593,7 @@ function SummarizedReport() {
       ...(summarizedTableData?.dynamicColumns || []),
       ...SUMMARIZED_FIXED_END_COLUMNS,
     ],
-    [summarizedTableData?.dynamicColumns]
+    [summarizedTableData?.dynamicColumns],
   );
 
   const isSummarizedFixedColumnVisible = useCallback(
@@ -2482,40 +2602,46 @@ function SummarizedReport() {
       if (!SUMMARIZED_TOGGLEABLE_FIXED_COLUMN_IDS.has(colId)) return true;
       return summarizedVisibleFixedColumnIds.has(colId);
     },
-    [summarizedVisibleFixedColumnIds]
+    [summarizedVisibleFixedColumnIds],
   );
 
   const summarizedDisplayOrderedColumns = useMemo(
-    () => summarizedOrderedColumns.filter((col) => isSummarizedFixedColumnVisible(col.id)),
-    [summarizedOrderedColumns, isSummarizedFixedColumnVisible]
+    () =>
+      summarizedOrderedColumns.filter((col) =>
+        isSummarizedFixedColumnVisible(col.id),
+      ),
+    [summarizedOrderedColumns, isSummarizedFixedColumnVisible],
   );
 
   const summarizedVerticalMergeEligibleColumns = useMemo(
     () =>
       summarizedDisplayOrderedColumns.filter((col) =>
-        canVerticallyMergeSummarizedColumn(col.id)
+        canVerticallyMergeSummarizedColumn(col.id),
       ),
-    [summarizedDisplayOrderedColumns]
+    [summarizedDisplayOrderedColumns],
   );
 
   const summarizedVisibleFixedStartColumns = useMemo(
-    () => SUMMARIZED_FIXED_START_COLUMNS.filter((col) => isSummarizedFixedColumnVisible(col.id)),
-    [isSummarizedFixedColumnVisible]
+    () =>
+      SUMMARIZED_FIXED_START_COLUMNS.filter((col) =>
+        isSummarizedFixedColumnVisible(col.id),
+      ),
+    [isSummarizedFixedColumnVisible],
   );
 
   const summarizedVerticalMergedColumnIds = useMemo(
     () => summarizedTableData?.verticalMergedColumnIds || [],
-    [summarizedTableData?.verticalMergedColumnIds]
+    [summarizedTableData?.verticalMergedColumnIds],
   );
 
   const summarizedVerticalMergedSet = useMemo(
     () => new Set(summarizedVerticalMergedColumnIds),
-    [summarizedVerticalMergedColumnIds]
+    [summarizedVerticalMergedColumnIds],
   );
 
   const summarizedVerticalMergeValues = useMemo(
     () => summarizedTableData?.verticalMergeValues || {},
-    [summarizedTableData?.verticalMergeValues]
+    [summarizedTableData?.verticalMergeValues],
   );
 
   const getSummarizedColumnWidth = useCallback((colId) => {
@@ -2540,19 +2666,19 @@ function SummarizedReport() {
     () =>
       summarizedDisplayOrderedColumns.reduce(
         (total, col) => total + getSummarizedColumnWidth(col.id),
-        0
+        0,
       ) + 160, // Action column (delete + merge checkbox)
-    [summarizedDisplayOrderedColumns, getSummarizedColumnWidth]
+    [summarizedDisplayOrderedColumns, getSummarizedColumnWidth],
   );
 
   const summarizedGrandTotalsByColumn = useMemo(
     () => computeSummarizedGrandTotalsFromRows(summarizedTableData.rows || []),
-    [summarizedTableData.rows, computeSummarizedGrandTotalsFromRows]
+    [summarizedTableData.rows, computeSummarizedGrandTotalsFromRows],
   );
 
   const summarizedAllFairValueRowsDashOnly = useMemo(
     () => areAllSummarizedFairValueRowsDashOnly(summarizedTableData.rows || []),
-    [summarizedTableData.rows, areAllSummarizedFairValueRowsDashOnly]
+    [summarizedTableData.rows, areAllSummarizedFairValueRowsDashOnly],
   );
 
   const summarizedDisplayedFairValueGrandTotal = useMemo(() => {
@@ -2560,11 +2686,11 @@ function SummarizedReport() {
       return summarizedGrandTotalsByColumn.estimated_fair_value ?? 0;
     }
     const manualValue = parseCurrency(
-      String(summarizedTableData.manualEstimatedFairValueGrandTotal ?? "")
+      String(summarizedTableData.manualEstimatedFairValueGrandTotal ?? ""),
     );
     return manualValue > 0
       ? manualValue
-      : summarizedGrandTotalsByColumn.estimated_fair_value ?? 0;
+      : (summarizedGrandTotalsByColumn.estimated_fair_value ?? 0);
   }, [
     summarizedAllFairValueRowsDashOnly,
     summarizedTableData.manualEstimatedFairValueGrandTotal,
@@ -2579,7 +2705,11 @@ function SummarizedReport() {
         manualEstimatedFairValueGrandTotal: handleCurrencyFormatting(value),
       });
     },
-    [summarizedTableData, handleSummarizedTableDataChange, handleCurrencyFormatting]
+    [
+      summarizedTableData,
+      handleSummarizedTableDataChange,
+      handleCurrencyFormatting,
+    ],
   );
 
   const summarizedDynamicColumnTotals = useMemo(() => {
@@ -2601,8 +2731,8 @@ function SummarizedReport() {
 
   const handleSummarizedDynamicAllowSumChange = useCallback(
     (columnId, allowSum) => {
-      const nextDynamicColumns = (summarizedTableData.dynamicColumns || []).map((col) =>
-        col.id === columnId ? { ...col, allowSum } : col
+      const nextDynamicColumns = (summarizedTableData.dynamicColumns || []).map(
+        (col) => (col.id === columnId ? { ...col, allowSum } : col),
       );
       const nextRows =
         allowSum === true
@@ -2617,15 +2747,15 @@ function SummarizedReport() {
         rows: nextRows,
       });
     },
-    [summarizedTableData, handleSummarizedTableDataChange]
+    [summarizedTableData, handleSummarizedTableDataChange],
   );
 
   const formatSummarizedGrandTotalCell = useCallback(
     (numeric) =>
       handleCurrencyFormatting(
-        (Math.round((Number(numeric) + Number.EPSILON) * 100) / 100).toFixed(2)
+        (Math.round((Number(numeric) + Number.EPSILON) * 100) / 100).toFixed(2),
       ),
-    [handleCurrencyFormatting]
+    [handleCurrencyFormatting],
   );
 
   const summarizedInputStyle = useMemo(
@@ -2638,31 +2768,46 @@ function SummarizedReport() {
       lineHeight: "1.4",
       border: "1px solid #d1d5db",
     }),
-    []
+    [],
   );
 
   const summarizedSelectStyles = useMemo(
     () => ({
       container: (base) => ({ ...base, minHeight: "42px", width: "100%" }),
-      control: (base) => ({ ...base, minHeight: "42px", height: "42px", width: "100%" }),
-      valueContainer: (base) => ({ ...base, minHeight: "42px", padding: "0 8px" }),
+      control: (base) => ({
+        ...base,
+        minHeight: "42px",
+        height: "42px",
+        width: "100%",
+      }),
+      valueContainer: (base) => ({
+        ...base,
+        minHeight: "42px",
+        padding: "0 8px",
+      }),
       indicatorsContainer: (base) => ({ ...base, height: "42px" }),
       menu: (base) => ({ ...base, zIndex: 20 }),
     }),
-    []
+    [],
   );
 
   const computeAmountPostDepreciation = useCallback(
     (row) => {
-      const totalInvoiceCost = parseCurrency(String(row?.total_invoice_cost ?? ""));
-      const depreciationRate = Number(String(row?.depr_rate ?? "").replace(/\D/g, "")) || 0;
-      const computedValue = totalInvoiceCost - (totalInvoiceCost * depreciationRate) / 100;
-      const normalizedValue = Number.isFinite(computedValue) ? Math.max(computedValue, 0) : 0;
+      const totalInvoiceCost = parseCurrency(
+        String(row?.total_invoice_cost ?? ""),
+      );
+      const depreciationRate =
+        Number(String(row?.depr_rate ?? "").replace(/\D/g, "")) || 0;
+      const computedValue =
+        totalInvoiceCost - (totalInvoiceCost * depreciationRate) / 100;
+      const normalizedValue = Number.isFinite(computedValue)
+        ? Math.max(computedValue, 0)
+        : 0;
       return handleCurrencyFormatting(
-        (Math.round((normalizedValue + Number.EPSILON) * 100) / 100).toFixed(2)
+        (Math.round((normalizedValue + Number.EPSILON) * 100) / 100).toFixed(2),
       );
     },
-    [parseCurrency, handleCurrencyFormatting]
+    [parseCurrency, handleCurrencyFormatting],
   );
 
   const handleSummarizedCellChange = useCallback(
@@ -2672,26 +2817,34 @@ function SummarizedReport() {
         idx === rowIndex
           ? (() => {
               const updatedRow = { ...row, [columnId]: value };
-              if (columnId === "total_invoice_cost" || columnId === "depr_rate") {
-                updatedRow.amount_post_depreciation = computeAmountPostDepreciation(updatedRow);
+              if (
+                columnId === "total_invoice_cost" ||
+                columnId === "depr_rate"
+              ) {
+                updatedRow.amount_post_depreciation =
+                  computeAmountPostDepreciation(updatedRow);
               }
               return updatedRow;
             })()
-          : row
+          : row,
       );
       handleSummarizedTableDataChange({
         ...summarizedTableData,
         rows: nextRows,
       });
     },
-    [summarizedTableData, handleSummarizedTableDataChange, computeAmountPostDepreciation]
+    [
+      summarizedTableData,
+      handleSummarizedTableDataChange,
+      computeAmountPostDepreciation,
+    ],
   );
 
   const handleFetchSummarizedOrderIntoRow = useCallback(
     async (rowIndex, orderNumberFromInput) => {
       const rows = summarizedTableData.rows || [];
       const sourceOrderNumber = String(
-        orderNumberFromInput ?? rows[rowIndex]?.source_order_number ?? ""
+        orderNumberFromInput ?? rows[rowIndex]?.source_order_number ?? "",
       ).trim();
 
       if (!sourceOrderNumber) {
@@ -2699,10 +2852,13 @@ function SummarizedReport() {
         return;
       }
 
-      setSummarizedOrderFetchLoadingByRow((prev) => ({ ...prev, [rowIndex]: true }));
+      setSummarizedOrderFetchLoadingByRow((prev) => ({
+        ...prev,
+        [rowIndex]: true,
+      }));
       try {
         const matchedOrder = await dispatch(
-          fetchOrderByOrderNumber(sourceOrderNumber)
+          fetchOrderByOrderNumber(sourceOrderNumber),
         ).unwrap();
 
         if (!matchedOrder?.id) {
@@ -2711,11 +2867,14 @@ function SummarizedReport() {
         }
 
         const reportType = String(matchedOrder.report_type || "").trim();
-        if (!reportType || !SUMMARIZED_FETCH_ALLOWED_REPORT_TYPES.has(reportType)) {
+        if (
+          !reportType ||
+          !SUMMARIZED_FETCH_ALLOWED_REPORT_TYPES.has(reportType)
+        ) {
           toast.error(
             reportType
               ? `Report type "${reportType}" is not allowed. Allowed: report_ce, report_cv, report_machinery, report_avr, report_marine.`
-              : "This order does not have an allowed report type."
+              : "This order does not have an allowed report type.",
           );
           return;
         }
@@ -2726,7 +2885,7 @@ function SummarizedReport() {
             fetchOrderReportLookup({
               orderId: matchedOrder.id,
               reportType,
-            })
+            }),
           ).unwrap();
           report = reportPayload?.data?.report || {};
         } catch (_) {
@@ -2763,14 +2922,14 @@ function SummarizedReport() {
         }
 
         const fetchedMachineDescription = String(
-          matchedOrder?.child_category_name ?? ""
+          matchedOrder?.child_category_name ?? "",
         ).trim();
         const fetchedSupplierName = String(
-          matchedOrder?.sub_category_name ?? ""
+          matchedOrder?.sub_category_name ?? "",
         ).trim();
         const fetchedAssetSerialNo = getSummarizedAssetSerialFromReport(
           reportType,
-          report
+          report,
         );
         const fetchedYom = getSummarizedYomFromReport(reportType, report);
         const verticalMergedColumnIds =
@@ -2798,27 +2957,52 @@ function SummarizedReport() {
             source_order_number: matchedOrder.order_number || sourceOrderNumber,
             machine_description: keepIfPresent(
               row.machine_description,
-              fetchedMachineDescription
+              fetchedMachineDescription,
             ),
-            supplier_name: keepIfPresent(row.supplier_name, fetchedSupplierName),
+            supplier_name: keepIfPresent(
+              row.supplier_name,
+              fetchedSupplierName,
+            ),
             asset_serial_no: fetchedAssetSerialNo,
             yom: fetchedYom,
             invoice_no: parsedInvoiceNo,
             invoice_date: parsedInvoiceDate,
             total_invoice_cost: currencyOrBlank(
+              report?.invoice_cost ||
               report?.tax_invoice_cost ||
                 report?.current_invoice_cost ||
-                report?.total_invoice_cost
+                report?.total_invoice_cost,
             ),
             depr_rate: digitsOnly(report?.depreciation),
             appraisal_value: currencyOrBlank(report?.appraiser_value),
             estimated_fair_value: currencyOrBlank(report?.fair_market_value),
           };
 
-          updatedRow.amount_post_depreciation = currencyOrBlank(report?.depreciation_value);
+          updatedRow.amount_post_depreciation = currencyOrBlank(
+            report?.depreciation_value,
+          );
           if (!updatedRow.amount_post_depreciation) {
-            updatedRow.amount_post_depreciation = computeAmountPostDepreciation(updatedRow);
+            updatedRow.amount_post_depreciation =
+              computeAmountPostDepreciation(updatedRow);
           }
+
+          console.warn("[Summarized Fetch] MAPPED ROW VALUES", {
+            rowIndex,
+            reportType,
+            sourceFields: {
+              tax_invoice_cost: report?.tax_invoice_cost,
+              current_invoice_cost: report?.current_invoice_cost,
+              total_invoice_cost: report?.total_invoice_cost,
+              depreciation: report?.depreciation,
+              depreciation_value: report?.depreciation_value,
+              appraiser_value: report?.appraiser_value,
+              fair_market_value: report?.fair_market_value,
+              invoice_no: report?.invoice_no,
+              invoice_date: report?.invoice_date,
+              invoice_no_date: report?.invoice_no_date,
+            },
+            updatedRow,
+          });
 
           return updatedRow;
         });
@@ -2829,7 +3013,7 @@ function SummarizedReport() {
           verticalMergeValues: nextVerticalMergeValues,
         });
         toast.success(
-          `Row filled from order ${matchedOrder.order_number || sourceOrderNumber} (${reportType}).`
+          `Row filled from order ${matchedOrder.order_number || sourceOrderNumber} (${reportType}).`,
         );
       } catch (err) {
         const message =
@@ -2838,7 +3022,10 @@ function SummarizedReport() {
             : err?.message || "Could not fetch report for this order.";
         toast.error(message);
       } finally {
-        setSummarizedOrderFetchLoadingByRow((prev) => ({ ...prev, [rowIndex]: false }));
+        setSummarizedOrderFetchLoadingByRow((prev) => ({
+          ...prev,
+          [rowIndex]: false,
+        }));
       }
     },
     [
@@ -2847,20 +3034,20 @@ function SummarizedReport() {
       handleCurrencyFormatting,
       handleSummarizedTableDataChange,
       computeAmountPostDepreciation,
-    ]
+    ],
   );
 
   const handleSummarizedDynamicHeaderChange = useCallback(
     (columnId, value) => {
-      const nextDynamicColumns = (summarizedTableData.dynamicColumns || []).map((col) =>
-        col.id === columnId ? { ...col, header: value } : col
+      const nextDynamicColumns = (summarizedTableData.dynamicColumns || []).map(
+        (col) => (col.id === columnId ? { ...col, header: value } : col),
       );
       handleSummarizedTableDataChange({
         ...summarizedTableData,
         dynamicColumns: nextDynamicColumns,
       });
     },
-    [summarizedTableData, handleSummarizedTableDataChange]
+    [summarizedTableData, handleSummarizedTableDataChange],
   );
 
   const handleSummarizedFixedHeaderChange = useCallback(
@@ -2874,7 +3061,7 @@ function SummarizedReport() {
         },
       });
     },
-    [summarizedTableData, handleSummarizedTableDataChange]
+    [summarizedTableData, handleSummarizedTableDataChange],
   );
 
   const renderSummarizedFixedHeaderContent = useCallback(
@@ -2899,12 +3086,15 @@ function SummarizedReport() {
       summarizedTableData.fixedColumnHeaders,
       summarizedInputStyle,
       handleSummarizedFixedHeaderChange,
-    ]
+    ],
   );
 
   const handleAddSummarizedRow = useCallback(() => {
     const dynamicCols = summarizedTableData.dynamicColumns || [];
-    const nextRows = [...(summarizedTableData.rows || []), buildEmptySummarizedRow(dynamicCols)];
+    const nextRows = [
+      ...(summarizedTableData.rows || []),
+      buildEmptySummarizedRow(dynamicCols),
+    ];
     scrollSummarizedTableToBottomRef.current = true;
     handleSummarizedTableDataChange({
       ...summarizedTableData,
@@ -2927,7 +3117,7 @@ function SummarizedReport() {
         rows: nextRows,
       });
     },
-    [summarizedTableData, handleSummarizedTableDataChange]
+    [summarizedTableData, handleSummarizedTableDataChange],
   );
 
   useLayoutEffect(() => {
@@ -2945,7 +3135,10 @@ function SummarizedReport() {
       header: "",
       allowSum: false,
     };
-    const nextDynamicColumns = [...(summarizedTableData.dynamicColumns || []), newColumn];
+    const nextDynamicColumns = [
+      ...(summarizedTableData.dynamicColumns || []),
+      newColumn,
+    ];
     const nextRows = (summarizedTableData.rows || []).map((row) => ({
       ...row,
       [newColumn.id]: "",
@@ -2968,7 +3161,7 @@ function SummarizedReport() {
         rows: nextRows,
       });
     },
-    [summarizedTableData, handleSummarizedTableDataChange]
+    [summarizedTableData, handleSummarizedTableDataChange],
   );
 
   const handleToggleSummarizedRowMerge = useCallback(
@@ -2988,36 +3181,38 @@ function SummarizedReport() {
         rows: nextRows,
       });
     },
-    [summarizedTableData, handleSummarizedTableDataChange]
+    [summarizedTableData, handleSummarizedTableDataChange],
   );
 
   const handleSummarizedMergedRowTextChange = useCallback(
     (rowIndex, value) => {
       const nextRows = (summarizedTableData.rows || []).map((row, idx) =>
-        idx === rowIndex ? { ...row, mergedRowText: value } : row
+        idx === rowIndex ? { ...row, mergedRowText: value } : row,
       );
       handleSummarizedTableDataChange({
         ...summarizedTableData,
         rows: nextRows,
       });
     },
-    [summarizedTableData, handleSummarizedTableDataChange]
+    [summarizedTableData, handleSummarizedTableDataChange],
   );
 
   const handleRemoveSummarizedColumn = useCallback(
     (columnId) => {
-      const nextDynamicColumns = (summarizedTableData.dynamicColumns || []).filter(
-        (col) => col.id !== columnId
-      );
+      const nextDynamicColumns = (
+        summarizedTableData.dynamicColumns || []
+      ).filter((col) => col.id !== columnId);
       const nextRows = (summarizedTableData.rows || []).map((row) => {
         const nextRow = { ...row };
         delete nextRow[columnId];
         return nextRow;
       });
-      const nextVerticalMergedColumnIds = (summarizedTableData.verticalMergedColumnIds || []).filter(
-        (id) => id !== columnId
-      );
-      const nextVerticalMergeValues = { ...(summarizedTableData.verticalMergeValues || {}) };
+      const nextVerticalMergedColumnIds = (
+        summarizedTableData.verticalMergedColumnIds || []
+      ).filter((id) => id !== columnId);
+      const nextVerticalMergeValues = {
+        ...(summarizedTableData.verticalMergeValues || {}),
+      };
       delete nextVerticalMergeValues[columnId];
       handleSummarizedTableDataChange({
         ...summarizedTableData,
@@ -3027,7 +3222,7 @@ function SummarizedReport() {
         verticalMergeValues: nextVerticalMergeValues,
       });
     },
-    [summarizedTableData, handleSummarizedTableDataChange]
+    [summarizedTableData, handleSummarizedTableDataChange],
   );
 
   const handleToggleVerticalColumnMerge = useCallback(
@@ -3036,7 +3231,9 @@ function SummarizedReport() {
       const currentIds = summarizedTableData.verticalMergedColumnIds || [];
       if (shouldMerge) {
         if (currentIds.includes(columnId)) return;
-        const seedValue = String((summarizedTableData.rows || [])[0]?.[columnId] ?? "");
+        const seedValue = String(
+          (summarizedTableData.rows || [])[0]?.[columnId] ?? "",
+        );
         handleSummarizedTableDataChange({
           ...summarizedTableData,
           verticalMergedColumnIds: [...currentIds, columnId],
@@ -3047,8 +3244,11 @@ function SummarizedReport() {
         });
         return;
       }
-      const sharedValue = summarizedTableData.verticalMergeValues?.[columnId] ?? "";
-      const nextVerticalMergeValues = { ...(summarizedTableData.verticalMergeValues || {}) };
+      const sharedValue =
+        summarizedTableData.verticalMergeValues?.[columnId] ?? "";
+      const nextVerticalMergeValues = {
+        ...(summarizedTableData.verticalMergeValues || {}),
+      };
       delete nextVerticalMergeValues[columnId];
       const nextRows = (summarizedTableData.rows || []).map((row) => ({
         ...row,
@@ -3061,7 +3261,7 @@ function SummarizedReport() {
         rows: nextRows,
       });
     },
-    [summarizedTableData, handleSummarizedTableDataChange]
+    [summarizedTableData, handleSummarizedTableDataChange],
   );
 
   const handleVerticalMergeValueChange = useCallback(
@@ -3074,7 +3274,7 @@ function SummarizedReport() {
         },
       });
     },
-    [summarizedTableData, handleSummarizedTableDataChange]
+    [summarizedTableData, handleSummarizedTableDataChange],
   );
 
   const handleSummarizedTableKeyDown = useCallback(
@@ -3104,8 +3304,14 @@ function SummarizedReport() {
       const activeTd = active?.closest("td[data-summarized-nav-row]");
       if (!tbody || !activeTd || !tbody.contains(activeTd)) return;
 
-      const startRow = parseInt(activeTd.getAttribute("data-summarized-nav-row"), 10);
-      const startCol = parseInt(activeTd.getAttribute("data-summarized-nav-col"), 10);
+      const startRow = parseInt(
+        activeTd.getAttribute("data-summarized-nav-row"),
+        10,
+      );
+      const startCol = parseInt(
+        activeTd.getAttribute("data-summarized-nav-col"),
+        10,
+      );
       if (!Number.isFinite(startRow) || !Number.isFinite(startCol)) return;
 
       const rowCount = (summarizedTableData.rows || []).length;
@@ -3129,7 +3335,7 @@ function SummarizedReport() {
         colCount,
         columns,
         mergedColumnIds,
-        summarizedTableData.rows || []
+        summarizedTableData.rows || [],
       );
       if (!target) return;
 
@@ -3141,7 +3347,7 @@ function SummarizedReport() {
       summarizedTableData.rows,
       summarizedDisplayOrderedColumns,
       summarizedVerticalMergedColumnIds,
-    ]
+    ],
   );
 
   const renderSummarizedDataCell = (col, row, rowIndex, colIndex) => {
@@ -3173,7 +3379,7 @@ function SummarizedReport() {
       : { style: cellStyle };
 
     const cellValue = verticallyMerged
-      ? summarizedVerticalMergeValues[columnId] ?? ""
+      ? (summarizedVerticalMergeValues[columnId] ?? "")
       : row[columnId] || "";
 
     const setCellValue = (nextValue) => {
@@ -3293,11 +3499,16 @@ function SummarizedReport() {
           className="form-field mb-0"
           style={summarizedInputStyle}
           value={cellValue}
-          onChange={(e) => setCellValue(handleCurrencyFormatting(e.target.value))}
+          onChange={(e) =>
+            setCellValue(handleCurrencyFormatting(e.target.value))
+          }
           placeholder="0.00"
         />
       );
-    } else if ((summarizedTableData.dynamicColumns || []).find((c) => c.id === columnId)?.allowSum) {
+    } else if (
+      (summarizedTableData.dynamicColumns || []).find((c) => c.id === columnId)
+        ?.allowSum
+    ) {
       cellContent = (
         <input
           type="text"
@@ -3412,10 +3623,16 @@ function SummarizedReport() {
           const shouldUpdateValuationHeading =
             !prev.valueation_report_for_heading ||
             prev.valueation_report_for_heading.trim() === "" ||
-            isAutoGeneratedHeading(prev.valueation_report_for_heading, prev.category_suffix || "");
+            isAutoGeneratedHeading(
+              prev.valueation_report_for_heading,
+              prev.category_suffix || "",
+            );
 
           if (shouldUpdateValuationHeading) {
-            updated.valueation_report_for_heading = buildValuationReportHeading(categorySuffixUpper, isRepoPurpose(prev.valuation_purpose));
+            updated.valueation_report_for_heading = buildValuationReportHeading(
+              categorySuffixUpper,
+              isRepoPurpose(prev.valuation_purpose),
+            );
           }
 
           // Always update other headings (they are not editable)
@@ -3451,7 +3668,7 @@ function SummarizedReport() {
           updated.amount_in_words = computeAmountInWordsFromFmv(
             updated.fair_market_value,
             parseCurrency,
-            convertNumberToWordsIndian
+            convertNumberToWordsIndian,
           );
         }
 
@@ -3475,7 +3692,13 @@ function SummarizedReport() {
         return updated;
       });
     },
-    [parseCurrency, handleCurrencyFormatting, convertNumberToWordsIndian, isAutoGeneratedHeading, buildValuationReportHeading]
+    [
+      parseCurrency,
+      handleCurrencyFormatting,
+      convertNumberToWordsIndian,
+      isAutoGeneratedHeading,
+      buildValuationReportHeading,
+    ],
   );
 
   // Handle SingleSearchSelect changes
@@ -3508,16 +3731,30 @@ function SummarizedReport() {
           const categorySuffix = prev.category_suffix || "";
           const isRepo = isRepoPurpose(value);
           if (isAutoGeneratedHeading(heading, categorySuffix)) {
-            const categorySuffixUpper = categorySuffix ? categorySuffix.toUpperCase().trim() : "";
-            updated.valueation_report_for_heading = buildValuationReportHeading(categorySuffixUpper, isRepo);
+            const categorySuffixUpper = categorySuffix
+              ? categorySuffix.toUpperCase().trim()
+              : "";
+            updated.valueation_report_for_heading = buildValuationReportHeading(
+              categorySuffixUpper,
+              isRepo,
+            );
           } else if (heading.trim() !== "") {
             let newHeading = heading;
             if (isRepo) {
-              if (newHeading.includes("VALUATION REPORT FOR ") && !newHeading.includes("(REPOSSESSION)")) {
-                newHeading = newHeading.replace("VALUATION REPORT FOR ", "VALUATION REPORT (REPOSSESSION) FOR ");
+              if (
+                newHeading.includes("VALUATION REPORT FOR ") &&
+                !newHeading.includes("(REPOSSESSION)")
+              ) {
+                newHeading = newHeading.replace(
+                  "VALUATION REPORT FOR ",
+                  "VALUATION REPORT (REPOSSESSION) FOR ",
+                );
               }
             } else {
-              newHeading = newHeading.replace("VALUATION REPORT (REPOSSESSION) FOR ", "VALUATION REPORT FOR ");
+              newHeading = newHeading.replace(
+                "VALUATION REPORT (REPOSSESSION) FOR ",
+                "VALUATION REPORT FOR ",
+              );
             }
             updated.valueation_report_for_heading = newHeading;
           }
@@ -3526,7 +3763,12 @@ function SummarizedReport() {
         return updated;
       });
     },
-    [getLicenseNumber, isAutoGeneratedHeading, buildValuationReportHeading, isRepoPurpose]
+    [
+      getLicenseNumber,
+      isAutoGeneratedHeading,
+      buildValuationReportHeading,
+      isRepoPurpose,
+    ],
   );
 
   // Handle file input changes
@@ -3680,15 +3922,19 @@ function SummarizedReport() {
     return () => {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [chassisImpressionFile, reportFormData?.chassis_no_pencil_impression, resolveChassisImageUrl]);
+  }, [
+    chassisImpressionFile,
+    reportFormData?.chassis_no_pencil_impression,
+    resolveChassisImageUrl,
+  ]);
 
   // Handle flexible field changes
   const handleFlexibleFieldChange = useCallback((fieldId, fieldType, value) => {
     if (initialFormDataRef.current !== null) isDirtyRef.current = true;
     setFlexibleFields((prev) =>
       prev.map((field) =>
-        field.id === fieldId ? { ...field, [fieldType]: value } : field
-      )
+        field.id === fieldId ? { ...field, [fieldType]: value } : field,
+      ),
     );
   }, []);
 
@@ -3725,7 +3971,7 @@ function SummarizedReport() {
 
       setFlexibleFields((prev) => [...prev, newField]);
     },
-    [flexibleFields]
+    [flexibleFields],
   );
 
   // Remove flexible field
@@ -3741,7 +3987,7 @@ function SummarizedReport() {
     flexibleFields.forEach((field, index) => {
       if (!field.field_label.trim() || !field.field_value.trim()) {
         errors.push(
-          `Flexible field ${index + 1}: Label and Value are required`
+          `Flexible field ${index + 1}: Label and Value are required`,
         );
       }
 
@@ -3749,7 +3995,7 @@ function SummarizedReport() {
       if (field.col_span === 2) {
         if (!field.field_label_2?.trim() || !field.field_value_2?.trim()) {
           errors.push(
-            `Flexible field ${index + 1}: Second Label and Value are required`
+            `Flexible field ${index + 1}: Second Label and Value are required`,
           );
         }
       }
@@ -3776,10 +4022,7 @@ function SummarizedReport() {
         return String(SUMMARIZED_APPENDIX_DEFAULT_ROW_PADDING_PX);
       }
       return String(
-        Math.min(
-          SUMMARIZED_APPENDIX_MAX_ROW_PADDING_PX,
-          Math.max(0, parsed)
-        )
+        Math.min(SUMMARIZED_APPENDIX_MAX_ROW_PADDING_PX, Math.max(0, parsed)),
       );
     });
   }, []);
@@ -3791,7 +4034,7 @@ function SummarizedReport() {
     }
     return Math.min(
       SUMMARIZED_APPENDIX_MAX_ROW_PADDING_PX,
-      Math.max(0, parsed)
+      Math.max(0, parsed),
     );
   }, [summarizedAppendixRowPaddingPx]);
 
@@ -3807,7 +4050,7 @@ function SummarizedReport() {
           const doc = preOpenedTab.document;
           doc.open();
           doc.write(
-            `<!doctype html><html><head><meta charset="utf-8"><title>Preparing report…</title><style>html,body{height:100%;margin:0}body{display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}.box{text-align:center}.spinner{width:44px;height:44px;border: 4px solid rgba(88, 100, 189, 0.2);border-top-color: #5864bd;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px}@keyframes spin{to{transform:rotate(360deg)}}small{opacity:.75}</style></head><body><div class="box"><div class="spinner"></div><div>Preparing your Report...</div><small>This tab will update automatically. So don't close the tab.</small></div></body></html>`
+            `<!doctype html><html><head><meta charset="utf-8"><title>Preparing report…</title><style>html,body{height:100%;margin:0}body{display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}.box{text-align:center}.spinner{width:44px;height:44px;border: 4px solid rgba(88, 100, 189, 0.2);border-top-color: #5864bd;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px}@keyframes spin{to{transform:rotate(360deg)}}small{opacity:.75}</style></head><body><div class="box"><div class="spinner"></div><div>Preparing your Report...</div><small>This tab will update automatically. So don't close the tab.</small></div></body></html>`,
           );
           doc.close();
         } catch (err) {
@@ -3830,7 +4073,7 @@ function SummarizedReport() {
       const computedAmountInWords = computeAmountInWordsFromFmv(
         fmvRaw,
         parseCurrency,
-        convertNumberToWordsIndian
+        convertNumberToWordsIndian,
       );
       if (
         fmvRaw &&
@@ -3838,7 +4081,7 @@ function SummarizedReport() {
         !computedAmountInWords
       ) {
         toast.error(
-          "Amount in words missing. Please enter a valid Fair Market Value."
+          "Amount in words missing. Please enter a valid Fair Market Value.",
         );
         if (preOpenedTab && !preOpenedTab.closed) {
           preOpenedTab.close();
@@ -3880,7 +4123,10 @@ function SummarizedReport() {
         }
 
         // Default for tax_invoice_copy_heading when empty
-        if (key === "tax_invoice_copy_heading" && (!value || String(value).trim() === "")) {
+        if (
+          key === "tax_invoice_copy_heading" &&
+          (!value || String(value).trim() === "")
+        ) {
           value = "Proforma Invoice Verified";
         }
 
@@ -3930,7 +4176,10 @@ function SummarizedReport() {
       });
 
       // Always include report_date_heading in payload (even if user did not change it - use preselected default)
-      formData.set("report_date_heading", reportFormData.report_date_heading || "Report Date");
+      formData.set(
+        "report_date_heading",
+        reportFormData.report_date_heading || "Report Date",
+      );
 
       // Add invoice_no_date (combined from invoice_no and invoice_date) - always include with fresh computed value
       formData.append("invoice_no_date", combinedInvoiceData || "");
@@ -3940,7 +4189,7 @@ function SummarizedReport() {
       const defaultDisclaimer = getDisclaimer(valuerName, order);
       formData.append(
         "disclaimer",
-        reportFormData.disclaimer || defaultDisclaimer
+        reportFormData.disclaimer || defaultDisclaimer,
       );
 
       // Add chassis impression image if selected
@@ -3951,7 +4200,7 @@ function SummarizedReport() {
       // Generate-only: appendix table row padding (sent for PDF; not saved to DB)
       formData.append(
         "summarized_appendix_cell_padding_px",
-        String(resolveSummarizedAppendixRowPaddingForGenerate())
+        String(resolveSummarizedAppendixRowPaddingForGenerate()),
       );
 
       // Add flexible fields to FormData with proper sequential ordering
@@ -3960,23 +4209,23 @@ function SummarizedReport() {
         // Add first field (or only field for Add One)
         formData.append(
           `flexible_fields[${formDataIndex}][section_name]`,
-          field.section_name
+          field.section_name,
         );
         formData.append(
           `flexible_fields[${formDataIndex}][col_span]`,
-          field.col_span
+          field.col_span,
         );
         formData.append(
           `flexible_fields[${formDataIndex}][field_label]`,
-          field.field_label
+          field.field_label,
         );
         formData.append(
           `flexible_fields[${formDataIndex}][field_value]`,
-          String(field.field_value || "") // Preserve all formatting including line breaks
+          String(field.field_value || ""), // Preserve all formatting including line breaks
         );
         formData.append(
           `flexible_fields[${formDataIndex}][field_order]`,
-          field.field_order
+          field.field_order,
         );
         formDataIndex++;
 
@@ -3984,23 +4233,23 @@ function SummarizedReport() {
         if (field.col_span === 2 && field.field_label_2 !== undefined) {
           formData.append(
             `flexible_fields[${formDataIndex}][section_name]`,
-            field.section_name
+            field.section_name,
           );
           formData.append(
             `flexible_fields[${formDataIndex}][col_span]`,
-            field.col_span
+            field.col_span,
           );
           formData.append(
             `flexible_fields[${formDataIndex}][field_label]`,
-            field.field_label_2
+            field.field_label_2,
           );
           formData.append(
             `flexible_fields[${formDataIndex}][field_value]`,
-            String(field.field_value_2 || "") // Preserve all formatting including line breaks
+            String(field.field_value_2 || ""), // Preserve all formatting including line breaks
           );
           formData.append(
             `flexible_fields[${formDataIndex}][field_order]`,
-            field.field_order + 1 // Sequential order for second field
+            field.field_order + 1, // Sequential order for second field
           );
           formDataIndex++;
         }
@@ -4046,7 +4295,7 @@ function SummarizedReport() {
         generateOrderReport({
           orderId: id,
           data: formData,
-        })
+        }),
       ).then((result) => {
         if (result.meta.requestStatus === "fulfilled") {
           // Open PDF in the pre-opened tab
@@ -4082,7 +4331,7 @@ function SummarizedReport() {
       reportTypeSelection,
       canEditRefNoId,
       resolveSummarizedAppendixRowPaddingForGenerate,
-    ]
+    ],
   );
 
   // Builds the save payload — used by both handleSaveReport and the navigation blocker.
@@ -4090,7 +4339,8 @@ function SummarizedReport() {
     const reportData = {};
 
     const valuerName = reportFormData.valuer_name || "VALUETECH SOLUTIONS";
-    reportData.disclaimer = reportFormData.disclaimer || getDisclaimer(valuerName, order);
+    reportData.disclaimer =
+      reportFormData.disclaimer || getDisclaimer(valuerName, order);
 
     Object.keys(reportFormData).forEach((key) => {
       let value = reportFormData[key];
@@ -4099,21 +4349,28 @@ function SummarizedReport() {
       if (key === "invoice_no_date") return;
 
       // Default for tax_invoice_copy_heading when empty
-      if (key === "tax_invoice_copy_heading" && (!value || String(value).trim() === "")) {
+      if (
+        key === "tax_invoice_copy_heading" &&
+        (!value || String(value).trim() === "")
+      ) {
         value = "Proforma Invoice Verified";
       }
 
       if (key === "registration_no") {
         if (registrationNoOption === "NOT_AVAILABLE") value = "NOT AVAILABLE";
-        else if (registrationNoOption === "NOT_APPLICABLE") value = "NOT APPLICABLE";
+        else if (registrationNoOption === "NOT_APPLICABLE")
+          value = "NOT APPLICABLE";
       }
       if (key === "registration_date") {
         if (registrationDateOption === "NOT_AVAILABLE") value = "NOT AVAILABLE";
-        else if (registrationDateOption === "NOT_APPLICABLE") value = "NOT APPLICABLE";
+        else if (registrationDateOption === "NOT_APPLICABLE")
+          value = "NOT APPLICABLE";
       }
       if (key === "location_of_machinery") {
-        if (locationOfMachineryOption === "NOT_AVAILABLE") value = "NOT AVAILABLE";
-        else if (locationOfMachineryOption === "NOT_APPLICABLE") value = "NOT APPLICABLE";
+        if (locationOfMachineryOption === "NOT_AVAILABLE")
+          value = "NOT AVAILABLE";
+        else if (locationOfMachineryOption === "NOT_APPLICABLE")
+          value = "NOT APPLICABLE";
       }
 
       // Final guard: normalize any WYSIWYG empties already present in state.
@@ -4127,15 +4384,20 @@ function SummarizedReport() {
         if (stripped === "") value = "";
       }
 
-      reportData[key] = (value !== null && value !== undefined && value !== "") ? String(value) : null;
+      reportData[key] =
+        value !== null && value !== undefined && value !== ""
+          ? String(value)
+          : null;
     });
 
-    reportData.report_date_heading = reportFormData.report_date_heading || "Report Date";
+    reportData.report_date_heading =
+      reportFormData.report_date_heading || "Report Date";
 
     const invoiceNo = reportFormData.invoice_no || "";
     const invoiceDate = reportFormData.invoice_date || "";
     let combinedInvoiceData = "";
-    if (invoiceNo && invoiceDate) combinedInvoiceData = `${invoiceNo} Dated ${invoiceDate}`;
+    if (invoiceNo && invoiceDate)
+      combinedInvoiceData = `${invoiceNo} Dated ${invoiceDate}`;
     else if (invoiceNo) combinedInvoiceData = invoiceNo;
     else if (invoiceDate) combinedInvoiceData = `Dated ${invoiceDate}`;
     reportData.invoice_no_date = combinedInvoiceData || null;
@@ -4143,19 +4405,36 @@ function SummarizedReport() {
     let formDataIndex = 0;
     flexibleFields.forEach((field) => {
       if (field.field_value && field.field_value.trim() !== "") {
-        reportData[`flexible_fields[${formDataIndex}][section_name]`] = field.section_name;
-        reportData[`flexible_fields[${formDataIndex}][col_span]`] = field.col_span;
-        reportData[`flexible_fields[${formDataIndex}][field_label]`] = field.field_label;
-        reportData[`flexible_fields[${formDataIndex}][field_value]`] = String(field.field_value || "");
-        reportData[`flexible_fields[${formDataIndex}][field_order]`] = field.field_order;
+        reportData[`flexible_fields[${formDataIndex}][section_name]`] =
+          field.section_name;
+        reportData[`flexible_fields[${formDataIndex}][col_span]`] =
+          field.col_span;
+        reportData[`flexible_fields[${formDataIndex}][field_label]`] =
+          field.field_label;
+        reportData[`flexible_fields[${formDataIndex}][field_value]`] = String(
+          field.field_value || "",
+        );
+        reportData[`flexible_fields[${formDataIndex}][field_order]`] =
+          field.field_order;
         formDataIndex++;
 
-        if (field.col_span === 2 && field.field_label_2 !== undefined && field.field_value_2 && field.field_value_2.trim() !== "") {
-          reportData[`flexible_fields[${formDataIndex}][section_name]`] = field.section_name;
-          reportData[`flexible_fields[${formDataIndex}][col_span]`] = field.col_span;
-          reportData[`flexible_fields[${formDataIndex}][field_label]`] = field.field_label_2;
-          reportData[`flexible_fields[${formDataIndex}][field_value]`] = String(field.field_value_2 || "");
-          reportData[`flexible_fields[${formDataIndex}][field_order]`] = field.field_order + 1;
+        if (
+          field.col_span === 2 &&
+          field.field_label_2 !== undefined &&
+          field.field_value_2 &&
+          field.field_value_2.trim() !== ""
+        ) {
+          reportData[`flexible_fields[${formDataIndex}][section_name]`] =
+            field.section_name;
+          reportData[`flexible_fields[${formDataIndex}][col_span]`] =
+            field.col_span;
+          reportData[`flexible_fields[${formDataIndex}][field_label]`] =
+            field.field_label_2;
+          reportData[`flexible_fields[${formDataIndex}][field_value]`] = String(
+            field.field_value_2 || "",
+          );
+          reportData[`flexible_fields[${formDataIndex}][field_order]`] =
+            field.field_order + 1;
           formDataIndex++;
         }
       }
@@ -4168,10 +4447,16 @@ function SummarizedReport() {
 
     return reportData;
   }, [
-    reportFormData, flexibleFields,
+    reportFormData,
+    flexibleFields,
     chassisImpressionFile,
-    registrationNoOption, registrationDateOption, locationOfMachineryOption,
-    parseCurrency, convertNumberToWordsIndian, getDisclaimer, order,
+    registrationNoOption,
+    registrationDateOption,
+    locationOfMachineryOption,
+    parseCurrency,
+    convertNumberToWordsIndian,
+    getDisclaimer,
+    order,
   ]);
 
   // Handle save report data
@@ -4187,7 +4472,7 @@ function SummarizedReport() {
     const computedAmountInWords = computeAmountInWordsFromFmv(
       fmvRaw,
       parseCurrency,
-      convertNumberToWordsIndian
+      convertNumberToWordsIndian,
     );
     if (
       fmvRaw &&
@@ -4195,7 +4480,7 @@ function SummarizedReport() {
       !computedAmountInWords
     ) {
       toast.error(
-        "Amount in words missing. Please enter a valid Fair Market Value."
+        "Amount in words missing. Please enter a valid Fair Market Value.",
       );
       return;
     }
@@ -4206,7 +4491,7 @@ function SummarizedReport() {
     // Only proceed if there's actual data to save
     if (Object.keys(reportData).length === 0) {
       toast.warning(
-        "No data to save. Please fill in some fields before saving."
+        "No data to save. Please fill in some fields before saving.",
       );
       return;
     }
@@ -4239,7 +4524,7 @@ function SummarizedReport() {
       saveOrderReport({
         orderId: id,
         reportData: savePayload,
-      })
+      }),
     ).then((result) => {
       if (result.meta.requestStatus === "fulfilled") {
         isDirtyRef.current = false;
@@ -4300,7 +4585,7 @@ function SummarizedReport() {
               })()
             : reportData;
           const result = await dispatch(
-            saveOrderReport({ orderId: id, reportData: payload })
+            saveOrderReport({ orderId: id, reportData: payload }),
           );
           if (result.meta.requestStatus === "fulfilled") {
             isDirtyRef.current = false;
@@ -4314,10 +4599,14 @@ function SummarizedReport() {
             originalPushState(
               pendingNavRef.current.state,
               pendingNavRef.current.title,
-              pendingNavRef.current.url
+              pendingNavRef.current.url,
             );
             // Dispatch a popstate so React Router picks up the URL change
-            window.dispatchEvent(new PopStateEvent("popstate", { state: pendingNavRef.current.state }));
+            window.dispatchEvent(
+              new PopStateEvent("popstate", {
+                state: pendingNavRef.current.state,
+              }),
+            );
             pendingNavRef.current = null;
           }
         }
@@ -4334,7 +4623,9 @@ function SummarizedReport() {
         originalPushState(null, "", window.location.href);
 
         // Show alert to inform user
-        alert("You have unsaved changes. Please save or discard changes before navigating.");
+        alert(
+          "You have unsaved changes. Please save or discard changes before navigating.",
+        );
       }
     };
 
@@ -4363,7 +4654,7 @@ function SummarizedReport() {
   const renderFlexibleFields = useCallback(
     (sectionName) => {
       const sectionFields = flexibleFields.filter(
-        (field) => field.section_name === sectionName
+        (field) => field.section_name === sectionName,
       );
 
       return sectionFields.map((field) => (
@@ -4401,7 +4692,7 @@ function SummarizedReport() {
                       handleFlexibleFieldChange(
                         field.id,
                         "field_label",
-                        e.target.value
+                        e.target.value,
                       )
                     }
                     placeholder="Enter field label"
@@ -4422,7 +4713,7 @@ function SummarizedReport() {
                       handleFlexibleFieldChange(
                         field.id,
                         "field_value",
-                        e.target.value
+                        e.target.value,
                       )
                     }
                     placeholder="Enter field value"
@@ -4447,7 +4738,7 @@ function SummarizedReport() {
                       handleFlexibleFieldChange(
                         field.id,
                         "field_label",
-                        e.target.value
+                        e.target.value,
                       )
                     }
                     placeholder="Enter first label"
@@ -4468,7 +4759,7 @@ function SummarizedReport() {
                       handleFlexibleFieldChange(
                         field.id,
                         "field_value",
-                        e.target.value
+                        e.target.value,
                       )
                     }
                     placeholder="Enter first value"
@@ -4489,7 +4780,7 @@ function SummarizedReport() {
                       handleFlexibleFieldChange(
                         field.id,
                         "field_label_2",
-                        e.target.value
+                        e.target.value,
                       )
                     }
                     placeholder="Enter second label"
@@ -4510,7 +4801,7 @@ function SummarizedReport() {
                       handleFlexibleFieldChange(
                         field.id,
                         "field_value_2",
-                        e.target.value
+                        e.target.value,
                       )
                     }
                     placeholder="Enter second value"
@@ -4523,14 +4814,14 @@ function SummarizedReport() {
         </div>
       ));
     },
-    [flexibleFields, handleFlexibleFieldChange, removeFlexibleField]
+    [flexibleFields, handleFlexibleFieldChange, removeFlexibleField],
   );
 
   // Render flexible fields with textarea for specific section
   const renderFlexibleFieldsWithTextarea = useCallback(
     (sectionName) => {
       const sectionFields = flexibleFields.filter(
-        (field) => field.section_name === sectionName
+        (field) => field.section_name === sectionName,
       );
 
       return sectionFields.map((field) => (
@@ -4568,7 +4859,7 @@ function SummarizedReport() {
                       handleFlexibleFieldChange(
                         field.id,
                         "field_label",
-                        e.target.value
+                        e.target.value,
                       )
                     }
                     placeholder="Enter field label"
@@ -4589,7 +4880,7 @@ function SummarizedReport() {
                       handleFlexibleFieldChange(
                         field.id,
                         "field_value",
-                        e.target.value
+                        e.target.value,
                       )
                     }
                     placeholder="Enter field value"
@@ -4614,7 +4905,7 @@ function SummarizedReport() {
                       handleFlexibleFieldChange(
                         field.id,
                         "field_label",
-                        e.target.value
+                        e.target.value,
                       )
                     }
                     placeholder="Enter first label"
@@ -4635,7 +4926,7 @@ function SummarizedReport() {
                       handleFlexibleFieldChange(
                         field.id,
                         "field_value",
-                        e.target.value
+                        e.target.value,
                       )
                     }
                     placeholder="Enter first value"
@@ -4656,7 +4947,7 @@ function SummarizedReport() {
                       handleFlexibleFieldChange(
                         field.id,
                         "field_label_2",
-                        e.target.value
+                        e.target.value,
                       )
                     }
                     placeholder="Enter second label"
@@ -4677,7 +4968,7 @@ function SummarizedReport() {
                       handleFlexibleFieldChange(
                         field.id,
                         "field_value_2",
-                        e.target.value
+                        e.target.value,
                       )
                     }
                     placeholder="Enter second value"
@@ -4690,7 +4981,7 @@ function SummarizedReport() {
         </div>
       ));
     },
-    [flexibleFields, handleFlexibleFieldChange, removeFlexibleField]
+    [flexibleFields, handleFlexibleFieldChange, removeFlexibleField],
   );
 
   // Memoized values for expensive calculations
@@ -4726,10 +5017,7 @@ function SummarizedReport() {
             <form onSubmit={handleReportSubmit} className="body-form-box">
               <div className="row mb-3">
                 <div className="col-12">
-                  <div
-                    className="d-flex gap-2"
-                    style={{ width: "100%" }}
-                  >
+                  <div className="d-flex gap-2" style={{ width: "100%" }}>
                     <button
                       type="button"
                       className="form-field"
@@ -4751,1469 +5039,1533 @@ function SummarizedReport() {
               </div>
               {activeReportTab === "general" ? (
                 <>
-              <div className="row">
-                <div className="col-12">
-                  <div className="form-group">
-                    <label htmlFor="category_suffix">
-                      Category Suffix <span className="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="category_suffix"
-                      name="category_suffix"
-                      value={reportFormData.category_suffix || ""}
-                      onChange={handleFormChange}
-                      placeholder="Enter category/subcategory/child-category (e.g., COMMERCIAL VEHICLE / CV CV-IN 11)"
-                    />
-                    <small className="form-text text-muted">
-                      This field controls all heading fields below. Enter the
-                      category information in the format: (category_name) /
-                      (sub_category_name) (child_category_name)
-                    </small>
-                  </div>
-                </div>
-                <div className="col-12">
-                  <div className="form-group">
-                    <label htmlFor="valueation_report_for_heading">
-                      Valuation Report For Heading
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="valueation_report_for_heading"
-                      name="valueation_report_for_heading"
-                      value={reportFormData.valueation_report_for_heading || ""}
-                      onChange={handleFormChange}
-                      placeholder="Auto-generated from Category Suffix"
-                    />
-                  </div>
-                </div>
-                <div className="col-12">
-                  <div className="form-group">
-                    <div className="d-flex align-items-end gap-3 flex-wrap" style={{ gap: "10px" }}>
-                      <div className="flex-grow-1" style={{ minWidth: "200px" }}>
-                        <label htmlFor="general_details_heading">
-                          General Details Heading
+                  <div className="row">
+                    <div className="col-12">
+                      <div className="form-group">
+                        <label htmlFor="category_suffix">
+                          Category Suffix <span className="text-danger">*</span>
                         </label>
                         <input
                           type="text"
                           className="form-field"
-                          id="general_details_heading"
-                          name="general_details_heading"
-                          value={reportFormData.general_details_heading || ""}
+                          id="category_suffix"
+                          name="category_suffix"
+                          value={reportFormData.category_suffix || ""}
+                          onChange={handleFormChange}
+                          placeholder="Enter category/subcategory/child-category (e.g., COMMERCIAL VEHICLE / CV CV-IN 11)"
+                        />
+                        <small className="form-text text-muted">
+                          This field controls all heading fields below. Enter
+                          the category information in the format:
+                          (category_name) / (sub_category_name)
+                          (child_category_name)
+                        </small>
+                      </div>
+                    </div>
+                    <div className="col-12">
+                      <div className="form-group">
+                        <label htmlFor="valueation_report_for_heading">
+                          Valuation Report For Heading
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="valueation_report_for_heading"
+                          name="valueation_report_for_heading"
+                          value={
+                            reportFormData.valueation_report_for_heading || ""
+                          }
+                          onChange={handleFormChange}
+                          placeholder="Auto-generated from Category Suffix"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-12">
+                      <div className="form-group">
+                        <div
+                          className="d-flex align-items-end gap-3 flex-wrap"
+                          style={{ gap: "10px" }}
+                        >
+                          <div
+                            className="flex-grow-1"
+                            style={{ minWidth: "200px" }}
+                          >
+                            <label htmlFor="general_details_heading">
+                              General Details Heading
+                            </label>
+                            <input
+                              type="text"
+                              className="form-field"
+                              id="general_details_heading"
+                              name="general_details_heading"
+                              value={
+                                reportFormData.general_details_heading || ""
+                              }
+                              readOnly
+                              placeholder="Auto-generated from Category Suffix"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="form-group ">
+                        <label>
+                          Ref NO. <span class="text-danger">*</span>
+                        </label>
+                        <div className="ref-no-input">
+                          <input
+                            type="text"
+                            className="form-field"
+                            name="ref_no_year"
+                            value={reportFormData.ref_no_year}
+                            onChange={handleFormChange}
+                          />
+                          <span className="ref-no-slash">/</span>
+                          <input
+                            type="text"
+                            className="form-field"
+                            name="ref_no_bank"
+                            value={order?.bank_initial || ""}
+                            onChange={handleFormChange}
+                            readOnly
+                          />
+                          <span className="ref-no-slash">/</span>
+                          <SingleSearchSelect
+                            options={[
+                              { value: "MUM", label: "MUM" },
+                              { value: "GUJ", label: "GUJ" },
+                            ]}
+                            value={reportFormData.state_name || "MUM"}
+                            onChange={(value) =>
+                              handleSelectChange("state_name", value)
+                            }
+                          />
+                          <span className="ref-no-slash">/</span>
+                          <input
+                            type="text"
+                            className="form-field"
+                            value={reportFormData.ref_no_code || ""}
+                            readOnly
+                            required
+                          />
+                          <span className="ref-no-slash">/</span>
+                          <input
+                            type="text"
+                            className="form-field"
+                            name="ref_no_month"
+                            value={reportFormData.ref_no_month || ""}
+                            onChange={handleFormChange}
+                            placeholder="Enter Month"
+                            required
+                          />
+                          <input
+                            type="text"
+                            className="form-field"
+                            {...(canEditRefNoId ? { name: "ref_no_id" } : {})}
+                            value={reportFormData.ref_no_id}
+                            onChange={
+                              canEditRefNoId ? handleFormChange : undefined
+                            }
+                            readOnly={!canEditRefNoId}
+                            placeholder="Enter ID"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-md-3">
+                      <div className="form-group">
+                        <label htmlFor="report_date">
+                          Report Date <span className="text-danger">*</span>
+                        </label>
+                        <div className="d-flex gap-2 align-items-center mb-2 drop-down-w-100">
+                          <div style={{ width: "80px", flexShrink: 0 }}>
+                            Heading:
+                          </div>
+                          <SingleSearchSelect
+                            options={[
+                              { value: "Report Date", label: "Report Date" },
+                              {
+                                value: "Rev-Report Date",
+                                label: "Rev-Report Date",
+                              },
+                            ]}
+                            value={
+                              reportFormData.report_date_heading ||
+                              "Report Date"
+                            }
+                            onChange={(value) =>
+                              handleSelectChange("report_date_heading", value)
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-md-3">
+                      <div className="form-group">
+                        <label htmlFor="report_date">&nbsp;</label>
+                        <div className="d-flex gap-2 align-items-center">
+                          <div style={{ width: "80px", flexShrink: 0 }}>
+                            Value:
+                          </div>
+                          <input
+                            type="text"
+                            className="form-field flex-grow-1"
+                            id="report_date"
+                            name="report_date"
+                            value={reportFormData.report_date}
+                            onChange={handleDateChange}
+                            placeholder="DD-MM-YYYY"
+                            maxLength="10"
+                            required
+                            style={{ marginBottom: 0, minWidth: 0 }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="valuer_name">
+                          Valuer Name <span class="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="valuer_name"
+                          name="valuer_name"
+                          value={reportFormData.valuer_name}
+                          readOnly
+                          placeholder="Set from order attributes"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="license_no">
+                          License No <span class="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="license_no"
+                          name="license_no"
+                          value={reportFormData.license_no}
+                          readOnly
+                          placeholder="Auto-populated based on valuer"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="valuer_contact">Valuer Contact</label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="valuer_contact"
+                          name="valuer_contact"
+                          value={reportFormData.valuer_contact}
+                          readOnly
+                          placeholder="Fixed contact number"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="col-md-3">
+                      <div className="form-group">
+                        <label htmlFor="valuation_purpose">
+                          Valuation Purpose <span class="text-danger">*</span>
+                        </label>
+                        <SingleSearchSelect
+                          options={[
+                            {
+                              value: "FINANCIAL USAGE",
+                              label: "FINANCIAL USAGE",
+                            },
+                            {
+                              value: "INUSRANCE USAGE",
+                              label: "INUSRANCE USAGE",
+                            },
+                            { value: "REPO PURPOSE", label: "REPO PURPOSE" },
+                          ]}
+                          value={reportFormData.valuation_purpose}
+                          onChange={(value) =>
+                            handleSelectChange("valuation_purpose", value)
+                          }
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-3">
+                      <div className="form-group">
+                        <label htmlFor="initiated_by">Initiated By</label>
+                        <WysiwygTextarea
+                          className="form-field"
+                          id="initiated_by"
+                          name="initiated_by"
+                          value={reportFormData.initiated_by || ""}
+                          onChange={handleFormChange}
+                          rows={2}
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-3">
+                      <div className="form-group">
+                        <label htmlFor="date_of_inspection">
+                          Date of Inspection
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="date_of_inspection"
+                          name="date_of_inspection"
+                          value={reportFormData.date_of_inspection}
+                          onChange={handleFormChange}
+                          placeholder="e.g. DD-MM-YYYY or text"
+                          maxLength="255"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-3">
+                      <div className="form-group">
+                        <label htmlFor="place_of_inspection">
+                          Place of Inspection <span class="text-danger">*</span>
+                        </label>
+                        <WysiwygTextarea
+                          className="form-field"
+                          id="place_of_inspection"
+                          name="place_of_inspection"
+                          value={reportFormData.place_of_inspection}
+                          onChange={handleFormChange}
+                          rows={2}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="row">
+                    <div className="col-md-3">
+                      <div className="form-group">
+                        <label htmlFor="registered_owner_name">
+                          Registered Owner Name{" "}
+                          <span class="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="registered_owner_name"
+                          name="registered_owner_name"
+                          value={reportFormData.registered_owner_name}
+                          onChange={handleFormChange}
+                          placeholder="ABC Company"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-3">
+                      <div className="form-group">
+                        <label htmlFor="registered_owner_address">
+                          Registered Owner Address{" "}
+                          <span class="text-danger">*</span>
+                        </label>
+                        <WysiwygTextarea
+                          className="form-field"
+                          id="registered_owner_address"
+                          name="registered_owner_address"
+                          value={reportFormData.registered_owner_address}
+                          onChange={handleFormChange}
+                          rows={2}
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-3">
+                      <div className="form-group">
+                        <label htmlFor="proposed_owner_name">
+                          Proposed Owner Name <span class="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="proposed_owner_name"
+                          name="proposed_owner_name"
+                          value={reportFormData.proposed_owner_name}
+                          onChange={handleFormChange}
+                          placeholder="XYZ Company"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-3">
+                      <div className="form-group">
+                        <label htmlFor="proposed_owner_address">
+                          Proposed Owner Address{" "}
+                          <span class="text-danger">*</span>
+                        </label>
+                        <WysiwygTextarea
+                          className="form-field"
+                          id="proposed_owner_address"
+                          name="proposed_owner_address"
+                          value={reportFormData.proposed_owner_address}
+                          onChange={handleFormChange}
+                          rows={2}
+                          placeholder="456 Corporate Avenue, Mumbai"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Inspected Equipment Details Section */}
+                  <div className="row">
+                    <div className="col-12">
+                      <h4>INSPECTED EQUIPMENT DETAILS</h4>
+                      <hr />
+                    </div>
+                    <div className="col-12">
+                      <div className="form-group">
+                        <label htmlFor="inspected_equipment_heading">
+                          Inspected Equipment Heading
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="inspected_equipment_heading"
+                          name="inspected_equipment_heading"
+                          value={
+                            reportFormData.inspected_equipment_heading || ""
+                          }
                           readOnly
                           placeholder="Auto-generated from Category Suffix"
                         />
                       </div>
                     </div>
-                  </div>
-                </div>
-                <div className="col-md-6">
-                  <div className="form-group ">
-                    <label>
-                      Ref NO. <span class="text-danger">*</span>
-                    </label>
-                    <div className="ref-no-input">
-                      <input
-                        type="text"
-                        className="form-field"
-                        name="ref_no_year"
-                        value={reportFormData.ref_no_year}
-                        onChange={handleFormChange}
-                      />
-                      <span className="ref-no-slash">/</span>
-                      <input
-                        type="text"
-                        className="form-field"
-                        name="ref_no_bank"
-                        value={order?.bank_initial || ""}
-                        onChange={handleFormChange}
-                        readOnly
-                      />
-                      <span className="ref-no-slash">/</span>
-                      <SingleSearchSelect
-                        options={[
-                          { value: "MUM", label: "MUM" },
-                          { value: "GUJ", label: "GUJ" },
-                        ]}
-                        value={reportFormData.state_name || "MUM"}
-                        onChange={(value) =>
-                          handleSelectChange("state_name", value)
-                        }
-                      />
-                      <span className="ref-no-slash">/</span>
-                      <input
-                        type="text"
-                        className="form-field"
-                        value={reportFormData.ref_no_code || ""}
-                        readOnly
-                        required
-                      />
-                      <span className="ref-no-slash">/</span>
-                      <input
-                        type="text"
-                        className="form-field"
-                        name="ref_no_month"
-                        value={reportFormData.ref_no_month || ""}
-                        onChange={handleFormChange}
-                        placeholder="Enter Month"
-                        required
-                      />
-                      <input
-                        type="text"
-                        className="form-field"
-                        {...(canEditRefNoId ? { name: "ref_no_id" } : {})}
-                        value={reportFormData.ref_no_id}
-                        onChange={canEditRefNoId ? handleFormChange : undefined}
-                        readOnly={!canEditRefNoId}
-                        placeholder="Enter ID"
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="report_date">
-                      Report Date <span className="text-danger">*</span>
-                    </label>
-                    <div className="d-flex gap-2 align-items-center mb-2 drop-down-w-100">
-                      <div style={{ width: "80px", flexShrink: 0 }}>
-                        Heading:
-                      </div>
-                      <SingleSearchSelect
-                        options={[
-                          { value: "Report Date", label: "Report Date" },
-                          {
-                            value: "Rev-Report Date",
-                            label: "Rev-Report Date",
-                          },
-                        ]}
-                        value={
-                          reportFormData.report_date_heading ||
-                          "Report Date"
-                        }
-                        onChange={(value) =>
-                          handleSelectChange("report_date_heading", value)
-                        }
-                      />
-                    </div>
-
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="report_date">
-                      &nbsp;
-                    </label>
-                    <div className="d-flex gap-2 align-items-center">
-                      <div style={{ width: "80px", flexShrink: 0 }}>
-                        Value:
-                      </div>
-                      <input
-                        type="text"
-                        className="form-field flex-grow-1"
-                        id="report_date"
-                        name="report_date"
-                        value={reportFormData.report_date}
-                        onChange={handleDateChange}
-                        placeholder="DD-MM-YYYY"
-                        maxLength="10"
-                        required
-                        style={{ marginBottom: 0, minWidth: 0 }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="row">
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="valuer_name">
-                      Valuer Name <span class="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="valuer_name"
-                      name="valuer_name"
-                      value={reportFormData.valuer_name}
-                      readOnly
-                      placeholder="Set from order attributes"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="license_no">
-                      License No <span class="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="license_no"
-                      name="license_no"
-                      value={reportFormData.license_no}
-                      readOnly
-                      placeholder="Auto-populated based on valuer"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="valuer_contact">Valuer Contact</label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="valuer_contact"
-                      name="valuer_contact"
-                      value={reportFormData.valuer_contact}
-                      readOnly
-                      placeholder="Fixed contact number"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="row">
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="valuation_purpose">
-                      Valuation Purpose <span class="text-danger">*</span>
-                    </label>
-                    <SingleSearchSelect
-                      options={[
-                        { value: "FINANCIAL USAGE", label: "FINANCIAL USAGE" },
-                        { value: "INUSRANCE USAGE", label: "INUSRANCE USAGE" },
-                        { value: "REPO PURPOSE", label: "REPO PURPOSE" },
-                      ]}
-                      value={reportFormData.valuation_purpose}
-                      onChange={(value) =>
-                        handleSelectChange("valuation_purpose", value)
-                      }
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="initiated_by">Initiated By</label>
-                    <WysiwygTextarea
-                      className="form-field"
-                      id="initiated_by"
-                      name="initiated_by"
-                      value={reportFormData.initiated_by || ""}
-                      onChange={handleFormChange}
-                      rows={2}
-                    />
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="date_of_inspection">
-                      Date of Inspection
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="date_of_inspection"
-                      name="date_of_inspection"
-                      value={reportFormData.date_of_inspection}
-                      onChange={handleFormChange}
-                      placeholder="e.g. DD-MM-YYYY or text"
-                      maxLength="255"
-                    />
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="place_of_inspection">
-                      Place of Inspection <span class="text-danger">*</span>
-                    </label>
-                    <WysiwygTextarea
-                      className="form-field"
-                      id="place_of_inspection"
-                      name="place_of_inspection"
-                      value={reportFormData.place_of_inspection}
-                      onChange={handleFormChange}
-                      rows={2}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="row">
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="registered_owner_name">
-                      Registered Owner Name <span class="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="registered_owner_name"
-                      name="registered_owner_name"
-                      value={reportFormData.registered_owner_name}
-                      onChange={handleFormChange}
-                      placeholder="ABC Company"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="registered_owner_address">
-                      Registered Owner Address{" "}
-                      <span class="text-danger">*</span>
-                    </label>
-                    <WysiwygTextarea
-                      className="form-field"
-                      id="registered_owner_address"
-                      name="registered_owner_address"
-                      value={reportFormData.registered_owner_address}
-                      onChange={handleFormChange}
-                      rows={2}
-                    />
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="proposed_owner_name">
-                      Proposed Owner Name <span class="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="proposed_owner_name"
-                      name="proposed_owner_name"
-                      value={reportFormData.proposed_owner_name}
-                      onChange={handleFormChange}
-                      placeholder="XYZ Company"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="proposed_owner_address">
-                      Proposed Owner Address <span class="text-danger">*</span>
-                    </label>
-                    <WysiwygTextarea
-                      className="form-field"
-                      id="proposed_owner_address"
-                      name="proposed_owner_address"
-                      value={reportFormData.proposed_owner_address}
-                      onChange={handleFormChange}
-                      rows={2}
-                      placeholder="456 Corporate Avenue, Mumbai"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Inspected Equipment Details Section */}
-              <div className="row">
-                <div className="col-12">
-                  <h4>INSPECTED EQUIPMENT DETAILS</h4>
-                  <hr />
-                </div>
-                <div className="col-12">
-                  <div className="form-group">
-                    <label htmlFor="inspected_equipment_heading">
-                      Inspected Equipment Heading
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="inspected_equipment_heading"
-                      name="inspected_equipment_heading"
-                      value={reportFormData.inspected_equipment_heading || ""}
-                      readOnly
-                      placeholder="Auto-generated from Category Suffix"
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="registration_no">Registration No</label>
-                    <div className="d-flex gap-2 align-items-center">
-                      <input
-                        type="text"
-                        className="form-field flex-grow-1"
-                        id="registration_no"
-                        name="registration_no"
-                        value={reportFormData.registration_no}
-                        onChange={handleFormChange}
-                        placeholder="MH01AB1234"
-                        style={{ marginBottom: 0 }}
-                      />
-                      <button
-                        type="button"
-                        className={`form-field registration-option-btn ${registrationNoOption === "NOT_AVAILABLE"
-                          ? "active"
-                          : ""
-                          }`}
-                        onClick={() =>
-                          handleRegistrationOption(
-                            "registration_no",
-                            "NOT_AVAILABLE"
-                          )
-                        }
-                        style={{
-                          padding: "8px 12px",
-                          whiteSpace: "nowrap",
-                          cursor: "pointer",
-                          marginBottom: 0,
-                        }}
-                      >
-                        Not Available
-                      </button>
-                      <button
-                        type="button"
-                        className={`form-field registration-option-btn ${registrationNoOption === "NOT_APPLICABLE"
-                          ? "active"
-                          : ""
-                          }`}
-                        onClick={() =>
-                          handleRegistrationOption(
-                            "registration_no",
-                            "NOT_APPLICABLE"
-                          )
-                        }
-                        style={{
-                          padding: "8px 12px",
-                          whiteSpace: "nowrap",
-                          cursor: "pointer",
-                          marginBottom: 0,
-                        }}
-                      >
-                        Not Applicable
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="registration_date">Registration Date</label>
-                    <div className="d-flex gap-2 align-items-center">
-                      <input
-                        type="text"
-                        className="form-field flex-grow-1"
-                        id="registration_date"
-                        name="registration_date"
-                        value={reportFormData.registration_date}
-                        onChange={handleDateChange}
-                        placeholder="DD-MM-YYYY"
-                        maxLength="10"
-                        style={{ marginBottom: 0 }}
-                      />
-                      <button
-                        type="button"
-                        className={`form-field registration-option-btn ${registrationDateOption === "NOT_AVAILABLE"
-                          ? "active"
-                          : ""
-                          }`}
-                        onClick={() =>
-                          handleRegistrationOption(
-                            "registration_date",
-                            "NOT_AVAILABLE"
-                          )
-                        }
-                        style={{
-                          padding: "8px 12px",
-                          whiteSpace: "nowrap",
-                          cursor: "pointer",
-                          marginBottom: 0,
-                        }}
-                      >
-                        Not Available
-                      </button>
-                      <button
-                        type="button"
-                        className={`form-field registration-option-btn ${registrationDateOption === "NOT_APPLICABLE"
-                          ? "active"
-                          : ""
-                          }`}
-                        onClick={() =>
-                          handleRegistrationOption(
-                            "registration_date",
-                            "NOT_APPLICABLE"
-                          )
-                        }
-                        style={{
-                          padding: "8px 12px",
-                          whiteSpace: "nowrap",
-                          cursor: "pointer",
-                          marginBottom: 0,
-                        }}
-                      >
-                        Not Applicable
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="location_of_machinery">
-                      Location Of Machinery <span class="text-danger">*</span>
-                    </label>
-                    <div className="d-flex gap-2 align-items-start">
-                      <WysiwygTextarea
-                        className="form-field flex-grow-1"
-                        id="location_of_machinery"
-                        name="location_of_machinery"
-                        value={reportFormData.location_of_machinery}
-                        onChange={handleFormChange}
-                        rows={2}
-                        style={{ marginBottom: 0 }}
-                      />
-                      <div className="d-flex flex-column gap-2">
-                        <button
-                          type="button"
-                          className={`form-field registration-option-btn ${locationOfMachineryOption === "NOT_AVAILABLE"
-                            ? "active"
-                            : ""
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="registration_no">Registration No</label>
+                        <div className="d-flex gap-2 align-items-center">
+                          <input
+                            type="text"
+                            className="form-field flex-grow-1"
+                            id="registration_no"
+                            name="registration_no"
+                            value={reportFormData.registration_no}
+                            onChange={handleFormChange}
+                            placeholder="MH01AB1234"
+                            style={{ marginBottom: 0 }}
+                          />
+                          <button
+                            type="button"
+                            className={`form-field registration-option-btn ${
+                              registrationNoOption === "NOT_AVAILABLE"
+                                ? "active"
+                                : ""
                             }`}
-                          onClick={() =>
-                            handleRegistrationOption(
-                              "location_of_machinery",
-                              "NOT_AVAILABLE"
-                            )
-                          }
-                          style={{
-                            padding: "8px 12px",
-                            whiteSpace: "nowrap",
-                            cursor: "pointer",
-                            marginBottom: 0,
-                          }}
-                        >
-                          Not Available
-                        </button>
-                        <button
-                          type="button"
-                          className={`form-field registration-option-btn ${locationOfMachineryOption === "NOT_APPLICABLE"
-                            ? "active"
-                            : ""
+                            onClick={() =>
+                              handleRegistrationOption(
+                                "registration_no",
+                                "NOT_AVAILABLE",
+                              )
+                            }
+                            style={{
+                              padding: "8px 12px",
+                              whiteSpace: "nowrap",
+                              cursor: "pointer",
+                              marginBottom: 0,
+                            }}
+                          >
+                            Not Available
+                          </button>
+                          <button
+                            type="button"
+                            className={`form-field registration-option-btn ${
+                              registrationNoOption === "NOT_APPLICABLE"
+                                ? "active"
+                                : ""
                             }`}
-                          onClick={() =>
-                            handleRegistrationOption(
-                              "location_of_machinery",
-                              "NOT_APPLICABLE"
-                            )
-                          }
-                          style={{
-                            padding: "8px 12px",
-                            whiteSpace: "nowrap",
-                            cursor: "pointer",
-                            marginBottom: 0,
-                          }}
-                        >
-                          Not Applicable
-                        </button>
+                            onClick={() =>
+                              handleRegistrationOption(
+                                "registration_no",
+                                "NOT_APPLICABLE",
+                              )
+                            }
+                            style={{
+                              padding: "8px 12px",
+                              whiteSpace: "nowrap",
+                              cursor: "pointer",
+                              marginBottom: 0,
+                            }}
+                          >
+                            Not Applicable
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="registration_date">
+                          Registration Date
+                        </label>
+                        <div className="d-flex gap-2 align-items-center">
+                          <input
+                            type="text"
+                            className="form-field flex-grow-1"
+                            id="registration_date"
+                            name="registration_date"
+                            value={reportFormData.registration_date}
+                            onChange={handleDateChange}
+                            placeholder="DD-MM-YYYY"
+                            maxLength="10"
+                            style={{ marginBottom: 0 }}
+                          />
+                          <button
+                            type="button"
+                            className={`form-field registration-option-btn ${
+                              registrationDateOption === "NOT_AVAILABLE"
+                                ? "active"
+                                : ""
+                            }`}
+                            onClick={() =>
+                              handleRegistrationOption(
+                                "registration_date",
+                                "NOT_AVAILABLE",
+                              )
+                            }
+                            style={{
+                              padding: "8px 12px",
+                              whiteSpace: "nowrap",
+                              cursor: "pointer",
+                              marginBottom: 0,
+                            }}
+                          >
+                            Not Available
+                          </button>
+                          <button
+                            type="button"
+                            className={`form-field registration-option-btn ${
+                              registrationDateOption === "NOT_APPLICABLE"
+                                ? "active"
+                                : ""
+                            }`}
+                            onClick={() =>
+                              handleRegistrationOption(
+                                "registration_date",
+                                "NOT_APPLICABLE",
+                              )
+                            }
+                            style={{
+                              padding: "8px 12px",
+                              whiteSpace: "nowrap",
+                              cursor: "pointer",
+                              marginBottom: 0,
+                            }}
+                          >
+                            Not Applicable
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="location_of_machinery">
+                          Location Of Machinery{" "}
+                          <span class="text-danger">*</span>
+                        </label>
+                        <div className="d-flex gap-2 align-items-start">
+                          <WysiwygTextarea
+                            className="form-field flex-grow-1"
+                            id="location_of_machinery"
+                            name="location_of_machinery"
+                            value={reportFormData.location_of_machinery}
+                            onChange={handleFormChange}
+                            rows={2}
+                            style={{ marginBottom: 0 }}
+                          />
+                          <div className="d-flex flex-column gap-2">
+                            <button
+                              type="button"
+                              className={`form-field registration-option-btn ${
+                                locationOfMachineryOption === "NOT_AVAILABLE"
+                                  ? "active"
+                                  : ""
+                              }`}
+                              onClick={() =>
+                                handleRegistrationOption(
+                                  "location_of_machinery",
+                                  "NOT_AVAILABLE",
+                                )
+                              }
+                              style={{
+                                padding: "8px 12px",
+                                whiteSpace: "nowrap",
+                                cursor: "pointer",
+                                marginBottom: 0,
+                              }}
+                            >
+                              Not Available
+                            </button>
+                            <button
+                              type="button"
+                              className={`form-field registration-option-btn ${
+                                locationOfMachineryOption === "NOT_APPLICABLE"
+                                  ? "active"
+                                  : ""
+                              }`}
+                              onClick={() =>
+                                handleRegistrationOption(
+                                  "location_of_machinery",
+                                  "NOT_APPLICABLE",
+                                )
+                              }
+                              style={{
+                                padding: "8px 12px",
+                                whiteSpace: "nowrap",
+                                cursor: "pointer",
+                                marginBottom: 0,
+                              }}
+                            >
+                              Not Applicable
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
-              <div className="row">
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="owner_serial_no">
-                      Owner Serial No
-                    </label>
-                    <SingleSearchSelect
-                      options={[
-                        { value: "1ST OWNER", label: "1ST OWNER" },
-                        { value: "2ND OWNER", label: "2ND OWNER" },
-                        { value: "3RD OWNER", label: "3RD OWNER" },
-                        { value: "4TH OWNER", label: "4TH OWNER" },
-                        { value: "5TH OWNER", label: "5TH OWNER" },
-                        { value: "6TH OWNER", label: "6TH OWNER" },
-                        { value: "7TH OWNER", label: "7TH OWNER" },
-                        { value: "8TH OWNER", label: "8TH OWNER" },
-                        { value: "9TH OWNER", label: "9TH OWNER" },
-                        { value: "10TH OWNER", label: "10TH OWNER" },
-                        { value: "AS PER ANIXTURE", label: "AS PER ANIXTURE" },
-                      ]}
-                      value={reportFormData.owner_serial_no}
-                      onChange={(value) =>
-                        handleSelectChange("owner_serial_no", value)
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="manufacture_year">
-                      Manufacture Year <span class="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="manufacture_year"
-                      name="manufacture_year"
-                      value={reportFormData.manufacture_year}
-                      onChange={handleFormChange}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="supplier_names">
-                      Supplier Name
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="supplier_names"
-                      name="supplier_names"
-                      value={reportFormData.supplier_names}
-                      onChange={handleFormChange}
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="asset_make">
-                      Asset Make & Supplier <span class="text-danger">*</span>
-                    </label>
-                    <div>
-                      <SingleSearchSelect
-                        options={[
-                          ...assetMakes.map((make) => ({
-                            value: make.id,
-                            label: make.name,
-                          })),
-                          { value: "OTHERS", label: "OTHERS" },
-                        ]}
-                        value={parseInt(reportFormData.asset_make)}
-                        onChange={(value) => {
-                          handleSelectChange("asset_make", value);
-                          setShowOtherAssetMake(value === "OTHERS");
-                          if (value !== "OTHERS") {
-                            setOtherAssetMake("");
+                  <div className="row">
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="owner_serial_no">Owner Serial No</label>
+                        <SingleSearchSelect
+                          options={[
+                            { value: "1ST OWNER", label: "1ST OWNER" },
+                            { value: "2ND OWNER", label: "2ND OWNER" },
+                            { value: "3RD OWNER", label: "3RD OWNER" },
+                            { value: "4TH OWNER", label: "4TH OWNER" },
+                            { value: "5TH OWNER", label: "5TH OWNER" },
+                            { value: "6TH OWNER", label: "6TH OWNER" },
+                            { value: "7TH OWNER", label: "7TH OWNER" },
+                            { value: "8TH OWNER", label: "8TH OWNER" },
+                            { value: "9TH OWNER", label: "9TH OWNER" },
+                            { value: "10TH OWNER", label: "10TH OWNER" },
+                            {
+                              value: "AS PER ANIXTURE",
+                              label: "AS PER ANIXTURE",
+                            },
+                          ]}
+                          value={reportFormData.owner_serial_no}
+                          onChange={(value) =>
+                            handleSelectChange("owner_serial_no", value)
                           }
-                        }}
-                        isLoading={assetMakesLoading}
-                      />
-                      {showOtherAssetMake && (
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="manufacture_year">
+                          Manufacture Year <span class="text-danger">*</span>
+                        </label>
                         <input
                           type="text"
-                          className="form-field mt-2"
-                          name="new_asset_make"
-                          placeholder="Enter Asset Make"
-                          value={otherAssetMake}
-                          onChange={(e) => {
-                            const value = e.target.value.toUpperCase();
-                            setOtherAssetMake(value);
-                            handleSelectChange(
-                              "new_asset_make",
-                              value || "OTHERS"
-                            );
-                          }}
+                          className="form-field"
+                          id="manufacture_year"
+                          name="manufacture_year"
+                          value={reportFormData.manufacture_year}
+                          onChange={handleFormChange}
                           required
                         />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="supplier_names">Supplier Name</label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="supplier_names"
+                          name="supplier_names"
+                          value={reportFormData.supplier_names}
+                          onChange={handleFormChange}
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="asset_make">
+                          Asset Make & Supplier{" "}
+                          <span class="text-danger">*</span>
+                        </label>
+                        <div>
+                          <SingleSearchSelect
+                            options={[
+                              ...assetMakes.map((make) => ({
+                                value: make.id,
+                                label: make.name,
+                              })),
+                              { value: "OTHERS", label: "OTHERS" },
+                            ]}
+                            value={parseInt(reportFormData.asset_make)}
+                            onChange={(value) => {
+                              handleSelectChange("asset_make", value);
+                              setShowOtherAssetMake(value === "OTHERS");
+                              if (value !== "OTHERS") {
+                                setOtherAssetMake("");
+                              }
+                            }}
+                            isLoading={assetMakesLoading}
+                          />
+                          {showOtherAssetMake && (
+                            <input
+                              type="text"
+                              className="form-field mt-2"
+                              name="new_asset_make"
+                              placeholder="Enter Asset Make"
+                              value={otherAssetMake}
+                              onChange={(e) => {
+                                const value = e.target.value.toUpperCase();
+                                setOtherAssetMake(value);
+                                handleSelectChange(
+                                  "new_asset_make",
+                                  value || "OTHERS",
+                                );
+                              }}
+                              required
+                            />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="model">
+                          Model <span class="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="model"
+                          name="model"
+                          value={reportFormData.model || ""}
+                          onChange={handleFormChange}
+                          placeholder="Enter Model"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="control_system">
+                          Control System <span class="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="control_system"
+                          name="control_system"
+                          value={reportFormData.control_system}
+                          onChange={handleFormChange}
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="machine_serial_no">
+                          Machine Serial No <span class="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="machine_serial_no"
+                          name="machine_serial_no"
+                          value={reportFormData.machine_serial_no}
+                          onChange={handleFormChange}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="laf_id">
+                          LAF Id <span class="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="laf_id"
+                          name="laf_id"
+                          value={reportFormData.laf_id}
+                          onChange={handleFormChange}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="application_usage">
+                          Application / Usage <span class="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="application_usage"
+                          name="application_usage"
+                          value={reportFormData.application_usage}
+                          onChange={handleFormChange}
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="row">
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="invoice_no">Invoice No. & Date</label>
+                        <div className="d-flex gap-2 align-items-center mb-2 drop-down-w-100">
+                          <div style={{ width: "100px", flexShrink: 0 }}>
+                            Heading:
+                          </div>
+                          <SingleSearchSelect
+                            options={[
+                              {
+                                value: "Invoice No. & Date",
+                                label: "Invoice No. & Date",
+                              },
+                              {
+                                value: "Proforma Invoice no. and date",
+                                label: "Proforma Invoice no. and date",
+                              },
+                              {
+                                value: "Quotation no. and date",
+                                label: "Quotation no. and date",
+                              },
+                            ]}
+                            value={
+                              reportFormData.invoice_no_heading ||
+                              "Invoice No. & Date"
+                            }
+                            onChange={(value) =>
+                              handleSelectChange("invoice_no_heading", value)
+                            }
+                          />
+                        </div>
+                        <div className="d-flex gap-2 align-items-center">
+                          <div style={{ width: "100px", flexShrink: 0 }}>
+                            Invoice No.:
+                          </div>
+                          <input
+                            type="text"
+                            className="form-field mb-2"
+                            id="invoice_no"
+                            name="invoice_no"
+                            value={reportFormData.invoice_no}
+                            onChange={handleFormChange}
+                            placeholder="Invoice No."
+                          />
+                        </div>
+                        <div className="d-flex gap-2 align-items-center">
+                          <div style={{ width: "100px", flexShrink: 0 }}>
+                            Invoice Date:
+                          </div>
+                          <input
+                            type="text"
+                            className="form-field"
+                            id="invoice_date"
+                            name="invoice_date"
+                            value={reportFormData.invoice_date}
+                            placeholder="DD-MM-YYYY"
+                            maxLength="10"
+                            onChange={handleDateChange}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="hyp_with">
+                          Hyp With <span class="text-danger">*</span>
+                        </label>
+                        <WysiwygTextarea
+                          className="form-field"
+                          id="hyp_with"
+                          name="hyp_with"
+                          value={reportFormData.hyp_with}
+                          onChange={handleFormChange}
+                          rows={2}
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="machine_type">Machine Type</label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="machine_type"
+                          name="machine_type"
+                          value={reportFormData.machine_type}
+                          onChange={handleFormChange}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Flexible Fields for INSPECTED EQUIPMENT DETAILS */}
+                  <div className="row mt-3">
+                    <div className="col-12">
+                      <div className="flexible-buttons-container">
+                        <button
+                          type="button"
+                          className="btn btn-outline-primary btn-sm"
+                          onClick={() =>
+                            addFlexibleFields("INSPECTED_EQUIPMENT_DETAILS", 2)
+                          }
+                        >
+                          Add One Set
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline-secondary btn-sm"
+                          onClick={() =>
+                            addFlexibleFields("INSPECTED_EQUIPMENT_DETAILS", 4)
+                          }
+                        >
+                          Add Two Set
+                        </button>
+                      </div>
+                      {renderFlexibleFields("INSPECTED_EQUIPMENT_DETAILS")}
+                    </div>
+                  </div>
+
+                  {/* Comments on Equipment at the Time of Inspection Section */}
+                  <div className="row">
+                    <div className="col-12">
+                      <h4>COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION</h4>
+                      <hr />
+                    </div>
+                    <div className="col-12">
+                      <div className="form-group">
+                        <label htmlFor="comments_on_equipment_heading">
+                          Comments on Equipment Heading
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="comments_on_equipment_heading"
+                          name="comments_on_equipment_heading"
+                          value={
+                            reportFormData.comments_on_equipment_heading || ""
+                          }
+                          readOnly
+                          placeholder="Auto-generated from Category Suffix"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <label htmlFor="asset_classification">
+                          Asset Classification{" "}
+                          <span class="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="asset_classification"
+                          name="asset_classification"
+                          value={reportFormData.asset_classification || ""}
+                          onChange={handleFormChange}
+                          placeholder="Enter Asset Classification"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="form-group">
+                        <label htmlFor="machine_technology">
+                          Machine Technology <span class="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="machine_technology"
+                          name="machine_technology"
+                          value={reportFormData.machine_technology}
+                          onChange={handleFormChange}
+                          placeholder="Enter Machine Technology"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="row">
+                    <div className="col-md-3">
+                      <div className="form-group">
+                        <label htmlFor="control_panel_unit">
+                          Control Panel Unit <span class="text-danger">*</span>
+                        </label>
+                        <SingleSearchSelect
+                          options={MACHINERY_CONDITION_OPTIONS}
+                          value={reportFormData.control_panel_unit}
+                          onChange={(value) =>
+                            handleSelectChange("control_panel_unit", value)
+                          }
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-3">
+                      <div className="form-group">
+                        <label htmlFor="machine_condition">
+                          Machine Condition <span class="text-danger">*</span>
+                        </label>
+                        <SingleSearchSelect
+                          options={MACHINERY_CONDITION_OPTIONS}
+                          value={reportFormData.machine_condition}
+                          onChange={(value) =>
+                            handleSelectChange("machine_condition", value)
+                          }
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-3">
+                      <div className="form-group">
+                        <label htmlFor="electrical_condition">
+                          Electrical Condition{" "}
+                          <span class="text-danger">*</span>
+                        </label>
+                        <SingleSearchSelect
+                          options={MACHINERY_CONDITION_OPTIONS}
+                          value={reportFormData.electrical_condition}
+                          onChange={(value) =>
+                            handleSelectChange("electrical_condition", value)
+                          }
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-3">
+                      <div className="form-group">
+                        <label htmlFor="mechanical_condition">
+                          Mechanical Condition{" "}
+                          <span class="text-danger">*</span>
+                        </label>
+                        <SingleSearchSelect
+                          options={MACHINERY_CONDITION_OPTIONS}
+                          value={reportFormData.mechanical_condition}
+                          onChange={(value) =>
+                            handleSelectChange("mechanical_condition", value)
+                          }
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Fix But Flex */}
+                  <div className="row">
+                    <div className="col-12">
+                      <div className="form-group mb-0">
+                        <label>Fix But Flex</label>
+                      </div>
+                    </div>
+                    <div className="col-md-2">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_heading_1"
+                          name="fix_but_flex_heading_1"
+                          value={reportFormData.fix_but_flex_heading_1}
+                          onChange={handleFormChange}
+                          placeholder="Title..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_value_1"
+                          name="fix_but_flex_value_1"
+                          value={reportFormData.fix_but_flex_value_1}
+                          onChange={handleFormChange}
+                          placeholder="Value..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-2">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_heading_2"
+                          name="fix_but_flex_heading_2"
+                          value={reportFormData.fix_but_flex_heading_2}
+                          onChange={handleFormChange}
+                          placeholder="Title..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_value_2"
+                          name="fix_but_flex_value_2"
+                          value={reportFormData.fix_but_flex_value_2}
+                          onChange={handleFormChange}
+                          placeholder="Value..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="col-md-2">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_heading_3"
+                          name="fix_but_flex_heading_3"
+                          value={reportFormData.fix_but_flex_heading_3}
+                          onChange={handleFormChange}
+                          placeholder="Title..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_value_3"
+                          name="fix_but_flex_value_3"
+                          value={reportFormData.fix_but_flex_value_3}
+                          onChange={handleFormChange}
+                          placeholder="Value..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-2">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_heading_4"
+                          name="fix_but_flex_heading_4"
+                          value={reportFormData.fix_but_flex_heading_4}
+                          onChange={handleFormChange}
+                          placeholder="Title..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_value_4"
+                          name="fix_but_flex_value_4"
+                          value={reportFormData.fix_but_flex_value_4}
+                          onChange={handleFormChange}
+                          placeholder="Value..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="col-md-2">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_heading_5"
+                          name="fix_but_flex_heading_5"
+                          value={reportFormData.fix_but_flex_heading_5}
+                          onChange={handleFormChange}
+                          placeholder="Title..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-2">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_value_5"
+                          name="fix_but_flex_value_5"
+                          value={reportFormData.fix_but_flex_value_5}
+                          onChange={handleFormChange}
+                          placeholder="Value..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-1">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_heading_6"
+                          name="fix_but_flex_heading_6"
+                          value={reportFormData.fix_but_flex_heading_6}
+                          onChange={handleFormChange}
+                          placeholder="Title..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-1">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_value_6"
+                          name="fix_but_flex_value_6"
+                          value={reportFormData.fix_but_flex_value_6}
+                          onChange={handleFormChange}
+                          placeholder="Value..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-2">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_heading_7"
+                          name="fix_but_flex_heading_7"
+                          value={reportFormData.fix_but_flex_heading_7}
+                          onChange={handleFormChange}
+                          placeholder="Title..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_value_7"
+                          name="fix_but_flex_value_7"
+                          value={reportFormData.fix_but_flex_value_7}
+                          onChange={handleFormChange}
+                          placeholder="Value..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="col-md-2">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_heading_8"
+                          name="fix_but_flex_heading_8"
+                          value={reportFormData.fix_but_flex_heading_8}
+                          onChange={handleFormChange}
+                          placeholder="Title..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-2">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_value_8"
+                          name="fix_but_flex_value_8"
+                          value={reportFormData.fix_but_flex_value_8}
+                          onChange={handleFormChange}
+                          placeholder="Value..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-2">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_heading_9"
+                          name="fix_but_flex_heading_9"
+                          value={reportFormData.fix_but_flex_heading_9}
+                          onChange={handleFormChange}
+                          placeholder="Title..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-1">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_value_9"
+                          name="fix_but_flex_value_9"
+                          value={reportFormData.fix_but_flex_value_9}
+                          onChange={handleFormChange}
+                          placeholder="Value..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-1">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_heading_10"
+                          name="fix_but_flex_heading_10"
+                          value={reportFormData.fix_but_flex_heading_10}
+                          onChange={handleFormChange}
+                          placeholder="Title..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_value_10"
+                          name="fix_but_flex_value_10"
+                          value={reportFormData.fix_but_flex_value_10}
+                          onChange={handleFormChange}
+                          placeholder="Value..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="col-md-2">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_heading_11"
+                          name="fix_but_flex_heading_11"
+                          value={reportFormData.fix_but_flex_heading_11}
+                          onChange={handleFormChange}
+                          placeholder="Title..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <WysiwygTextarea
+                          className="form-field"
+                          id="fix_but_flex_value_11"
+                          name="fix_but_flex_value_11"
+                          value={reportFormData.fix_but_flex_value_11}
+                          onChange={handleFormChange}
+                          placeholder="Value..."
+                          rows={2}
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-2">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_heading_12"
+                          name="fix_but_flex_heading_12"
+                          value={reportFormData.fix_but_flex_heading_12}
+                          onChange={handleFormChange}
+                          placeholder="Title..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fix_but_flex_value_12"
+                          name="fix_but_flex_value_12"
+                          value={reportFormData.fix_but_flex_value_12}
+                          onChange={handleFormChange}
+                          placeholder="Value..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="row">
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="machine_colour">
+                          Machine Colour <span class="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="machine_colour"
+                          name="machine_colour"
+                          value={reportFormData.machine_colour}
+                          onChange={handleFormChange}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="color_condition">
+                          Color Condition <span class="text-danger">*</span>
+                        </label>
+                        <SingleSearchSelect
+                          options={MACHINERY_CONDITION_OPTIONS}
+                          value={reportFormData.color_condition}
+                          onChange={(value) =>
+                            handleSelectChange("color_condition", value)
+                          }
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="damages_if_any">Damages If Any</label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="damages_if_any"
+                          name="damages_if_any"
+                          value={reportFormData.damages_if_any}
+                          onChange={handleFormChange}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Flexible Fields for COMMENTS ON EQUIPMENT */}
+                  <div className="row mt-3">
+                    <div className="col-12">
+                      <div className="flexible-buttons-container">
+                        <button
+                          type="button"
+                          className="btn btn-outline-primary btn-sm"
+                          onClick={() =>
+                            addFlexibleFields(
+                              "COMMENTS_ON_EQUIPMENT_AT_THE_TIME_OF_INSPECTION",
+                              2,
+                            )
+                          }
+                        >
+                          Add One Set
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline-secondary btn-sm"
+                          onClick={() =>
+                            addFlexibleFields(
+                              "COMMENTS_ON_EQUIPMENT_AT_THE_TIME_OF_INSPECTION",
+                              4,
+                            )
+                          }
+                        >
+                          Add Two Set
+                        </button>
+                      </div>
+                      {renderFlexibleFields(
+                        "COMMENTS_ON_EQUIPMENT_AT_THE_TIME_OF_INSPECTION",
                       )}
                     </div>
                   </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="model">
-                      Model <span class="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="model"
-                      name="model"
-                      value={reportFormData.model || ""}
-                      onChange={handleFormChange}
-                      placeholder="Enter Model"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="control_system">
-                      Control System <span class="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="control_system"
-                      name="control_system"
-                      value={reportFormData.control_system}
-                      onChange={handleFormChange}
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="row">
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="machine_serial_no">
-                      Machine Serial No <span class="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="machine_serial_no"
-                      name="machine_serial_no"
-                      value={reportFormData.machine_serial_no}
-                      onChange={handleFormChange}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="laf_id">
-                      LAF Id <span class="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="laf_id"
-                      name="laf_id"
-                      value={reportFormData.laf_id}
-                      onChange={handleFormChange}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="application_usage">
-                      Application / Usage <span class="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="application_usage"
-                      name="application_usage"
-                      value={reportFormData.application_usage}
-                      onChange={handleFormChange}
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
 
-              <div className="row">
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="invoice_no">Invoice No. & Date</label>
-                    <div className="d-flex gap-2 align-items-center mb-2 drop-down-w-100">
-                      <div style={{ width: "100px", flexShrink: 0 }}>
-                        Heading:
-                      </div>
-                      <SingleSearchSelect
-                        options={[
-                          {
-                            value: "Invoice No. & Date",
-                            label: "Invoice No. & Date",
-                          },
-                          {
-                            value: "Proforma Invoice no. and date",
-                            label: "Proforma Invoice no. and date",
-                          },
-                          {
-                            value: "Quotation no. and date",
-                            label: "Quotation no. and date",
-                          },
-                        ]}
-                        value={
-                          reportFormData.invoice_no_heading ||
-                          "Invoice No. & Date"
-                        }
-                        onChange={(value) =>
-                          handleSelectChange("invoice_no_heading", value)
-                        }
-                      />
+                  {/* RC, PERMIT, TAX, FITNESS & INSURANCE Section */}
+                  <div className="row">
+                    <div className="col-12">
+                      <h4>INSURANCE DETAILS OF THE</h4>
+                      <hr />
                     </div>
-                    <div className="d-flex gap-2 align-items-center">
-                      <div style={{ width: "100px", flexShrink: 0 }}>
-                        Invoice No.:
-                      </div>
-                      <input
-                        type="text"
-                        className="form-field mb-2"
-                        id="invoice_no"
-                        name="invoice_no"
-                        value={reportFormData.invoice_no}
-                        onChange={handleFormChange}
-                        placeholder="Invoice No."
-                      />
-                    </div>
-                    <div className="d-flex gap-2 align-items-center">
-                      <div style={{ width: "100px", flexShrink: 0 }}>
-                        Invoice Date:
-                      </div>
-                      <input
-                        type="text"
-                        className="form-field"
-                        id="invoice_date"
-                        name="invoice_date"
-                        value={reportFormData.invoice_date}
-                        placeholder="DD-MM-YYYY"
-                        maxLength="10"
-                        onChange={handleDateChange}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="hyp_with">
-                      Hyp With <span class="text-danger">*</span>
-                    </label>
-                    <WysiwygTextarea
-                      className="form-field"
-                      id="hyp_with"
-                      name="hyp_with"
-                      value={reportFormData.hyp_with}
-                      onChange={handleFormChange}
-                      rows={2}
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="machine_type">Machine Type</label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="machine_type"
-                      name="machine_type"
-                      value={reportFormData.machine_type}
-                      onChange={handleFormChange}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Flexible Fields for INSPECTED EQUIPMENT DETAILS */}
-              <div className="row mt-3">
-                <div className="col-12">
-                  <div className="flexible-buttons-container">
-                    <button
-                      type="button"
-                      className="btn btn-outline-primary btn-sm"
-                      onClick={() =>
-                        addFlexibleFields("INSPECTED_EQUIPMENT_DETAILS", 2)
-                      }
-                    >
-                      Add One Set
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary btn-sm"
-                      onClick={() =>
-                        addFlexibleFields("INSPECTED_EQUIPMENT_DETAILS", 4)
-                      }
-                    >
-                      Add Two Set
-                    </button>
-                  </div>
-                  {renderFlexibleFields("INSPECTED_EQUIPMENT_DETAILS")}
-                </div>
-              </div>
-
-              {/* Comments on Equipment at the Time of Inspection Section */}
-              <div className="row">
-                <div className="col-12">
-                  <h4>COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION</h4>
-                  <hr />
-                </div>
-                <div className="col-12">
-                  <div className="form-group">
-                    <label htmlFor="comments_on_equipment_heading">
-                      Comments on Equipment Heading
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="comments_on_equipment_heading"
-                      name="comments_on_equipment_heading"
-                      value={reportFormData.comments_on_equipment_heading || ""}
-                      readOnly
-                      placeholder="Auto-generated from Category Suffix"
-                    />
-                  </div>
-                </div>
-                <div className="col-md-6">
-                  <div className="form-group">
-                    <label htmlFor="asset_classification">
-                      Asset Classification <span class="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="asset_classification"
-                      name="asset_classification"
-                      value={reportFormData.asset_classification || ""}
-                      onChange={handleFormChange}
-                      placeholder="Enter Asset Classification"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="col-md-6">
-                  <div className="form-group">
-                    <label htmlFor="machine_technology">
-                      Machine Technology <span class="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="machine_technology"
-                      name="machine_technology"
-                      value={reportFormData.machine_technology}
-                      onChange={handleFormChange}
-                      placeholder="Enter Machine Technology"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="row">
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="control_panel_unit">
-                      Control Panel Unit <span class="text-danger">*</span>
-                    </label>
-                    <SingleSearchSelect
-                      options={MACHINERY_CONDITION_OPTIONS}
-                      value={reportFormData.control_panel_unit}
-                      onChange={(value) =>
-                        handleSelectChange("control_panel_unit", value)
-                      }
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="machine_condition">
-                      Machine Condition <span class="text-danger">*</span>
-                    </label>
-                    <SingleSearchSelect
-                      options={MACHINERY_CONDITION_OPTIONS}
-                      value={reportFormData.machine_condition}
-                      onChange={(value) =>
-                        handleSelectChange("machine_condition", value)
-                      }
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="electrical_condition">
-                      Electrical Condition <span class="text-danger">*</span>
-                    </label>
-                    <SingleSearchSelect
-                      options={MACHINERY_CONDITION_OPTIONS}
-                      value={reportFormData.electrical_condition}
-                      onChange={(value) =>
-                        handleSelectChange("electrical_condition", value)
-                      }
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="mechanical_condition">
-                      Mechanical Condition <span class="text-danger">*</span>
-                    </label>
-                    <SingleSearchSelect
-                      options={MACHINERY_CONDITION_OPTIONS}
-                      value={reportFormData.mechanical_condition}
-                      onChange={(value) =>
-                        handleSelectChange("mechanical_condition", value)
-                      }
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Fix But Flex */}
-              <div className="row">
-                <div className="col-12">
-                  <div className="form-group mb-0">
-                    <label>Fix But Flex</label>
-                  </div>
-                </div>
-                <div className="col-md-2">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_heading_1"
-                      name="fix_but_flex_heading_1"
-                      value={reportFormData.fix_but_flex_heading_1}
-                      onChange={handleFormChange}
-                      placeholder="Title..."
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_value_1"
-                      name="fix_but_flex_value_1"
-                      value={reportFormData.fix_but_flex_value_1}
-                      onChange={handleFormChange}
-                      placeholder="Value..."
-                    />
-                  </div>
-                </div>
-                <div className="col-md-2">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_heading_2"
-                      name="fix_but_flex_heading_2"
-                      value={reportFormData.fix_but_flex_heading_2}
-                      onChange={handleFormChange}
-                      placeholder="Title..."
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_value_2"
-                      name="fix_but_flex_value_2"
-                      value={reportFormData.fix_but_flex_value_2}
-                      onChange={handleFormChange}
-                      placeholder="Value..."
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="row">
-                <div className="col-md-2">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_heading_3"
-                      name="fix_but_flex_heading_3"
-                      value={reportFormData.fix_but_flex_heading_3}
-                      onChange={handleFormChange}
-                      placeholder="Title..."
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_value_3"
-                      name="fix_but_flex_value_3"
-                      value={reportFormData.fix_but_flex_value_3}
-                      onChange={handleFormChange}
-                      placeholder="Value..."
-                    />
-                  </div>
-                </div>
-                <div className="col-md-2">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_heading_4"
-                      name="fix_but_flex_heading_4"
-                      value={reportFormData.fix_but_flex_heading_4}
-                      onChange={handleFormChange}
-                      placeholder="Title..."
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_value_4"
-                      name="fix_but_flex_value_4"
-                      value={reportFormData.fix_but_flex_value_4}
-                      onChange={handleFormChange}
-                      placeholder="Value..."
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="row">
-                <div className="col-md-2">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_heading_5"
-                      name="fix_but_flex_heading_5"
-                      value={reportFormData.fix_but_flex_heading_5}
-                      onChange={handleFormChange}
-                      placeholder="Title..."
-                    />
-                  </div>
-                </div>
-                <div className="col-md-2">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_value_5"
-                      name="fix_but_flex_value_5"
-                      value={reportFormData.fix_but_flex_value_5}
-                      onChange={handleFormChange}
-                      placeholder="Value..."
-                    />
-                  </div>
-                </div>
-                <div className="col-md-1">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_heading_6"
-                      name="fix_but_flex_heading_6"
-                      value={reportFormData.fix_but_flex_heading_6}
-                      onChange={handleFormChange}
-                      placeholder="Title..."
-                    />
-                  </div>
-                </div>
-                <div className="col-md-1">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_value_6"
-                      name="fix_but_flex_value_6"
-                      value={reportFormData.fix_but_flex_value_6}
-                      onChange={handleFormChange}
-                      placeholder="Value..."
-                    />
-                  </div>
-                </div>
-                <div className="col-md-2">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_heading_7"
-                      name="fix_but_flex_heading_7"
-                      value={reportFormData.fix_but_flex_heading_7}
-                      onChange={handleFormChange}
-                      placeholder="Title..."
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_value_7"
-                      name="fix_but_flex_value_7"
-                      value={reportFormData.fix_but_flex_value_7}
-                      onChange={handleFormChange}
-                      placeholder="Value..."
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="row">
-                <div className="col-md-2">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_heading_8"
-                      name="fix_but_flex_heading_8"
-                      value={reportFormData.fix_but_flex_heading_8}
-                      onChange={handleFormChange}
-                      placeholder="Title..."
-                    />
-                  </div>
-                </div>
-                <div className="col-md-2">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_value_8"
-                      name="fix_but_flex_value_8"
-                      value={reportFormData.fix_but_flex_value_8}
-                      onChange={handleFormChange}
-                      placeholder="Value..."
-                    />
-                  </div>
-                </div>
-                <div className="col-md-2">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_heading_9"
-                      name="fix_but_flex_heading_9"
-                      value={reportFormData.fix_but_flex_heading_9}
-                      onChange={handleFormChange}
-                      placeholder="Title..."
-                    />
-                  </div>
-                </div>
-                <div className="col-md-1">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_value_9"
-                      name="fix_but_flex_value_9"
-                      value={reportFormData.fix_but_flex_value_9}
-                      onChange={handleFormChange}
-                      placeholder="Value..."
-                    />
-                  </div>
-                </div>
-                <div className="col-md-1">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_heading_10"
-                      name="fix_but_flex_heading_10"
-                      value={reportFormData.fix_but_flex_heading_10}
-                      onChange={handleFormChange}
-                      placeholder="Title..."
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_value_10"
-                      name="fix_but_flex_value_10"
-                      value={reportFormData.fix_but_flex_value_10}
-                      onChange={handleFormChange}
-                      placeholder="Value..."
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="row">
-                <div className="col-md-2">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_heading_11"
-                      name="fix_but_flex_heading_11"
-                      value={reportFormData.fix_but_flex_heading_11}
-                      onChange={handleFormChange}
-                      placeholder="Title..."
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <WysiwygTextarea
-                      className="form-field"
-                      id="fix_but_flex_value_11"
-                      name="fix_but_flex_value_11"
-                      value={reportFormData.fix_but_flex_value_11}
-                      onChange={handleFormChange}
-                      placeholder="Value..."
-                      rows={2}
-                    />
-                  </div>
-                </div>
-                <div className="col-md-2">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_heading_12"
-                      name="fix_but_flex_heading_12"
-                      value={reportFormData.fix_but_flex_heading_12}
-                      onChange={handleFormChange}
-                      placeholder="Title..."
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fix_but_flex_value_12"
-                      name="fix_but_flex_value_12"
-                      value={reportFormData.fix_but_flex_value_12}
-                      onChange={handleFormChange}
-                      placeholder="Value..."
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="row">
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="machine_colour">
-                      Machine Colour <span class="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="machine_colour"
-                      name="machine_colour"
-                      value={reportFormData.machine_colour}
-                      onChange={handleFormChange}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="color_condition">
-                      Color Condition <span class="text-danger">*</span>
-                    </label>
-                    <SingleSearchSelect
-                      options={MACHINERY_CONDITION_OPTIONS}
-                      value={reportFormData.color_condition}
-                      onChange={(value) =>
-                        handleSelectChange("color_condition", value)
-                      }
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="damages_if_any">Damages If Any</label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="damages_if_any"
-                      name="damages_if_any"
-                      value={reportFormData.damages_if_any}
-                      onChange={handleFormChange}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Flexible Fields for COMMENTS ON EQUIPMENT */}
-              <div className="row mt-3">
-                <div className="col-12">
-                  <div className="flexible-buttons-container">
-                    <button
-                      type="button"
-                      className="btn btn-outline-primary btn-sm"
-                      onClick={() =>
-                        addFlexibleFields(
-                          "COMMENTS_ON_EQUIPMENT_AT_THE_TIME_OF_INSPECTION",
-                          2
-                        )
-                      }
-                    >
-                      Add One Set
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary btn-sm"
-                      onClick={() =>
-                        addFlexibleFields(
-                          "COMMENTS_ON_EQUIPMENT_AT_THE_TIME_OF_INSPECTION",
-                          4
-                        )
-                      }
-                    >
-                      Add Two Set
-                    </button>
-                  </div>
-                  {renderFlexibleFields(
-                    "COMMENTS_ON_EQUIPMENT_AT_THE_TIME_OF_INSPECTION"
-                  )}
-                </div>
-              </div>
-
-              {/* RC, PERMIT, TAX, FITNESS & INSURANCE Section */}
-              <div className="row">
-                <div className="col-12">
-                  <h4>INSURANCE DETAILS OF THE</h4>
-                  <hr />
-                </div>
-                <div className="col-12">
-                  <div className="form-group">
-                    <label htmlFor="insurance_details_heading">
-                      Insurance Details Heading
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="insurance_details_heading"
-                      name="insurance_details_heading"
-                      value={reportFormData.insurance_details_heading || ""}
-                      readOnly
-                      placeholder="Auto-generated from Category Suffix"
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="tax_invoice_copy">
-                      Tax Invoice Copy
-                    </label>
-                    <div className="d-flex gap-2 align-items-center mb-2 drop-down-w-100">
-                      <div style={{ width: "100px", flexShrink: 0 }}>
-                        Heading:
-                      </div>
-                      <div className="flex-grow-1" style={{ minWidth: 0 }}>
-                        <SingleSearchSelect
-                          options={[
-                            {
-                              value: "Proforma Invoice",
-                              label: "Proforma Invoice",
-                            },
-                            {
-                              value: "Tax Invoice",
-                              label: "Tax Invoice",
-                            },
-                          ]}
-                          value={
-                            reportFormData.tax_invoice_copy_heading ||
-                            "Proforma Invoice Verified"
-                          }
-                          onChange={(value) =>
-                            handleSelectChange("tax_invoice_copy_heading", value)
-                          }
+                    <div className="col-12">
+                      <div className="form-group">
+                        <label htmlFor="insurance_details_heading">
+                          Insurance Details Heading
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="insurance_details_heading"
+                          name="insurance_details_heading"
+                          value={reportFormData.insurance_details_heading || ""}
+                          readOnly
+                          placeholder="Auto-generated from Category Suffix"
                         />
                       </div>
                     </div>
-                    <div className="d-flex gap-2 align-items-center">
-                      <div style={{ width: "100px", flexShrink: 0 }}>
-                        Value:
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="tax_invoice_copy">
+                          Tax Invoice Copy
+                        </label>
+                        <div className="d-flex gap-2 align-items-center mb-2 drop-down-w-100">
+                          <div style={{ width: "100px", flexShrink: 0 }}>
+                            Heading:
+                          </div>
+                          <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                            <SingleSearchSelect
+                              options={[
+                                {
+                                  value: "Proforma Invoice",
+                                  label: "Proforma Invoice",
+                                },
+                                {
+                                  value: "Tax Invoice",
+                                  label: "Tax Invoice",
+                                },
+                              ]}
+                              value={
+                                reportFormData.tax_invoice_copy_heading ||
+                                "Proforma Invoice Verified"
+                              }
+                              onChange={(value) =>
+                                handleSelectChange(
+                                  "tax_invoice_copy_heading",
+                                  value,
+                                )
+                              }
+                            />
+                          </div>
+                        </div>
+                        <div className="d-flex gap-2 align-items-center">
+                          <div style={{ width: "100px", flexShrink: 0 }}>
+                            Value:
+                          </div>
+                          <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                            <SingleSearchSelect
+                              options={[
+                                {
+                                  value: "COPY VERIFIED",
+                                  label: "COPY VERIFIED",
+                                },
+                                {
+                                  value: "COPY NOT AVAILABLE",
+                                  label: "COPY NOT AVAILABLE",
+                                },
+                                {
+                                  value: "AS PER ANIXTURE",
+                                  label: "AS PER ANIXTURE",
+                                },
+                              ]}
+                              value={reportFormData.tax_invoice_copy}
+                              onChange={(value) =>
+                                handleSelectChange("tax_invoice_copy", value)
+                              }
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="rc_book_verified">Quotation Copy</label>
                         <SingleSearchSelect
                           options={[
                             { value: "COPY VERIFIED", label: "COPY VERIFIED" },
@@ -6221,99 +6573,70 @@ function SummarizedReport() {
                               value: "COPY NOT AVAILABLE",
                               label: "COPY NOT AVAILABLE",
                             },
-                            { value: "AS PER ANIXTURE", label: "AS PER ANIXTURE" },
                           ]}
-                          value={reportFormData.tax_invoice_copy}
+                          value={reportFormData.quotation_copy}
                           onChange={(value) =>
-                            handleSelectChange("tax_invoice_copy", value)
+                            handleSelectChange("quotation_copy", value)
                           }
                         />
                       </div>
                     </div>
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="rc_book_verified">
-                      Quotation Copy
-                    </label>
-                    <SingleSearchSelect
-                      options={[
-                        { value: "COPY VERIFIED", label: "COPY VERIFIED" },
-                        {
-                          value: "COPY NOT AVAILABLE",
-                          label: "COPY NOT AVAILABLE",
-                        },
-                      ]}
-                      value={reportFormData.quotation_copy}
-                      onChange={(value) =>
-                        handleSelectChange("quotation_copy", value)
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="rc_book_verified">
-                      Insurance Copy
-                    </label>
-                    <SingleSearchSelect
-                      options={[
-                        { value: "COPY VERIFIED", label: "COPY VERIFIED" },
-                        {
-                          value: "COPY NOT AVAILABLE",
-                          label: "COPY NOT AVAILABLE",
-                        },
-                      ]}
-                      value={reportFormData.rc_book_verified}
-                      onChange={(value) =>
-                        handleSelectChange("rc_book_verified", value)
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="bill_of_entry">
-                      Bill of Entry
-                    </label>
-                    <SingleSearchSelect
-                      options={[
-                        { value: "COPY VERIFIED", label: "COPY VERIFIED" },
-                        {
-                          value: "COPY NOT AVAILABLE",
-                          label: "COPY NOT AVAILABLE",
-                        },
-                      ]}
-                      value={reportFormData.bill_of_entry}
-                      onChange={(value) =>
-                        handleSelectChange("bill_of_entry", value)
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="bill_of_entry">
-                    Bill of Landing
-                    </label>
-                    <SingleSearchSelect
-                      options={[
-                        { value: "COPY VERIFIED", label: "COPY VERIFIED" },
-                        {
-                          value: "COPY NOT AVAILABLE",
-                          label: "COPY NOT AVAILABLE",
-                        },
-                      ]}
-                      value={reportFormData.bill_of_landing}
-                      onChange={(value) =>
-                        handleSelectChange("bill_of_landing", value)
-                      }
-                    />
-                  </div>
-                </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="rc_book_verified">Insurance Copy</label>
+                        <SingleSearchSelect
+                          options={[
+                            { value: "COPY VERIFIED", label: "COPY VERIFIED" },
+                            {
+                              value: "COPY NOT AVAILABLE",
+                              label: "COPY NOT AVAILABLE",
+                            },
+                          ]}
+                          value={reportFormData.rc_book_verified}
+                          onChange={(value) =>
+                            handleSelectChange("rc_book_verified", value)
+                          }
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="bill_of_entry">Bill of Entry</label>
+                        <SingleSearchSelect
+                          options={[
+                            { value: "COPY VERIFIED", label: "COPY VERIFIED" },
+                            {
+                              value: "COPY NOT AVAILABLE",
+                              label: "COPY NOT AVAILABLE",
+                            },
+                          ]}
+                          value={reportFormData.bill_of_entry}
+                          onChange={(value) =>
+                            handleSelectChange("bill_of_entry", value)
+                          }
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="bill_of_entry">Bill of Landing</label>
+                        <SingleSearchSelect
+                          options={[
+                            { value: "COPY VERIFIED", label: "COPY VERIFIED" },
+                            {
+                              value: "COPY NOT AVAILABLE",
+                              label: "COPY NOT AVAILABLE",
+                            },
+                          ]}
+                          value={reportFormData.bill_of_landing}
+                          onChange={(value) =>
+                            handleSelectChange("bill_of_landing", value)
+                          }
+                        />
+                      </div>
+                    </div>
 
-                {/* <div className="col-md-3">
+                    {/* <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="tax_upto_title">Title</label>
                     <input
@@ -6343,7 +6666,7 @@ function SummarizedReport() {
                   </div>
                 </div> */}
 
-              {/* <div className="row">
+                    {/* <div className="row">
                  <div className="col-md-3">
                   <div className="form-group">
                     <label htmlFor="permit_upto">Permit Upto</label>
@@ -6418,444 +6741,444 @@ function SummarizedReport() {
                 </div> 
               </div>*/}
 
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="policy_no">Policy No</label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="policy_no"
-                      name="policy_no"
-                      value={reportFormData.policy_no}
-                      onChange={handleFormChange}
-                      placeholder="POL123456789"
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="insurance_valid_date">
-                      Insurance Val. Date
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="insurance_valid_date"
-                      name="insurance_valid_date"
-                      value={reportFormData.insurance_valid_date}
-                      onChange={handleDateChange}
-                      placeholder="DD-MM-YYYY"
-                      maxLength="10"
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="insured_value">Insured Value</label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="insured_value"
-                      name="insured_value"
-                      value={reportFormData.insured_value}
-                      onChange={handleCurrencyChange}
-                      placeholder="₹ 0.00"
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group">
-                    <label htmlFor="insurance_verified">
-                      Insurance Verified
-                    </label>
-                    <SingleSearchSelect
-                      options={[
-                        { value: "COPY VERIFIED", label: "COPY VERIFIED" },
-                        {
-                          value: "COPY NOT AVAILABLE",
-                          label: "COPY NOT AVAILABLE",
-                        },
-                      ]}
-                      value={reportFormData.insurance_verified}
-                      onChange={(value) =>
-                        handleSelectChange("insurance_verified", value)
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {canViewSubCategoryOrders && (
-                <div className="row">
-                  <div className="col-12 mb-3">
-                    <h4>Sub Category Orders</h4>
-                    <hr />
-                    <div className="show-x-entries mb-2">
-                      Show &nbsp;
-                      <select
-                        value={entriesToShow}
-                        onChange={(e) => setEntriesToShow(Number(e.target.value))}
-                        className="count-of-page-selector"
-                      >
-                        {[5, 10, 25, 50, 100].map((size) => (
-                          <option key={size} value={size}>
-                            {size}
-                          </option>
-                        ))}
-                      </select>{" "}
-                      &nbsp; Entries of {finalizedReportRows.length} entries
-                    </div>
-                    <div className="finalized-reports-table-scroll">
-                      <table className="table table-bordered table-striped">
-                        <thead>
-                          <tr>
-                            <th>Order Number</th>
-                            <th>Asset Make</th>
-                            <th>Manufacture Year</th>
-                            <th>Current Invoice Cost</th>
-                            <th>Depreciation</th>
-                            <th>Depreciation Value</th>
-                            <th>Appraiser Value</th>
-                            <th>Fair Market Value</th>
-                            <th>View</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {finalizedReportsLoading ? (
-                            <tr>
-                              <td colSpan={9} className="text-center">  
-                                Loading finalized reports...
-                              </td>
-                            </tr>
-                          ) : finalizedReportRows.length === 0 ? (
-                            <tr>
-                              <td colSpan={9} className="text-center">
-                                No finalized reports found
-                              </td>
-                            </tr>
-                          ) : (
-                            visibleFinalizedRows.map((row) => (
-                              <tr key={row.id}>
-                                <td>{row.order_number}</td>
-                                <td>{row.asset_make}</td>
-                                <td>{row.manufacture_year}</td>
-                                <td>{row.current_invoice_cost}</td>
-                                <td>{row.depreciation}%</td>
-                                <td>{row.depreciation_value}</td>
-                                <td>{row.appraiser_value}</td>
-                                <td>{row.fair_market_value}</td>
-                                <td>
-                                  <Link
-                                    to={`/orders/${row.id}/details`}
-                                    className=""
-                                    title="View"
-                                  >
-                                    <ViewIcon size={16} color="#fff" />
-                                  </Link>
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="row">
-                <div className="col-12">
-                  <h4>OVER ALL FEED BACK OF THE INSPECTED</h4>
-                  <hr />
-                </div>
-
-              <div className="col-12">
-                  <div className="form-group">
-                    <label htmlFor="overall_feedback_heading">
-                      Overall Feedback Heading
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="overall_feedback_heading"
-                      name="overall_feedback_heading"
-                      value={reportFormData.overall_feedback_heading || ""}
-                      readOnly
-                      placeholder="Auto-generated from Category Suffix"
-                    />
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="tax_invoice_cost">
-                      Tax Invoice Cost <span class="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="tax_invoice_cost"
-                      name="tax_invoice_cost"
-                      value={reportFormData.tax_invoice_cost}
-                      onChange={handleCurrencyChange}
-                      placeholder="₹ 0.00"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="depreciation">
-                      Depreciation <span class="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="depreciation"
-                      name="depreciation"
-                      value={reportFormData.depreciation}
-                      onChange={handleFormChange}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="depreciation_value">
-                      Depreciation Value <span class="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="depreciation_value"
-                      name="depreciation_value"
-                      value={reportFormData.depreciation_value}
-                      onChange={handleCurrencyChange}
-                      placeholder="₹ 0.00"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="appraiser_value">
-                      Appraiser Value <span class="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="appraiser_value"
-                      name="appraiser_value"
-                      value={reportFormData.appraiser_value}
-                      onChange={handleCurrencyChange}
-                      placeholder="₹ 0.00"
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="row">
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="fair_market_value">
-                      Fair Market Value <span class="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="fair_market_value"
-                      name="fair_market_value"
-                      value={reportFormData.fair_market_value}
-                      onChange={handleFormChange}
-                      placeholder="₹ 0.00"
-                      required
-                    />
-                  </div>
-                </div>
-                <FairMarketValueAmountInWordsField
-                  value={reportFormData.amount_in_words}
-                  onChange={handleFormChange}
-                />
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="no_of_photograph">
-                      No of Photographs
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="no_of_photograph"
-                      name="no_of_photograph"
-                      value={reportFormData.no_of_photograph}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Only allow numbers, + and -
-                        const sanitized = value.replace(/[^0-9+\-]/g, "");
-                        e.target.value = sanitized;
-                        handleFormChange(e);
-                      }}
-                      placeholder="e.g., 10 or 1+3+6 or 5-2"
-                    />
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="form-group">
-                    <label htmlFor="no_of_collage">
-                      No of Collages
-                    </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="no_of_collage"
-                      name="no_of_collage"
-                      value={reportFormData.no_of_collage}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Only allow numbers, + and -
-                        const sanitized = value.replace(/[^0-9+\-]/g, "");
-                        e.target.value = sanitized;
-                        handleFormChange(e);
-                      }}
-                      placeholder="e.g., 2 or 1+1"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="row">
-                <div className="col-md-12">
-                  <div className="form-group">
-                    <label htmlFor="valuer_comments_remarks">
-                      Valuer Comments/remarks <span class="text-danger">*</span>
-                    </label>
-                    <WysiwygTextarea
-                      className="form-field"
-                      id="valuer_comments_remarks"
-                      name="valuer_comments_remarks"
-                      value={reportFormData.valuer_comments_remarks}
-                      onChange={handleFormChange}
-                      rows={2}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="row">
-                <div className="col-md-12">
-                  <div className="form-group">
-                    <label htmlFor="valuer_special_remarks">
-                      Valuer Special Remarks
-                    </label>
-                    <WysiwygTextarea
-                      className="form-field"
-                      id="valuer_special_remarks"
-                      name="valuer_special_remarks"
-                      value={reportFormData.valuer_special_remarks}
-                      onChange={handleFormChange}
-                      rows={2}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Flexible Fields for Additional Fields */}
-              <div className="row mt-3">
-                <div className="col-12">
-                  <div className="flexible-buttons-container">
-                    <button
-                      type="button"
-                      className="btn btn-outline-primary btn-sm"
-                      onClick={() =>
-                        addFlexibleFields(
-                          "OVER_ALL_FEED_BACK_OF_THE_INSPECTED",
-                          2
-                        )
-                      }
-                    >
-                      Add New Set
-                    </button>
-                  </div>
-                  {renderFlexibleFieldsWithTextarea(
-                    "OVER_ALL_FEED_BACK_OF_THE_INSPECTED"
-                  )}
-                </div>
-              </div>
-
-              <div className="row">
-                <div className="col-md-12">
-                  <div className="form-group">
-                    <label htmlFor="declaration">
-                      Declaration <span className="text-danger">*</span>
-                    </label>
-                    <WysiwygTextarea
-                      className="form-field"
-                      id="declaration"
-                      name="declaration"
-                      value={reportFormData.declaration}
-                      onChange={handleFormChange}
-                      rows={6}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="col-md-12">
-                  <div className="form-group">
-                    <label htmlFor="disclaimer">
-                      Disclaimer <span className="text-danger">*</span>
-                    </label>
-                    <WysiwygTextarea
-                      className="form-field"
-                      id="disclaimer"
-                      name="disclaimer"
-                      value={reportFormData.disclaimer}
-                      onChange={handleFormChange}
-                      rows={8}
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Generate Report Buttons - Rough and Production */}
-              <div className="row">
-                <div className="col-md-12">
-                  <div className="form-group">
-                    <label htmlFor="chassis_no_pencil_impression">
-                      Chassis No Pencil Impression (Image)
-                    </label>
-                    <input
-                      type="file"
-                      className="form-field"
-                      id="chassis_no_pencil_impression"
-                      name="chassis_no_pencil_impression"
-                      onChange={handleFileChange}
-                      accept="image/*"
-                    />
-                    {chassisPreviewUrl && (
-                      <div
-                        style={{
-                          marginTop: "12px",
-                          maxWidth: "320px",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "6px",
-                          padding: "8px",
-                          backgroundColor: "#f9fafb",
-                        }}
-                      >
-                        <img
-                          src={chassisPreviewUrl}
-                          alt="Chassis impression preview"
-                          style={{
-                            width: "100%",
-                            height: "auto",
-                            display: "block",
-                          }}
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="policy_no">Policy No</label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="policy_no"
+                          name="policy_no"
+                          value={reportFormData.policy_no}
+                          onChange={handleFormChange}
+                          placeholder="POL123456789"
                         />
                       </div>
-                    )}
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="insurance_valid_date">
+                          Insurance Val. Date
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="insurance_valid_date"
+                          name="insurance_valid_date"
+                          value={reportFormData.insurance_valid_date}
+                          onChange={handleDateChange}
+                          placeholder="DD-MM-YYYY"
+                          maxLength="10"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="insured_value">Insured Value</label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="insured_value"
+                          name="insured_value"
+                          value={reportFormData.insured_value}
+                          onChange={handleCurrencyChange}
+                          placeholder="₹ 0.00"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="form-group">
+                        <label htmlFor="insurance_verified">
+                          Insurance Verified
+                        </label>
+                        <SingleSearchSelect
+                          options={[
+                            { value: "COPY VERIFIED", label: "COPY VERIFIED" },
+                            {
+                              value: "COPY NOT AVAILABLE",
+                              label: "COPY NOT AVAILABLE",
+                            },
+                          ]}
+                          value={reportFormData.insurance_verified}
+                          onChange={(value) =>
+                            handleSelectChange("insurance_verified", value)
+                          }
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
 
+                  {canViewSubCategoryOrders && (
+                    <div className="row">
+                      <div className="col-12 mb-3">
+                        <h4>Sub Category Orders</h4>
+                        <hr />
+                        <div className="show-x-entries mb-2">
+                          Show &nbsp;
+                          <select
+                            value={entriesToShow}
+                            onChange={(e) =>
+                              setEntriesToShow(Number(e.target.value))
+                            }
+                            className="count-of-page-selector"
+                          >
+                            {[5, 10, 25, 50, 100].map((size) => (
+                              <option key={size} value={size}>
+                                {size}
+                              </option>
+                            ))}
+                          </select>{" "}
+                          &nbsp; Entries of {finalizedReportRows.length} entries
+                        </div>
+                        <div className="finalized-reports-table-scroll">
+                          <table className="table table-bordered table-striped">
+                            <thead>
+                              <tr>
+                                <th>Order Number</th>
+                                <th>Asset Make</th>
+                                <th>Manufacture Year</th>
+                                <th>Current Invoice Cost</th>
+                                <th>Depreciation</th>
+                                <th>Depreciation Value</th>
+                                <th>Appraiser Value</th>
+                                <th>Fair Market Value</th>
+                                <th>View</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {finalizedReportsLoading ? (
+                                <tr>
+                                  <td colSpan={9} className="text-center">
+                                    Loading finalized reports...
+                                  </td>
+                                </tr>
+                              ) : finalizedReportRows.length === 0 ? (
+                                <tr>
+                                  <td colSpan={9} className="text-center">
+                                    No finalized reports found
+                                  </td>
+                                </tr>
+                              ) : (
+                                visibleFinalizedRows.map((row) => (
+                                  <tr key={row.id}>
+                                    <td>{row.order_number}</td>
+                                    <td>{row.asset_make}</td>
+                                    <td>{row.manufacture_year}</td>
+                                    <td>{row.current_invoice_cost}</td>
+                                    <td>{row.depreciation}%</td>
+                                    <td>{row.depreciation_value}</td>
+                                    <td>{row.appraiser_value}</td>
+                                    <td>{row.fair_market_value}</td>
+                                    <td>
+                                      <Link
+                                        to={`/orders/${row.id}/details`}
+                                        className=""
+                                        title="View"
+                                      >
+                                        <ViewIcon size={16} color="#fff" />
+                                      </Link>
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="row">
+                    <div className="col-12">
+                      <h4>OVER ALL FEED BACK OF THE INSPECTED</h4>
+                      <hr />
+                    </div>
+
+                    <div className="col-12">
+                      <div className="form-group">
+                        <label htmlFor="overall_feedback_heading">
+                          Overall Feedback Heading
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="overall_feedback_heading"
+                          name="overall_feedback_heading"
+                          value={reportFormData.overall_feedback_heading || ""}
+                          readOnly
+                          placeholder="Auto-generated from Category Suffix"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-3">
+                      <div className="form-group">
+                        <label htmlFor="tax_invoice_cost">
+                          Tax Invoice Cost <span class="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="tax_invoice_cost"
+                          name="tax_invoice_cost"
+                          value={reportFormData.tax_invoice_cost}
+                          onChange={handleCurrencyChange}
+                          placeholder="₹ 0.00"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-3">
+                      <div className="form-group">
+                        <label htmlFor="depreciation">
+                          Depreciation <span class="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="depreciation"
+                          name="depreciation"
+                          value={reportFormData.depreciation}
+                          onChange={handleFormChange}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-3">
+                      <div className="form-group">
+                        <label htmlFor="depreciation_value">
+                          Depreciation Value <span class="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="depreciation_value"
+                          name="depreciation_value"
+                          value={reportFormData.depreciation_value}
+                          onChange={handleCurrencyChange}
+                          placeholder="₹ 0.00"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-3">
+                      <div className="form-group">
+                        <label htmlFor="appraiser_value">
+                          Appraiser Value <span class="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="appraiser_value"
+                          name="appraiser_value"
+                          value={reportFormData.appraiser_value}
+                          onChange={handleCurrencyChange}
+                          placeholder="₹ 0.00"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="col-md-3">
+                      <div className="form-group">
+                        <label htmlFor="fair_market_value">
+                          Fair Market Value <span class="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="fair_market_value"
+                          name="fair_market_value"
+                          value={reportFormData.fair_market_value}
+                          onChange={handleFormChange}
+                          placeholder="₹ 0.00"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <FairMarketValueAmountInWordsField
+                      value={reportFormData.amount_in_words}
+                      onChange={handleFormChange}
+                    />
+                    <div className="col-md-3">
+                      <div className="form-group">
+                        <label htmlFor="no_of_photograph">
+                          No of Photographs
+                        </label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="no_of_photograph"
+                          name="no_of_photograph"
+                          value={reportFormData.no_of_photograph}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Only allow numbers, + and -
+                            const sanitized = value.replace(/[^0-9+\-]/g, "");
+                            e.target.value = sanitized;
+                            handleFormChange(e);
+                          }}
+                          placeholder="e.g., 10 or 1+3+6 or 5-2"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-3">
+                      <div className="form-group">
+                        <label htmlFor="no_of_collage">No of Collages</label>
+                        <input
+                          type="text"
+                          className="form-field"
+                          id="no_of_collage"
+                          name="no_of_collage"
+                          value={reportFormData.no_of_collage}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Only allow numbers, + and -
+                            const sanitized = value.replace(/[^0-9+\-]/g, "");
+                            e.target.value = sanitized;
+                            handleFormChange(e);
+                          }}
+                          placeholder="e.g., 2 or 1+1"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="row">
+                    <div className="col-md-12">
+                      <div className="form-group">
+                        <label htmlFor="valuer_comments_remarks">
+                          Valuer Comments/remarks{" "}
+                          <span class="text-danger">*</span>
+                        </label>
+                        <WysiwygTextarea
+                          className="form-field"
+                          id="valuer_comments_remarks"
+                          name="valuer_comments_remarks"
+                          value={reportFormData.valuer_comments_remarks}
+                          onChange={handleFormChange}
+                          rows={2}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="row">
+                    <div className="col-md-12">
+                      <div className="form-group">
+                        <label htmlFor="valuer_special_remarks">
+                          Valuer Special Remarks
+                        </label>
+                        <WysiwygTextarea
+                          className="form-field"
+                          id="valuer_special_remarks"
+                          name="valuer_special_remarks"
+                          value={reportFormData.valuer_special_remarks}
+                          onChange={handleFormChange}
+                          rows={2}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Flexible Fields for Additional Fields */}
+                  <div className="row mt-3">
+                    <div className="col-12">
+                      <div className="flexible-buttons-container">
+                        <button
+                          type="button"
+                          className="btn btn-outline-primary btn-sm"
+                          onClick={() =>
+                            addFlexibleFields(
+                              "OVER_ALL_FEED_BACK_OF_THE_INSPECTED",
+                              2,
+                            )
+                          }
+                        >
+                          Add New Set
+                        </button>
+                      </div>
+                      {renderFlexibleFieldsWithTextarea(
+                        "OVER_ALL_FEED_BACK_OF_THE_INSPECTED",
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="row">
+                    <div className="col-md-12">
+                      <div className="form-group">
+                        <label htmlFor="declaration">
+                          Declaration <span className="text-danger">*</span>
+                        </label>
+                        <WysiwygTextarea
+                          className="form-field"
+                          id="declaration"
+                          name="declaration"
+                          value={reportFormData.declaration}
+                          onChange={handleFormChange}
+                          rows={6}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-12">
+                      <div className="form-group">
+                        <label htmlFor="disclaimer">
+                          Disclaimer <span className="text-danger">*</span>
+                        </label>
+                        <WysiwygTextarea
+                          className="form-field"
+                          id="disclaimer"
+                          name="disclaimer"
+                          value={reportFormData.disclaimer}
+                          onChange={handleFormChange}
+                          rows={8}
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Generate Report Buttons - Rough and Production */}
+                  <div className="row">
+                    <div className="col-md-12">
+                      <div className="form-group">
+                        <label htmlFor="chassis_no_pencil_impression">
+                          Chassis No Pencil Impression (Image)
+                        </label>
+                        <input
+                          type="file"
+                          className="form-field"
+                          id="chassis_no_pencil_impression"
+                          name="chassis_no_pencil_impression"
+                          onChange={handleFileChange}
+                          accept="image/*"
+                        />
+                        {chassisPreviewUrl && (
+                          <div
+                            style={{
+                              marginTop: "12px",
+                              maxWidth: "320px",
+                              border: "1px solid #e5e7eb",
+                              borderRadius: "6px",
+                              padding: "8px",
+                              backgroundColor: "#f9fafb",
+                            }}
+                          >
+                            <img
+                              src={chassisPreviewUrl}
+                              alt="Chassis impression preview"
+                              style={{
+                                width: "100%",
+                                height: "auto",
+                                display: "block",
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </>
               ) : (
                 <div className="row">
@@ -6882,13 +7205,21 @@ function SummarizedReport() {
                         <SummarizedFixedColumnVisibilityDropdown
                           columns={SUMMARIZED_COLUMNS_FOR_VISIBILITY_UI}
                           visibleIds={summarizedVisibleFixedColumnIds}
-                          onVisibleIdsChange={handleSummarizedVisibleColumnIdsChange}
+                          onVisibleIdsChange={
+                            handleSummarizedVisibleColumnIdsChange
+                          }
                         />
                         <SummarizedVerticalColumnMergeDropdown
                           columns={summarizedVerticalMergeEligibleColumns}
-                          dynamicColumns={summarizedTableData.dynamicColumns || []}
-                          fixedColumnHeaders={summarizedTableData.fixedColumnHeaders || {}}
-                          verticalMergedColumnIds={summarizedVerticalMergedColumnIds}
+                          dynamicColumns={
+                            summarizedTableData.dynamicColumns || []
+                          }
+                          fixedColumnHeaders={
+                            summarizedTableData.fixedColumnHeaders || {}
+                          }
+                          verticalMergedColumnIds={
+                            summarizedVerticalMergedColumnIds
+                          }
                           onToggleColumnMerge={handleToggleVerticalColumnMerge}
                         />
                         <label
@@ -6949,18 +7280,22 @@ function SummarizedReport() {
                       >
                         <thead>
                           <tr>
-                            {isSummarizedFixedColumnVisible(SUMMARIZED_SR_NO_COLUMN.id) && (
+                            {isSummarizedFixedColumnVisible(
+                              SUMMARIZED_SR_NO_COLUMN.id,
+                            ) && (
                               <th
                                 style={{
                                   minWidth: `${getSummarizedColumnWidth(SUMMARIZED_SR_NO_COLUMN.id)}px`,
                                   width: `${getSummarizedColumnWidth(SUMMARIZED_SR_NO_COLUMN.id)}px`,
                                 }}
                               >
-                                {renderSummarizedFixedHeaderContent(SUMMARIZED_SR_NO_COLUMN)}
+                                {renderSummarizedFixedHeaderContent(
+                                  SUMMARIZED_SR_NO_COLUMN,
+                                )}
                               </th>
                             )}
                             {SUMMARIZED_TRAILING_COLUMNS.filter((col) =>
-                              isSummarizedFixedColumnVisible(col.id)
+                              isSummarizedFixedColumnVisible(col.id),
                             ).map((col) => (
                               <th
                                 key={col.id}
@@ -6973,7 +7308,7 @@ function SummarizedReport() {
                               </th>
                             ))}
                             {SUMMARIZED_FIXED_START_COLUMNS.filter((col) =>
-                              isSummarizedFixedColumnVisible(col.id)
+                              isSummarizedFixedColumnVisible(col.id),
                             ).map((col) => (
                               <th
                                 key={col.id}
@@ -6985,53 +7320,70 @@ function SummarizedReport() {
                                 {renderSummarizedFixedHeaderContent(col)}
                               </th>
                             ))}
-                            {(summarizedTableData.dynamicColumns || []).map((col) => (
-                              <th
-                                key={col.id}
-                                style={{
-                                  minWidth: `${getSummarizedColumnWidth(col.id)}px`,
-                                  width: `${getSummarizedColumnWidth(col.id)}px`,
-                                }}
-                              >
-                                <div className="d-flex flex-column gap-1" style={{ position: "relative" }}>
-                                  <div className="d-flex align-items-start gap-1">
-                                    <AutoGrowTextarea
-                                      className="form-field mb-0"
-                                      style={summarizedInputStyle}
-                                      value={col.header || ""}
-                                      onChange={(e) =>
-                                        handleSummarizedDynamicHeaderChange(col.id, e.target.value)
-                                      }
-                                      placeholder="Enter column heading"
-                                    />
-                                    <button
-                                      type="button"
-                                      className="flexible-field-remove-button"
-                                      onClick={() => handleRemoveSummarizedColumn(col.id)}
-                                      style={{ top: "-8px", right: "-8px" }}
-                                      title="Remove this column"
-                                    >
-                                      <DeleteIcon />
-                                    </button>
-                                  </div>
-                                  <label
-                                    className="d-flex align-items-center gap-2 mb-0"
-                                    style={{ fontSize: "12px", fontWeight: 500, cursor: "pointer" }}
+                            {(summarizedTableData.dynamicColumns || []).map(
+                              (col) => (
+                                <th
+                                  key={col.id}
+                                  style={{
+                                    minWidth: `${getSummarizedColumnWidth(col.id)}px`,
+                                    width: `${getSummarizedColumnWidth(col.id)}px`,
+                                  }}
+                                >
+                                  <div
+                                    className="d-flex flex-column gap-1"
+                                    style={{ position: "relative" }}
                                   >
-                                    <input
-                                      type="checkbox"
-                                      checked={Boolean(col.allowSum)}
-                                      onChange={(e) =>
-                                        handleSummarizedDynamicAllowSumChange(col.id, e.target.checked)
-                                      }
-                                    />
-                                    Allow sum
-                                  </label>
-                                </div>
-                              </th>
-                            ))}
+                                    <div className="d-flex align-items-start gap-1">
+                                      <AutoGrowTextarea
+                                        className="form-field mb-0"
+                                        style={summarizedInputStyle}
+                                        value={col.header || ""}
+                                        onChange={(e) =>
+                                          handleSummarizedDynamicHeaderChange(
+                                            col.id,
+                                            e.target.value,
+                                          )
+                                        }
+                                        placeholder="Enter column heading"
+                                      />
+                                      <button
+                                        type="button"
+                                        className="flexible-field-remove-button"
+                                        onClick={() =>
+                                          handleRemoveSummarizedColumn(col.id)
+                                        }
+                                        style={{ top: "-8px", right: "-8px" }}
+                                        title="Remove this column"
+                                      >
+                                        <DeleteIcon />
+                                      </button>
+                                    </div>
+                                    <label
+                                      className="d-flex align-items-center gap-2 mb-0"
+                                      style={{
+                                        fontSize: "12px",
+                                        fontWeight: 500,
+                                        cursor: "pointer",
+                                      }}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={Boolean(col.allowSum)}
+                                        onChange={(e) =>
+                                          handleSummarizedDynamicAllowSumChange(
+                                            col.id,
+                                            e.target.checked,
+                                          )
+                                        }
+                                      />
+                                      Allow sum
+                                    </label>
+                                  </div>
+                                </th>
+                              ),
+                            )}
                             {SUMMARIZED_FIXED_END_COLUMNS.filter((col) =>
-                              isSummarizedFixedColumnVisible(col.id)
+                              isSummarizedFixedColumnVisible(col.id),
                             ).map((col) => (
                               <th
                                 key={col.id}
@@ -7043,123 +7395,162 @@ function SummarizedReport() {
                                 {renderSummarizedFixedHeaderContent(col)}
                               </th>
                             ))}
-                            <th style={{ minWidth: "160px", width: "160px" }}>Action</th>
+                            <th style={{ minWidth: "160px", width: "160px" }}>
+                              Action
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
-                          {(summarizedTableData.rows || []).map((row, rowIndex) => (
-                            <React.Fragment key={`sum-row-block-${rowIndex}`}>
-                              {rowIndex > 0 ? (
-                                <SummarizedRowInsertZone
-                                  insertIndex={rowIndex}
-                                  colSpan={summarizedDisplayOrderedColumns.length + 1}
-                                  onInsert={handleInsertSummarizedRowAt}
-                                />
-                              ) : null}
-                            <tr key={`sum-row-${rowIndex}`}>
-                              {isSummarizedMergedTitleRow(row) ? (
-                                <td
-                                  colSpan={summarizedDisplayOrderedColumns.length}
-                                  className="summarized-merged-title-cell"
-                                  style={{ textAlign: "center", verticalAlign: "middle" }}
-                                >
-                                  <AutoGrowTextarea
-                                    className="form-field mb-0"
-                                    style={summarizedInputStyle}
-                                    value={getSummarizedMergedRowText(row)}
-                                    onChange={(e) =>
-                                      handleSummarizedMergedRowTextChange(
-                                        rowIndex,
-                                        e.target.value
-                                      )
+                          {(summarizedTableData.rows || []).map(
+                            (row, rowIndex) => (
+                              <React.Fragment key={`sum-row-block-${rowIndex}`}>
+                                {rowIndex > 0 ? (
+                                  <SummarizedRowInsertZone
+                                    insertIndex={rowIndex}
+                                    colSpan={
+                                      summarizedDisplayOrderedColumns.length + 1
                                     }
-                                    placeholder="Enter merged row title"
+                                    onInsert={handleInsertSummarizedRowAt}
                                   />
-                                </td>
-                              ) : (
-                                summarizedDisplayOrderedColumns
-                                  .map((col, colIndex) =>
-                                    renderSummarizedDataCell(col, row, rowIndex, colIndex)
-                                  )
-                                  .filter(Boolean)
-                              )}
-                              <td style={{ minWidth: "160px", width: "160px" }}>
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "flex-start",
-                                    gap: "8px",
-                                  }}
-                                >
-                                  <label
-                                    className="d-flex align-items-center gap-2 mb-0"
-                                    style={{
-                                      fontSize: "12px",
-                                      fontWeight: 500,
-                                      cursor: "pointer",
-                                      whiteSpace: "nowrap",
-                                    }}
-                                    title="Merge all columns in this row into one title cell"
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={isSummarizedMergedTitleRow(row)}
-                                      onChange={(e) =>
-                                        handleToggleSummarizedRowMerge(
-                                          rowIndex,
-                                          e.target.checked
-                                        )
+                                ) : null}
+                                <tr key={`sum-row-${rowIndex}`}>
+                                  {isSummarizedMergedTitleRow(row) ? (
+                                    <td
+                                      colSpan={
+                                        summarizedDisplayOrderedColumns.length
                                       }
-                                    />
-                                    Merge row
-                                  </label>
-                                  {rowIndex > 0 ? (
-                                    <button
-                                      type="button"
-                                      className="flexible-field-remove-button"
-                                      onClick={() => handleRemoveSummarizedRow(rowIndex)}
-                                      style={{ position: "static" }}
-                                      title="Remove this row"
+                                      className="summarized-merged-title-cell"
+                                      style={{
+                                        textAlign: "center",
+                                        verticalAlign: "middle",
+                                      }}
                                     >
-                                      <DeleteIcon />
-                                    </button>
+                                      <AutoGrowTextarea
+                                        className="form-field mb-0"
+                                        style={summarizedInputStyle}
+                                        value={getSummarizedMergedRowText(row)}
+                                        onChange={(e) =>
+                                          handleSummarizedMergedRowTextChange(
+                                            rowIndex,
+                                            e.target.value,
+                                          )
+                                        }
+                                        placeholder="Enter merged row title"
+                                      />
+                                    </td>
                                   ) : (
-                                    <span style={{ color: "#9ca3af", fontSize: "12px" }}>
-                                      Base Row
-                                    </span>
+                                    summarizedDisplayOrderedColumns
+                                      .map((col, colIndex) =>
+                                        renderSummarizedDataCell(
+                                          col,
+                                          row,
+                                          rowIndex,
+                                          colIndex,
+                                        ),
+                                      )
+                                      .filter(Boolean)
                                   )}
-                                </div>
-                              </td>
-                            </tr>
-                            </React.Fragment>
-                          ))}
-                          <tr key="sum-row-grand-total" className="summarized-grand-total-row">
-                            {isSummarizedFixedColumnVisible(SUMMARIZED_SR_NO_COLUMN.id) && (
-                              <td />
-                            )}
+                                  <td
+                                    style={{
+                                      minWidth: "160px",
+                                      width: "160px",
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        alignItems: "flex-start",
+                                        gap: "8px",
+                                      }}
+                                    >
+                                      <label
+                                        className="d-flex align-items-center gap-2 mb-0"
+                                        style={{
+                                          fontSize: "12px",
+                                          fontWeight: 500,
+                                          cursor: "pointer",
+                                          whiteSpace: "nowrap",
+                                        }}
+                                        title="Merge all columns in this row into one title cell"
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={isSummarizedMergedTitleRow(
+                                            row,
+                                          )}
+                                          onChange={(e) =>
+                                            handleToggleSummarizedRowMerge(
+                                              rowIndex,
+                                              e.target.checked,
+                                            )
+                                          }
+                                        />
+                                        Merge row
+                                      </label>
+                                      {rowIndex > 0 ? (
+                                        <button
+                                          type="button"
+                                          className="flexible-field-remove-button"
+                                          onClick={() =>
+                                            handleRemoveSummarizedRow(rowIndex)
+                                          }
+                                          style={{ position: "static" }}
+                                          title="Remove this row"
+                                        >
+                                          <DeleteIcon />
+                                        </button>
+                                      ) : (
+                                        <span
+                                          style={{
+                                            color: "#9ca3af",
+                                            fontSize: "12px",
+                                          }}
+                                        >
+                                          Base Row
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              </React.Fragment>
+                            ),
+                          )}
+                          <tr
+                            key="sum-row-grand-total"
+                            className="summarized-grand-total-row"
+                          >
+                            {isSummarizedFixedColumnVisible(
+                              SUMMARIZED_SR_NO_COLUMN.id,
+                            ) && <td />}
                             {SUMMARIZED_TRAILING_COLUMNS.filter((col) =>
-                              isSummarizedFixedColumnVisible(col.id)
+                              isSummarizedFixedColumnVisible(col.id),
                             ).map((col) => (
                               <td key={`grand-total-trail-${col.id}`} />
                             ))}
                             {summarizedVisibleFixedStartColumns.length > 0 && (
                               <td
                                 className="summarized-grand-total-label-cell"
-                                colSpan={summarizedVisibleFixedStartColumns.length}
+                                colSpan={
+                                  summarizedVisibleFixedStartColumns.length
+                                }
                               >
-                                GRAND TOTAL - FAIR VALUATION AMOUNT (marked in green shade)
+                                GRAND TOTAL - FAIR VALUATION AMOUNT (marked in
+                                green shade)
                               </td>
                             )}
-                            {(summarizedTableData.dynamicColumns || []).map((col) => (
-                              <td key={`grand-total-dynamic-${col.id}`}>
-                                {col.allowSum
-                                  ? summarizedDynamicColumnTotals[col.id] ?? 0
-                                  : ""}
-                              </td>
-                            ))}
+                            {(summarizedTableData.dynamicColumns || []).map(
+                              (col) => (
+                                <td key={`grand-total-dynamic-${col.id}`}>
+                                  {col.allowSum
+                                    ? (summarizedDynamicColumnTotals[col.id] ??
+                                      0)
+                                    : ""}
+                                </td>
+                              ),
+                            )}
                             {SUMMARIZED_FIXED_END_COLUMNS.filter((col) =>
-                              isSummarizedFixedColumnVisible(col.id)
+                              isSummarizedFixedColumnVisible(col.id),
                             ).map((col) => (
                               <td
                                 key={`grand-total-${col.id}`}
@@ -7169,38 +7560,42 @@ function SummarizedReport() {
                                     : ""
                                 }
                               >
-                                {SUMMARIZED_CURRENCY_COLUMN_IDS.has(col.id)
-                                  ? col.id === "estimated_fair_value" &&
-                                    summarizedAllFairValueRowsDashOnly
-                                    ? (
-                                      <input
-                                        type="text"
-                                        className="form-field mb-0"
-                                        style={{
-                                          ...summarizedInputStyle,
-                                          backgroundColor: "#daf2d0",
-                                          fontWeight: 700,
-                                        }}
-                                        value={
-                                          summarizedTableData.manualEstimatedFairValueGrandTotal ||
-                                          formatSummarizedGrandTotalCell(
-                                            summarizedDisplayedFairValueGrandTotal
-                                          )
-                                        }
-                                        onChange={(e) =>
-                                          handleSummarizedManualFairValueGrandTotalChange(
-                                            e.target.value
-                                          )
-                                        }
-                                        placeholder="0.00"
-                                      />
-                                    )
-                                    : formatSummarizedGrandTotalCell(
+                                {SUMMARIZED_CURRENCY_COLUMN_IDS.has(col.id) ? (
+                                  col.id === "estimated_fair_value" &&
+                                  summarizedAllFairValueRowsDashOnly ? (
+                                    <input
+                                      type="text"
+                                      className="form-field mb-0"
+                                      style={{
+                                        ...summarizedInputStyle,
+                                        backgroundColor: "#daf2d0",
+                                        fontWeight: 700,
+                                      }}
+                                      value={
+                                        summarizedTableData.manualEstimatedFairValueGrandTotal ||
+                                        formatSummarizedGrandTotalCell(
+                                          summarizedDisplayedFairValueGrandTotal,
+                                        )
+                                      }
+                                      onChange={(e) =>
+                                        handleSummarizedManualFairValueGrandTotalChange(
+                                          e.target.value,
+                                        )
+                                      }
+                                      placeholder="0.00"
+                                    />
+                                  ) : (
+                                    formatSummarizedGrandTotalCell(
                                       col.id === "estimated_fair_value"
                                         ? summarizedDisplayedFairValueGrandTotal
-                                        : summarizedGrandTotalsByColumn[col.id] ?? 0
+                                        : (summarizedGrandTotalsByColumn[
+                                            col.id
+                                          ] ?? 0),
                                     )
-                                  : ""}
+                                  )
+                                ) : (
+                                  ""
+                                )}
                               </td>
                             ))}
                             <td className="summarized-grand-total-action-cell" />
