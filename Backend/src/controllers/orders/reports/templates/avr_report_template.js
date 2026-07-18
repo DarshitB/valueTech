@@ -493,11 +493,11 @@ body.single-page{
             </tr>
             <tr>
                 <th style="width: 10%;">Installed & Running</th>
-                <td colspan="2">At ${formData.installed_running || ""}</td>
+                <td colspan="2"> ${formData.installed_running || ""}</td>
             </tr>
             <tr>
                 <th style="width: 10%;">Installed Asset Whether Functional or Not</th>
-                <td colspan="2">Fully Functional AT ${
+                <td colspan="2"> ${
                   formData.installed_asset_whether_functional_or_not || ""
                 }</td>
             </tr>

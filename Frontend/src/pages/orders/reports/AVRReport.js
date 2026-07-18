@@ -2039,6 +2039,7 @@ function AVRReport() {
                         { value: "Packed / Knocked Down", label: "Packed / Knocked Down" },
                         { value: "Dismantled / Packed Condition", label: "Dismantled / Packed Condition" },
                         { value: "Scrap Condition", label: "Scrap Condition" },
+                        { value: "Stacked / packed condition", label: "Stacked / packed condition" },
                         { value: "Not Available", label: "Not Available" },
                         { value: "Not Applicable", label: "Not Applicable" },
                       ]}
