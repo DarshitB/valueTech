@@ -40,6 +40,7 @@ const SUMMARY_CARD_TABLE_FILTER = {
   DETAILS_PENDING: "details_pending",
   PRICE_PENDING: "price_pending",
   MAIL_PENDING: "mail_pending",
+  DISCARD: "discard",
 };
 
 const isSameOrderDay = (d1, d2) =>
@@ -65,13 +66,15 @@ const matchesSummaryCardTableFilter = (order, filterKey) => {
     case SUMMARY_CARD_TABLE_FILTER.ORDER_CREATED:
       return statusId != null && statusId <= 2;
     case SUMMARY_CARD_TABLE_FILTER.PHOTO_PENDING:
-      return [2, 4, 5].includes(statusId);
+      return [4, 5, 6].includes(statusId);
     case SUMMARY_CARD_TABLE_FILTER.DETAILS_PENDING:
       return [7, 8].includes(statusId);
     case SUMMARY_CARD_TABLE_FILTER.PRICE_PENDING:
       return statusId === 10;
     case SUMMARY_CARD_TABLE_FILTER.MAIL_PENDING:
       return statusId === 12;
+    case SUMMARY_CARD_TABLE_FILTER.DISCARD:
+      return statusId === 11;
     default:
       return true;
   }
@@ -1916,6 +1919,42 @@ function Dashboard() {
                                         orders.filter(
                                           (order) =>
                                             order.current_status_id === 12
+                                        ).length
+                                      )}
+                                    </p>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="col-xl-2 col-lg-4 col-md-4 col-sm-6 col-xs-12">
+                              <div className="padding-top-bottom">
+                                <div
+                                  className={`sneak-peek-card order-status discard-orders sneak-peek-card-clickable${
+                                    summaryCardTableFilter ===
+                                    SUMMARY_CARD_TABLE_FILTER.DISCARD
+                                      ? " is-active"
+                                      : ""
+                                  }`}
+                                >
+                                  <button
+                                    type="button"
+                                    className="sneak-peek-card-action"
+                                    onClick={() =>
+                                      setSummaryCardTableFilter(
+                                        SUMMARY_CARD_TABLE_FILTER.DISCARD
+                                      )
+                                    }
+                                    aria-pressed={
+                                      summaryCardTableFilter ===
+                                      SUMMARY_CARD_TABLE_FILTER.DISCARD
+                                    }
+                                  >
+                                    <h3>Discard</h3>
+                                    <p>
+                                      {formatTwoDigits(
+                                        orders.filter(
+                                          (order) =>
+                                            order.current_status_id === 11
                                         ).length
                                       )}
                                     </p>

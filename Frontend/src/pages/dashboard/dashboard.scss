@@ -339,6 +339,20 @@
     padding-bottom: 30px;
   }
   .dashboard-order-summary-row {
+    @media (min-width: 1200px) {
+      display: flex;
+      flex-wrap: nowrap;
+      margin-left: calc(var(--bs-gutter-x, 1.5rem) * -0.5);
+      margin-right: calc(var(--bs-gutter-x, 1.5rem) * -0.5);
+
+      > [class*="col-xl-"] {
+        flex: 1 1 0;
+        min-width: 0;
+        max-width: none;
+        width: auto;
+      }
+    }
+
     > [class*="col-"] {
       display: flex;
       flex-direction: column;
@@ -444,6 +458,10 @@
       }
       &.re-validate-orders {
         background: linear-gradient(to right, #cc3e15, #f05f35);
+        color: $primary-font-color;
+      }
+      &.discard-orders {
+        background: linear-gradient(to right, #374151, #6b7280);
         color: $primary-font-color;
       }
       &.total-orders {

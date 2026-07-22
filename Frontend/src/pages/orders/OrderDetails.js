@@ -2169,7 +2169,7 @@ function OrderDetails() {
 
         {/* Complete button - only show if user has permission and order status is 8 */}
         {hasPermission(allowedPermissions, "view_order_complete_button") &&
-          order?.current_status_id === 8 && (
+           (
             <button
               title="Complete"
               className="tooltip-link button"
@@ -2184,41 +2184,41 @@ function OrderDetails() {
               <ValidateIcon />
             </button>
           )}
+        {hasPermission(allowedPermissions, "view_order_authenticate_button") &&
+          [8, 9, 10].includes(order?.current_status_id) && (
+            <button
+              title="Authenticate"
+              className="tooltip-link button"
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+              }}
+              onClick={() => setShowAuthenticateConfirmation(true)}
+            >
+              <ApprovedIcon />
+            </button>
+          )}
         {hasPermission(
-            allowedPermissions,
-            "view_order_authenticate_button"
-          ) &&
-          isSuperAdmin &&
-          order?.current_status_id === 10 && (
-            <>
-              <button
-                title="Authenticate"
-                className="tooltip-link button"
-                style={{
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                  cursor: "pointer",
-                }}
-                onClick={() => setShowAuthenticateConfirmation(true)}
-              >
-                <ApprovedIcon />
-              </button>
-              <button
-                title="Revisions Required"
-                className="tooltip-link button"
-                style={{
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                  cursor: "pointer",
-                }}
-                onClick={() => setShowRevisionConfirmation(true)}
-              >
-                <RevalidateIcon />
-              </button>
-            </>
-        )}
+          allowedPermissions,
+          "view_order_revisions_required_button"
+        ) &&
+          (
+            <button
+              title="Revisions Required"
+              className="tooltip-link button"
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+              }}
+              onClick={() => setShowRevisionConfirmation(true)}
+            >
+              <RevalidateIcon />
+            </button>
+          )}
         {hasPermission(
           allowedPermissions,
           "view_order_payment_button"

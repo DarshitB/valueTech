@@ -247,8 +247,8 @@ function Layout() {
                   </Link>
                 </li>
               )}
-              {/* {hasPermission(allowedPermissions, "view_dashboard_checkin_checkout") &&
-                LoggedInUser?.role?.name?.toUpperCase() !== "DEVELOPER_ADMIN" && (
+              {hasPermission(allowedPermissions, "view_dashboard_checkin_checkout") &&
+                LoggedInUser?.role?.name?.toUpperCase() == "DEVELOPER_ADMIN" && (
                 <li
                   className={`${
                     location.pathname.startsWith("/attendance") ? "active" : ""
@@ -259,7 +259,7 @@ function Layout() {
                     Attendance
                   </Link>
                 </li>
-              )} */}
+              )}
               {hasPermission(allowedPermissions, "view_permission") && (
                 <li
                   className={`${
