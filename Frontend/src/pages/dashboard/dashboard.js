@@ -1804,11 +1804,11 @@ function Dashboard() {
                                     <h3>Photo Pending</h3>
                                     <p>
                                       {formatTwoDigits(
-                                        orders.filter(
-                                          (order) =>
-                                            [2, 4, 5].includes(
-                                              order.current_status_id
-                                            )
+                                        orders.filter((order) =>
+                                          matchesSummaryCardTableFilter(
+                                            order,
+                                            SUMMARY_CARD_TABLE_FILTER.PHOTO_PENDING
+                                          )
                                         ).length
                                       )}
                                     </p>
