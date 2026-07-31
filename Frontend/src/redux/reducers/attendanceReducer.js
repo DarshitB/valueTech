@@ -15,6 +15,18 @@ export const fetchAttendanceByUserId = createAsyncThunk(
   }
 );
 
+export const fetchBreaksByUserId = createAsyncThunk(
+  "attendance/fetchBreaksByUserId",
+  async (userId, { rejectWithValue }) => {
+    try {
+      const res = await attendanceApi.getBreaksByUserId(userId);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
 // Fetch the last attendance record for a user
 export const fetchLastAttendanceByUserId = createAsyncThunk(
   "attendance/fetchLastByUserId",
@@ -66,9 +78,71 @@ export const updateAttendanceCheckout = createAsyncThunk(
   }
 );
 
+export const updateAttendanceLunchIn = createAsyncThunk(
+  "attendance/lunchIn",
+  async (data, { rejectWithValue }) => {
+    try {
+      const res = await attendanceApi.lunchInAttendance(data);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+export const updateAttendanceLunchOut = createAsyncThunk(
+  "attendance/lunchOut",
+  async (data, { rejectWithValue }) => {
+    try {
+      const res = await attendanceApi.lunchOutAttendance(data);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+export const updateAttendanceBreakIn = createAsyncThunk(
+  "attendance/breakIn",
+  async (data, { rejectWithValue }) => {
+    try {
+      const res = await attendanceApi.breakInAttendance(data);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+export const updateAttendanceBreakOut = createAsyncThunk(
+  "attendance/breakOut",
+  async (data, { rejectWithValue }) => {
+    try {
+      const res = await attendanceApi.breakOutAttendance(data);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+const applyLastRecordPayload = (state, payload) => {
+  if (!payload?.id) return;
+  const index = state.list.findIndex((record) => record.id === payload.id);
+  if (index !== -1) {
+    state.list[index] = payload;
+  }
+  if (state.lastRecord && state.lastRecord.id === payload.id) {
+    state.lastRecord = payload;
+  } else if (!state.lastRecord) {
+    state.lastRecord = payload;
+  }
+};
+
 // Initial state
 const initialState = {
   list: [],
+  breaks: [],
   loading: false,
   error: null,
   lastRecord: null,
@@ -97,6 +171,13 @@ const attendanceSlice = createSlice({
         toast.error(`Failed to fetch attendance: ${action.payload}`);
       })
 
+      .addCase(fetchBreaksByUserId.fulfilled, (state, action) => {
+        state.breaks = Array.isArray(action.payload) ? action.payload : [];
+      })
+      .addCase(fetchBreaksByUserId.rejected, (state, action) => {
+        state.error = action.payload;
+      })
+
       // Fetch last attendance by user ID
       .addCase(fetchLastAttendanceByUserId.pending, (state) => {
         state.loading = true;
@@ -123,24 +204,60 @@ const attendanceSlice = createSlice({
 
       // Update attendance (check-out)
       .addCase(updateAttendanceCheckout.fulfilled, (state, action) => {
-        // Update the record in the list if it exists
-        const index = state.list.findIndex(
-          (record) => record.id === action.payload.id
-        );
-        if (index !== -1) {
-          state.list[index] = action.payload;
-        }
-        // Update last record
-        if (state.lastRecord && state.lastRecord.id === action.payload.id) {
-          state.lastRecord = action.payload;
-        }
+        applyLastRecordPayload(state, action.payload);
         toast.success("Check-out successful");
       })
       .addCase(updateAttendanceCheckout.rejected, (state, action) => {
         toast.error(`Check-out failed: ${action.payload}`);
+      })
+
+      .addCase(updateAttendanceLunchIn.fulfilled, (state, action) => {
+        applyLastRecordPayload(state, action.payload);
+        toast.success("Lunch in recorded");
+      })
+      .addCase(updateAttendanceLunchIn.rejected, (state, action) => {
+        toast.error(`Lunch in failed: ${action.payload}`);
+      })
+
+      .addCase(updateAttendanceLunchOut.fulfilled, (state, action) => {
+        applyLastRecordPayload(state, action.payload);
+        toast.success("Lunch out recorded");
+      })
+      .addCase(updateAttendanceLunchOut.rejected, (state, action) => {
+        toast.error(`Lunch out failed: ${action.payload}`);
+      })
+
+      .addCase(updateAttendanceBreakIn.fulfilled, (state, action) => {
+        applyLastRecordPayload(state, action.payload);
+        if (action.payload?.open_break) {
+          state.breaks = [...state.breaks, action.payload.open_break];
+        }
+        toast.success("Break in recorded");
+      })
+      .addCase(updateAttendanceBreakIn.rejected, (state, action) => {
+        toast.error(`Break in failed: ${action.payload}`);
+      })
+
+      .addCase(updateAttendanceBreakOut.fulfilled, (state, action) => {
+        applyLastRecordPayload(state, {
+          ...action.payload,
+          open_break: null,
+        });
+        const closed = action.payload?.closed_break;
+        if (closed?.id) {
+          const idx = state.breaks.findIndex((b) => b.id === closed.id);
+          if (idx !== -1) {
+            state.breaks[idx] = closed;
+          } else {
+            state.breaks.push(closed);
+          }
+        }
+        toast.success("Break out recorded");
+      })
+      .addCase(updateAttendanceBreakOut.rejected, (state, action) => {
+        toast.error(`Break out failed: ${action.payload}`);
       });
   },
 });
 
 export default attendanceSlice.reducer;
-

@@ -18,6 +18,8 @@ import orderMediaDocumentsReducer from "./reducers/orderMediaDocumentsReducer";
 import collageReducer from "./reducers/collageReducer";
 import assetMakesReducer from "./reducers/assetMakesReducer";
 import attendanceReducer from "./reducers/attendanceReducer";
+import holidayReducer from "./reducers/holidayReducer";
+import userLeaveReducer from "./reducers/userLeaveReducer";
 import notificationReducer from "./reducers/notificationReducer";
 import spreadsheetReducer from "./reducers/spreadsheetReducer";
 
@@ -42,6 +44,8 @@ const store = configureStore({
     collage: collageReducer,
     assetMakes: assetMakesReducer,
     attendance: attendanceReducer,
+    holidays: holidayReducer,
+    userLeaves: userLeaveReducer,
     notifications: notificationReducer,
     spreadsheets: spreadsheetReducer,
   },

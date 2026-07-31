@@ -4075,11 +4075,13 @@ function generateMarineReportHTML(
 
                 if (element === heroPage) continue;
 
-                // Custom Media Block (heading + description + image) must always
-                // stay together as ONE unbreakable unit: either the whole block
-                // fits on the current page, or the whole block (not just the
-                // image) moves to the next page. This does not affect any other
-                // heading/paragraph/table/image in the report.
+                // Custom Media Block (heading + description + image): keep as
+                // one unit. Page choice is based on heading+description (reliable
+                // to measure). Image always lands on that same page — natural
+                // size if it fits, otherwise shrink to leftover height so a
+                // tall/vertical image never takes a page alone. Uses
+                // getUsedContentHeight (not scrollHeight) because .page-content
+                // has overflow:hidden which made the old check miss overflows.
                 const cmbGroupId = element.getAttribute && element.getAttribute('data-cmb-group');
                 if (cmbGroupId && !element._cmbForceIndividual) {
                     const groupIndices = [i];
@@ -4093,28 +4095,36 @@ function generateMarineReportHTML(
                         j++;
                     }
                     const groupElements = groupIndices.map(idx => allContentElements[idx]);
+                    const imageEl = groupElements.find(el => el.tagName === 'IMG') || null;
+                    const textEls = groupElements.filter(el => el !== imageEl);
 
                     currentTable = null;
 
-                    const measureGroupFits = (container, els) => {
+                    const measureUsedFits = (container, els, extraReserve) => {
                         const clones = els.map(el => el.cloneNode(true));
                         clones.forEach(c => container.appendChild(c));
                         void container.offsetHeight;
-                        const fits = container.scrollHeight <= pageContentHeight;
+                        const used = getUsedContentHeight(container) + (extraReserve || 0);
+                        const fits = used <= pageContentHeight;
                         clones.forEach(c => c.remove());
                         return fits;
                     };
 
-                    if (measureGroupFits(currentPageContent, groupElements)) {
-                        groupElements.forEach(el => currentPageContent.appendChild(el));
-                        void currentPageContent.offsetHeight;
-                        i = j - 1;
-                        continue;
-                    }
-
+                    // Minimum leftover height before we allow the image on the
+                    // current page. Below this, the image becomes unreadably
+                    // small — move the whole block (heading+description+image)
+                    // to a fresh page instead. Only this threshold changed;
+                    // shrink-to-fit on a dedicated page still applies for tall
+                    // vertical images that need a full page of height.
+                    const MIN_IMAGE_SPACE = Math.max(350, Math.floor(pageContentHeight * 0.45));
                     const pageHasContent = currentPageContent.children.length > 0;
+                    const fitsHere = measureUsedFits(
+                        currentPageContent,
+                        textEls,
+                        imageEl ? MIN_IMAGE_SPACE : 0
+                    );
 
-                    if (pageHasContent) {
+                    if (!fitsHere && pageHasContent) {
                         currentPageNum++;
                         const newPage = createNewPage(currentPageNum);
                         currentPage.insertAdjacentElement('afterend', newPage);
@@ -4122,20 +4132,63 @@ function generateMarineReportHTML(
                         currentPageContent = currentPage.querySelector('.page-content');
                     }
 
-                    if (measureGroupFits(currentPageContent, groupElements)) {
-                        groupElements.forEach(el => currentPageContent.appendChild(el));
-                        void currentPageContent.offsetHeight;
-                        i = j - 1;
+                    // Huge description alone taller than a blank page — keep
+                    // old per-element safety net so text can still split.
+                    if (!measureUsedFits(currentPageContent, textEls, 0)) {
+                        groupElements.forEach(el => { el._cmbForceIndividual = true; });
+                        i = i - 1;
                         continue;
                     }
 
-                    // Extreme fallback: the block is too large to fit even on a
-                    // fresh, empty page (e.g. a huge description/image). In this
-                    // rare case, fall through to the normal per-element rules
-                    // below (heading grouping / splittable description /
-                    // image fill-remaining) so nothing is lost.
-                    groupElements.forEach(el => { el._cmbForceIndividual = true; });
-                    i = i - 1;
+                    textEls.forEach(el => currentPageContent.appendChild(el));
+                    void currentPageContent.offsetHeight;
+
+                    if (imageEl) {
+                        let remainingSpace = Math.max(
+                            pageContentHeight - getUsedContentHeight(currentPageContent),
+                            40
+                        );
+
+                        // Safety: if leftover is still too small after placing
+                        // text (edge case), pull the whole block onto a new
+                        // page so the image is not tiny.
+                        if (remainingSpace < MIN_IMAGE_SPACE && currentPageContent.children.length > textEls.length) {
+                            textEls.forEach(el => el.remove());
+                            if (imageEl.parentNode) imageEl.remove();
+                            currentPageNum++;
+                            const newPage = createNewPage(currentPageNum);
+                            currentPage.insertAdjacentElement('afterend', newPage);
+                            currentPage = newPage;
+                            currentPageContent = currentPage.querySelector('.page-content');
+                            textEls.forEach(el => currentPageContent.appendChild(el));
+                            void currentPageContent.offsetHeight;
+                            remainingSpace = Math.max(
+                                pageContentHeight - getUsedContentHeight(currentPageContent),
+                                40
+                            );
+                        }
+
+                        imageEl.style.width = '100%';
+                        imageEl.style.height = 'auto';
+                        imageEl.style.objectFit = '';
+                        imageEl.style.maxHeight = '';
+                        currentPageContent.appendChild(imageEl);
+                        void currentPageContent.offsetHeight;
+
+                        // Shrink whenever natural size exceeds leftover space
+                        // (vertical images on a dedicated page). Do not shrink
+                        // below MIN on a page that still has prior content —
+                        // that case already moved above.
+                        if (imageEl.offsetHeight > remainingSpace ||
+                            getUsedContentHeight(currentPageContent) > pageContentHeight) {
+                            imageEl.style.height = remainingSpace + 'px';
+                            imageEl.style.maxHeight = remainingSpace + 'px';
+                            imageEl.style.objectFit = 'contain';
+                            void currentPageContent.offsetHeight;
+                        }
+                    }
+
+                    i = j - 1;
                     continue;
                 }
 
@@ -4311,23 +4364,45 @@ function generateMarineReportHTML(
                             void currentPageContent.offsetHeight;
                             const usedHeight = getUsedContentHeight(currentPageContent);
                             const remainingSpace = pageContentHeight - usedHeight;
-                            const MIN_IMAGE_FILL_SPACE = 150; // px
+                            const MIN_IMAGE_FILL_SPACE = Math.max(350, Math.floor(pageContentHeight * 0.45));
 
                               if (remainingSpace >= MIN_IMAGE_FILL_SPACE) {
                                   element.style.width = '100%';
                                   element.style.height = remainingSpace + 'px';
+                                  element.style.maxHeight = remainingSpace + 'px';
                                   element.style.objectFit = 'contain';
                                   currentPageContent.appendChild(element);
                                   void currentPageContent.offsetHeight;
                               } else {
-                                  element.style.width = '100%';
-                                  element.style.height = 'auto';
-                                  element.style.objectFit = '';
+                                  // Not enough leftover on current page — move to a
+                                  // new page. If this image belongs to a custom media
+                                  // block, also move its heading+description with it
+                                  // so the image never sits alone on a full page.
+                                  const groupId = element.getAttribute('data-cmb-group');
+                                  const groupTextEls = groupId
+                                      ? Array.from(currentPageContent.children).filter((el) =>
+                                            el.getAttribute &&
+                                            el.getAttribute('data-cmb-group') === groupId
+                                        )
+                                      : [];
+
                                   currentPageNum++;
                                   const newPage = createNewPage(currentPageNum);
                                   currentPage.insertAdjacentElement('afterend', newPage);
                                   currentPage = newPage;
                                   currentPageContent = currentPage.querySelector('.page-content');
+
+                                  groupTextEls.forEach((el) => currentPageContent.appendChild(el));
+                                  void currentPageContent.offsetHeight;
+
+                                  const spaceForImage = Math.max(
+                                      pageContentHeight - getUsedContentHeight(currentPageContent),
+                                      40
+                                  );
+                                  element.style.width = '100%';
+                                  element.style.height = spaceForImage + 'px';
+                                  element.style.maxHeight = spaceForImage + 'px';
+                                  element.style.objectFit = 'contain';
                                   currentPageContent.appendChild(element);
                                   void currentPageContent.offsetHeight;
                               }

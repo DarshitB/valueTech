@@ -9,9 +9,11 @@ const attendance = {
         "attendance.id",
         "attendance.user_id",
         "users.name as user_name",
-        "attendance.working_date",
+        db.raw("to_char(attendance.working_date, 'YYYY-MM-DD') as working_date"),
         "attendance.checkin_time",
         "attendance.checkout_time",
+        "attendance.lunch_in",
+        "attendance.lunch_out",
         "attendance.checkin_via",
         "attendance.checkout_remarks"
       )
@@ -27,9 +29,11 @@ const attendance = {
         "attendance.id",
         "attendance.user_id",
         "users.name as user_name",
-        "attendance.working_date",
+        db.raw("to_char(attendance.working_date, 'YYYY-MM-DD') as working_date"),
         "attendance.checkin_time",
         "attendance.checkout_time",
+        "attendance.lunch_in",
+        "attendance.lunch_out",
         "attendance.checkin_via",
         "attendance.checkout_remarks"
       )
@@ -49,6 +53,8 @@ const attendance = {
         "attendance.working_date",
         "attendance.checkin_time",
         "attendance.checkout_time",
+        "attendance.lunch_in",
+        "attendance.lunch_out",
         "attendance.checkin_via",
         "attendance.checkout_remarks"
       )
@@ -61,6 +67,21 @@ const attendance = {
   // Update attendance record
   update: (id, data) =>
     db("attendance").where({ id }).update(data).returning("*"),
+
+  // Open days: day in set, day out missing (for midnight auto-close)
+  findOpenWithoutCheckout: () =>
+    db("attendance")
+      .select(
+        "id",
+        "user_id",
+        "working_date",
+        "checkin_time",
+        "checkout_time",
+        "lunch_in",
+        "lunch_out"
+      )
+      .whereNotNull("checkin_time")
+      .whereNull("checkout_time"),
 };
 
 module.exports = attendance;

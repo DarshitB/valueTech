@@ -1408,13 +1408,220 @@ export const SpreadsheetIcon = ({
       className={`icon ${className}`}
       xmlns="http://www.w3.org/2000/svg"
       {...props}
+      style={{ ...(props.style || {}), fill: "none" }}
     >
-      <rect x="9" y="7" width="32" height="36" rx="2.5" />
+      <rect x="9" y="7" width="32" height="36" rx="2.5" fill="none" />
       <line x1="9" y1="17" x2="41" y2="17" />
       <line x1="9" y1="27" x2="41" y2="27" />
       <line x1="9" y1="37" x2="41" y2="37" />
       <line x1="20" y1="7" x2="20" y2="43" />
       <line x1="31" y1="7" x2="31" y2="43" />
+    </svg>
+  );
+};
+
+// Calendar + check — attendance / day-in tracking
+export const AttendanceIcon = ({
+  color = "currentColor",
+  className = "",
+  ...props
+}) => {
+  return (
+    <svg
+      viewBox="0 0 50 50"
+      width="30"
+      height="30"
+      fill="none"
+      stroke={color}
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`icon ${className}`}
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+      style={{ ...(props.style || {}), fill: "none" }}
+    >
+      <rect x="10" y="11" width="30" height="30" rx="2.5" fill="none" />
+      <line x1="10" y1="19" x2="40" y2="19" />
+      <line x1="18" y1="8" x2="18" y2="14" />
+      <line x1="32" y1="8" x2="32" y2="14" />
+      <polyline points="18,30 23,35 33,25" fill="none" />
+    </svg>
+  );
+};
+
+// Day In — login / enter arrow
+export const DayInIcon = ({
+  color = "currentColor",
+  className = "",
+  ...props
+}) => {
+  return (
+    <svg
+      viewBox="0 0 50 50"
+      width="30"
+      height="30"
+      fill="none"
+      stroke={color}
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`icon ${className}`}
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+      style={{ ...(props.style || {}), fill: "none" }}
+    >
+      <path d="M28 10h8a4 4 0 0 1 4 4v22a4 4 0 0 1-4 4h-8" fill="none" />
+      <polyline points="24,32 32,25 24,18" fill="none" />
+      <line x1="10" y1="25" x2="32" y2="25" />
+    </svg>
+  );
+};
+
+// Day Out — logout / exit arrow
+export const DayOutIcon = ({
+  color = "currentColor",
+  className = "",
+  ...props
+}) => {
+  return (
+    <svg
+      viewBox="0 0 50 50"
+      width="30"
+      height="30"
+      fill="none"
+      stroke={color}
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`icon ${className}`}
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+      style={{ ...(props.style || {}), fill: "none" }}
+    >
+      <path d="M22 10h-8a4 4 0 0 0-4 4v22a4 4 0 0 0 4 4h8" fill="none" />
+      <polyline points="26,18 34,25 26,32" fill="none" />
+      <line x1="18" y1="25" x2="34" y2="25" />
+    </svg>
+  );
+};
+
+// Lunch In — utensils (fork + knife)
+export const LunchInIcon = ({
+  color = "currentColor",
+  className = "",
+  ...props
+}) => {
+  return (
+    <svg
+      viewBox="0 0 50 50"
+      width="30"
+      height="30"
+      fill="none"
+      stroke={color}
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`icon ${className}`}
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+      style={{ ...(props.style || {}), fill: "none" }}
+    >
+      <path d="M16 10v12c0 2 1.5 4 4 4v14" fill="none" />
+      <line x1="14" y1="10" x2="14" y2="18" />
+      <line x1="16" y1="10" x2="16" y2="18" />
+      <line x1="18" y1="10" x2="18" y2="18" />
+      <line x1="20" y1="10" x2="20" y2="18" />
+      <path d="M32 10c0 6 4 8 4 14v16" fill="none" />
+      <path d="M32 10v14" fill="none" />
+    </svg>
+  );
+};
+
+// Lunch Out — coffee mug (break ending / leave lunch)
+export const LunchOutIcon = ({
+  color = "currentColor",
+  className = "",
+  ...props
+}) => {
+  return (
+    <svg
+      viewBox="0 0 50 50"
+      width="30"
+      height="30"
+      fill="none"
+      stroke={color}
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`icon ${className}`}
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+      style={{ ...(props.style || {}), fill: "none" }}
+    >
+      <path
+        d="M12 16h22v18a6 6 0 0 1-6 6H18a6 6 0 0 1-6-6V16z"
+        fill="none"
+      />
+      <path d="M34 20h4a4 4 0 0 1 0 8h-4" fill="none" />
+      <line x1="16" y1="10" x2="16" y2="14" />
+      <line x1="22" y1="10" x2="22" y2="14" />
+      <line x1="28" y1="10" x2="28" y2="14" />
+    </svg>
+  );
+};
+
+// Break In — start personal break (pause)
+export const BreakInIcon = ({
+  color = "currentColor",
+  className = "",
+  ...props
+}) => {
+  return (
+    <svg
+      viewBox="0 0 50 50"
+      width="30"
+      height="30"
+      fill="none"
+      stroke={color}
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`icon ${className}`}
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+      style={{ ...(props.style || {}), fill: "none" }}
+    >
+      <circle cx="25" cy="25" r="16" fill="none" />
+      <line x1="20" y1="17" x2="20" y2="33" />
+      <line x1="30" y1="17" x2="30" y2="33" />
+    </svg>
+  );
+};
+
+// Break Out — end personal break (play / resume)
+export const BreakOutIcon = ({
+  color = "currentColor",
+  className = "",
+  ...props
+}) => {
+  return (
+    <svg
+      viewBox="0 0 50 50"
+      width="30"
+      height="30"
+      fill="none"
+      stroke={color}
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`icon ${className}`}
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+      style={{ ...(props.style || {}), fill: "none" }}
+    >
+      <circle cx="25" cy="25" r="16" fill="none" />
+      <polygon points="21,17 35,25 21,33" fill="none" />
     </svg>
   );
 };

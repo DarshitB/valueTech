@@ -6,6 +6,7 @@
 
 .main-sidebar {
   zoom: $app-zoom;
+  transition: left 0.5s ease;
 }
 
 .main-content {
@@ -13,6 +14,7 @@
   padding-bottom: 30px;
   padding-top: 105px;
   height: 125vh;
+  transition: padding-left 0.5s ease;
 
   &--no-zoom {
     zoom: 1;
@@ -38,25 +40,115 @@
 }
 
 .navbar {
+  transition: left 0.5s ease;
+
   .form-inline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
     .hamburger {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       background-color: transparent;
-      display: none;
-    }
-  }
-}
-.sidebar-brand-link {
-  font-size: 23px !important;
-}
-@media (max-width: 1024px) {
-  .navbar {
-    .form-inline {
-      .hamburger {
-        background-color: transparent;
+      border: none;
+      box-shadow: none;
+      color: $primary-font-color;
+      padding: 4px 8px;
+      margin: 0;
+      cursor: pointer;
+      line-height: 1;
+      opacity: 1;
+      transition: opacity 0.2s ease;
+
+      &:hover,
+      &:focus,
+      &:active,
+      &:focus-visible {
+        background-color: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: $primary-font-color !important;
+        opacity: 0.75;
+      }
+
+      svg {
         display: block;
+        color: inherit;
       }
     }
   }
+}
+
+.sidebar-brand-link {
+  font-size: 23px !important;
+}
+
+.sidebar-overlay {
+  display: none;
+}
+
+.sidebar-edge-hotzone {
+  display: none;
+}
+
+// Desktop: hamburger collapses / expands the sidebar
+@media (min-width: 1025px) {
+  .main-wrapper-1.sidebar-is-closed {
+    .main-sidebar {
+      left: -250px !important;
+    }
+
+    .navbar {
+      left: 0 !important;
+    }
+
+    .main-content {
+      padding-left: 30px !important;
+    }
+
+    .main-content--no-zoom {
+      padding-left: 10px !important;
+    }
+
+    .sidebar-edge-hotzone {
+      display: block;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 15px;
+      height: 100vh;
+      z-index: 1090;
+    }
+  }
+
+  // Closed + edge hover: overlay sidebar without shifting content
+  .main-wrapper-1.sidebar-is-closed.sidebar-is-peeking {
+    .main-sidebar {
+      left: 0 !important;
+      position: fixed !important;
+      top: 0;
+      height: 100%;
+      z-index: 1100;
+      box-shadow: 0 4px 25px 0 rgba(0, 0, 0, 0.18);
+    }
+
+    .navbar {
+      left: 0 !important;
+    }
+
+    .main-content {
+      padding-left: 30px !important;
+    }
+
+    .main-content--no-zoom {
+      padding-left: 10px !important;
+    }
+  }
+}
+
+@media (max-width: 1024px) {
   .page-title-heading {
     font-size: 15px;
   }
@@ -71,7 +163,7 @@
     left: -260px;
     top: 0;
     height: 100%;
-    transition: left 0.3s ease-in-out;
+    transition: left 0.5s ease;
     z-index: 1001;
     background-color: #fff;
   }
@@ -90,6 +182,7 @@
     left: 0;
   }
   .sidebar-overlay {
+    display: block;
     position: fixed;
     top: 0;
     left: 0;

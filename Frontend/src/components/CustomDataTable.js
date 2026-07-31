@@ -21,6 +21,8 @@ const CustomDataTable = ({
   showEntriesSelector = true,
   showFooter = true,
   serverPagination = null,
+  // null = legacy (all columns except index 0); array = only those indexes
+  sortableColumns = null,
 }) => {
   const { header, rows, footer, buttons, filters } = children;
 
@@ -28,6 +30,14 @@ const CustomDataTable = ({
   const isServerSearch =
     isServerPaginated &&
     typeof serverPagination?.onSearchChange === "function";
+
+  const isColumnSortable = (index) => {
+    if (Array.isArray(sortableColumns)) {
+      return sortableColumns.includes(index);
+    }
+    // Legacy default: skip sequential-number column (index 0)
+    return index !== 0;
+  };
 
   // Load entries per page from localStorage or default to 10
   const [entriesPerPage, setEntriesPerPage] = useState(() => {
@@ -53,8 +63,16 @@ const CustomDataTable = ({
       return {
         element: row,
         data: cells.map((cell) => {
-          const text = getTextFromReactNode(cell.props?.children);
-          return (text && String(text).toLowerCase()) ?? "";
+          const text = String(
+            getTextFromReactNode(cell.props?.children) || ""
+          ).toLowerCase();
+          // Prefer explicit sort key when provided (e.g. ISO date for Date column)
+          const sortKey = cell.props?.["data-sort"] ?? cell.props?.sortValue;
+          const sort =
+            sortKey != null && String(sortKey) !== ""
+              ? String(sortKey).toLowerCase()
+              : text;
+          return { search: text, sort };
         }),
       };
     });
@@ -73,7 +91,7 @@ const CustomDataTable = ({
     const normalizedSearch = normalizeForSearch(search);
     return rawData.filter(({ data }) =>
       data.some((value) => {
-        const normalizedValue = normalizeForSearch(value);
+        const normalizedValue = normalizeForSearch(value.search);
         return normalizedValue.includes(normalizedSearch);
       })
     );
@@ -83,8 +101,8 @@ const CustomDataTable = ({
   const sortedData = useMemo(() => {
     if (sortConfig.index === null) return filteredData;
     return [...filteredData].sort((a, b) => {
-      const valA = a.data[sortConfig.index];
-      const valB = b.data[sortConfig.index];
+      const valA = a.data[sortConfig.index]?.sort ?? "";
+      const valB = b.data[sortConfig.index]?.sort ?? "";
       if (valA < valB) return sortConfig.direction === "asc" ? -1 : 1;
       if (valA > valB) return sortConfig.direction === "asc" ? 1 : -1;
       return 0;
@@ -146,9 +164,8 @@ const CustomDataTable = ({
 
   // Sort handler
   const handleSort = (index) => {
-    // Skip sorting for sequential number column (index 0)
-    if (index === 0) return;
-    
+    if (!isColumnSortable(index)) return;
+
     if (sortConfig.index === index) {
       setSortConfig({
         index,
@@ -244,16 +261,21 @@ const CustomDataTable = ({
               {React.Children.map(header.props.children, (th, index) => {
                 // Filter out falsy values (false, null, undefined)
                 if (!th) return null;
+                const sortable = isColumnSortable(index);
                 return (
                   <th
                     className={`dataTable-table-heading-th ${
                       th.props.className || ""
-                    }`}
+                    }${sortable ? "" : " no-sort"}`}
                     onClick={() => handleSort(index)}
-                    style={th.props.style || {}}
+                    style={{
+                      ...(th.props.style || {}),
+                      cursor: sortable ? "pointer" : "default",
+                    }}
                   >
                     {th.props.children}
-                    {sortConfig.index === index &&
+                    {sortable &&
+                      sortConfig.index === index &&
                       (sortConfig.direction === "asc" ? " ▲" : " ▼")}
                   </th>
                 );

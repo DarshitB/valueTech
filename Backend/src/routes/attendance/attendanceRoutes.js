@@ -20,5 +20,14 @@ router.post("/", attendanceController.create);
 // Update attendance record (for checkout)
 router.put("/", attendanceController.update);
 
+// Lunch in / lunch out on open attendance
+router.put("/lunch-in", attendanceController.lunchIn);
+router.put("/lunch-out", attendanceController.lunchOut);
+
+// Personal break in (start) / break out (end) — multiple per day
+router.put("/break-in", attendanceController.breakIn);
+router.put("/break-out", attendanceController.breakOut);
+router.get("/breaks/user/:userId", attendanceController.getBreaksByUserId);
+
 module.exports = router;
 

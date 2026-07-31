@@ -1262,6 +1262,13 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
       timeout: isMarineReport ? 60000 : 10000,
     });
     /* page.on('console', msg => console.log('PAGE LOG:', msg.text())); */
+    page.on('console', (msg) => {
+      try {
+        console.log('[marine-pdf]', msg.text());
+      } catch (_) {
+        /* ignore */
+      }
+    });
 
 
     // For marine reports, add additional wait to ensure JavaScript pagination completes

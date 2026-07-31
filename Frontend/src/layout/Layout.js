@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import "./Layout.scss";
 import { Link, Outlet, useLocation } from "react-router-dom";
 
@@ -16,6 +16,7 @@ import {
   OfficerIcon,
   OrderHistoryIcon,
   SpreadsheetIcon,
+  AttendanceIcon,
   OrderIcon,
   PermissionIcon,
   UsersIcon,
@@ -25,16 +26,24 @@ import {
   selectUser,
 } from "../redux/selectors/authSelectors";
 import { hasPermission } from "../utils/permissionUtils";
-import {
-  AlignJustify,
-  Hamburger,
-  HamburgerIcon,
-  LucideHamburger,
-} from "lucide-react";
+import { AlignJustify } from "lucide-react";
 import { usePageTitle } from "../context/PageTitleContext";
 import NotificationDropdown from "../components/NotificationDropdown";
 import CommentNotificationDropdown from "../components/CommentNotificationDropdown";
 import MediaNotificationDropdown from "../components/MediaNotificationDropdown";
+
+const DESKTOP_BREAKPOINT = 1024;
+const SIDEBAR_STORAGE_KEY = "sidebar_open";
+
+const isDesktopViewport = () =>
+  typeof window !== "undefined" && window.innerWidth > DESKTOP_BREAKPOINT;
+
+const getSavedSidebarOpen = () => {
+  if (!isDesktopViewport()) return false;
+  const saved = localStorage.getItem(SIDEBAR_STORAGE_KEY);
+  if (saved === null) return true; // default open on desktop
+  return saved === "true";
+};
 
 function Layout() {
   /* start get location for add active class */
@@ -66,7 +75,17 @@ function Layout() {
   /* ====useStates=======*/
   const [userProfile, setUserProfile] = useState(false); // Toggle for user profile dropdown
 
-  const [sidebarOpen, setSidebarOpen] = useState(false); // Toggle for sidebar
+  // Desktop: restore from localStorage (same pattern as table entries count)
+  // Mobile: always start closed
+  const [sidebarOpen, setSidebarOpen] = useState(() => getSavedSidebarOpen());
+  // When closed on desktop, peek overlay from left-edge hover
+  const [sidebarPeek, setSidebarPeek] = useState(false);
+
+  // Persist desktop sidebar open/closed preference in the browser
+  useEffect(() => {
+    if (!isDesktopViewport()) return;
+    localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarOpen));
+  }, [sidebarOpen]);
 
   const dispatch = useDispatch(); // Function to handle logout
   const handleLogout = () => {
@@ -78,6 +97,32 @@ function Layout() {
     location.pathname.length > "/spreadsheet/".length;
 
   const resolvedTitle = title || pageTitle;
+
+  const toggleSidebar = () => {
+    setSidebarPeek(false);
+    setSidebarOpen((prev) => !prev);
+  };
+
+  // Mobile: close after nav. Desktop pinned: stay open. Peek overlay: hide peek.
+  const handleSidebarNavClick = () => {
+    setSidebarPeek(false);
+    if (!isDesktopViewport()) {
+      setSidebarOpen(false);
+    }
+  };
+
+  const handleSidebarMouseLeave = (event) => {
+    if (sidebarOpen || !isDesktopViewport()) return;
+    const nextTarget = event.relatedTarget;
+    if (
+      nextTarget &&
+      typeof nextTarget.closest === "function" &&
+      nextTarget.closest(".sidebar-edge-hotzone")
+    ) {
+      return;
+    }
+    setSidebarPeek(false);
+  };
 
   const renderPageHeading = () => {
     if (!isSpreadsheetRoute) {
@@ -97,12 +142,19 @@ function Layout() {
 
   return (
     <>
-      <div className="main-wrapper main-wrapper-1">
+      <div
+        className={`main-wrapper main-wrapper-1 ${
+          sidebarOpen ? "sidebar-is-open" : "sidebar-is-closed"
+        }${sidebarPeek && !sidebarOpen ? " sidebar-is-peeking" : ""}`}
+      >
         <nav className="navbar navbar-expand-lg main-navbar sticky">
           <div className="form-inline mr-auto">
             <button
+              type="button"
               className="btn hamburger"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
+              aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+              aria-expanded={sidebarOpen}
+              onClick={toggleSidebar}
             >
               <AlignJustify size={20} />
             </button>
@@ -153,23 +205,43 @@ function Layout() {
             </li>
           </ul>
         </nav>
+        {!sidebarOpen && (
+          <div
+            className="sidebar-edge-hotzone"
+            onMouseEnter={() => {
+              if (isDesktopViewport()) setSidebarPeek(true);
+            }}
+            onMouseLeave={(event) => {
+              const nextTarget = event.relatedTarget;
+              if (
+                nextTarget &&
+                typeof nextTarget.closest === "function" &&
+                nextTarget.closest(".main-sidebar")
+              ) {
+                return;
+              }
+              setSidebarPeek(false);
+            }}
+          />
+        )}
         <div
           className={`main-sidebar sidebar-style-2 ${
             sidebarOpen ? "open" : ""
           }`}
+          onMouseLeave={handleSidebarMouseLeave}
         >
           <aside id="sidebar-wrapper">
             <div className="sidebar-brand">
-              <Link to="/dashboard" className="sidebar-brand-link">Valuetech Solutions</Link>
+             <Link to="/dashboard" className="sidebar-brand-link">Valuetech Solutions</Link>
             </div>
-            <ul className="sidebar-menu">
+            <ul className="sidebar-menu" onClick={handleSidebarNavClick}>
               <li className="menu-header">&nbsp;</li>
               <li
                 className={`${
                   location.pathname === "/dashboard" ? "active" : ""
                 } dropdown`}
               >
-                <Link to="/dashboard" onClick={() => setSidebarOpen(false)}>
+                <Link to="/dashboard">
                   <DashboardIcon className="feather feather-monitor" />
                   Dashboard
                 </Link>
@@ -180,7 +252,7 @@ function Layout() {
                     location.pathname.startsWith("/orders-history") ? "active" : ""
                   } dropdown`}
                 >
-                  <Link to="orders-history" onClick={() => setSidebarOpen(false)}>
+                  <Link to="orders-history">
                     <OrderIcon className="feather feather-monitor" />
                     Orders History
                   </Link>
@@ -196,7 +268,6 @@ function Layout() {
                 >
                   <Link
                     to="order-history"
-                    onClick={() => setSidebarOpen(false)}
                   >
                     <OrderHistoryIcon className="feather feather-monitor" />
                     Order History
@@ -212,7 +283,7 @@ function Layout() {
                       : ""
                   } dropdown`}
                 >
-                  <Link to="spreadsheet" onClick={() => setSidebarOpen(false)}>
+                  <Link to="spreadsheet">
                     <SpreadsheetIcon className="feather feather-monitor" />
                     Spreadsheets
                   </Link>
@@ -228,7 +299,6 @@ function Layout() {
                 >
                   <Link
                     to="field-verifier"
-                    onClick={() => setSidebarOpen(false)}
                   >
                     <FieldVerifierIcon className="feather feather-monitor" />
                     Field Verifier
@@ -241,21 +311,21 @@ function Layout() {
                     location.pathname.startsWith("/users") ? "active" : ""
                   } dropdown`}
                 >
-                  <Link to="users" onClick={() => setSidebarOpen(false)}>
+                  <Link to="users">
                     <UsersIcon className="feather feather-monitor" />
                     Users
                   </Link>
                 </li>
               )}
               {hasPermission(allowedPermissions, "view_dashboard_checkin_checkout") &&
-                LoggedInUser?.role?.name?.toUpperCase() == "DEVELOPER_ADMIN" && (
+                LoggedInUser?.role?.name?.toUpperCase() !== "DEVELOPER_ADMIN" && (
                 <li
                   className={`${
                     location.pathname.startsWith("/attendance") ? "active" : ""
                   } dropdown`}
                 >
-                  <Link to="attendance" onClick={() => setSidebarOpen(false)}>
-                    <DashboardIcon className="feather feather-monitor" />
+                  <Link to="attendance">
+                    <AttendanceIcon className="feather feather-monitor" />
                     Attendance
                   </Link>
                 </li>
@@ -266,7 +336,7 @@ function Layout() {
                     location.pathname.startsWith("/permissions") ? "active" : ""
                   } dropdown`}
                 >
-                  <Link to="permissions" onClick={() => setSidebarOpen(false)}>
+                  <Link to="permissions">
                     <PermissionIcon className="feather feather-monitor" />
                     Permissions
                   </Link>
@@ -278,7 +348,7 @@ function Layout() {
                     location.pathname.startsWith("/banks") ? "active" : ""
                   } dropdown`}
                 >
-                  <Link to="banks" onClick={() => setSidebarOpen(false)}>
+                  <Link to="banks">
                     <BankIcon className="feather feather-monitor" />
                     Banks
                   </Link>
@@ -290,7 +360,7 @@ function Layout() {
                     location.pathname.startsWith("/officers") ? "active" : ""
                   } dropdown`}
                 >
-                  <Link to="officers" onClick={() => setSidebarOpen(false)}>
+                  <Link to="officers">
                     <OfficerIcon className="feather feather-monitor" />
                     Officers
                   </Link>
@@ -302,7 +372,7 @@ function Layout() {
                     location.pathname.startsWith("/categories") ? "active" : ""
                   } dropdown`}
                 >
-                  <Link to="categories" onClick={() => setSidebarOpen(false)}>
+                  <Link to="categories">
                     <CategoryIcon className="feather feather-monitor" />
                     Categories
                   </Link>
@@ -314,7 +384,7 @@ function Layout() {
                     location.pathname.startsWith("/states") ? "active" : ""
                   } dropdown`}
                 >
-                  <Link to="states" onClick={() => setSidebarOpen(false)}>
+                  <Link to="states">
                     <LocationIcon className="feather feather-monitor" />
                     Locations
                   </Link>

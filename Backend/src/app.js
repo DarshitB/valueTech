@@ -30,6 +30,8 @@ const officerRouter = require("./routes/user/officerRouter");
 
 // Attendance routes
 const attendanceRoutes = require("./routes/attendance/attendanceRoutes");
+const holidayRoutes = require("./routes/holiday/holidayRoutes");
+const userLeaveRoutes = require("./routes/userLeave/userLeaveRoutes");
 
 // Orders routes
 const orderRoutes = require("./routes/orders/orderRoutes");
@@ -165,6 +167,8 @@ app.use("/api/subcategories", subcategoryRoutes);
 app.use("/api/child-categories", childCategoryRoutes);
 app.use("/api/officers", officerRouter);
 app.use("/api/attendance", attendanceRoutes);
+app.use("/api/holidays", holidayRoutes);
+app.use("/api/user-leaves", userLeaveRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/orders-reports/custom-report", customReportRoutes);
 app.use("/api/orders-reports", ordersReportsRoutes);

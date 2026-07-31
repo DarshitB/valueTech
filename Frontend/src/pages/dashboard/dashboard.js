@@ -19,7 +19,12 @@ import {
   fetchLastAttendanceByUserId,
   addAttendance,
   updateAttendanceCheckout,
+  updateAttendanceLunchIn,
+  updateAttendanceLunchOut,
+  updateAttendanceBreakIn,
+  updateAttendanceBreakOut,
 } from "../../redux/reducers/attendanceReducer";
+import { fetchUserLeavesByUserId } from "../../redux/reducers/userLeaveReducer";
 import FormModel from "../../components/FormModel";
 import SingleSearchSelect from "../../components/SingleSearchSelect";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
@@ -27,7 +32,14 @@ import { hasPermission } from "../../utils/permissionUtils";
 import { toast } from "react-toastify";
 import CustomDataTable from "../../components/CustomDataTable";
 import "./dashboard.scss";
-import { DashboardIcon } from "../../components/icons/Icons";
+import {
+  DayInIcon,
+  DayOutIcon,
+  LunchInIcon,
+  LunchOutIcon,
+  BreakInIcon,
+  BreakOutIcon,
+} from "../../components/icons/Icons";
 import { DeleteIcon, EditIcon, MoreIcon } from "../../components/icons";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import DatePicker from "react-datepicker";
@@ -95,11 +107,12 @@ function Dashboard() {
   const { list: officers } = useSelector((state) => state.officers);
   const { list: users } = useSelector((state) => state.users);
   const { list: allChildCategories } = useSelector(
-    (state) => state.childCategories
+    (state) => state.childCategories,
   );
   const { list: fieldVerifiers } = useSelector((state) => state.fieldVerifier);
   const { lastRecord: lastAttendance, loading: attendanceLoading } =
     useSelector((state) => state.attendance);
+  const { list: userLeaves } = useSelector((state) => state.userLeaves);
 
   /*  console.log("orders", orders); */
 
@@ -125,10 +138,11 @@ function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch]); // Only run on mount
 
-  // Fetch last attendance record on mount
+  // Fetch last attendance + leaves for today's leave-block on punch buttons
   useEffect(() => {
     if (currentUser?.id) {
       dispatch(fetchLastAttendanceByUserId(currentUser.id));
+      dispatch(fetchUserLeavesByUserId({ userId: currentUser.id }));
     }
   }, [dispatch, currentUser?.id]);
 
@@ -176,7 +190,7 @@ function Dashboard() {
       "view_user_assigned_filter",
     ];
     return filterPermissions.some((permission) =>
-      hasPermission(allowedPermissions, permission)
+      hasPermission(allowedPermissions, permission),
     );
   }, [allowedPermissions]);
 
@@ -188,15 +202,17 @@ function Dashboard() {
     (officer) =>
       officer.role_name.toUpperCase().includes("BANK OFFICER") ||
       officer.role_name.toUpperCase().includes("BANK AUTHORITY") ||
-      officer.role_name.toUpperCase().includes("CREDIT HEAD")
+      officer.role_name.toUpperCase().includes("CREDIT HEAD"),
   );
 
   const managers = users.filter((user) =>
-    user.role_name.toUpperCase().includes("MANAGER")
+    user.role_name.toUpperCase().includes("MANAGER"),
   );
 
   const telecallers = users.filter((user) =>
-    String(user.role_name || "").toUpperCase().includes("TELECALLER")
+    String(user.role_name || "")
+      .toUpperCase()
+      .includes("TELECALLER"),
   );
 
   // Fields allowed for TELECALLER role
@@ -211,7 +227,7 @@ function Dashboard() {
   // Permission: can telecaller see customer name in edit modal
   const canTelecallerSeeCustomerName = hasPermission(
     allowedPermissions,
-    "show_customer_name_to_telecaller"
+    "show_customer_name_to_telecaller",
   );
 
   // State for filtered child categories for Bank Officers
@@ -414,7 +430,7 @@ function Dashboard() {
         (officer) =>
           officer.user_id === currentUser?.id ||
           officer.name === currentUser?.name ||
-          officer.email === currentUser?.email
+          officer.email === currentUser?.email,
       );
 
       if (
@@ -495,7 +511,7 @@ function Dashboard() {
   const getCreatedDate = getOrderCreatedDate;
 
   const todaysOrdersCount = (orders || []).filter((o) =>
-    isSameDay(getCreatedDate(o), new Date())
+    isSameDay(getCreatedDate(o), new Date()),
   ).length;
 
   // Calculate pending orders (orders with status_id < 5)
@@ -512,17 +528,17 @@ function Dashboard() {
 
   // Calculate completed orders
   const completedOrdersCount = (orders || []).filter(
-    (order) => order.current_status_name?.toLowerCase() === "completed"
+    (order) => order.current_status_name?.toLowerCase() === "completed",
   ).length;
 
   // Calculate active field verifiers
   const activeFieldVerifiersCount = (fieldVerifiers || []).filter(
-    (verifier) => verifier.is_active === true
+    (verifier) => verifier.is_active === true,
   ).length;
 
   // Calculate inactive field verifiers
   const inactiveFieldVerifiersCount = (fieldVerifiers || []).filter(
-    (verifier) => verifier.is_active === false
+    (verifier) => verifier.is_active === false,
   ).length;
 
   const formatTwoDigits = (num) => String(num ?? 0).padStart(2, "0");
@@ -704,6 +720,39 @@ function Dashboard() {
     </div>
   );
 
+  // Same late buffer as Attendance page: Day In after day_start + 20 min → red
+  const LATE_DAY_IN_BUFFER_MINUTES = 20;
+
+  const parseTimeToMinutes = (timeValue) => {
+    if (timeValue == null || timeValue === "") return null;
+    if (timeValue instanceof Date && !Number.isNaN(timeValue.getTime())) {
+      return timeValue.getHours() * 60 + timeValue.getMinutes();
+    }
+    const match = String(timeValue).match(/(\d{1,2}):(\d{2})/);
+    if (!match) return null;
+    return parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+  };
+
+  const attendanceScheduleUser =
+    (Array.isArray(users) ? users : []).find(
+      (user) => String(user.id) === String(currentUser?.id),
+    ) || currentUser;
+
+  const isDayInLate = (checkinTime) => {
+    if (!checkinTime) return false;
+
+    const scheduledStartMinutes = parseTimeToMinutes(
+      attendanceScheduleUser?.day_start,
+    );
+    if (scheduledStartMinutes == null) return false;
+
+    const checkin = new Date(checkinTime);
+    const checkinMinutes = checkin.getHours() * 60 + checkin.getMinutes();
+    const lateBy = checkinMinutes - scheduledStartMinutes;
+
+    return lateBy > LATE_DAY_IN_BUFFER_MINUTES;
+  };
+
   // Format attendance date and time
   const formatAttendanceDateTime = (dateString) => {
     const date = new Date(dateString);
@@ -712,7 +761,7 @@ function Dashboard() {
     const ampm = hours >= 12 ? "PM" : "AM";
     const displayHours = hours % 12 || 12;
     const formattedTime = `${String(displayHours).padStart(2, "0")}:${String(
-      minutes
+      minutes,
     ).padStart(2, "0")} ${ampm}`;
 
     const weekdays = [
@@ -746,7 +795,7 @@ function Dashboard() {
     };
 
     const formattedDate = `${day}${getOrdinalSuffix(day)}-${String(
-      month
+      month,
     ).padStart(2, "0")}-${year}`;
 
     return `${formattedTime} ${weekday}, ${formattedDate}`;
@@ -761,12 +810,43 @@ function Dashboard() {
     const displayHours = hours % 12 || 12;
     return `${String(displayHours).padStart(2, "0")}:${String(minutes).padStart(
       2,
-      "0"
+      "0",
     )} ${ampm}`;
   };
 
   // Determine if check-in button should be disabled
+  const toDateOnlyString = (value) => {
+    if (!value) return null;
+    if (typeof value === "string") {
+      const plain = value.trim().match(/^(\d{4}-\d{2}-\d{2})$/);
+      if (plain) return plain[1];
+    }
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  };
+
+  // Paid leave / leave for current user today → block all punch buttons (holiday unchanged)
+  const isAttendanceBlockedByLeaveToday = () => {
+    const todayKey = toDateOnlyString(new Date());
+    if (!todayKey) return false;
+
+    return (userLeaves || []).some((leave) => {
+      if (leave.leave_type !== "paid_leave" && leave.leave_type !== "leave") {
+        return false;
+      }
+      const start = toDateOnlyString(leave.start_date);
+      const end = toDateOnlyString(leave.end_date) || start;
+      if (!start) return false;
+      return todayKey >= start && todayKey <= end;
+    });
+  };
+
   const isCheckInDisabled = () => {
+    if (isAttendanceBlockedByLeaveToday()) return true;
     // Check-in is disabled ONLY if checkin time is set but checkout time is not set
     if (
       lastAttendance &&
@@ -779,16 +859,82 @@ function Dashboard() {
     return false;
   };
 
+  const hasOpenBreak = () => !!lastAttendance?.open_break;
+  const isLunchInProgress = () =>
+    !!(lastAttendance?.lunch_in && !lastAttendance?.lunch_out);
+
   // Determine if check-out button should be disabled
   const isCheckOutDisabled = () => {
-    // Check-out is disabled if: 1) no record found, or 2) checkout time is already set
+    if (isAttendanceBlockedByLeaveToday()) return true;
     if (!lastAttendance) {
       return true;
     }
     if (lastAttendance.checkout_time) {
       return true;
     }
-    // Otherwise, check-out is enabled (record exists, checkin is set, checkout is not set)
+    if (!lastAttendance.checkin_time) {
+      return true;
+    }
+    // Block day out while lunch is open (lunch_in set, lunch_out missing)
+    if (isLunchInProgress()) {
+      return true;
+    }
+    // Block day out while personal break is open
+    if (hasOpenBreak()) {
+      return true;
+    }
+    return false;
+  };
+
+  const isLunchInDisabled = () => {
+    if (isAttendanceBlockedByLeaveToday()) return true;
+    if (!lastAttendance?.checkin_time || lastAttendance?.checkout_time) {
+      return true;
+    }
+    if (lastAttendance.lunch_in) {
+      return true;
+    }
+    // Mutual exclusion: lunch off while break is open
+    if (hasOpenBreak()) {
+      return true;
+    }
+    return false;
+  };
+
+  const isLunchOutDisabled = () => {
+    if (isAttendanceBlockedByLeaveToday()) return true;
+    if (!lastAttendance?.checkin_time || lastAttendance?.checkout_time) {
+      return true;
+    }
+    if (!lastAttendance.lunch_in || lastAttendance.lunch_out) {
+      return true;
+    }
+    // Mutual exclusion: lunch off while break is open
+    if (hasOpenBreak()) {
+      return true;
+    }
+    return false;
+  };
+
+  // Break In = start break (needs Day In; blocked mid-lunch or if break already open)
+  const isBreakInDisabled = () => {
+    if (isAttendanceBlockedByLeaveToday()) return true;
+    if (!lastAttendance?.checkin_time || lastAttendance?.checkout_time) {
+      return true;
+    }
+    if (isLunchInProgress()) return true;
+    if (hasOpenBreak()) return true;
+    return false;
+  };
+
+  // Break Out = end break (only when a break is open)
+  const isBreakOutDisabled = () => {
+    if (isAttendanceBlockedByLeaveToday()) return true;
+    if (!lastAttendance?.checkin_time || lastAttendance?.checkout_time) {
+      return true;
+    }
+    if (isLunchInProgress()) return true;
+    if (!hasOpenBreak()) return true;
     return false;
   };
 
@@ -864,7 +1010,7 @@ function Dashboard() {
         addAttendance({
           user_id: currentUser.id,
           checkin_via: "Portal",
-        })
+        }),
       ).unwrap();
       // Success toast is shown in the reducer
     } catch (error) {
@@ -876,6 +1022,66 @@ function Dashboard() {
   const handleCheckOut = () => {
     setCheckoutRemark("");
     setShowCheckoutModal(true);
+  };
+
+  const handleLunchIn = async () => {
+    if (!currentUser?.id) {
+      toast.error("User ID not found");
+      return;
+    }
+
+    try {
+      await dispatch(
+        updateAttendanceLunchIn({ user_id: currentUser.id }),
+      ).unwrap();
+    } catch (error) {
+      // Error toast is shown in the reducer
+    }
+  };
+
+  const handleLunchOut = async () => {
+    if (!currentUser?.id) {
+      toast.error("User ID not found");
+      return;
+    }
+
+    try {
+      await dispatch(
+        updateAttendanceLunchOut({ user_id: currentUser.id }),
+      ).unwrap();
+    } catch (error) {
+      // Error toast is shown in the reducer
+    }
+  };
+
+  const handleBreakIn = async () => {
+    if (!currentUser?.id) {
+      toast.error("User ID not found");
+      return;
+    }
+
+    try {
+      await dispatch(
+        updateAttendanceBreakIn({ user_id: currentUser.id }),
+      ).unwrap();
+    } catch (error) {
+      // Error toast is shown in the reducer
+    }
+  };
+
+  const handleBreakOut = async () => {
+    if (!currentUser?.id) {
+      toast.error("User ID not found");
+      return;
+    }
+
+    try {
+      await dispatch(
+        updateAttendanceBreakOut({ user_id: currentUser.id }),
+      ).unwrap();
+    } catch (error) {
+      // Error toast is shown in the reducer
+    }
   };
 
   // Submit Check-out with optional remarks
@@ -900,6 +1106,103 @@ function Dashboard() {
     }
   };
 
+  const renderAttendanceCard = () => (
+    <div className="attendance-card">
+      <div className="attendance-card-actions">
+        <div className="attendance-card-buttons-container">
+          <button
+            type="button"
+            className="attendance-card-button check-in-button"
+            onClick={handleCheckIn}
+            disabled={attendanceLoading || isCheckInDisabled()}
+          >
+            <DayInIcon /> Day In
+          </button>
+          <button
+            type="button"
+            className="attendance-card-button lunch-in-button"
+            onClick={handleLunchIn}
+            disabled={attendanceLoading || isLunchInDisabled()}
+          >
+            <LunchInIcon /> Lunch In
+          </button>
+          <button
+            type="button"
+            className="attendance-card-button lunch-out-button"
+            onClick={handleLunchOut}
+            disabled={attendanceLoading || isLunchOutDisabled()}
+          >
+            <LunchOutIcon /> Lunch Out
+          </button>
+          <button
+            type="button"
+            className="attendance-card-button check-out-button"
+            onClick={handleCheckOut}
+            disabled={attendanceLoading || isCheckOutDisabled()}
+          >
+            <DayOutIcon /> Day Out
+          </button>
+        </div>
+        <div className="attendance-card-buttons-container attendance-card-buttons-container--breaks">
+          <button
+            type="button"
+            className="attendance-card-button break-in-button"
+            onClick={handleBreakIn}
+            disabled={attendanceLoading || isBreakInDisabled()}
+          >
+            <BreakInIcon /> Break In
+          </button>
+          <button
+            type="button"
+            className="attendance-card-button break-out-button"
+            onClick={handleBreakOut}
+            disabled={attendanceLoading || isBreakOutDisabled()}
+          >
+            <BreakOutIcon /> Break Out
+          </button>
+        </div>
+      </div>
+      <div className="attendance-card-checkin-time">
+        {lastAttendance?.checkin_time && !lastAttendance?.checkout_time ? (
+          <>
+            <p>Your Current Checkin Time was</p>
+            <h4
+              className={
+                isDayInLate(lastAttendance.checkin_time)
+                  ? "tooltip-link"
+                  : undefined
+              }
+              title={
+                isDayInLate(lastAttendance.checkin_time)
+                  ? "Late Day In"
+                  : undefined
+              }
+              style={
+                isDayInLate(lastAttendance.checkin_time)
+                  ? { color: "#dc3545", fontWeight: 600 }
+                  : undefined
+              }
+            >
+              {formatAttendanceDateTime(lastAttendance.checkin_time)}
+            </h4>
+          </>
+        ) : lastAttendance?.checkout_time ? (
+          <>
+            <p>You checked out at</p>
+            <h4 style={{ color: "#dc3545" }}>
+              {formatCheckoutTime(lastAttendance.checkout_time)}
+            </h4>
+          </>
+        ) : (
+          <>
+            <p>Your Current Checkin Time was</p>
+            <h4>No check-in recorded</h4>
+          </>
+        )}
+      </div>
+    </div>
+  );
+
   // Open Order Attributes Modal
   const openAttributesModal = (order) => {
     setAttributesOrderId(order.id);
@@ -923,7 +1226,7 @@ function Dashboard() {
             return normalizedRoleName.includes(normalizedExcludedRole);
           });
         })
-        .map((u) => u.id)
+        .map((u) => u.id),
     );
     const assignedUserIds = (order.assigned_users || [])
       .map((user) => user.id)
@@ -942,16 +1245,16 @@ function Dashboard() {
   const handleAttributesSubmit = async () => {
     const canEditPriority = hasPermission(
       allowedPermissions,
-      "edit_order_priority_db"
+      "edit_order_priority_db",
     );
     const canEditType = hasPermission(allowedPermissions, "edit_order_type_db");
     const canEditValuerName = hasPermission(
       allowedPermissions,
-      "edit_valuer_name_to_order_db"
+      "edit_valuer_name_to_order_db",
     );
     const canAssignUsers = hasPermission(
       allowedPermissions,
-      "assign_user_to_order_db"
+      "assign_user_to_order_db",
     );
 
     // Build payload with only the fields that user has permission to edit and have values
@@ -1002,7 +1305,7 @@ function Dashboard() {
 
     try {
       await dispatch(
-        updateOrderAttributes({ id: attributesOrderId, data: payload })
+        updateOrderAttributes({ id: attributesOrderId, data: payload }),
       ).unwrap();
       setShowAttributesModal(false);
       setAttributesOrderId(null);
@@ -1014,7 +1317,7 @@ function Dashboard() {
       });
     } catch (err) {
       toast.error(
-        typeof err === "string" ? err : "Failed to update attributes"
+        typeof err === "string" ? err : "Failed to update attributes",
       );
     }
   };
@@ -1107,23 +1410,63 @@ function Dashboard() {
   const filteredTableOrdersCount = useMemo(() => {
     if (!orders || !Array.isArray(orders)) return 0;
     return orders.filter((order) => {
-      const typeMatch = !selectedOrderType || order.order_type === selectedOrderType;
-      const priorityMatch = !selectedPriority || order.order_priority === selectedPriority;
+      const typeMatch =
+        !selectedOrderType || order.order_type === selectedOrderType;
+      const priorityMatch =
+        !selectedPriority || order.order_priority === selectedPriority;
       const bankMatch = !selectedBank || order.bank_name === selectedBank;
-      const branchMatch = !selectedBranch || order.branch_name === selectedBranch;
-      const officerMatch = !selectedOfficer || order.officer_name === selectedOfficer;
-      const managerMatch = !selectedManager || order.manager_name === selectedManager;
-      const fieldVerifierMatch = !selectedFieldVerifier || order.field_verifier_name === selectedFieldVerifier;
-      const valuerMatch = !selectedValuerName || order.valuer_name === selectedValuerName;
-      const statusMatch = !selectedOrderStatus || order.current_status_name === selectedOrderStatus;
-      const paymentStatusMatch = !selectedPaymentStatus || order.payment_status === selectedPaymentStatus;
-      const categoryMatch = !selectedCategory || order.category_name === selectedCategory;
-      const assetCategoryMatch = !selectedAssetCategory || order.sub_category_name === selectedAssetCategory;
-      const subCategoryMatch = !selectedSubCategory || order.child_category_name === selectedSubCategory;
-      const createdByMatch = !selectedCreatedBy || order.created_by === selectedCreatedBy;
-      const userAssignedMatch = !selectedUserAssigned || (order.assigned_users && order.assigned_users.some((user) => user.name === selectedUserAssigned));
+      const branchMatch =
+        !selectedBranch || order.branch_name === selectedBranch;
+      const officerMatch =
+        !selectedOfficer || order.officer_name === selectedOfficer;
+      const managerMatch =
+        !selectedManager || order.manager_name === selectedManager;
+      const fieldVerifierMatch =
+        !selectedFieldVerifier ||
+        order.field_verifier_name === selectedFieldVerifier;
+      const valuerMatch =
+        !selectedValuerName || order.valuer_name === selectedValuerName;
+      const statusMatch =
+        !selectedOrderStatus ||
+        order.current_status_name === selectedOrderStatus;
+      const paymentStatusMatch =
+        !selectedPaymentStatus ||
+        order.payment_status === selectedPaymentStatus;
+      const categoryMatch =
+        !selectedCategory || order.category_name === selectedCategory;
+      const assetCategoryMatch =
+        !selectedAssetCategory ||
+        order.sub_category_name === selectedAssetCategory;
+      const subCategoryMatch =
+        !selectedSubCategory ||
+        order.child_category_name === selectedSubCategory;
+      const createdByMatch =
+        !selectedCreatedBy || order.created_by === selectedCreatedBy;
+      const userAssignedMatch =
+        !selectedUserAssigned ||
+        (order.assigned_users &&
+          order.assigned_users.some(
+            (user) => user.name === selectedUserAssigned,
+          ));
       const dateMatch = matchesDateFilter(order);
-      return typeMatch && priorityMatch && categoryMatch && assetCategoryMatch && subCategoryMatch && createdByMatch && userAssignedMatch && bankMatch && branchMatch && officerMatch && managerMatch && fieldVerifierMatch && valuerMatch && statusMatch && paymentStatusMatch && dateMatch;
+      return (
+        typeMatch &&
+        priorityMatch &&
+        categoryMatch &&
+        assetCategoryMatch &&
+        subCategoryMatch &&
+        createdByMatch &&
+        userAssignedMatch &&
+        bankMatch &&
+        branchMatch &&
+        officerMatch &&
+        managerMatch &&
+        fieldVerifierMatch &&
+        valuerMatch &&
+        statusMatch &&
+        paymentStatusMatch &&
+        dateMatch
+      );
     }).length;
   }, [
     orders,
@@ -1147,8 +1490,10 @@ function Dashboard() {
   ]);
 
   const handleSubmit = () => {
-    const canEditRegistration =
-      hasPermission(allowedPermissions, "edit_order_registration_number");
+    const canEditRegistration = hasPermission(
+      allowedPermissions,
+      "edit_order_registration_number",
+    );
 
     // Collect all validation errors
     if (!formData.customer_name.trim()) {
@@ -1173,11 +1518,8 @@ function Dashboard() {
       payload.contact = formData.contact.trim();
 
       // Only include other fields if they have changed
-      if (
-        formData.customer_name_2 !== (currentOrder.customer_name_2 || "")
-      ) {
-        payload.customer_name_2 =
-          formData.customer_name_2.trim() || null;
+      if (formData.customer_name_2 !== (currentOrder.customer_name_2 || "")) {
+        payload.customer_name_2 = formData.customer_name_2.trim() || null;
       }
 
       if (
@@ -1207,7 +1549,7 @@ function Dashboard() {
       if (
         canEditRegistration &&
         formData.registration_number !==
-        (currentOrder.registration_number || "")
+          (currentOrder.registration_number || "")
       ) {
         payload.registration_number =
           formData.registration_number.trim() || null;
@@ -1222,12 +1564,20 @@ function Dashboard() {
       }
 
       // Add created_at only if user has permission and value is set and changed
-      if (hasPermission(allowedPermissions, "edit_order_created_at") && formData.created_at) {
-        const currentCreatedAt = currentOrder.created_at ? new Date(currentOrder.created_at) : null;
+      if (
+        hasPermission(allowedPermissions, "edit_order_created_at") &&
+        formData.created_at
+      ) {
+        const currentCreatedAt = currentOrder.created_at
+          ? new Date(currentOrder.created_at)
+          : null;
         const newCreatedAt = formData.created_at;
 
         // Only add if changed
-        if (!currentCreatedAt || currentCreatedAt.getTime() !== newCreatedAt.getTime()) {
+        if (
+          !currentCreatedAt ||
+          currentCreatedAt.getTime() !== newCreatedAt.getTime()
+        ) {
           payload.created_at = newCreatedAt.toISOString();
         }
       }
@@ -1245,12 +1595,20 @@ function Dashboard() {
       };
 
       if (canEditRegistration) {
-        payload.registration_number = formData.registration_number.trim() || null;
+        payload.registration_number =
+          formData.registration_number.trim() || null;
       }
 
       // Add number_of_order_duplication only if user has permission and has entered a value (add order only)
-      if (hasPermission(allowedPermissions, "view_order_add_number_of_order_duplication")) {
-        const dupVal = (formData.number_of_order_duplication || "").toString().trim();
+      if (
+        hasPermission(
+          allowedPermissions,
+          "view_order_add_number_of_order_duplication",
+        )
+      ) {
+        const dupVal = (formData.number_of_order_duplication || "")
+          .toString()
+          .trim();
         if (dupVal !== "") {
           const parsed = parseInt(dupVal, 10);
           if (!Number.isNaN(parsed)) {
@@ -1260,7 +1618,10 @@ function Dashboard() {
       }
 
       // Add created_at only if user has permission and value is set
-      if (hasPermission(allowedPermissions, "add_order_created_at") && formData.created_at) {
+      if (
+        hasPermission(allowedPermissions, "add_order_created_at") &&
+        formData.created_at
+      ) {
         payload.created_at = formData.created_at.toISOString();
       }
     }
@@ -1275,7 +1636,7 @@ function Dashboard() {
     if (isBankOfficer) {
       // For Bank Officer users, find their officer record and use the officer's ID
       const currentOfficer = officers.find(
-        (officer) => officer.user_id === currentUser?.id
+        (officer) => officer.user_id === currentUser?.id,
       );
 
       if (currentOfficer) {
@@ -1311,7 +1672,9 @@ function Dashboard() {
     }
 
     // TELECALLER ID handling - use form data when user has permission
-    if (hasPermission(allowedPermissions, "view_order_add_edit_telecaller_filed")) {
+    if (
+      hasPermission(allowedPermissions, "view_order_add_edit_telecaller_filed")
+    ) {
       newTelecallerId = formData.telecaller_id;
     }
 
@@ -1329,9 +1692,11 @@ function Dashboard() {
       hasPermission(allowedPermissions, "view_order_add_edit_manager_filed");
     const canChangeTelecaller = hasPermission(
       allowedPermissions,
-      "view_order_add_edit_telecaller_filed"
+      "view_order_add_edit_telecaller_filed",
     );
-    const canChangeFieldVerifier = isManager || isSuperAdmin ||
+    const canChangeFieldVerifier =
+      isManager ||
+      isSuperAdmin ||
       hasPermission(allowedPermissions, "view_order_add_edit_manager_filed");
 
     // For edit mode, only include these fields if they have changed AND user can change them
@@ -1394,18 +1759,22 @@ function Dashboard() {
   // Check if user has any dashboard permissions
   const hasStatisticsPermission = hasPermission(
     allowedPermissions,
-    "view_dashboard_statistics"
+    "view_dashboard_statistics",
   );
   const hasCheckinPermission = hasPermission(
     allowedPermissions,
-    "view_dashboard_checkin_checkout"
+    "view_dashboard_checkin_checkout",
   );
   const hasOrderTablePermission = hasPermission(
     allowedPermissions,
-    "view_dashboard_order_table"
+    "view_dashboard_order_table",
   );
   const hasAnyDashboardPermission =
     hasStatisticsPermission || hasCheckinPermission || hasOrderTablePermission;
+
+  // Keep attendance UI hidden for developer admins (same rule as Layout menu)
+  const isDeveloperAdmin =
+    currentUser?.role?.name?.toUpperCase() === "DEVELOPER_ADMIN";
 
   // Compute users options (show all users except specific roles)
   const adminUsersOptions = React.useMemo(() => {
@@ -1448,7 +1817,7 @@ function Dashboard() {
     if (!Array.isArray(fieldVerifiers) || !Array.isArray(users)) return [];
 
     const managerUser = users.find(
-      (u) => u.id === selectedManagerIdForFieldVerifier
+      (u) => u.id === selectedManagerIdForFieldVerifier,
     );
     if (!managerUser) return [];
 
@@ -1456,7 +1825,7 @@ function Dashboard() {
     if (!managerName) return [];
 
     return fieldVerifiers.filter(
-      (verifier) => verifier.created_by === managerName
+      (verifier) => verifier.created_by === managerName,
     );
   }, [selectedManagerIdForFieldVerifier, fieldVerifiers, users]);
 
@@ -1546,109 +1915,181 @@ function Dashboard() {
         ) : (
           <div className="row">
             {hasStatisticsPermission && !isTelecaller && !isManager && (
-              <div
-                className={`${hasPermission(
-                  allowedPermissions,
-                  "view_dashboard_checkin_checkout"
-                )
-                  ? "col-xl-12"
-                  : "col-xl-12"
-                  } col-lg-12 col-md-12 col-sm-12 col-xs-12`}
-              >
+              <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12">
                 <div className="left-part-of-sneak-peek">
-                  <div className="row dashboard-order-summary-row">
+                  <div
+                    className={`row dashboard-order-summary-row${
+                      hasCheckinPermission
+                        ? " dashboard-order-summary-row--with-attendance"
+                        : ""
+                    }`}
+                  >
                     {isBankAuthority ? (
-                      <>
-                        <div className="col-xl-4 col-lg-4 col-md-4 col-sm-12 col-xs-12">
-                          <div className="padding-top-bottom">
-                            <div className="sneak-peek-card order-status today-orders-card">
-                              <h3>Today's Orders</h3>
-                              <p>{formatTwoDigits(todaysOrdersCount)}</p>
+                      hasCheckinPermission ? (
+                        <>
+                          <div className="col-xl-2 col-lg-4 col-md-4 col-sm-12 col-xs-12">
+                            <div className="padding-top-bottom sneak-peek-stacked">
+                              <div className="sneak-peek-card order-status today-orders-card sneak-peek-card-inline">
+                                <h3>Today's Orders</h3>
+                                <p>{formatTwoDigits(todaysOrdersCount)}</p>
+                              </div>
+                              <div className="sneak-peek-card order-status validate-orders sneak-peek-card-inline">
+                                <h3>Completed</h3>
+                                <p>{formatTwoDigits(completedOrdersCount)}</p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="col-xl-2 col-lg-4 col-md-4 col-sm-12 col-xs-12">
-                          <div className="padding-top-bottom">
-                            <div className="sneak-peek-card order-status ongoing-orders">
-                              <h3>Total Orders</h3>
-                              <p>{formatTwoDigits(orders.length)}</p>
+                          <div className="col-xl-2 col-lg-4 col-md-4 col-sm-12 col-xs-12">
+                            <div className="padding-top-bottom sneak-peek-stacked">
+                              <div className="sneak-peek-card order-status ongoing-orders sneak-peek-card-inline">
+                                <h3>Total Orders</h3>
+                                <p>{formatTwoDigits(orders.length)}</p>
+                              </div>
+                              <div className="sneak-peek-card order-status today-orders-card sneak-peek-card-inline">
+                                <h3>Total Officer</h3>
+                                <p>{formatTwoDigits(officers.length)}</p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="col-xl-2 col-lg-4 col-md-4 col-sm-12 col-xs-12">
-                          <div className="padding-top-bottom">
-                            <div className="sneak-peek-card order-status re-validate-orders">
-                              <h3>Ongoing</h3>
-                              <p>
-                                {formatTwoDigits(
-                                  orders.filter((order) => {
-                                    const status =
-                                      order.current_status_name?.toLowerCase();
-                                    // Count orders that are not "submitted" or "completed"
-                                    return (
-                                      status &&
-                                      status !== "submitted" &&
-                                      status !== "completed"
-                                    );
-                                  }).length
-                                )}
-                              </p>
+                          <div className="col-xl-2 col-lg-4 col-md-4 col-sm-12 col-xs-12">
+                            <div className="padding-top-bottom sneak-peek-stacked">
+                              <div className="sneak-peek-card order-status re-validate-orders sneak-peek-card-inline">
+                                <h3>Ongoing</h3>
+                                <p>
+                                  {formatTwoDigits(
+                                    orders.filter((order) => {
+                                      const status =
+                                        order.current_status_name?.toLowerCase();
+                                      return (
+                                        status &&
+                                        status !== "submitted" &&
+                                        status !== "completed"
+                                      );
+                                    }).length,
+                                  )}
+                                </p>
+                              </div>
+                              <div className="sneak-peek-card order-status ongoing-orders sneak-peek-card-inline">
+                                <h3>Active Officer</h3>
+                                <p>-</p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="col-xl-2 col-lg-4 col-md-4 col-sm-12 col-xs-12">
-                          <div className="padding-top-bottom">
-                            <div className="sneak-peek-card order-status submitted-orders">
-                              <h3>Document Submitted</h3>
-                              <p>{formatTwoDigits(
-                                orders.filter(
-                                  (order) =>
-                                    order.current_status_id === 7
-                                ).length
-                              )}</p>
+                          <div className="col-xl-2 col-lg-4 col-md-4 col-sm-12 col-xs-12">
+                            <div className="padding-top-bottom sneak-peek-stacked">
+                              <div className="sneak-peek-card order-status submitted-orders sneak-peek-card-inline">
+                                <h3>Document Submitted</h3>
+                                <p>
+                                  {formatTwoDigits(
+                                    orders.filter(
+                                      (order) => order.current_status_id === 7,
+                                    ).length,
+                                  )}
+                                </p>
+                              </div>
+                              <div className="sneak-peek-card order-status submitted-orders sneak-peek-card-inline">
+                                <h3>Inactive Officer</h3>
+                                <p>-</p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="col-xl-2 col-lg-4 col-md-4 col-sm-12 col-xs-12">
-                          <div className="padding-top-bottom">
-                            <div className="sneak-peek-card order-status validate-orders">
-                              <h3>Completed</h3>
-                              <p>{formatTwoDigits(completedOrdersCount)}</p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="col-xl-4 col-lg-4 col-md-4 col-sm-12 col-xs-12">
+                            <div className="padding-top-bottom">
+                              <div className="sneak-peek-card order-status today-orders-card">
+                                <h3>Today's Orders</h3>
+                                <p>{formatTwoDigits(todaysOrdersCount)}</p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="col-xl-4 col-lg-4 col-md-4 col-sm-12 col-xs-12">
-                          <div className="padding-top-bottom">
-                            <div className="sneak-peek-card order-status today-orders-card">
-                              <h3>Total Officer</h3>
-                              <p>{formatTwoDigits(officers.length)}</p>
+                          <div className="col-xl-2 col-lg-4 col-md-4 col-sm-12 col-xs-12">
+                            <div className="padding-top-bottom">
+                              <div className="sneak-peek-card order-status ongoing-orders">
+                                <h3>Total Orders</h3>
+                                <p>{formatTwoDigits(orders.length)}</p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="col-xl-4 col-lg-4 col-md-4 col-sm-12 col-xs-12">
-                          <div className="padding-top-bottom">
-                            <div className="sneak-peek-card order-status ongoing-orders">
-                              <h3>Active Officer</h3>
-                              <p>-</p>
+                          <div className="col-xl-2 col-lg-4 col-md-4 col-sm-12 col-xs-12">
+                            <div className="padding-top-bottom">
+                              <div className="sneak-peek-card order-status re-validate-orders">
+                                <h3>Ongoing</h3>
+                                <p>
+                                  {formatTwoDigits(
+                                    orders.filter((order) => {
+                                      const status =
+                                        order.current_status_name?.toLowerCase();
+                                      // Count orders that are not "submitted" or "completed"
+                                      return (
+                                        status &&
+                                        status !== "submitted" &&
+                                        status !== "completed"
+                                      );
+                                    }).length,
+                                  )}
+                                </p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="col-xl-4 col-lg-4 col-md-4 col-sm-12 col-xs-12">
-                          <div className="padding-top-bottom">
-                            <div className="sneak-peek-card order-status submitted-orders">
-                              <h3>Inactive Officer</h3>
-                              <p>-</p>
+                          <div className="col-xl-2 col-lg-4 col-md-4 col-sm-12 col-xs-12">
+                            <div className="padding-top-bottom">
+                              <div className="sneak-peek-card order-status submitted-orders">
+                                <h3>Document Submitted</h3>
+                                <p>
+                                  {formatTwoDigits(
+                                    orders.filter(
+                                      (order) => order.current_status_id === 7,
+                                    ).length,
+                                  )}
+                                </p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </>
+                          <div className="col-xl-2 col-lg-4 col-md-4 col-sm-12 col-xs-12">
+                            <div className="padding-top-bottom">
+                              <div className="sneak-peek-card order-status validate-orders">
+                                <h3>Completed</h3>
+                                <p>{formatTwoDigits(completedOrdersCount)}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="col-xl-4 col-lg-4 col-md-4 col-sm-12 col-xs-12">
+                            <div className="padding-top-bottom">
+                              <div className="sneak-peek-card order-status today-orders-card">
+                                <h3>Total Officer</h3>
+                                <p>{formatTwoDigits(officers.length)}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="col-xl-4 col-lg-4 col-md-4 col-sm-12 col-xs-12">
+                            <div className="padding-top-bottom">
+                              <div className="sneak-peek-card order-status ongoing-orders">
+                                <h3>Active Officer</h3>
+                                <p>-</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="col-xl-4 col-lg-4 col-md-4 col-sm-12 col-xs-12">
+                            <div className="padding-top-bottom">
+                              <div className="sneak-peek-card order-status submitted-orders">
+                                <h3>Inactive Officer</h3>
+                                <p>-</p>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      )
                     ) : (
                       <>
                         <div className="col-xl-2 col-lg-4 col-md-4 col-sm-12 col-xs-12">
                           <div className="padding-top-bottom sneak-peek-stacked">
                             <div
                               className={`sneak-peek-card order-status total-orders sneak-peek-card-inline sneak-peek-card-clickable${
-                                summaryCardTableFilter === null ? " is-active" : ""
+                                summaryCardTableFilter === null
+                                  ? " is-active"
+                                  : ""
                               }`}
                             >
                               <button
@@ -1658,7 +2099,9 @@ function Dashboard() {
                                 aria-pressed={summaryCardTableFilter === null}
                               >
                                 <h3>Total Orders</h3>
-                                <p>{formatTwoDigits(filteredTableOrdersCount)}</p>
+                                <p>
+                                  {formatTwoDigits(filteredTableOrdersCount)}
+                                </p>
                               </button>
                             </div>
                             <div
@@ -1674,7 +2117,7 @@ function Dashboard() {
                                 className="sneak-peek-card-action"
                                 onClick={() =>
                                   setSummaryCardTableFilter(
-                                    SUMMARY_CARD_TABLE_FILTER.TODAY_ORDERS
+                                    SUMMARY_CARD_TABLE_FILTER.TODAY_ORDERS,
                                   )
                                 }
                                 aria-pressed={
@@ -1712,7 +2155,7 @@ function Dashboard() {
                                           status !== "submitted" &&
                                           status !== "completed"
                                         );
-                                      }).length
+                                      }).length,
                                     )}
                                   </p>
                                 </div>
@@ -1724,8 +2167,8 @@ function Dashboard() {
                                   <h3>Document Submitted</h3>
                                   {formatTwoDigits(
                                     orders.filter(
-                                      (order) => order.current_status_id === 7
-                                    ).length
+                                      (order) => order.current_status_id === 7,
+                                    ).length,
                                   )}
                                 </div>
                               </div>
@@ -1735,6 +2178,217 @@ function Dashboard() {
                                 <div className="sneak-peek-card order-status validate-orders">
                                   <h3>Completed</h3>
                                   <p>-</p>
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        ) : hasCheckinPermission && !isDeveloperAdmin ? (
+                          <>
+                            <div className="col-xl-2 col-lg-4 col-md-4 col-sm-6 col-xs-12">
+                              <div className="padding-top-bottom sneak-peek-stacked">
+                                <div
+                                  className={`sneak-peek-card order-status ongoing-orders sneak-peek-card-inline sneak-peek-card-clickable${
+                                    summaryCardTableFilter ===
+                                    SUMMARY_CARD_TABLE_FILTER.ORDER_CREATED
+                                      ? " is-active"
+                                      : ""
+                                  }`}
+                                >
+                                  <button
+                                    type="button"
+                                    className="sneak-peek-card-action"
+                                    onClick={() =>
+                                      setSummaryCardTableFilter(
+                                        SUMMARY_CARD_TABLE_FILTER.ORDER_CREATED,
+                                      )
+                                    }
+                                    aria-pressed={
+                                      summaryCardTableFilter ===
+                                      SUMMARY_CARD_TABLE_FILTER.ORDER_CREATED
+                                    }
+                                  >
+                                    <h3>Order Created</h3>
+                                    <p>
+                                      {formatTwoDigits(
+                                        orders.filter(
+                                          (order) =>
+                                            order.current_status_id != null &&
+                                            order.current_status_id <= 2,
+                                        ).length,
+                                      )}
+                                    </p>
+                                  </button>
+                                </div>
+                                <div
+                                  className={`sneak-peek-card order-status submitted-orders sneak-peek-card-inline sneak-peek-card-clickable${
+                                    summaryCardTableFilter ===
+                                    SUMMARY_CARD_TABLE_FILTER.PHOTO_PENDING
+                                      ? " is-active"
+                                      : ""
+                                  }`}
+                                >
+                                  <button
+                                    type="button"
+                                    className="sneak-peek-card-action"
+                                    onClick={() =>
+                                      setSummaryCardTableFilter(
+                                        SUMMARY_CARD_TABLE_FILTER.PHOTO_PENDING,
+                                      )
+                                    }
+                                    aria-pressed={
+                                      summaryCardTableFilter ===
+                                      SUMMARY_CARD_TABLE_FILTER.PHOTO_PENDING
+                                    }
+                                  >
+                                    <h3>Photo Pending</h3>
+                                    <p>
+                                      {formatTwoDigits(
+                                        orders.filter((order) =>
+                                          matchesSummaryCardTableFilter(
+                                            order,
+                                            SUMMARY_CARD_TABLE_FILTER.PHOTO_PENDING,
+                                          ),
+                                        ).length,
+                                      )}
+                                    </p>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="col-xl-2 col-lg-4 col-md-4 col-sm-6 col-xs-12">
+                              <div className="padding-top-bottom sneak-peek-stacked">
+                                <div
+                                  className={`sneak-peek-card order-status validate-orders sneak-peek-card-inline sneak-peek-card-clickable${
+                                    summaryCardTableFilter ===
+                                    SUMMARY_CARD_TABLE_FILTER.DETAILS_PENDING
+                                      ? " is-active"
+                                      : ""
+                                  }`}
+                                >
+                                  <button
+                                    type="button"
+                                    className="sneak-peek-card-action"
+                                    onClick={() =>
+                                      setSummaryCardTableFilter(
+                                        SUMMARY_CARD_TABLE_FILTER.DETAILS_PENDING,
+                                      )
+                                    }
+                                    aria-pressed={
+                                      summaryCardTableFilter ===
+                                      SUMMARY_CARD_TABLE_FILTER.DETAILS_PENDING
+                                    }
+                                  >
+                                    <h3>Details Pending</h3>
+                                    <p>
+                                      {formatTwoDigits(
+                                        orders.filter((order) =>
+                                          [7, 8].includes(
+                                            order.current_status_id,
+                                          ),
+                                        ).length,
+                                      )}
+                                    </p>
+                                  </button>
+                                </div>
+                                <div
+                                  className={`sneak-peek-card order-status price-pending-orders sneak-peek-card-inline sneak-peek-card-clickable${
+                                    summaryCardTableFilter ===
+                                    SUMMARY_CARD_TABLE_FILTER.PRICE_PENDING
+                                      ? " is-active"
+                                      : ""
+                                  }`}
+                                >
+                                  <button
+                                    type="button"
+                                    className="sneak-peek-card-action"
+                                    onClick={() =>
+                                      setSummaryCardTableFilter(
+                                        SUMMARY_CARD_TABLE_FILTER.PRICE_PENDING,
+                                      )
+                                    }
+                                    aria-pressed={
+                                      summaryCardTableFilter ===
+                                      SUMMARY_CARD_TABLE_FILTER.PRICE_PENDING
+                                    }
+                                  >
+                                    <h3>Price Pending</h3>
+                                    <p>
+                                      {formatTwoDigits(
+                                        orders.filter(
+                                          (order) =>
+                                            order.current_status_id === 10,
+                                        ).length,
+                                      )}
+                                    </p>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="col-xl-2 col-lg-4 col-md-4 col-sm-6 col-xs-12">
+                              <div className="padding-top-bottom sneak-peek-stacked">
+                                <div
+                                  className={`sneak-peek-card order-status re-validate-orders sneak-peek-card-inline sneak-peek-card-clickable${
+                                    summaryCardTableFilter ===
+                                    SUMMARY_CARD_TABLE_FILTER.MAIL_PENDING
+                                      ? " is-active"
+                                      : ""
+                                  }`}
+                                >
+                                  <button
+                                    type="button"
+                                    className="sneak-peek-card-action"
+                                    onClick={() =>
+                                      setSummaryCardTableFilter(
+                                        SUMMARY_CARD_TABLE_FILTER.MAIL_PENDING,
+                                      )
+                                    }
+                                    aria-pressed={
+                                      summaryCardTableFilter ===
+                                      SUMMARY_CARD_TABLE_FILTER.MAIL_PENDING
+                                    }
+                                  >
+                                    <h3>Mail Pending</h3>
+                                    <p>
+                                      {formatTwoDigits(
+                                        orders.filter(
+                                          (order) =>
+                                            order.current_status_id === 12,
+                                        ).length,
+                                      )}
+                                    </p>
+                                  </button>
+                                </div>
+                                <div
+                                  className={`sneak-peek-card order-status discard-orders sneak-peek-card-inline sneak-peek-card-clickable${
+                                    summaryCardTableFilter ===
+                                    SUMMARY_CARD_TABLE_FILTER.DISCARD
+                                      ? " is-active"
+                                      : ""
+                                  }`}
+                                >
+                                  <button
+                                    type="button"
+                                    className="sneak-peek-card-action"
+                                    onClick={() =>
+                                      setSummaryCardTableFilter(
+                                        SUMMARY_CARD_TABLE_FILTER.DISCARD,
+                                      )
+                                    }
+                                    aria-pressed={
+                                      summaryCardTableFilter ===
+                                      SUMMARY_CARD_TABLE_FILTER.DISCARD
+                                    }
+                                  >
+                                    <h3>Discard</h3>
+                                    <p>
+                                      {formatTwoDigits(
+                                        orders.filter(
+                                          (order) =>
+                                            order.current_status_id === 11,
+                                        ).length,
+                                      )}
+                                    </p>
+                                  </button>
                                 </div>
                               </div>
                             </div>
@@ -1756,7 +2410,7 @@ function Dashboard() {
                                     className="sneak-peek-card-action"
                                     onClick={() =>
                                       setSummaryCardTableFilter(
-                                        SUMMARY_CARD_TABLE_FILTER.ORDER_CREATED
+                                        SUMMARY_CARD_TABLE_FILTER.ORDER_CREATED,
                                       )
                                     }
                                     aria-pressed={
@@ -1770,8 +2424,8 @@ function Dashboard() {
                                         orders.filter(
                                           (order) =>
                                             order.current_status_id != null &&
-                                            order.current_status_id <= 2
-                                        ).length
+                                            order.current_status_id <= 2,
+                                        ).length,
                                       )}
                                     </p>
                                   </button>
@@ -1793,7 +2447,7 @@ function Dashboard() {
                                     className="sneak-peek-card-action"
                                     onClick={() =>
                                       setSummaryCardTableFilter(
-                                        SUMMARY_CARD_TABLE_FILTER.PHOTO_PENDING
+                                        SUMMARY_CARD_TABLE_FILTER.PHOTO_PENDING,
                                       )
                                     }
                                     aria-pressed={
@@ -1807,9 +2461,9 @@ function Dashboard() {
                                         orders.filter((order) =>
                                           matchesSummaryCardTableFilter(
                                             order,
-                                            SUMMARY_CARD_TABLE_FILTER.PHOTO_PENDING
-                                          )
-                                        ).length
+                                            SUMMARY_CARD_TABLE_FILTER.PHOTO_PENDING,
+                                          ),
+                                        ).length,
                                       )}
                                     </p>
                                   </button>
@@ -1831,7 +2485,7 @@ function Dashboard() {
                                     className="sneak-peek-card-action"
                                     onClick={() =>
                                       setSummaryCardTableFilter(
-                                        SUMMARY_CARD_TABLE_FILTER.DETAILS_PENDING
+                                        SUMMARY_CARD_TABLE_FILTER.DETAILS_PENDING,
                                       )
                                     }
                                     aria-pressed={
@@ -1842,12 +2496,11 @@ function Dashboard() {
                                     <h3>Details Pending</h3>
                                     <p>
                                       {formatTwoDigits(
-                                        orders.filter(
-                                          (order) =>
-                                            [7, 8].includes(
-                                              order.current_status_id
-                                            )
-                                        ).length
+                                        orders.filter((order) =>
+                                          [7, 8].includes(
+                                            order.current_status_id,
+                                          ),
+                                        ).length,
                                       )}
                                     </p>
                                   </button>
@@ -1869,7 +2522,7 @@ function Dashboard() {
                                     className="sneak-peek-card-action"
                                     onClick={() =>
                                       setSummaryCardTableFilter(
-                                        SUMMARY_CARD_TABLE_FILTER.PRICE_PENDING
+                                        SUMMARY_CARD_TABLE_FILTER.PRICE_PENDING,
                                       )
                                     }
                                     aria-pressed={
@@ -1882,8 +2535,8 @@ function Dashboard() {
                                       {formatTwoDigits(
                                         orders.filter(
                                           (order) =>
-                                            order.current_status_id === 10
-                                        ).length
+                                            order.current_status_id === 10,
+                                        ).length,
                                       )}
                                     </p>
                                   </button>
@@ -1905,7 +2558,7 @@ function Dashboard() {
                                     className="sneak-peek-card-action"
                                     onClick={() =>
                                       setSummaryCardTableFilter(
-                                        SUMMARY_CARD_TABLE_FILTER.MAIL_PENDING
+                                        SUMMARY_CARD_TABLE_FILTER.MAIL_PENDING,
                                       )
                                     }
                                     aria-pressed={
@@ -1918,8 +2571,8 @@ function Dashboard() {
                                       {formatTwoDigits(
                                         orders.filter(
                                           (order) =>
-                                            order.current_status_id === 12
-                                        ).length
+                                            order.current_status_id === 12,
+                                        ).length,
                                       )}
                                     </p>
                                   </button>
@@ -1941,7 +2594,7 @@ function Dashboard() {
                                     className="sneak-peek-card-action"
                                     onClick={() =>
                                       setSummaryCardTableFilter(
-                                        SUMMARY_CARD_TABLE_FILTER.DISCARD
+                                        SUMMARY_CARD_TABLE_FILTER.DISCARD,
                                       )
                                     }
                                     aria-pressed={
@@ -1954,8 +2607,8 @@ function Dashboard() {
                                       {formatTwoDigits(
                                         orders.filter(
                                           (order) =>
-                                            order.current_status_id === 11
-                                        ).length
+                                            order.current_status_id === 11,
+                                        ).length,
                                       )}
                                     </p>
                                   </button>
@@ -1966,68 +2619,26 @@ function Dashboard() {
                         )}
                       </>
                     )}
+                    {hasCheckinPermission && !isDeveloperAdmin && (
+                      <div className="col-xl-3 col-lg-4 col-md-6 col-sm-12 col-xs-12 attendance-summary-col">
+                        <div className="padding-top-bottom">
+                          {renderAttendanceCard()}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             )}
-            {/* {hasCheckinPermission && (
-              <div className="col-xl-5 col-lg-12 col-md-12 col-sm-12 col-xs-12">
-                <div className="attendance-card-container">
-                  <div className="attendance-card">
-                    <div className="attendance-card-buttons-container">
-                      <button
-                        className="attendance-card-button check-in-button"
-                        onClick={handleCheckIn}
-                        disabled={attendanceLoading || isCheckInDisabled()}
-                      >
-                        <DashboardIcon /> Checkin
-                      </button>
-                      <button
-                        className="attendance-card-button check-out-button"
-                        onClick={handleCheckOut}
-                        disabled={attendanceLoading || isCheckOutDisabled()}
-                      >
-                        <DashboardIcon /> Checkout
-                      </button>
-                    </div>
-                    <div className="attendance-card-checkin-time">
-                      {lastAttendance?.checkin_time && !lastAttendance?.checkout_time ? (
-                        <>
-                          <p>Your Current Checkin Time was</p>
-                          <h4>{formatAttendanceDateTime(lastAttendance.checkin_time)}</h4>
-                        </>
-                      ) : lastAttendance?.checkout_time ? (
-                        <>
-                          <p>You checked out at</p>
-                          <h4 style={{ color: "#dc3545" }}>{formatCheckoutTime(lastAttendance.checkout_time)}</h4>
-                        </>
-                      ) : (
-                        <>
-                          <p>Your Current Checkin Time was</p>
-                          <h4>No check-in recorded</h4>
-                        </>
-                      )}
-                    </div>
+            {hasCheckinPermission &&
+              !isDeveloperAdmin &&
+              !(hasStatisticsPermission && !isTelecaller && !isManager) && (
+                <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12">
+                  <div className="attendance-card-container attendance-card-container--standalone">
+                    {renderAttendanceCard()}
                   </div>
                 </div>
-                <div className="attendance-card-container">
-                  <div className="attendance-card">
-                    <div className="attendance-card-buttons-container">
-                      <button className="attendance-card-button check-in-button">
-                        <DashboardIcon /> Checkin
-                      </button>
-                      <button className="attendance-card-button check-out-button">
-                        <DashboardIcon /> Checkout
-                      </button>
-                    </div>
-                    <div className="attendance-card-checkin-time">
-                      <p>Your Current Checkin Time was</p>
-                      <h4>09:35 AM Monday, 15th-09-2025</h4>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )} */}
+              )}
             {hasOrderTablePermission && (
               <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12">
                 {/* Filter Container - Outside dashboard-order-table */}
@@ -2037,206 +2648,222 @@ function Dashboard() {
                     <div className="filter-row">
                       {hasPermission(
                         allowedPermissions,
-                        "view_order_type_filter"
+                        "view_order_type_filter",
                       ) && (
+                        <SingleSearchSelect
+                          className="search-selector"
+                          options={[
+                            { value: "", label: "All Types" },
+                            { value: "VKA1", label: "VKA1" },
+                            { value: "VKA2", label: "VKA2" },
+                            { value: "VKA3", label: "VKA3" },
+                          ]}
+                          value={selectedOrderType || null}
+                          onChange={(value) => {
+                            const val = value || "";
+                            setSelectedOrderType(val);
+                            localStorage.setItem(
+                              "filter_dashboard_orderType",
+                              val,
+                            );
+                          }}
+                          placeholder="All Types"
+                        />
+                      )}
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_order_priority_filter",
+                      ) && (
+                        <SingleSearchSelect
+                          className="search-selector"
+                          options={[
+                            { value: "", label: "All Priorities" },
+                            { value: "High", label: "High" },
+                            { value: "Low", label: "Low" },
+                          ]}
+                          value={selectedPriority || null}
+                          onChange={(value) => {
+                            const val = value || "";
+                            setSelectedPriority(val);
+                            localStorage.setItem(
+                              "filter_dashboard_priority",
+                              val,
+                            );
+                          }}
+                          placeholder="All Priorities"
+                        />
+                      )}
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_status_filter",
+                      ) && (
+                        <SingleSearchSelect
+                          className="search-selector"
+                          options={[
+                            { value: "", label: "All Status" },
+                            ...distinctOrderStatuses.map((status) => ({
+                              value: status,
+                              label: status,
+                            })),
+                          ]}
+                          value={selectedOrderStatus || null}
+                          onChange={(value) => {
+                            const val = value || "";
+                            setSelectedOrderStatus(val);
+                            localStorage.setItem(
+                              "filter_dashboard_orderStatus",
+                              val,
+                            );
+                          }}
+                          placeholder="All Status"
+                        />
+                      )}
+                      {hasPermission(
+                        allowedPermissions,
+                        "view_date_filter",
+                      ) && (
+                        <>
                           <SingleSearchSelect
                             className="search-selector"
                             options={[
-                              { value: "", label: "All Types" },
-                              { value: "VKA1", label: "VKA1" },
-                              { value: "VKA2", label: "VKA2" },
-                              { value: "VKA3", label: "VKA3" },
+                              { value: "", label: "Date Preset" },
+                              { value: "today", label: "Today" },
+                              { value: "thisWeek", label: "This Week" },
+                              { value: "thisMonth", label: "This Month" },
+                              { value: "fromTo", label: "From-To Date" },
                             ]}
-                            value={selectedOrderType || null}
+                            value={selectedDatePreset || null}
                             onChange={(value) => {
                               const val = value || "";
-                              setSelectedOrderType(val);
-                              localStorage.setItem("filter_dashboard_orderType", val);
+                              const previousValue = selectedDatePreset;
+                              setSelectedDatePreset(val);
+                              localStorage.setItem(
+                                "filter_dashboard_datePreset",
+                                val,
+                              );
+                              // Clear date range when changing from "fromTo" to another preset or empty
+                              if (
+                                previousValue === "fromTo" &&
+                                val !== "fromTo"
+                              ) {
+                                setSelectedDateRange({
+                                  start: null,
+                                  end: null,
+                                });
+                                localStorage.removeItem(
+                                  "filter_dashboard_dateRangeStart",
+                                );
+                                localStorage.removeItem(
+                                  "filter_dashboard_dateRangeEnd",
+                                );
+                              }
+                              // Clear date range when preset is selected (except for fromTo)
+                              if (val && val !== "fromTo") {
+                                setSelectedDateRange({
+                                  start: null,
+                                  end: null,
+                                });
+                                localStorage.removeItem(
+                                  "filter_dashboard_dateRangeStart",
+                                );
+                                localStorage.removeItem(
+                                  "filter_dashboard_dateRangeEnd",
+                                );
+                              }
                             }}
-                            placeholder="All Types"
+                            placeholder="Date Preset"
                           />
-                        )}
-                      {hasPermission(
-                        allowedPermissions,
-                        "view_order_priority_filter"
-                      ) && (
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "All Priorities" },
-                              { value: "High", label: "High" },
-                              { value: "Low", label: "Low" },
-                            ]}
-                            value={selectedPriority || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              setSelectedPriority(val);
-                              localStorage.setItem("filter_dashboard_priority", val);
-                            }}
-                            placeholder="All Priorities"
-                          />
-                        )}
-                      {hasPermission(
-                        allowedPermissions,
-                        "view_status_filter"
-                      ) && (
-                          <SingleSearchSelect
-                            className="search-selector"
-                            options={[
-                              { value: "", label: "All Status" },
-                              ...distinctOrderStatuses.map((status) => ({
-                                value: status,
-                                label: status,
-                              })),
-                            ]}
-                            value={selectedOrderStatus || null}
-                            onChange={(value) => {
-                              const val = value || "";
-                              setSelectedOrderStatus(val);
-                              localStorage.setItem("filter_dashboard_orderStatus", val);
-                            }}
-                            placeholder="All Status"
-                          />
-                        )}
-                      {hasPermission(
-                        allowedPermissions,
-                        "view_date_filter"
-                      ) && (
-                          <>
-                            <SingleSearchSelect
-                              className="search-selector"
-                              options={[
-                                { value: "", label: "Date Preset" },
-                                { value: "today", label: "Today" },
-                                { value: "thisWeek", label: "This Week" },
-                                { value: "thisMonth", label: "This Month" },
-                                { value: "fromTo", label: "From-To Date" },
-                              ]}
-                              value={selectedDatePreset || null}
-                              onChange={(value) => {
-                                const val = value || "";
-                                const previousValue = selectedDatePreset;
-                                setSelectedDatePreset(val);
-                                localStorage.setItem("filter_dashboard_datePreset", val);
-                                // Clear date range when changing from "fromTo" to another preset or empty
-                                if (
-                                  previousValue === "fromTo" &&
-                                  val !== "fromTo"
-                                ) {
-                                  setSelectedDateRange({
-                                    start: null,
-                                    end: null,
-                                  });
-                                  localStorage.removeItem(
-                                    "filter_dashboard_dateRangeStart"
-                                  );
-                                  localStorage.removeItem("filter_dashboard_dateRangeEnd");
-                                }
-                                // Clear date range when preset is selected (except for fromTo)
-                                if (val && val !== "fromTo") {
-                                  setSelectedDateRange({
-                                    start: null,
-                                    end: null,
-                                  });
-                                  localStorage.removeItem(
-                                    "filter_dashboard_dateRangeStart"
-                                  );
-                                  localStorage.removeItem("filter_dashboard_dateRangeEnd");
-                                }
-                              }}
-                              placeholder="Date Preset"
-                            />
-                            {selectedDatePreset === "fromTo" && (
-                              <>
-                                <div className="date-picker-wrapper">
-                                  <DatePicker
-                                    selected={selectedDateRange.start}
-                                    onChange={(date) => {
-                                      setSelectedDateRange((prev) => ({
-                                        ...prev,
-                                        start: date,
-                                      }));
-                                      if (date) {
-                                        localStorage.setItem(
-                                          "filter_dashboard_dateRangeStart",
-                                          date.toISOString()
-                                        );
-                                      } else {
-                                        localStorage.removeItem(
-                                          "filter_dashboard_dateRangeStart"
-                                        );
-                                      }
-                                      // Set preset to fromTo if dates are manually selected
-                                      if (
-                                        !selectedDatePreset &&
-                                        (date || selectedDateRange.end)
-                                      ) {
-                                        setSelectedDatePreset("fromTo");
-                                        localStorage.setItem(
-                                          "filter_dashboard_datePreset",
-                                          "fromTo"
-                                        );
-                                      }
-                                    }}
-                                    selectsStart
-                                    startDate={selectedDateRange.start}
-                                    endDate={selectedDateRange.end}
-                                    placeholderText="Start Date"
-                                    className="form-field search-selector"
-                                    dateFormat="d MMM yyyy"
-                                    renderCustomHeader={renderDatePickerHeader}
-                                    showMonthDropdown
-                                    showYearDropdown
-                                    dropdownMode="select"
-                                  />
-                                </div>
-                                <div className="date-picker-wrapper">
-                                  <DatePicker
-                                    selected={selectedDateRange.end}
-                                    onChange={(date) => {
-                                      setSelectedDateRange((prev) => ({
-                                        ...prev,
-                                        end: date,
-                                      }));
-                                      if (date) {
-                                        localStorage.setItem(
-                                          "filter_dashboard_dateRangeEnd",
-                                          date.toISOString()
-                                        );
-                                      } else {
-                                        localStorage.removeItem(
-                                          "filter_dashboard_dateRangeEnd"
-                                        );
-                                      }
-                                      // Set preset to fromTo if dates are manually selected
-                                      if (
-                                        !selectedDatePreset &&
-                                        (selectedDateRange.start || date)
-                                      ) {
-                                        setSelectedDatePreset("fromTo");
-                                        localStorage.setItem(
-                                          "filter_dashboard_datePreset",
-                                          "fromTo"
-                                        );
-                                      }
-                                    }}
-                                    selectsEnd
-                                    startDate={selectedDateRange.start}
-                                    endDate={selectedDateRange.end}
-                                    minDate={selectedDateRange.start}
-                                    placeholderText="End Date"
-                                    className="form-field search-selector"
-                                    dateFormat="d MMM yyyy"
-                                    renderCustomHeader={renderDatePickerHeader}
-                                    showMonthDropdown
-                                    showYearDropdown
-                                    dropdownMode="select"
-                                  />
-                                </div>
-                              </>
-                            )}
-                          </>
-                        )}
+                          {selectedDatePreset === "fromTo" && (
+                            <>
+                              <div className="date-picker-wrapper">
+                                <DatePicker
+                                  selected={selectedDateRange.start}
+                                  onChange={(date) => {
+                                    setSelectedDateRange((prev) => ({
+                                      ...prev,
+                                      start: date,
+                                    }));
+                                    if (date) {
+                                      localStorage.setItem(
+                                        "filter_dashboard_dateRangeStart",
+                                        date.toISOString(),
+                                      );
+                                    } else {
+                                      localStorage.removeItem(
+                                        "filter_dashboard_dateRangeStart",
+                                      );
+                                    }
+                                    // Set preset to fromTo if dates are manually selected
+                                    if (
+                                      !selectedDatePreset &&
+                                      (date || selectedDateRange.end)
+                                    ) {
+                                      setSelectedDatePreset("fromTo");
+                                      localStorage.setItem(
+                                        "filter_dashboard_datePreset",
+                                        "fromTo",
+                                      );
+                                    }
+                                  }}
+                                  selectsStart
+                                  startDate={selectedDateRange.start}
+                                  endDate={selectedDateRange.end}
+                                  placeholderText="Start Date"
+                                  className="form-field search-selector"
+                                  dateFormat="d MMM yyyy"
+                                  renderCustomHeader={renderDatePickerHeader}
+                                  showMonthDropdown
+                                  showYearDropdown
+                                  dropdownMode="select"
+                                />
+                              </div>
+                              <div className="date-picker-wrapper">
+                                <DatePicker
+                                  selected={selectedDateRange.end}
+                                  onChange={(date) => {
+                                    setSelectedDateRange((prev) => ({
+                                      ...prev,
+                                      end: date,
+                                    }));
+                                    if (date) {
+                                      localStorage.setItem(
+                                        "filter_dashboard_dateRangeEnd",
+                                        date.toISOString(),
+                                      );
+                                    } else {
+                                      localStorage.removeItem(
+                                        "filter_dashboard_dateRangeEnd",
+                                      );
+                                    }
+                                    // Set preset to fromTo if dates are manually selected
+                                    if (
+                                      !selectedDatePreset &&
+                                      (selectedDateRange.start || date)
+                                    ) {
+                                      setSelectedDatePreset("fromTo");
+                                      localStorage.setItem(
+                                        "filter_dashboard_datePreset",
+                                        "fromTo",
+                                      );
+                                    }
+                                  }}
+                                  selectsEnd
+                                  startDate={selectedDateRange.start}
+                                  endDate={selectedDateRange.end}
+                                  minDate={selectedDateRange.start}
+                                  placeholderText="End Date"
+                                  className="form-field search-selector"
+                                  dateFormat="d MMM yyyy"
+                                  renderCustomHeader={renderDatePickerHeader}
+                                  showMonthDropdown
+                                  showYearDropdown
+                                  dropdownMode="select"
+                                />
+                              </div>
+                            </>
+                          )}
+                        </>
+                      )}
                       {hasActiveFilters && (
                         <button
                           className="btn clear-filters-btn"
@@ -2252,8 +2879,9 @@ function Dashboard() {
 
                     {/* Advanced Filters Section */}
                     <div
-                      className={`advanced-filters-section ${isAdvancedFiltersOpen ? "open" : ""
-                        }`}
+                      className={`advanced-filters-section ${
+                        isAdvancedFiltersOpen ? "open" : ""
+                      }`}
                     >
                       <div
                         className="advanced-filters-header"
@@ -2263,8 +2891,9 @@ function Dashboard() {
                         style={{ cursor: "pointer" }}
                       >
                         <span
-                          className={`advanced-filters-title ${isAdvancedFiltersOpen ? "open" : ""
-                            }`}
+                          className={`advanced-filters-title ${
+                            isAdvancedFiltersOpen ? "open" : ""
+                          }`}
                         >
                           Advanced Filters
                         </span>
@@ -2272,232 +2901,265 @@ function Dashboard() {
                       <div className="filter-row advanced-filters-content">
                         {hasPermission(
                           allowedPermissions,
-                          "view_category_filter"
+                          "view_category_filter",
                         ) && (
-                            <SingleSearchSelect
-                              className="search-selector"
-                              options={[
-                                { value: "", label: "All Categories" },
-                                ...distinctCategories.map((category) => ({
-                                  value: category,
-                                  label: category,
-                                })),
-                              ]}
-                              value={selectedCategory || null}
-                              onChange={(value) => {
-                                const val = value || "";
-                                setSelectedCategory(val);
-                                localStorage.setItem("filter_dashboard_category", val);
-                              }}
-                              placeholder="All Categories"
-                            />
-                          )}
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Categories" },
+                              ...distinctCategories.map((category) => ({
+                                value: category,
+                                label: category,
+                              })),
+                            ]}
+                            value={selectedCategory || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedCategory(val);
+                              localStorage.setItem(
+                                "filter_dashboard_category",
+                                val,
+                              );
+                            }}
+                            placeholder="All Categories"
+                          />
+                        )}
                         {hasPermission(
                           allowedPermissions,
-                          "view_asset_category_filter"
+                          "view_asset_category_filter",
                         ) && (
-                            <SingleSearchSelect
-                              className="search-selector"
-                              options={[
-                                { value: "", label: "All Asset Categories" },
-                                ...distinctAssetCategories.map(
-                                  (assetCategory) => ({
-                                    value: assetCategory,
-                                    label: assetCategory,
-                                  })
-                                ),
-                              ]}
-                              value={selectedAssetCategory || null}
-                              onChange={(value) => {
-                                const val = value || "";
-                                setSelectedAssetCategory(val);
-                                localStorage.setItem("filter_dashboard_assetCategory", val);
-                              }}
-                              placeholder="All Asset Categories"
-                            />
-                          )}
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Asset Categories" },
+                              ...distinctAssetCategories.map(
+                                (assetCategory) => ({
+                                  value: assetCategory,
+                                  label: assetCategory,
+                                }),
+                              ),
+                            ]}
+                            value={selectedAssetCategory || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedAssetCategory(val);
+                              localStorage.setItem(
+                                "filter_dashboard_assetCategory",
+                                val,
+                              );
+                            }}
+                            placeholder="All Asset Categories"
+                          />
+                        )}
                         {hasPermission(
                           allowedPermissions,
-                          "view_sub_category_filter"
+                          "view_sub_category_filter",
                         ) && (
-                            <SingleSearchSelect
-                              className="search-selector"
-                              options={[
-                                { value: "", label: "All Sub Categories" },
-                                ...distinctSubCategories.map((subCategory) => ({
-                                  value: subCategory,
-                                  label: subCategory,
-                                })),
-                              ]}
-                              value={selectedSubCategory || null}
-                              onChange={(value) => {
-                                const val = value || "";
-                                setSelectedSubCategory(val);
-                                localStorage.setItem("filter_dashboard_subCategory", val);
-                              }}
-                              placeholder="All Sub Categories"
-                            />
-                          )}
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Sub Categories" },
+                              ...distinctSubCategories.map((subCategory) => ({
+                                value: subCategory,
+                                label: subCategory,
+                              })),
+                            ]}
+                            value={selectedSubCategory || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedSubCategory(val);
+                              localStorage.setItem(
+                                "filter_dashboard_subCategory",
+                                val,
+                              );
+                            }}
+                            placeholder="All Sub Categories"
+                          />
+                        )}
                         {hasPermission(
                           allowedPermissions,
-                          "view_valuer_name_filter"
+                          "view_valuer_name_filter",
                         ) && (
-                            <SingleSearchSelect
-                              className="search-selector"
-                              options={[
-                                { value: "", label: "All Valuers" },
-                                ...distinctValuerNames.map((valuer) => ({
-                                  value: valuer,
-                                  label: valuer,
-                                })),
-                              ]}
-                              value={selectedValuerName || null}
-                              onChange={(value) => {
-                                const val = value || "";
-                                setSelectedValuerName(val);
-                                localStorage.setItem("filter_dashboard_valuerName", val);
-                              }}
-                              placeholder="All Valuers"
-                            />
-                          )}
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Valuers" },
+                              ...distinctValuerNames.map((valuer) => ({
+                                value: valuer,
+                                label: valuer,
+                              })),
+                            ]}
+                            value={selectedValuerName || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedValuerName(val);
+                              localStorage.setItem(
+                                "filter_dashboard_valuerName",
+                                val,
+                              );
+                            }}
+                            placeholder="All Valuers"
+                          />
+                        )}
                         {hasPermission(
                           allowedPermissions,
-                          "view_manager_filter"
+                          "view_manager_filter",
                         ) && (
-                            <SingleSearchSelect
-                              className="search-selector"
-                              options={[
-                                { value: "", label: "All Managers" },
-                                ...distinctManagers.map((manager) => ({
-                                  value: manager,
-                                  label: manager,
-                                })),
-                              ]}
-                              value={selectedManager || null}
-                              onChange={(value) => {
-                                const val = value || "";
-                                setSelectedManager(val);
-                                localStorage.setItem("filter_dashboard_manager", val);
-                              }}
-                              placeholder="All Managers"
-                            />
-                          )}
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Managers" },
+                              ...distinctManagers.map((manager) => ({
+                                value: manager,
+                                label: manager,
+                              })),
+                            ]}
+                            value={selectedManager || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedManager(val);
+                              localStorage.setItem(
+                                "filter_dashboard_manager",
+                                val,
+                              );
+                            }}
+                            placeholder="All Managers"
+                          />
+                        )}
                         {hasPermission(
                           allowedPermissions,
-                          "view_bank_filter"
+                          "view_bank_filter",
                         ) && (
-                            <SingleSearchSelect
-                              className="search-selector"
-                              options={[
-                                { value: "", label: "All Banks" },
-                                ...distinctBanks.map((bank) => ({
-                                  value: bank,
-                                  label: bank,
-                                })),
-                              ]}
-                              value={selectedBank || null}
-                              onChange={(value) => {
-                                const val = value || "";
-                                setSelectedBank(val);
-                                localStorage.setItem("filter_dashboard_bank", val);
-                              }}
-                              placeholder="All Banks"
-                            />
-                          )}
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Banks" },
+                              ...distinctBanks.map((bank) => ({
+                                value: bank,
+                                label: bank,
+                              })),
+                            ]}
+                            value={selectedBank || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedBank(val);
+                              localStorage.setItem(
+                                "filter_dashboard_bank",
+                                val,
+                              );
+                            }}
+                            placeholder="All Banks"
+                          />
+                        )}
                         {hasPermission(
                           allowedPermissions,
-                          "view_bank_branch_filter"
+                          "view_bank_branch_filter",
                         ) && (
-                            <SingleSearchSelect
-                              className="search-selector"
-                              options={[
-                                { value: "", label: "All Branches" },
-                                ...distinctBranches.map((branch) => ({
-                                  value: branch,
-                                  label: branch,
-                                })),
-                              ]}
-                              value={selectedBranch || null}
-                              onChange={(value) => {
-                                const val = value || "";
-                                setSelectedBranch(val);
-                                localStorage.setItem("filter_dashboard_branch", val);
-                              }}
-                              placeholder="All Branches"
-                            />
-                          )}
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Branches" },
+                              ...distinctBranches.map((branch) => ({
+                                value: branch,
+                                label: branch,
+                              })),
+                            ]}
+                            value={selectedBranch || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedBranch(val);
+                              localStorage.setItem(
+                                "filter_dashboard_branch",
+                                val,
+                              );
+                            }}
+                            placeholder="All Branches"
+                          />
+                        )}
                         {hasPermission(
                           allowedPermissions,
-                          "view_branch_officer_filter"
+                          "view_branch_officer_filter",
                         ) && (
-                            <SingleSearchSelect
-                              className="search-selector"
-                              options={[
-                                { value: "", label: "All Officers" },
-                                ...distinctOfficers.map((officer) => ({
-                                  value: officer,
-                                  label: officer,
-                                })),
-                              ]}
-                              value={selectedOfficer || null}
-                              onChange={(value) => {
-                                const val = value || "";
-                                setSelectedOfficer(val);
-                                localStorage.setItem("filter_dashboard_officer", val);
-                              }}
-                              placeholder="All Officers"
-                            />
-                          )}
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Officers" },
+                              ...distinctOfficers.map((officer) => ({
+                                value: officer,
+                                label: officer,
+                              })),
+                            ]}
+                            value={selectedOfficer || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedOfficer(val);
+                              localStorage.setItem(
+                                "filter_dashboard_officer",
+                                val,
+                              );
+                            }}
+                            placeholder="All Officers"
+                          />
+                        )}
                         {hasPermission(
                           allowedPermissions,
-                          "view_field_verifier_filter"
+                          "view_field_verifier_filter",
                         ) && (
-                            <SingleSearchSelect
-                              className="search-selector"
-                              options={[
-                                { value: "", label: "All Field Verifiers" },
-                                ...distinctFieldVerifiers.map(
-                                  (fieldVerifier) => ({
-                                    value: fieldVerifier,
-                                    label: fieldVerifier,
-                                  })
-                                ),
-                              ]}
-                              value={selectedFieldVerifier || null}
-                              onChange={(value) => {
-                                const val = value || "";
-                                setSelectedFieldVerifier(val);
-                                localStorage.setItem("filter_dashboard_fieldVerifier", val);
-                              }}
-                              placeholder="All Field Verifiers"
-                            />
-                          )}
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Field Verifiers" },
+                              ...distinctFieldVerifiers.map(
+                                (fieldVerifier) => ({
+                                  value: fieldVerifier,
+                                  label: fieldVerifier,
+                                }),
+                              ),
+                            ]}
+                            value={selectedFieldVerifier || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedFieldVerifier(val);
+                              localStorage.setItem(
+                                "filter_dashboard_fieldVerifier",
+                                val,
+                              );
+                            }}
+                            placeholder="All Field Verifiers"
+                          />
+                        )}
 
                         {hasPermission(
                           allowedPermissions,
-                          "view_payment_status_filter"
+                          "view_payment_status_filter",
                         ) && (
-                            <SingleSearchSelect
-                              className="search-selector"
-                              options={[
-                                { value: "", label: "All Payment Statuses" },
-                                ...distinctPaymentStatuses.map(
-                                  (paymentStatus) => ({
-                                    value: paymentStatus,
-                                    label: paymentStatus,
-                                  })
-                                ),
-                              ]}
-                              value={selectedPaymentStatus || null}
-                              onChange={(value) => {
-                                const val = value || "";
-                                setSelectedPaymentStatus(val);
-                                localStorage.setItem("filter_dashboard_paymentStatus", val);
-                              }}
-                              placeholder="All Payment Statuses"
-                            />
-                          )}
-                        {hasPermission(allowedPermissions, "view_created_by_filter") && (
+                          <SingleSearchSelect
+                            className="search-selector"
+                            options={[
+                              { value: "", label: "All Payment Statuses" },
+                              ...distinctPaymentStatuses.map(
+                                (paymentStatus) => ({
+                                  value: paymentStatus,
+                                  label: paymentStatus,
+                                }),
+                              ),
+                            ]}
+                            value={selectedPaymentStatus || null}
+                            onChange={(value) => {
+                              const val = value || "";
+                              setSelectedPaymentStatus(val);
+                              localStorage.setItem(
+                                "filter_dashboard_paymentStatus",
+                                val,
+                              );
+                            }}
+                            placeholder="All Payment Statuses"
+                          />
+                        )}
+                        {hasPermission(
+                          allowedPermissions,
+                          "view_created_by_filter",
+                        ) && (
                           <SingleSearchSelect
                             className="search-selector"
                             options={[
@@ -2511,12 +3173,18 @@ function Dashboard() {
                             onChange={(value) => {
                               const val = value || "";
                               setSelectedCreatedBy(val);
-                              localStorage.setItem("filter_dashboard_createdBy", val);
+                              localStorage.setItem(
+                                "filter_dashboard_createdBy",
+                                val,
+                              );
                             }}
                             placeholder="All Created By"
                           />
                         )}
-                        {hasPermission(allowedPermissions, "view_user_assigned_filter") && (
+                        {hasPermission(
+                          allowedPermissions,
+                          "view_user_assigned_filter",
+                        ) && (
                           <SingleSearchSelect
                             className="search-selector"
                             options={[
@@ -2530,7 +3198,10 @@ function Dashboard() {
                             onChange={(value) => {
                               const val = value || "";
                               setSelectedUserAssigned(val);
-                              localStorage.setItem("filter_dashboard_userAssigned", val);
+                              localStorage.setItem(
+                                "filter_dashboard_userAssigned",
+                                val,
+                              );
                             }}
                             placeholder="All Users Assigned"
                           />
@@ -2562,12 +3233,12 @@ function Dashboard() {
                           >
                             {hasPermission(
                               allowedPermissions,
-                              "add_order_db"
+                              "add_order_db",
                             ) && (
-                                <button className="btn" onClick={openAddModal}>
-                                  Add Order
-                                </button>
-                              )}
+                              <button className="btn" onClick={openAddModal}>
+                                Add Order
+                              </button>
+                            )}
                             {/* {hasPermission(
                               allowedPermissions,
                               "view_order"
@@ -2582,126 +3253,126 @@ function Dashboard() {
                           <tr>
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_order_number_db"
+                              "view_order_table_order_number_db",
                             ) && (
-                                <th style={{ width: "150px" }}>Order Number</th>
-                              )}
+                              <th style={{ width: "150px" }}>Order Number</th>
+                            )}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_ref_id_db"
-                            ) && (
-                                <th style={{ width: "150px" }}>Ref ID</th>
-                              )}
+                              "view_order_table_ref_id_db",
+                            ) && <th style={{ width: "150px" }}>Ref ID</th>}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_category_db"
+                              "view_order_table_category_db",
                             ) && <th style={{ width: "150px" }}>Category</th>}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_asset_category_db"
+                              "view_order_table_asset_category_db",
                             ) && (
-                                <th style={{ width: "150px" }}>Asset Category</th>
-                              )}
+                              <th style={{ width: "150px" }}>Asset Category</th>
+                            )}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_sub_category_db"
+                              "view_order_table_sub_category_db",
                             ) && (
-                                <th style={{ width: "150px" }}>Subcategory</th>
-                              )}
+                              <th style={{ width: "150px" }}>Subcategory</th>
+                            )}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_manager_db"
+                              "view_order_table_manager_db",
                             ) && <th style={{ width: "150px" }}>Manager</th>}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_field_verifier_db"
+                              "view_order_table_field_verifier_db",
                             ) && (
-                                <th style={{ width: "150px" }}>Field Verifier</th>
-                              )}
+                              <th style={{ width: "150px" }}>Field Verifier</th>
+                            )}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_Bank_db"
+                              "view_order_table_Bank_db",
                             ) && <th style={{ width: "150px" }}>Bank</th>}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_Bank_Branch_db"
+                              "view_order_table_Bank_Branch_db",
                             ) && <th style={{ width: "150px" }}>Branch</th>}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_Branch_Officer_db"
+                              "view_order_table_Branch_Officer_db",
                             ) && <th style={{ width: "150px" }}>Officer</th>}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_contact_person_name_db"
+                              "view_order_table_contact_person_name_db",
                             ) && (
-                                <th style={{ width: "200px" }}>Contact Person Name</th>
-                              )}
+                              <th style={{ width: "200px" }}>
+                                Contact Person Name
+                              </th>
+                            )}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_customer_name_db"
+                              "view_order_table_customer_name_db",
                             ) && (
-                                <th style={{ width: "200px" }}>Customer Name</th>
-                              )}
+                              <th style={{ width: "200px" }}>Customer Name</th>
+                            )}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_registration_number_db"
+                              "view_order_table_registration_number_db",
                             ) && (
-                                <th style={{ width: "200px" }}>
-                                  Registration Number
-                                </th>
-                              )}
+                              <th style={{ width: "200px" }}>
+                                Registration Number
+                              </th>
+                            )}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_payment_status_db"
+                              "view_order_table_payment_status_db",
                             ) && (
-                                <th style={{ width: "200px" }}>Payment Status</th>
-                              )}
+                              <th style={{ width: "200px" }}>Payment Status</th>
+                            )}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_payment_amount_db"
+                              "view_order_table_payment_amount_db",
                             ) && (
-                                <th style={{ width: "200px" }}>Payment Amount</th>
-                              )}
+                              <th style={{ width: "200px" }}>Payment Amount</th>
+                            )}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_created_at_db"
+                              "view_order_table_created_at_db",
                             ) && <th style={{ width: "180px" }}>Created At</th>}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_created_by_db"
+                              "view_order_table_created_by_db",
                             ) && <th style={{ width: "120px" }}>Created By</th>}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_updated_by_db"
+                              "view_order_table_updated_by_db",
                             ) && <th>Updated By</th>}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_priority_db"
+                              "view_order_table_priority_db",
                             ) && <th style={{ width: "120px" }}>Priority</th>}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_type_db"
+                              "view_order_table_type_db",
                             ) && <th style={{ width: "120px" }}>Type</th>}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_valuer_name_db"
+                              "view_order_table_valuer_name_db",
                             ) && (
-                                <th style={{ width: "120px" }}>Valuer Name</th>
-                              )}
+                              <th style={{ width: "120px" }}>Valuer Name</th>
+                            )}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_status_db"
+                              "view_order_table_status_db",
                             ) && <th style={{ width: "175px" }}>Status</th>}
                             {hasPermission(
                               allowedPermissions,
-                              "view_order_table_action_db"
+                              "view_order_table_action_db",
                             ) && (
-                                <th
-                                  style={{ textAlign: "center", width: "200px" }}
-                                >
-                                  Action
-                                </th>
-                              )}
+                              <th
+                                style={{ textAlign: "center", width: "200px" }}
+                              >
+                                Action
+                              </th>
+                            )}
                           </tr>
                         ),
                         rows: [...orders]
@@ -2740,7 +3411,7 @@ function Dashboard() {
                             const fieldVerifierMatch =
                               !selectedFieldVerifier ||
                               order.field_verifier_name ===
-                              selectedFieldVerifier;
+                                selectedFieldVerifier;
 
                             // Filter by valuer name if selected
                             const valuerMatch =
@@ -2774,20 +3445,24 @@ function Dashboard() {
 
                             // Filter by created by if selected
                             const createdByMatch =
-                              !selectedCreatedBy || order.created_by === selectedCreatedBy;
+                              !selectedCreatedBy ||
+                              order.created_by === selectedCreatedBy;
 
                             // Filter by user assigned if selected
                             const userAssignedMatch =
                               !selectedUserAssigned ||
                               (order.assigned_users &&
-                                order.assigned_users.some((user) => user.name === selectedUserAssigned));
+                                order.assigned_users.some(
+                                  (user) => user.name === selectedUserAssigned,
+                                ));
 
                             // Filter by date if selected
                             const dateMatch = matchesDateFilter(order);
-                            const summaryCardMatch = matchesSummaryCardTableFilter(
-                              order,
-                              summaryCardTableFilter
-                            );
+                            const summaryCardMatch =
+                              matchesSummaryCardTableFilter(
+                                order,
+                                summaryCardTableFilter,
+                              );
 
                             // Show order only if all filters match (or no filter is selected)
                             return (
@@ -2816,7 +3491,7 @@ function Dashboard() {
                               className={
                                 hasPermission(
                                   allowedPermissions,
-                                  "view_order_details"
+                                  "view_order_details",
                                 )
                                   ? "clickable-row"
                                   : ""
@@ -2825,12 +3500,16 @@ function Dashboard() {
                                 if (
                                   hasPermission(
                                     allowedPermissions,
-                                    "view_order_details"
+                                    "view_order_details",
                                   )
                                 ) {
                                   const path = `/orders/${order.id}/details`;
                                   if (e.ctrlKey || e.metaKey) {
-                                    window.open(path, "_blank", "noopener,noreferrer");
+                                    window.open(
+                                      path,
+                                      "_blank",
+                                      "noopener,noreferrer",
+                                    );
                                   } else {
                                     navigate(path);
                                   }
@@ -2839,7 +3518,7 @@ function Dashboard() {
                               style={{
                                 cursor: hasPermission(
                                   allowedPermissions,
-                                  "view_order_details"
+                                  "view_order_details",
                                 )
                                   ? "pointer"
                                   : "default",
@@ -2847,185 +3526,182 @@ function Dashboard() {
                             >
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_order_number_db"
+                                "view_order_table_order_number_db",
                               ) && (
-                                  <td
-                                    className={
-                                      hasPermission(
-                                        allowedPermissions,
-                                        "view_order_details"
-                                      )
-                                        ? "get-me-inside"
-                                        : ""
-                                    }
-                                  >
-                                    {order.order_number}
-                                  </td>
-                                )}
+                                <td
+                                  className={
+                                    hasPermission(
+                                      allowedPermissions,
+                                      "view_order_details",
+                                    )
+                                      ? "get-me-inside"
+                                      : ""
+                                  }
+                                >
+                                  {order.order_number}
+                                </td>
+                              )}
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_ref_id_db"
-                              ) && (
-                                  <td>
-                                    {order.ref_no_id || "-"}
-                                  </td>
-                                )}
+                                "view_order_table_ref_id_db",
+                              ) && <td>{order.ref_no_id || "-"}</td>}
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_category_db"
+                                "view_order_table_category_db",
                               ) && <td>{order.category_name || "-"}</td>}
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_asset_category_db"
+                                "view_order_table_asset_category_db",
                               ) && <td>{order.sub_category_name || "-"}</td>}
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_sub_category_db"
+                                "view_order_table_sub_category_db",
                               ) && <td>{order.child_category_name || "-"}</td>}
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_manager_db"
+                                "view_order_table_manager_db",
                               ) && <td>{order.manager_name || "-"}</td>}
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_field_verifier_db"
+                                "view_order_table_field_verifier_db",
                               ) && <td>{order.field_verifier_name || "-"}</td>}
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_Bank_db"
+                                "view_order_table_Bank_db",
                               ) && <td>{order.bank_name || "-"}</td>}
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_Bank_Branch_db"
+                                "view_order_table_Bank_Branch_db",
                               ) && <td>{order.branch_name || "-"}</td>}
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_Branch_Officer_db"
+                                "view_order_table_Branch_Officer_db",
                               ) && <td>{order.officer_name || "-"}</td>}
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_contact_person_name_db"
+                                "view_order_table_contact_person_name_db",
                               ) && <td>{order.customer_name || "-"}</td>}
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_customer_name_db"
+                                "view_order_table_customer_name_db",
                               ) && <td>{order.customer_name_2 || "-"}</td>}
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_registration_number_db"
+                                "view_order_table_registration_number_db",
                               ) && <td>{order.registration_number || "-"}</td>}
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_payment_status_db"
+                                "view_order_table_payment_status_db",
                               ) && <td>{order.payment_status || "-"}</td>}
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_payment_amount_db"
+                                "view_order_table_payment_amount_db",
                               ) && <td>{order.payment_amount || "-"}</td>}
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_created_at_db"
+                                "view_order_table_created_at_db",
                               ) && <td>{formatDate(order.created_at)}</td>}
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_created_by_db"
+                                "view_order_table_created_by_db",
                               ) && <td>{order.created_by}</td>}
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_updated_by_db"
+                                "view_order_table_updated_by_db",
                               ) && <td>{order.updated_by || "-"}</td>}
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_priority_db"
+                                "view_order_table_priority_db",
                               ) && (
-                                  <td>
-                                    <span
-                                      className={`priority-badge priority-${order.order_priority?.toLowerCase() ||
-                                        "none"
-                                        }`}
-                                    >
-                                      {order.order_priority || "-"}
-                                    </span>
-                                  </td>
-                                )}
+                                <td>
+                                  <span
+                                    className={`priority-badge priority-${
+                                      order.order_priority?.toLowerCase() ||
+                                      "none"
+                                    }`}
+                                  >
+                                    {order.order_priority || "-"}
+                                  </span>
+                                </td>
+                              )}
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_type_db"
+                                "view_order_table_type_db",
                               ) && <td>{order.order_type || "-"}</td>}
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_valuer_name_db"
+                                "view_order_table_valuer_name_db",
                               ) && <td>{order.valuer_name || "-"}</td>}
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_status_db"
+                                "view_order_table_status_db",
                               ) && (
-                                  <td>
-                                    <p className="status-state order-state">
-                                      {order.current_status_name}
-                                    </p>
-                                  </td>
-                                )}
+                                <td>
+                                  <p className="status-state order-state">
+                                    {order.current_status_name}
+                                  </p>
+                                </td>
+                              )}
                               {hasPermission(
                                 allowedPermissions,
-                                "view_order_table_action_db"
+                                "view_order_table_action_db",
                               ) && (
-                                  <td style={{ textAlign: "center" }}>
-                                    {hasPermission(
+                                <td style={{ textAlign: "center" }}>
+                                  {hasPermission(
+                                    allowedPermissions,
+                                    "edit_order_db",
+                                  ) && (
+                                    <button
+                                      className="action-icons"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openEditModal(order);
+                                      }}
+                                    >
+                                      <EditIcon />
+                                    </button>
+                                  )}
+                                  {hasPermission(
+                                    allowedPermissions,
+                                    "delete_order_db",
+                                  ) && (
+                                    <button
+                                      className="action-icons"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        confirmDelete(
+                                          order.id,
+                                          order.customer_name,
+                                        );
+                                      }}
+                                    >
+                                      <DeleteIcon />
+                                    </button>
+                                  )}
+                                  {(hasPermission(
+                                    allowedPermissions,
+                                    "edit_order_priority_db",
+                                  ) ||
+                                    hasPermission(
                                       allowedPermissions,
-                                      "edit_order_db"
-                                    ) && (
-                                        <button
-                                          className="action-icons"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            openEditModal(order);
-                                          }}
-                                        >
-                                          <EditIcon />
-                                        </button>
-                                      )}
-                                    {hasPermission(
-                                      allowedPermissions,
-                                      "delete_order_db"
-                                    ) && (
-                                        <button
-                                          className="action-icons"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            confirmDelete(
-                                              order.id,
-                                              order.customer_name
-                                            );
-                                          }}
-                                        >
-                                          <DeleteIcon />
-                                        </button>
-                                      )}
-                                    {(hasPermission(
-                                      allowedPermissions,
-                                      "edit_order_priority_db"
+                                      "edit_order_type_db",
                                     ) ||
-                                      hasPermission(
-                                        allowedPermissions,
-                                        "edit_order_type_db"
-                                      ) ||
-                                      hasPermission(
-                                        allowedPermissions,
-                                        "edit_valuer_name_to_order_db"
-                                      )) && (
-                                        <button
-                                          className="action-icons"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            openAttributesModal(order);
-                                          }}
-                                        >
-                                          <MoreIcon />
-                                        </button>
-                                      )}
-                                  </td>
-                                )}
+                                    hasPermission(
+                                      allowedPermissions,
+                                      "edit_valuer_name_to_order_db",
+                                    )) && (
+                                    <button
+                                      className="action-icons"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openAttributesModal(order);
+                                      }}
+                                    >
+                                      <MoreIcon />
+                                    </button>
+                                  )}
+                                </td>
+                              )}
                             </tr>
                           )),
                       }}
@@ -3042,7 +3718,7 @@ function Dashboard() {
       {isTelecaller &&
         hasPermission(
           allowedPermissions,
-          "view_dashboard_order_cards_telecaller"
+          "view_dashboard_order_cards_telecaller",
         ) && (
           <div className="telecoller-dashboard">
             {loading ? (
@@ -3053,12 +3729,13 @@ function Dashboard() {
               orders.map((order) => (
                 <div
                   key={order.id}
-                  className={`telecoller-dashboard-order-card clickable-card ${order.current_status_id === 5
-                    ? "reassign-order"
-                    : order.current_status_id >= 7
-                      ? "complete-order"
-                      : ""
-                    }`}
+                  className={`telecoller-dashboard-order-card clickable-card ${
+                    order.current_status_id === 5
+                      ? "reassign-order"
+                      : order.current_status_id >= 7
+                        ? "complete-order"
+                        : ""
+                  }`}
                   onClick={() => openEditModal(order)}
                   style={{ cursor: "pointer" }}
                 >
@@ -3076,13 +3753,13 @@ function Dashboard() {
                     </div>
                     {hasPermission(
                       allowedPermissions,
-                      "show_customer_name_to_telecaller"
+                      "show_customer_name_to_telecaller",
                     ) && (
-                        <div className="telecoller-dashboard-order-card-body-item">
-                          <span>Client Name</span>
-                          <p>{order.customer_name || "-----"}</p>
-                        </div>
-                      )}
+                      <div className="telecoller-dashboard-order-card-body-item">
+                        <span>Client Name</span>
+                        <p>{order.customer_name || "-----"}</p>
+                      </div>
+                    )}
                     <div className="telecoller-dashboard-order-card-body-item two-rows">
                       <div className="telecoller-dashboard-order-card-body-item-inner">
                         <span>Contact Number</span>
@@ -3105,33 +3782,33 @@ function Dashboard() {
                     </div>
                     {(hasPermission(
                       allowedPermissions,
-                      "show_bank_to_telelcaller"
+                      "show_bank_to_telelcaller",
                     ) ||
                       hasPermission(
                         allowedPermissions,
-                        "show_officer_to_telecaller"
+                        "show_officer_to_telecaller",
                       )) && (
-                        <div className="telecoller-dashboard-order-card-body-item two-rows">
-                          {hasPermission(
-                            allowedPermissions,
-                            "show_bank_to_telelcaller"
-                          ) && (
-                              <div className="telecoller-dashboard-order-card-body-item-inner">
-                                <span>Bank</span>
-                                <p>{order.bank_name || "-----"}</p>
-                              </div>
-                            )}
-                          {hasPermission(
-                            allowedPermissions,
-                            "show_officer_to_telecaller"
-                          ) && (
-                              <div className="telecoller-dashboard-order-card-body-item-inner">
-                                <span>Officer</span>
-                                <p>{order.officer_name || "-----"}</p>
-                              </div>
-                            )}
-                        </div>
-                      )}
+                      <div className="telecoller-dashboard-order-card-body-item two-rows">
+                        {hasPermission(
+                          allowedPermissions,
+                          "show_bank_to_telelcaller",
+                        ) && (
+                          <div className="telecoller-dashboard-order-card-body-item-inner">
+                            <span>Bank</span>
+                            <p>{order.bank_name || "-----"}</p>
+                          </div>
+                        )}
+                        {hasPermission(
+                          allowedPermissions,
+                          "show_officer_to_telecaller",
+                        ) && (
+                          <div className="telecoller-dashboard-order-card-body-item-inner">
+                            <span>Officer</span>
+                            <p>{order.officer_name || "-----"}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))
@@ -3148,7 +3825,7 @@ function Dashboard() {
       {isTelecaller &&
         !hasPermission(
           allowedPermissions,
-          "view_dashboard_order_cards_telecaller"
+          "view_dashboard_order_cards_telecaller",
         ) && (
           <div className="welcome-message-container">
             <div className="welcome-message">
@@ -3162,9 +3839,10 @@ function Dashboard() {
         <FormModel>
           {{
             title: isEdit
-              ? `Edit Order - ${orders.find((order) => order.id === editOrderId)
-                ?.order_number || "N/A"
-              }`
+              ? `Edit Order - ${
+                  orders.find((order) => order.id === editOrderId)
+                    ?.order_number || "N/A"
+                }`
               : "Add Order",
             body: (
               <form
@@ -3187,7 +3865,8 @@ function Dashboard() {
                           onChange={(e) => {
                             if (isManagerEditing) return;
                             if (!isTelecaller) {
-                              const customer_name = e.target.value.toUpperCase();
+                              const customer_name =
+                                e.target.value.toUpperCase();
                               setFormData({
                                 ...formData,
                                 customer_name,
@@ -3198,7 +3877,9 @@ function Dashboard() {
                         />
                       </div>
                       <div className="form-group">
-                        <label htmlFor="customerName2Field">Customer Name</label>
+                        <label htmlFor="customerName2Field">
+                          Customer Name
+                        </label>
                         <input
                           className="form-field"
                           id="customerName2Field"
@@ -3207,7 +3888,8 @@ function Dashboard() {
                           onChange={(e) => {
                             if (isManagerEditing) return;
                             if (!isTelecaller) {
-                              const customer_name_2 = e.target.value.toUpperCase();
+                              const customer_name_2 =
+                                e.target.value.toUpperCase();
                               setFormData({
                                 ...formData,
                                 customer_name_2,
@@ -3312,11 +3994,10 @@ function Dashboard() {
                       name="registrationNumber"
                       value={formData.registration_number}
                       onChange={(e) => {
-                        const canEditRegistrationField =
-                          hasPermission(
-                            allowedPermissions,
-                            "edit_order_registration_number"
-                          );
+                        const canEditRegistrationField = hasPermission(
+                          allowedPermissions,
+                          "edit_order_registration_number",
+                        );
 
                         if (!canEditRegistrationField) return;
 
@@ -3330,7 +4011,7 @@ function Dashboard() {
                       disabled={
                         !hasPermission(
                           allowedPermissions,
-                          "edit_order_registration_number"
+                          "edit_order_registration_number",
                         )
                       }
                     />
@@ -3358,50 +4039,56 @@ function Dashboard() {
                     />
                   </div>
 
-                  {!isEdit && hasPermission(allowedPermissions, "view_order_add_number_of_order_duplication") && (
-                    <div className="form-group">
-                      <label htmlFor="numberOfOrderDuplication">
-                        Number of order duplication
-                      </label>
-                      <input
-                        className="form-field"
-                        id="numberOfOrderDuplication"
-                        name="numberOfOrderDuplication"
-                        type="text"
-                        inputMode="numeric"
-                        value={formData.number_of_order_duplication}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          if (/^\d*$/.test(value)) {
-                            setFormData({
-                              ...formData,
-                              number_of_order_duplication: value,
-                            });
-                          }
-                        }}
-                        placeholder="Enter number (integer only)"
-                      />
-                    </div>
-                  )}
+                  {!isEdit &&
+                    hasPermission(
+                      allowedPermissions,
+                      "view_order_add_number_of_order_duplication",
+                    ) && (
+                      <div className="form-group">
+                        <label htmlFor="numberOfOrderDuplication">
+                          Number of order duplication
+                        </label>
+                        <input
+                          className="form-field"
+                          id="numberOfOrderDuplication"
+                          name="numberOfOrderDuplication"
+                          type="text"
+                          inputMode="numeric"
+                          value={formData.number_of_order_duplication}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (/^\d*$/.test(value)) {
+                              setFormData({
+                                ...formData,
+                                number_of_order_duplication: value,
+                              });
+                            }
+                          }}
+                          placeholder="Enter number (integer only)"
+                        />
+                      </div>
+                    )}
 
                   {/* Created At field - Show based on permission (managers cannot edit) */}
                   {!isManager &&
                     ((isEdit &&
                       hasPermission(
                         allowedPermissions,
-                        "edit_order_created_at"
+                        "edit_order_created_at",
                       )) ||
                       (!isEdit &&
                         hasPermission(
                           allowedPermissions,
-                          "add_order_created_at"
+                          "add_order_created_at",
                         ))) && (
                       <div className="form-group">
                         <label htmlFor="createdAt">Created At</label>
                         <DatePicker
                           id="createdAt"
                           selected={formData.created_at}
-                          onChange={(date) => setFormData({ ...formData, created_at: date })}
+                          onChange={(date) =>
+                            setFormData({ ...formData, created_at: date })
+                          }
                           showTimeSelect
                           timeFormat="HH:mm"
                           timeIntervals={15}
@@ -3417,65 +4104,65 @@ function Dashboard() {
                   {/* Subcategory field - Show based on permission */}
                   {hasPermission(
                     allowedPermissions,
-                    "view_order_add_edit_subcategory_filed"
+                    "view_order_add_edit_subcategory_filed",
                   ) && (
-                      <div className="form-group">
-                        <label htmlFor="Subcategory">Subcategory</label>
-                        <SingleSearchSelect
-                          id="Subcategory"
-                          className="search-selector"
-                          options={filteredChildCategories.map(
-                            (childCategory) => ({
-                              value: childCategory.id,
-                              label: `${childCategory.name}`,
-                            })
-                          )}
-                          value={formData.child_category_id}
-                          onChange={(val) => {
-                            if (isManagerEditing) return;
-                            // Only allow TELECALLER to change this field if they have permission
-                            if (!isTelecaller) {
-                              setFormData({
-                                ...formData,
-                                child_category_id: val,
-                              });
-                            }
-                          }}
-                          placeholder="Select Subcategory"
-                          disabled={isTelecaller || isManagerEditing}
-                        />
-                      </div>
-                    )}
+                    <div className="form-group">
+                      <label htmlFor="Subcategory">Subcategory</label>
+                      <SingleSearchSelect
+                        id="Subcategory"
+                        className="search-selector"
+                        options={filteredChildCategories.map(
+                          (childCategory) => ({
+                            value: childCategory.id,
+                            label: `${childCategory.name}`,
+                          }),
+                        )}
+                        value={formData.child_category_id}
+                        onChange={(val) => {
+                          if (isManagerEditing) return;
+                          // Only allow TELECALLER to change this field if they have permission
+                          if (!isTelecaller) {
+                            setFormData({
+                              ...formData,
+                              child_category_id: val,
+                            });
+                          }
+                        }}
+                        placeholder="Select Subcategory"
+                        disabled={isTelecaller || isManagerEditing}
+                      />
+                    </div>
+                  )}
                   {/* Telecaller field - Show based on permission */}
                   {hasPermission(
                     allowedPermissions,
-                    "view_order_add_edit_telecaller_filed"
+                    "view_order_add_edit_telecaller_filed",
                   ) && (
-                      <div className="form-group">
-                        <label htmlFor="telecallerField">Telecaller</label>
-                        <SingleSearchSelect
-                          id="telecallerField"
-                          className="search-selector"
-                          options={telecallers.map((user) => ({
-                            value: user.id,
-                            label: `${user.name} (${user.role_name})`,
-                          }))}
-                          value={formData.telecaller_id}
-                          onChange={(val) => {
-                            setFormData({
-                              ...formData,
-                              telecaller_id: val,
-                            });
-                          }}
-                          placeholder="Select telecaller"
-                        />
-                      </div>
-                    )}
+                    <div className="form-group">
+                      <label htmlFor="telecallerField">Telecaller</label>
+                      <SingleSearchSelect
+                        id="telecallerField"
+                        className="search-selector"
+                        options={telecallers.map((user) => ({
+                          value: user.id,
+                          label: `${user.name} (${user.role_name})`,
+                        }))}
+                        value={formData.telecaller_id}
+                        onChange={(val) => {
+                          setFormData({
+                            ...formData,
+                            telecaller_id: val,
+                          });
+                        }}
+                        placeholder="Select telecaller"
+                      />
+                    </div>
+                  )}
 
                   {/* Officer field - Show based on permission but hidden for Bank Officers */}
                   {hasPermission(
                     allowedPermissions,
-                    "view_order_add_edit_officer_filed"
+                    "view_order_add_edit_officer_filed",
                   ) &&
                     !isBankOfficer && (
                       <div className="form-group">
@@ -3504,7 +4191,7 @@ function Dashboard() {
                   {/* MANAGER field - Show based on permission but hidden for MANAGER users */}
                   {hasPermission(
                     allowedPermissions,
-                    "view_order_add_edit_manager_filed"
+                    "view_order_add_edit_manager_filed",
                   ) &&
                     !isManager && (
                       <div className="form-group">
@@ -3535,7 +4222,7 @@ function Dashboard() {
                   {selectedManagerIdForFieldVerifier &&
                     hasPermission(
                       allowedPermissions,
-                      "view_order_add_edit_manager_filed"
+                      "view_order_add_edit_manager_filed",
                     ) && (
                       <div className="form-group">
                         <label htmlFor="fieldVerifierField">
@@ -3548,7 +4235,7 @@ function Dashboard() {
                             (verifier) => ({
                               value: verifier.id,
                               label: verifier.name,
-                            })
+                            }),
                           )}
                           value={formData.field_verifier_id}
                           onChange={(val) => {
@@ -3625,39 +4312,40 @@ function Dashboard() {
                 <div className="body-form-box">
                   {hasPermission(
                     allowedPermissions,
-                    "edit_order_priority_db"
+                    "edit_order_priority_db",
                   ) && (
-                      <div className="form-group order-priority-radio-group">
-                        <label>Order Priority</label>
-                        <div className="radio-group two-items">
-                          {["Low", "High"].map((priority) => (
-                            <label
-                              key={priority}
-                              className={`radio-label ${priority.toLowerCase()} ${attributesFormData.order_priority === priority
+                    <div className="form-group order-priority-radio-group">
+                      <label>Order Priority</label>
+                      <div className="radio-group two-items">
+                        {["Low", "High"].map((priority) => (
+                          <label
+                            key={priority}
+                            className={`radio-label ${priority.toLowerCase()} ${
+                              attributesFormData.order_priority === priority
                                 ? "selected"
                                 : ""
-                                }`}
-                            >
-                              <input
-                                type="radio"
-                                name="order_priority"
-                                value={priority}
-                                checked={
-                                  attributesFormData.order_priority === priority
-                                }
-                                onChange={(e) =>
-                                  setAttributesFormData({
-                                    ...attributesFormData,
-                                    order_priority: e.target.value,
-                                  })
-                                }
-                              />
-                              {priority}
-                            </label>
-                          ))}
-                        </div>
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="order_priority"
+                              value={priority}
+                              checked={
+                                attributesFormData.order_priority === priority
+                              }
+                              onChange={(e) =>
+                                setAttributesFormData({
+                                  ...attributesFormData,
+                                  order_priority: e.target.value,
+                                })
+                              }
+                            />
+                            {priority}
+                          </label>
+                        ))}
                       </div>
-                    )}
+                    </div>
+                  )}
 
                   {hasPermission(allowedPermissions, "edit_order_type_db") && (
                     <div className="form-group">
@@ -3666,10 +4354,11 @@ function Dashboard() {
                         {["VKA1", "VKA2", "VKA3"].map((type) => (
                           <label
                             key={type}
-                            className={`radio-label ${attributesFormData.order_type === type
-                              ? "selected"
-                              : ""
-                              }`}
+                            className={`radio-label ${
+                              attributesFormData.order_type === type
+                                ? "selected"
+                                : ""
+                            }`}
                           >
                             <input
                               type="radio"
@@ -3692,59 +4381,59 @@ function Dashboard() {
 
                   {hasPermission(
                     allowedPermissions,
-                    "edit_valuer_name_to_order_db"
+                    "edit_valuer_name_to_order_db",
                   ) && (
-                      <div className="form-group">
-                        <label>Valuer Name</label>
-                        <SingleSearchSelect
-                          className="search-selector"
-                          options={[
-                            {
-                              value: "V.K. ASSOCIATES",
-                              label: "V.K. ASSOCIATES",
-                            },
-                            {
-                              value: "VALUETECH SOLUTIONS",
-                              label: "VALUETECH SOLUTIONS",
-                            },
-                            {
-                              value: "VISHAL D. KOTHARI",
-                              label: "VISHAL D. KOTHARI",
-                            },
-                          ]}
-                          value={attributesFormData.valuer_name}
-                          onChange={(value) =>
-                            setAttributesFormData({
-                              ...attributesFormData,
-                              valuer_name: value,
-                            })
-                          }
-                          placeholder="Select valuer name"
-                        />
-                      </div>
-                    )}
+                    <div className="form-group">
+                      <label>Valuer Name</label>
+                      <SingleSearchSelect
+                        className="search-selector"
+                        options={[
+                          {
+                            value: "V.K. ASSOCIATES",
+                            label: "V.K. ASSOCIATES",
+                          },
+                          {
+                            value: "VALUETECH SOLUTIONS",
+                            label: "VALUETECH SOLUTIONS",
+                          },
+                          {
+                            value: "VISHAL D. KOTHARI",
+                            label: "VISHAL D. KOTHARI",
+                          },
+                        ]}
+                        value={attributesFormData.valuer_name}
+                        onChange={(value) =>
+                          setAttributesFormData({
+                            ...attributesFormData,
+                            valuer_name: value,
+                          })
+                        }
+                        placeholder="Select valuer name"
+                      />
+                    </div>
+                  )}
 
                   {hasPermission(
                     allowedPermissions,
-                    "assign_user_to_order_db"
+                    "assign_user_to_order_db",
                   ) && (
-                      <div className="form-group">
-                        <label>Users assigned</label>
-                        <SingleSearchSelect
-                          className="search-selector"
-                          options={adminUsersOptions}
-                          value={attributesFormData.admin_user_ids}
-                          onChange={(values) =>
-                            setAttributesFormData({
-                              ...attributesFormData,
-                              admin_user_ids: values || [],
-                            })
-                          }
-                          placeholder="Select users..."
-                          isMulti={true}
-                        />
-                      </div>
-                    )}
+                    <div className="form-group">
+                      <label>Users assigned</label>
+                      <SingleSearchSelect
+                        className="search-selector"
+                        options={adminUsersOptions}
+                        value={attributesFormData.admin_user_ids}
+                        onChange={(values) =>
+                          setAttributesFormData({
+                            ...attributesFormData,
+                            admin_user_ids: values || [],
+                          })
+                        }
+                        placeholder="Select users..."
+                        isMulti={true}
+                      />
+                    </div>
+                  )}
                   <div className="form-buttons">
                     <button className="submit-button" type="submit">
                       Update Attributes
@@ -3769,9 +4458,9 @@ function Dashboard() {
 
       {/* Checkout Remarks Modal */}
       {showCheckoutModal && (
-        <FormModel>
+        <FormModel size="lg">
           {{
-            title: "Check Out",
+            title: "Day Out",
             body: (
               <form
                 className="body-form-box"
@@ -3795,7 +4484,7 @@ function Dashboard() {
                   </div>
                   <div className="form-buttons">
                     <button className="submit-button" type="submit">
-                      Check Out
+                      Day Out
                     </button>
                   </div>
                 </div>

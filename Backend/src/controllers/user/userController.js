@@ -73,8 +73,17 @@ exports.checkEmailExistence = async (req, res) => {
 
 exports.create = async (req, res, next) => {
   try {
-    const { email, password, role_id, name, mobile, city_id, department = [] } =
-      req.body;
+    const {
+      email,
+      password,
+      role_id,
+      name,
+      mobile,
+      city_id,
+      department = [],
+      day_start = null,
+      day_end = null,
+    } = req.body;
 
     if (!email || !password || !role_id || !name) {
       throw new BadRequestError(
@@ -97,6 +106,8 @@ exports.create = async (req, res, next) => {
       password: hash,
       role_id,
       city_id: city_id || null,
+      day_start: day_start || null,
+      day_end: day_end || null,
       created_by: req.user?.id,
       created_at: new Date(),
     });
@@ -155,6 +166,8 @@ exports.create = async (req, res, next) => {
             password: hash,
             role_id: req.body.role_id,
             city_id: req.body.city_id ?? null,
+            day_start: req.body.day_start || null,
+            day_end: req.body.day_end || null,
             deleted_at: null,
             deleted_by: null,
             updated_at: new Date(),
@@ -183,8 +196,17 @@ exports.create = async (req, res, next) => {
 exports.update = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, email, password, role_id, mobile, city_id, department } =
-      req.body;
+    const {
+      name,
+      email,
+      password,
+      role_id,
+      mobile,
+      city_id,
+      department,
+      day_start,
+      day_end,
+    } = req.body;
 
     const existing = await User.findById(id);
     if (!existing) throw new NotFoundError("User not found");
@@ -198,6 +220,13 @@ exports.update = async (req, res, next) => {
       updated_by: req.user?.id,
       updated_at: new Date(),
     };
+
+    if (day_start !== undefined) {
+      updatedData.day_start = day_start || null;
+    }
+    if (day_end !== undefined) {
+      updatedData.day_end = day_end || null;
+    }
 
     if (password) {
       updatedData.password = await bcrypt.hash(password, 10);

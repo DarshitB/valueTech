@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import {
   fetchUsers,
   addUser,
@@ -27,6 +29,42 @@ import { selectPermissions } from "../../redux/selectors/authSelectors";
 import { hasPermission } from "../../utils/permissionUtils";
 import { toast } from "react-toastify";
 
+const emptyUserForm = {
+  name: "",
+  email: "",
+  mobile: "",
+  role_id: "",
+  city_id: "",
+  department: [],
+  password: "",
+  confirm_password: "",
+  day_start: null,
+  day_end: null,
+};
+
+// Convert DB TIME ("09:00:00") / ISO string to Date for the time picker
+const parseTimeToDate = (timeValue) => {
+  if (!timeValue) return null;
+  if (timeValue instanceof Date && !Number.isNaN(timeValue.getTime())) {
+    return timeValue;
+  }
+  const match = String(timeValue).match(/(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const date = new Date();
+  date.setHours(parseInt(match[1], 10), parseInt(match[2], 10), 0, 0);
+  return date;
+};
+
+// Convert picker Date to "HH:mm:ss" for Postgres TIME
+const formatDateToTime = (dateValue) => {
+  if (!dateValue || !(dateValue instanceof Date) || Number.isNaN(dateValue.getTime())) {
+    return null;
+  }
+  const hours = String(dateValue.getHours()).padStart(2, "0");
+  const minutes = String(dateValue.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}:00`;
+};
+
 function Users() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -49,16 +87,7 @@ function Users() {
   }, [dispatch]);
 
   // 👤 New/Edit User State
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    mobile: "",
-    role_id: "",
-    city_id: "",
-    department: [],
-    password: "",
-    confirm_password: "",
-  });
+  const [formData, setFormData] = useState({ ...emptyUserForm });
 
   const [isEdit, setIsEdit] = useState(false);
   const [editUserId, setEditUserId] = useState(null);
@@ -107,16 +136,7 @@ function Users() {
   // Open Add User Form
   const openAddModal = () => {
     setIsEdit(false);
-    setFormData({
-      name: "",
-      email: "",
-      mobile: "",
-      role_id: "",
-      city_id: "",
-      department: [],
-      password: "",
-      confirm_password: "",
-    });
+    setFormData({ ...emptyUserForm });
     setShowFormModal(true);
   };
 
@@ -135,6 +155,8 @@ function Users() {
         : [],
       password: "",
       confirm_password: "",
+      day_start: parseTimeToDate(user.day_start),
+      day_end: parseTimeToDate(user.day_end),
     });
     setShowFormModal(true);
   };
@@ -211,6 +233,8 @@ function Users() {
       role_id: parseInt(formData.role_id, 10),
       city_id: parseInt(formData.city_id, 10),
       department: formData.department,
+      day_start: formatDateToTime(formData.day_start),
+      day_end: formatDateToTime(formData.day_end),
     };
 
     if (!isEdit || formData.password) {
@@ -557,6 +581,53 @@ function Users() {
                     />
                   </div>
 
+                  <div className="form-group-row">
+                    <div className="form-group">
+                      <label htmlFor="dayStart">Day Start</label>
+                      <DatePicker
+                        id="dayStart"
+                        selected={formData.day_start}
+                        onChange={(date) =>
+                          setFormData({ ...formData, day_start: date })
+                        }
+                        showTimeSelect
+                        showTimeSelectOnly
+                        timeIntervals={15}
+                        timeCaption="Start"
+                        dateFormat="h:mm aa"
+                        placeholderText="Select start time"
+                        className="form-field"
+                        isClearable
+                        portalId="datepicker-portal"
+                        popperPlacement="bottom-start"
+                        popperClassName="user-day-time-picker-popper"
+                        popperProps={{ strategy: "fixed" }}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="dayEnd">Day End</label>
+                      <DatePicker
+                        id="dayEnd"
+                        selected={formData.day_end}
+                        onChange={(date) =>
+                          setFormData({ ...formData, day_end: date })
+                        }
+                        showTimeSelect
+                        showTimeSelectOnly
+                        timeIntervals={15}
+                        timeCaption="End"
+                        dateFormat="h:mm aa"
+                        placeholderText="Select end time"
+                        className="form-field"
+                        isClearable
+                        portalId="datepicker-portal"
+                        popperPlacement="bottom-start"
+                        popperClassName="user-day-time-picker-popper"
+                        popperProps={{ strategy: "fixed" }}
+                      />
+                    </div>
+                  </div>
+
                   <div className="form-group">
                     <label>Password</label>
                     <div className="have-field-with-icon">
@@ -605,16 +676,7 @@ function Users() {
               setShowFormModal(false);
               setIsEdit(false);
               setEditUserId(null);
-              setFormData({
-                name: "",
-                email: "",
-                mobile: "",
-                role_id: "",
-                city_id: "",
-                department: [],
-                password: "",
-                confirm_password: "",
-              });
+              setFormData({ ...emptyUserForm });
             },
           }}
         </FormModel>

@@ -13,6 +13,12 @@
     &.xl {
       max-width: 1024px;
     }
+    &.lg {
+      max-width: 800px;
+      .modal-content {
+        max-width: 800px;
+      }
+    }
     .modal-content {
       width: 100%;
       position: relative;
@@ -90,6 +96,19 @@
     }
     .css-1nmdiq5-menu {
     }
+    .react-datepicker-wrapper {
+      width: 100%;
+      display: block;
+    }
+    .react-datepicker__input-container {
+      width: 100%;
+      display: block;
+
+      input.form-field {
+        width: 100%;
+        box-sizing: border-box;
+      }
+    }
   }
   .form-group-row {
     display: flex;
@@ -165,5 +184,67 @@
         }
       }
     }
+  }
+}
+
+// Time picker popover: above modal, compact size
+.user-day-time-picker-popper {
+  z-index: 2000 !important;
+
+  .react-datepicker {
+    font-size: 13px;
+    border-radius: 8px;
+    border: 1px solid #d0d5dd;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  }
+
+  .react-datepicker__header {
+    padding: 6px 0;
+  }
+
+  .react-datepicker__header--time {
+    padding: 6px 8px;
+  }
+
+  .react-datepicker-time__header {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .react-datepicker__time-container {
+    width: 110px;
+
+    .react-datepicker__time {
+      .react-datepicker__time-box {
+        width: 110px;
+
+        ul.react-datepicker__time-list {
+          height: 160px !important;
+          overflow-y: auto;
+
+          li.react-datepicker__time-list-item {
+            height: 28px !important;
+            line-height: 28px !important;
+            padding: 0 8px !important;
+            font-size: 12px;
+
+            &:hover {
+              background-color: rgba(88, 100, 189, 0.1);
+            }
+
+            &--selected {
+              background-color: #5864bd !important;
+              color: #fff !important;
+              font-weight: 500;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .react-datepicker__triangle {
+    display: none;
   }
 }

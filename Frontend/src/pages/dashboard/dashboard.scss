@@ -351,6 +351,96 @@
         max-width: none;
         width: auto;
       }
+
+      > .attendance-summary-col {
+        flex: 1.75 1 0;
+        min-width: 240px;
+      }
+    }
+
+    --bs-gutter-x: 0.75rem;
+    @media (min-width: 1200px) {
+      > [class*="col-"] {
+        padding-left: calc(var(--bs-gutter-x) * 0.5);
+        padding-right: calc(var(--bs-gutter-x) * 0.5);
+      }
+    }
+
+    &.dashboard-order-summary-row--with-attendance {
+
+      @media (min-width: 1200px) {
+        > .attendance-summary-col {
+          flex: 2.4 1 0;
+          min-width: 280px;
+        }
+      }
+      
+      
+      
+      .padding-top-bottom {
+        padding-top: 8px;
+        padding-bottom: 8px;
+      }
+
+      .sneak-peek-stacked {
+        gap: 8px;
+      }
+
+      .attendance-card {
+        padding: 16px 20px 7px;
+        min-height: 0;
+        justify-content: center;
+
+        .attendance-card-buttons-container {
+          gap: 8px;
+          margin-bottom: 8px;
+
+          .attendance-card-button {
+            width: auto;
+            min-width: 0;
+            flex: 1 1 0;
+            min-height: 75px;
+            font-size: 15px;
+            font-weight: 600;
+            padding: 8px 6px;
+
+            svg {
+              width: 32px;
+              height: 32px;
+            }
+
+            &.check-out-button {
+              flex: 0 0 auto;
+              width: auto;
+              min-width: 64px;
+              padding: 6px 8px;
+              font-size: 12px;
+            }
+          }
+        }
+
+        .attendance-card-checkin-time {
+          display: flex;
+          flex-direction: row;
+          flex-wrap: wrap;
+          align-items: baseline;
+          justify-content: center;
+          gap: 6px;
+          line-height: 1.2;
+
+          p {
+            font-size: 12px;
+            line-height: 1.2;
+            margin-bottom: 0;
+          }
+
+          h4 {
+            font-size: 14px;
+            margin-bottom: 0;
+            margin-top: 0;
+          }
+        }
+      }
     }
 
     > [class*="col-"] {
@@ -361,6 +451,178 @@
       > .sneak-peek-stacked {
         flex: 1;
         width: 100%;
+      }
+    }
+
+    .attendance-card {
+      background-color: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+      padding: 12px;
+      height: 100%;
+      min-height: 120px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      box-sizing: border-box;
+
+      .attendance-card-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        width: auto;
+        max-width: 100%;
+        margin-bottom: 8px;
+      }
+
+      .attendance-card-buttons-container {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 0;
+        width: auto;
+        max-width: 100%;
+
+
+
+        .attendance-card-button {
+          flex: 1 1 0;
+          width: auto;
+          min-width: 0;
+          min-height: 75px;
+          height: auto;
+          border-radius: 10px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 6px 4px;
+          font-size: 15px;
+          line-height: 1.2;
+          box-shadow: none;
+          outline: none;
+
+
+
+          svg {
+            width: 32px;
+            height: 32px;
+            margin-bottom: 2px;
+          }
+
+          &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+
+          &.check-out-button {
+            flex: 1 1 0;
+            width: auto;
+            min-width: 0;
+            padding: 6px 4px;
+            font-size: 15px;
+            border: 2px solid $color-danger;
+            color: $color-danger;
+            background-color: transparent;
+            transition: all 0.25s ease;
+            &:hover:not(:disabled) {
+              color: $primary-font-color;
+              background-color: $color-danger;
+            }
+          }
+
+          &.check-in-button {
+            border: 2px solid $color-success;
+            color: $primary-font-color;
+            background-color: $color-success;
+            transition: all 0.25s ease;
+            &:hover:not(:disabled) {
+              color: $color-success;
+              background-color: $primary-font-color;
+            }
+          }
+
+          &.lunch-in-button {
+            border: 2px solid #fd9506;
+            color: $primary-font-color;
+            background-color: #fd9506;
+            transition: all 0.25s ease;
+            &:hover:not(:disabled) {
+              color: #fd9506;
+              background-color: $primary-font-color;
+            }
+          }
+
+          &.lunch-out-button {
+            border: 2px solid #fd9506;
+            color: #fd9506;
+            background-color: transparent;
+            transition: all 0.25s ease;
+            &:hover:not(:disabled) {
+              color: $primary-font-color;
+              background-color: #fd9506;
+            }
+          }
+
+          &.break-in-button {
+            flex: 1 0 auto;
+            min-width: 110px;
+            border: 2px solid #2b7bbb;
+            color: $primary-font-color;
+            background-color: #2b7bbb;
+            transition: all 0.25s ease;
+            &:hover:not(:disabled) {
+              color: #2b7bbb;
+              background-color: $primary-font-color;
+            }
+          }
+
+          &.break-out-button {
+            flex: 1 0 auto;
+            min-width: 110px;
+            border: 2px solid #2b7bbb;
+            color: #2b7bbb;
+            background-color: transparent;
+            transition: all 0.25s ease;
+            &:hover:not(:disabled) {
+              color: $primary-font-color;
+              background-color: #2b7bbb;
+            }
+          }
+        }
+
+        &.attendance-card-buttons-container--breaks {
+          .attendance-card-button {
+            min-height: 45px;
+            min-width: 0;
+            flex-direction: row !important;
+            gap: 8px;
+          }
+        }
+      }
+
+      .attendance-card-checkin-time {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: center;
+        gap: 6px;
+        line-height: 1.2;
+
+        p {
+          text-align: left;
+          margin-bottom: 0;
+          font-size: 12px;
+          color: $base-font-color;
+        }
+        h4 {
+          text-align: left;
+          margin-bottom: 0;
+          margin-top: 0;
+          font-size: 14px;
+          line-height: 1.2;
+          color: $base-font-color;
+        }
       }
     }
   }
@@ -431,6 +693,9 @@
           text-align: left;
           flex: 1;
           min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         p {
@@ -517,67 +782,293 @@
   }
   .attendance-card-container {
     padding-bottom: 30px;
-    height: 100%;
     box-sizing: border-box;
+    width: 100%;
+
+    &.attendance-card-container--standalone {
+      max-width: none;
+      width: 100%;
+
+      .attendance-card {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 14px 20px;
+        min-height: 0;
+
+        .attendance-card-actions {
+          flex: 0 1 auto;
+          width: max-content;
+          max-width: calc(100% - 220px);
+          margin-bottom: 0;
+          min-width: 0;
+          flex-direction: row;
+        }
+
+        .attendance-card-buttons-container {
+          flex: 0 0 auto;
+          width: auto;
+          margin-bottom: 0;
+          gap: 10px;
+
+          .attendance-card-button {
+            width: auto;
+            min-width: 110px;
+            min-height: 48px;
+            flex: 0 0 auto;
+            flex-direction: row;
+            gap: 8px;
+            padding: 8px 14px;
+            font-size: 14px;
+
+            svg {
+              width: 32px;
+              height: 32px;
+              margin-bottom: 0;
+            }
+
+            &.check-out-button {
+              flex: 0 0 auto;
+              min-width: 110px;
+              padding: 8px 14px;
+              font-size: 14px;
+            }
+
+            &.break-in-button,
+            &.break-out-button {
+              flex: 0 0 auto;
+              min-width: 110px;
+              width: auto;
+            }
+          }
+
+          &.attendance-card-buttons-container--breaks {
+            width: auto;
+
+            .attendance-card-button {
+              flex: 0 0 auto;
+              min-width: 110px;
+              width: auto;
+            }
+          }
+        }
+
+        .attendance-card-checkin-time {
+          flex: 1 1 auto;
+          min-width: 180px;
+          display: flex;
+          flex-direction: row;
+          flex-wrap: wrap;
+          align-items: baseline;
+          justify-content: flex-end;
+          gap: 6px;
+          text-align: right;
+          line-height: 1.2;
+
+          p {
+            text-align: right;
+            font-size: 13px;
+            margin-bottom: 0;
+          }
+
+          h4 {
+            text-align: right;
+            font-size: 16px;
+            margin-top: 0;
+            margin-bottom: 0;
+          }
+        }
+      }
+
+      @media (max-width: 767.98px) {
+        .attendance-card {
+          flex-direction: column;
+          align-items: stretch;
+
+          .attendance-card-actions {
+            width: 100%;
+            max-width: none;
+          }
+
+          .attendance-card-buttons-container {
+            width: 100%;
+
+            .attendance-card-button {
+              flex: 1 1 0;
+              min-width: 0;
+
+              &.check-out-button,
+              &.break-in-button,
+              &.break-out-button {
+                flex: 1 1 0;
+                min-width: 0;
+              }
+            }
+          }
+
+          .attendance-card-checkin-time {
+            justify-content: center;
+            text-align: center;
+            min-width: 0;
+
+            p,
+            h4 {
+              text-align: center;
+            }
+          }
+        }
+      }
+    }
+
     .attendance-card {
       background-color: #ffffff;
       border-radius: 12px;
       box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
-      padding: 30px 30px 30px 30px;
-      height: 100%;
+      padding: 16px;
       display: flex;
       flex-direction: column;
       justify-content: center;
+
+      .attendance-card-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: auto;
+        max-width: 100%;
+        margin-bottom: 8px;
+      }
+
       .attendance-card-buttons-container {
         display: flex;
         gap: 10px;
-        margin-bottom: 20px;
+        margin-bottom: 0;
+        width: auto;
+        max-width: 100%;
+
+        &.attendance-card-buttons-container--breaks {
+          .attendance-card-button {
+            flex: 0 0 auto;
+            width: auto;
+            min-width: 110px;
+          }
+        }
+
         .attendance-card-button {
-          width: 50%;
-          height: 80px;
+          flex: 1 1 0;
+          width: auto;
+          min-width: 0;
+          min-height: 56px;
+          height: auto;
           border-radius: 12px;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          padding: 3px;
+          padding: 6px;
           box-shadow: none;
           outline: none;
+
           &:disabled {
             opacity: 0.5;
             cursor: not-allowed;
           }
+
           &.check-out-button {
+            flex: 1 1 0;
+            width: auto;
+            min-width: 0;
+            padding: 6px;
+            font-size: inherit;
             border: 2px solid $color-danger;
             color: $color-danger;
             background-color: transparent;
             transition: all 0.25s ease;
-            &:hover {
+            &:hover:not(:disabled) {
               color: $primary-font-color;
               background-color: $color-danger;
             }
           }
+
           &.check-in-button {
             border: 2px solid $color-success;
             color: $primary-font-color;
             background-color: $color-success;
             transition: all 0.25s ease;
-            &:hover {
+            &:hover:not(:disabled) {
               color: $color-success;
               background-color: $primary-font-color;
             }
           }
+
+          &.lunch-in-button {
+            border: 2px solid #fd9506;
+            color: $primary-font-color;
+            background-color: #fd9506;
+            transition: all 0.25s ease;
+            &:hover:not(:disabled) {
+              color: #fd9506;
+              background-color: $primary-font-color;
+            }
+          }
+
+          &.lunch-out-button {
+            border: 2px solid #fd9506;
+            color: #fd9506;
+            background-color: transparent;
+            transition: all 0.25s ease;
+            &:hover:not(:disabled) {
+              color: $primary-font-color;
+              background-color: #fd9506;
+            }
+          }
+
+          &.break-in-button {
+            flex: 0 0 auto;
+            min-width: 110px;
+            border: 2px solid #2b7bbb;
+            color: $primary-font-color;
+            background-color: #2b7bbb;
+            transition: all 0.25s ease;
+            &:hover:not(:disabled) {
+              color: #2b7bbb;
+              background-color: $primary-font-color;
+            }
+          }
+
+          &.break-out-button {
+            flex: 0 0 auto;
+            min-width: 110px;
+            border: 2px solid #2b7bbb;
+            color: #2b7bbb;
+            background-color: transparent;
+            transition: all 0.25s ease;
+            &:hover:not(:disabled) {
+              color: $primary-font-color;
+              background-color: #2b7bbb;
+            }
+          }
         }
       }
+
       .attendance-card-checkin-time {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: center;
+        gap: 6px;
+        line-height: 1.2;
+
         p {
-          text-align: center;
+          text-align: left;
           margin-bottom: 0;
           color: $base-font-color;
         }
         h4 {
-          text-align: center;
+          text-align: left;
           margin-bottom: 0;
+          margin-top: 0;
           color: $base-font-color;
         }
       }
@@ -768,7 +1259,103 @@
   }
 }
 
-/* aatandace page styles */
-.attendance-data-table {
-  height: calc(100% - 150px);
+/* Attendance page — match Users/Orders list layout spacing */
+.attendance-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+
+  .dashboard-container-sneak-peek {
+    flex-shrink: 0;
+
+    .left-part-of-sneak-peek {
+      margin-top: 0;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .padding-top-bottom {
+      padding-top: 0;
+      padding-bottom: 16px;
+      height: auto;
+    }
+
+    .sneak-peek-card {
+      height: auto;
+      min-height: 0;
+    }
+  }
+
+  .attendance-data-table {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+
+    .dataTable-container {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 20px 30px 20px 20px;
+
+      .dataTable-table-container {
+        .dataTable-table {
+          tfoot {
+            position: sticky;
+            bottom: 0;
+            z-index: 1;
+            background-color: #fff;
+
+            .attendance-totals-row td {
+              border-top: 2px solid #d8dbe6;
+              font-weight: 700;
+              background-color: #f7f8fc;
+            }
+          }
+        }
+      }
+
+      .attendance-status-tag {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.2;
+        white-space: nowrap;
+
+        &.status-holiday {
+          background-color: #e8e4ff;
+          color: #5b4bb7;
+        }
+
+        &.status-paid_leave {
+          background-color: #d9f5e5;
+          color: #1f7a4d;
+        }
+
+        &.status-leave {
+          background-color: #ffe8d6;
+          color: #b85c1a;
+        }
+
+        &.status-half_day {
+          background-color: #fff3c4;
+          color: #8a6d00;
+        }
+      }
+    }
+  }
+}
+
+.attendance-holiday-note {
+  margin: 0 0 16px;
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.4;
 }
