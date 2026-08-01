@@ -21,6 +21,7 @@ export {
   OrderHistoryIcon,
   SpreadsheetIcon,
   AttendanceIcon,
+  AttendanceDateIcon,
   DayInIcon,
   DayOutIcon,
   LunchInIcon,

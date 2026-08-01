@@ -88,6 +88,26 @@ const userLeave = {
       .orderBy("id", "desc")
       .first(),
 
+  // Approved leaves covering a calendar date (all users)
+  findCoveringDate: (date) =>
+    db("user_leaves")
+      .select(
+        "user_leaves.id",
+        "user_leaves.user_id",
+        db.raw("to_char(user_leaves.start_date, 'YYYY-MM-DD') as start_date"),
+        db.raw("to_char(user_leaves.end_date, 'YYYY-MM-DD') as end_date"),
+        "user_leaves.leave_type",
+        "user_leaves.half_day_session",
+        "user_leaves.remarks",
+        "user_leaves.status"
+      )
+      .whereNull("user_leaves.deleted_at")
+      .where("user_leaves.status", "approved")
+      .andWhere("user_leaves.start_date", "<=", date)
+      .andWhere("user_leaves.end_date", ">=", date)
+      .orderBy("user_leaves.user_id", "asc")
+      .orderBy("user_leaves.id", "desc"),
+
   create: async (data) => {
     const [row] = await db("user_leaves").insert(data).returning("*");
     return [normalizeDateFields(row)];

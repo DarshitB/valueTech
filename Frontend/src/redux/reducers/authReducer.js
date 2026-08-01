@@ -123,13 +123,36 @@ export const generateOtp = createAsyncThunk(
   }
 );
 
-// Verify OTP
+// Verify OTP — then auto Day In if user has view_dashboard_checkin_checkout
 export const verifyOtp = createAsyncThunk(
   "auth/verifyOtp",
   async (payload, thunkAPI) => {
     try {
       const res = await axios.post("/api/auth/verify-otp", payload);
       toast.success(res.data.message || "Login Code verified successfully");
+
+      const user = thunkAPI.getState()?.auth?.user;
+      const permissions = user?.permissions || [];
+      const userId = user?.id;
+
+      if (
+        userId &&
+        permissions.includes("view_dashboard_checkin_checkout")
+      ) {
+        try {
+          await axios.post("/api/attendance", {
+            user_id: userId,
+            checkin_via: "OTP",
+          });
+        } catch (dayInErr) {
+          // Already day-in / leave / incomplete previous day — do not block OTP login
+          console.error(
+            "Auto Day In after OTP skipped:",
+            dayInErr?.response?.data?.message || dayInErr.message
+          );
+        }
+      }
+
       return res.data;
     } catch (err) {
       toast.error(err.response?.data?.message || "Login Code verification failed");

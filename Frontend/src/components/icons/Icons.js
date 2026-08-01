@@ -1450,6 +1450,36 @@ export const AttendanceIcon = ({
   );
 };
 
+// Attendance Date — calendar with day highlight (distinct from Attendance checkmark)
+export const AttendanceDateIcon = ({
+  color = "currentColor",
+  className = "",
+  ...props
+}) => {
+  return (
+    <svg
+      viewBox="0 0 50 50"
+      width="30"
+      height="30"
+      fill="none"
+      stroke={color}
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`icon ${className}`}
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+      style={{ ...(props.style || {}), fill: "none" }}
+    >
+      <rect x="10" y="11" width="30" height="30" rx="2.5" fill="none" />
+      <line x1="10" y1="19" x2="40" y2="19" />
+      <line x1="18" y1="8" x2="18" y2="14" />
+      <line x1="32" y1="8" x2="32" y2="14" />
+      <rect x="20" y="24" width="10" height="10" rx="1.5" fill="none" />
+    </svg>
+  );
+};
+
 // Day In — login / enter arrow
 export const DayInIcon = ({
   color = "currentColor",

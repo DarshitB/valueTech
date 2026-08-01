@@ -17,6 +17,7 @@ import {
   OrderHistoryIcon,
   SpreadsheetIcon,
   AttendanceIcon,
+  AttendanceDateIcon,
   OrderIcon,
   PermissionIcon,
   UsersIcon,
@@ -317,11 +318,29 @@ function Layout() {
                   </Link>
                 </li>
               )}
+              {hasPermission(allowedPermissions, "view_attendance_date_page") && (
+                <li
+                  className={`${
+                    location.pathname.startsWith("/attendance-date")
+                      ? "active"
+                      : ""
+                  } dropdown`}
+                >
+                  <Link to="attendance-date">
+                    <AttendanceDateIcon className="feather feather-monitor" />
+                    Attendance Date
+                  </Link>
+                </li>
+              )}
               {hasPermission(allowedPermissions, "view_dashboard_checkin_checkout") &&
                 LoggedInUser?.role?.name?.toUpperCase() !== "DEVELOPER_ADMIN" && (
                 <li
                   className={`${
-                    location.pathname.startsWith("/attendance") ? "active" : ""
+                    location.pathname === "/attendance" ||
+                    /^\/attendance\/\d{4}-\d{2}-\d{2}/.test(location.pathname) ||
+                    /^\/users\/[^/]+\/attendance/.test(location.pathname)
+                      ? "active"
+                      : ""
                   } dropdown`}
                 >
                   <Link to="attendance">

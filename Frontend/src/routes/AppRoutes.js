@@ -12,6 +12,8 @@ import OrderHistory from "../pages/orders/order-history/OrderHistory";
 import FieldVerifier from "../pages/field-verifier/FieldVerifier";
 import Users from "../pages/users/Users";
 import Attendance from "../pages/users/Attendance";
+import AttendanceDate from "../pages/users/AttendanceDate";
+import AttendanceDetail from "../pages/users/AttendanceDetail";
 import Permissions from "../pages/permissions/Permissions";
 import Banks from "../pages/banks/Banks";
 import Categories from "../pages/categories/Categories";
@@ -179,10 +181,34 @@ const AppRoutes = () => {
           }
         />
         <Route
+          path="attendance-date"
+          element={
+            <ProtectedRoute permission="view_attendance_date_page">
+              <AttendanceDate />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="attendance/:workingDate"
+          element={
+            <ProtectedRoute permission="view_dashboard_checkin_checkout">
+              <AttendanceDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="attendance"
           element={
             <ProtectedRoute permission="view_dashboard_checkin_checkout">
               <Attendance />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="users/:userId/attendance/:workingDate"
+          element={
+            <ProtectedRoute permission="show_attendance_of_all_users">
+              <AttendanceDetail />
             </ProtectedRoute>
           }
         />

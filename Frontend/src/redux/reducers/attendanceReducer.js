@@ -2,12 +2,17 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import * as attendanceApi from "../../api/attendance.api";
 import { toast } from "react-toastify";
 
-// Fetch attendance records for a specific user
+// Fetch attendance records for a specific user (optional { from, to })
 export const fetchAttendanceByUserId = createAsyncThunk(
   "attendance/fetchByUserId",
-  async (userId, { rejectWithValue }) => {
+  async (arg, { rejectWithValue }) => {
     try {
-      const res = await attendanceApi.getAttendanceByUserId(userId);
+      const userId = typeof arg === "object" ? arg.userId : arg;
+      const params =
+        typeof arg === "object"
+          ? { from: arg.from, to: arg.to }
+          : undefined;
+      const res = await attendanceApi.getAttendanceByUserId(userId, params);
       return res.data;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || err.message);
@@ -17,9 +22,76 @@ export const fetchAttendanceByUserId = createAsyncThunk(
 
 export const fetchBreaksByUserId = createAsyncThunk(
   "attendance/fetchBreaksByUserId",
-  async (userId, { rejectWithValue }) => {
+  async (arg, { rejectWithValue }) => {
     try {
-      const res = await attendanceApi.getBreaksByUserId(userId);
+      const userId = typeof arg === "object" ? arg.userId : arg;
+      const params =
+        typeof arg === "object"
+          ? { from: arg.from, to: arg.to }
+          : undefined;
+      const res = await attendanceApi.getBreaksByUserId(userId, params);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+// Attendance Date page: all users for one working date
+export const fetchAttendanceByWorkingDate = createAsyncThunk(
+  "attendance/fetchByWorkingDate",
+  async (workingDate, { rejectWithValue }) => {
+    try {
+      const res = await attendanceApi.getAttendanceByWorkingDate(workingDate);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+// Attendance detail: one user + one working date
+export const fetchAttendanceDetail = createAsyncThunk(
+  "attendance/fetchDetail",
+  async ({ userId, workingDate }, { rejectWithValue }) => {
+    try {
+      const res = await attendanceApi.getAttendanceDetail(userId, workingDate);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+export const updateAttendanceWorkTimes = createAsyncThunk(
+  "attendance/updateWorkTimes",
+  async (data, { rejectWithValue }) => {
+    try {
+      const res = await attendanceApi.updateAttendanceWorkTimes(data);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+export const updateBreakWorkTimes = createAsyncThunk(
+  "attendance/updateBreakWorkTimes",
+  async ({ id, data }, { rejectWithValue }) => {
+    try {
+      const res = await attendanceApi.updateBreakWorkTimes(id, data);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+export const updateAttendanceCheckoutRemarks = createAsyncThunk(
+  "attendance/updateCheckoutRemarks",
+  async (data, { rejectWithValue }) => {
+    try {
+      const res = await attendanceApi.updateAttendanceCheckoutRemarks(data);
       return res.data;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || err.message);
@@ -143,6 +215,14 @@ const applyLastRecordPayload = (state, payload) => {
 const initialState = {
   list: [],
   breaks: [],
+  byDateList: [],
+  byDateBreaks: [],
+  byDateLeaves: [],
+  byDateLoading: false,
+  detail: null,
+  detailBreaks: [],
+  detailActivities: [],
+  detailLoading: false,
   loading: false,
   error: null,
   lastRecord: null,
@@ -176,6 +256,83 @@ const attendanceSlice = createSlice({
       })
       .addCase(fetchBreaksByUserId.rejected, (state, action) => {
         state.error = action.payload;
+      })
+
+      .addCase(fetchAttendanceByWorkingDate.pending, (state) => {
+        state.byDateLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchAttendanceByWorkingDate.fulfilled, (state, action) => {
+        const payload = action.payload || {};
+        state.byDateList = Array.isArray(payload.attendance)
+          ? payload.attendance
+          : [];
+        state.byDateBreaks = Array.isArray(payload.breaks) ? payload.breaks : [];
+        state.byDateLeaves = Array.isArray(payload.leaves) ? payload.leaves : [];
+        state.byDateLoading = false;
+      })
+      .addCase(fetchAttendanceByWorkingDate.rejected, (state, action) => {
+        state.byDateLoading = false;
+        state.error = action.payload;
+        toast.error(`Failed to fetch attendance by date: ${action.payload}`);
+      })
+
+      .addCase(fetchAttendanceDetail.pending, (state) => {
+        state.detailLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchAttendanceDetail.fulfilled, (state, action) => {
+        state.detail = action.payload?.attendance || null;
+        state.detailBreaks = Array.isArray(action.payload?.breaks)
+          ? action.payload.breaks
+          : [];
+        state.detailActivities = Array.isArray(action.payload?.activities)
+          ? action.payload.activities
+          : [];
+        state.detailLoading = false;
+      })
+      .addCase(fetchAttendanceDetail.rejected, (state, action) => {
+        state.detailLoading = false;
+        state.error = action.payload;
+        toast.error(`Failed to fetch attendance detail: ${action.payload}`);
+      })
+
+      .addCase(updateAttendanceWorkTimes.fulfilled, (state, action) => {
+        state.detail = action.payload?.attendance || state.detail;
+        state.detailBreaks = Array.isArray(action.payload?.breaks)
+          ? action.payload.breaks
+          : state.detailBreaks;
+        toast.success("Attendance times updated");
+      })
+      .addCase(updateAttendanceWorkTimes.rejected, (state, action) => {
+        toast.error(`Failed to update attendance times: ${action.payload}`);
+      })
+
+      .addCase(updateAttendanceCheckoutRemarks.fulfilled, (state, action) => {
+        if (action.payload?.attendance) {
+          state.detail = {
+            ...(state.detail || {}),
+            ...action.payload.attendance,
+          };
+        }
+        toast.success("Day out remark saved");
+      })
+      .addCase(updateAttendanceCheckoutRemarks.rejected, (state, action) => {
+        toast.error(`Failed to save day out remark: ${action.payload}`);
+      })
+
+      .addCase(updateBreakWorkTimes.fulfilled, (state, action) => {
+        const updated = action.payload;
+        if (updated?.id) {
+          const idx = state.detailBreaks.findIndex((b) => b.id === updated.id);
+          if (idx !== -1) {
+            state.detailBreaks[idx] = updated;
+          }
+        }
+        toast.success("Break times updated");
+      })
+      .addCase(updateBreakWorkTimes.rejected, (state, action) => {
+        toast.error(`Failed to update break times: ${action.payload}`);
       })
 
       // Fetch last attendance by user ID

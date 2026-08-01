@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { fetchAttendanceByUserId, fetchBreaksByUserId } from "../../redux/reducers/attendanceReducer";
@@ -65,14 +65,28 @@ const dateOnlyToLocalDate = (value) => {
   return new Date(y, m - 1, d);
 };
 
+const getCurrentMonthRange = () => {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth(), 1);
+  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  from.setHours(0, 0, 0, 0);
+  to.setHours(0, 0, 0, 0);
+  return { from, to };
+};
+
 function Attendance() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { userId } = useParams(); // Get userId from URL params if viewing someone else's attendance
   const { setTitle } = usePageTitle();
 
   /* get logged user */
   const currentUser = useSelector(selectUser);
   const allowedPermissions = useSelector(selectPermissions);
+  const canViewOvertimeWorked = hasPermission(
+    allowedPermissions,
+    "view_attendance_overtime_worked"
+  );
 
   // Redux data
   const { list: attendanceList, breaks: attendanceBreaks, loading } = useSelector(
@@ -84,6 +98,9 @@ function Attendance() {
 
   // State for real-time clock updates
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // From / To date filter (defaults: current month first → last day)
+  const [dateRange, setDateRange] = useState(getCurrentMonthRange);
 
   // Company holiday modal
   const [showHolidayModal, setShowHolidayModal] = useState(false);
@@ -121,14 +138,24 @@ function Attendance() {
   }, [users, currentUser, targetUserId]);
   const targetUserName = targetUser?.name || `User #${targetUserId}`;
 
-  // Fetch attendance on mount and when userId changes
+  // Fetch attendance for selected From/To range (DB filter only)
   useEffect(() => {
-    if (targetUserId) {
-      dispatch(fetchAttendanceByUserId(targetUserId));
-      dispatch(fetchBreaksByUserId(targetUserId));
-      dispatch(fetchUserLeavesByUserId({ userId: targetUserId }));
-    }
-  }, [dispatch, targetUserId]);
+    if (!targetUserId) return;
+
+    const from = toDateOnlyString(dateRange.from);
+    const to = toDateOnlyString(dateRange.to);
+    if (!from || !to) return;
+
+    const params = { userId: targetUserId, from, to };
+    dispatch(fetchAttendanceByUserId(params));
+    dispatch(fetchBreaksByUserId(params));
+    dispatch(
+      fetchUserLeavesByUserId({
+        userId: targetUserId,
+        params: { from, to },
+      })
+    );
+  }, [dispatch, targetUserId, dateRange.from, dateRange.to]);
 
   // Company holidays for status column
   useEffect(() => {
@@ -770,7 +797,15 @@ function Attendance() {
         })
       ).unwrap();
       setShowLeaveModal(false);
-      dispatch(fetchUserLeavesByUserId({ userId: targetUserId }));
+      dispatch(
+        fetchUserLeavesByUserId({
+          userId: targetUserId,
+          params: {
+            from: toDateOnlyString(dateRange.from),
+            to: toDateOnlyString(dateRange.to),
+          },
+        })
+      );
     } catch (err) {
       // toast handled in reducer
     } finally {
@@ -778,25 +813,23 @@ function Attendance() {
     }
   };
 
-  // Every calendar day from user's first attendance date through today
+  // Same continuous day list as before: From → min(today, To); empty days filled.
+  // From/To only change which records were fetched from the DB.
   const displayAttendanceList = useMemo(() => {
-    if (!attendanceList?.length) return [];
+    const fromKey = toDateKey(dateRange.from);
+    const toKey = toDateKey(dateRange.to);
+    if (!fromKey || !toKey || fromKey > toKey) return [];
+
+    const todayKey = toDateKey(new Date());
+    const endKey = todayKey && todayKey < toKey ? todayKey : toKey;
+    if (fromKey > endKey) return [];
 
     const recordsByDate = new Map();
-    let earliest = null;
-
-    attendanceList.forEach((record) => {
+    (attendanceList || []).forEach((record) => {
       const key = toDateKey(record.working_date);
       if (!key) return;
 
-      const recordDate = new Date(record.working_date);
-      recordDate.setHours(0, 0, 0, 0);
-      if (!earliest || recordDate < earliest) {
-        earliest = recordDate;
-      }
-
       const existing = recordsByDate.get(key);
-      // Keep the latest/most complete record if multiple exist for one day
       if (
         !existing ||
         (record.checkin_time && !existing.checkin_time) ||
@@ -806,15 +839,12 @@ function Attendance() {
       }
     });
 
-    if (!earliest) return [];
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     const rows = [];
-    const cursor = new Date(today);
+    const cursor = dateOnlyToLocalDate(endKey);
+    const start = dateOnlyToLocalDate(fromKey);
+    if (!cursor || !start) return [];
 
-    while (cursor >= earliest) {
+    while (cursor >= start) {
       const key = toDateKey(cursor);
       const existing = recordsByDate.get(key);
 
@@ -836,7 +866,7 @@ function Attendance() {
     }
 
     return rows;
-  }, [attendanceList]);
+  }, [attendanceList, dateRange.from, dateRange.to]);
 
   // Sum lunch / break / working / OT / total across closed attendance days
   const attendanceColumnTotals = useMemo(() => {
@@ -897,22 +927,26 @@ function Attendance() {
                 </div>
               </div>
             </div>
-            <div className="col-xl-3 col-lg-6 col-md-6 col-sm-12 col-xs-12">
-              <div className="padding-top-bottom">
-                <div className="sneak-peek-card today-orders light">
-                  <h3>Today's Overtime Hours</h3>
-                  <p>{calculateTodayOvertimeHours()}</p>
+            {canViewOvertimeWorked && (
+              <div className="col-xl-3 col-lg-6 col-md-6 col-sm-12 col-xs-12">
+                <div className="padding-top-bottom">
+                  <div className="sneak-peek-card today-orders light">
+                    <h3>Today's Overtime Hours</h3>
+                    <p>{calculateTodayOvertimeHours()}</p>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="col-xl-3 col-lg-6 col-md-6 col-sm-12 col-xs-12">
-              <div className="padding-top-bottom">
-                <div className="sneak-peek-card today-orders light">
-                  <h3>This Month Total Overtime Hours</h3>
-                  <p>{calculateMonthOvertimeHours()}</p>
+            )}
+            {canViewOvertimeWorked && (
+              <div className="col-xl-3 col-lg-6 col-md-6 col-sm-12 col-xs-12">
+                <div className="padding-top-bottom">
+                  <div className="sneak-peek-card today-orders light">
+                    <h3>This Month Total Overtime Hours</h3>
+                    <p>{calculateMonthOvertimeHours()}</p>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -928,18 +962,74 @@ function Attendance() {
             sortableColumns={[0]}
           >
             {{
-              buttons: hasPermission(
-                allowedPermissions,
-                "add_company_holiday"
-              ) && (
-                <div className="add-action-buttons">
-                  <button
-                    className="btn"
-                    type="button"
-                    onClick={openHolidayModal}
-                  >
-                    Add Holiday for All
-                  </button>
+              buttons: (
+                <div className="add-action-buttons attendance-range-filter">
+                  <label htmlFor="attendance_from_date">From</label>
+                  <DatePicker
+                    id="attendance_from_date"
+                    selected={dateRange.from}
+                    onChange={(date) => {
+                      if (!date) return;
+                      const next = new Date(date);
+                      next.setHours(0, 0, 0, 0);
+                      setDateRange((prev) => ({
+                        from: next,
+                        to: prev.to && prev.to < next ? next : prev.to,
+                      }));
+                    }}
+                    placeholderText="From date"
+                    className="form-field"
+                    dateFormat="d MMM yyyy"
+                    renderCustomHeader={renderDatePickerHeader}
+                    showMonthDropdown
+                    showYearDropdown
+                    dropdownMode="select"
+                    portalId="datepicker-portal"
+                    popperPlacement="bottom-start"
+                    popperClassName="attendance-date-picker-popper"
+                    calendarClassName="attendance-date-calendar"
+                    popperProps={{ strategy: "fixed" }}
+                  />
+                  <label htmlFor="attendance_to_date">To</label>
+                  <DatePicker
+                    id="attendance_to_date"
+                    selected={dateRange.to}
+                    onChange={(date) => {
+                      if (!date) return;
+                      const next = new Date(date);
+                      next.setHours(0, 0, 0, 0);
+                      setDateRange((prev) => ({
+                        from:
+                          prev.from && next < prev.from ? next : prev.from,
+                        to: next,
+                      }));
+                    }}
+                    minDate={dateRange.from}
+                    placeholderText="To date"
+                    className="form-field"
+                    dateFormat="d MMM yyyy"
+                    renderCustomHeader={renderDatePickerHeader}
+                    showMonthDropdown
+                    showYearDropdown
+                    dropdownMode="select"
+                    portalId="datepicker-portal"
+                    popperPlacement="bottom-start"
+                    popperClassName="attendance-date-picker-popper"
+                    calendarClassName="attendance-date-calendar"
+                    popperProps={{ strategy: "fixed" }}
+                  />
+                  {hasPermission(
+                    allowedPermissions,
+                    "add_company_holiday"
+                  ) && (
+                    <button
+                      className="btn"
+                      type="button"
+                      onClick={openHolidayModal}
+                    >
+                      Add Holiday for All
+                    </button>
+                  )}
                 </div>
               ),
               header: (
@@ -953,7 +1043,9 @@ function Attendance() {
                   <th style={{ width: "140px" }}>Total Lunch Time</th>
                   <th style={{ width: "140px" }}>Total Break Time</th>
                   <th style={{ width: "130px" }}>Working Hours</th>
-                  <th style={{ width: "140px" }}>Overtime Worked</th>
+                  {canViewOvertimeWorked && (
+                    <th style={{ width: "140px" }}>Overtime Worked</th>
+                  )}
                   <th style={{ width: "120px" }}>Total Hours</th>
                   {hasPermission(allowedPermissions, "add_user_leave") && (
                     <th style={{ width: "90px", textAlign: "center" }}>
@@ -968,9 +1060,26 @@ function Attendance() {
                   record?.lunch_in &&
                   record?.lunch_out &&
                   getLunchMinutes(record) > 60;
+                const dateKey = toDateKey(record.working_date);
+                // Own page → /attendance/:date; Users → eye → /users/:id/attendance/:date
+                const openDetail = dateKey
+                  ? () =>
+                      navigate(
+                        isViewingOtherUser
+                          ? `/users/${targetUserId}/attendance/${dateKey}`
+                          : `/attendance/${dateKey}`
+                      )
+                  : undefined;
                 return (
-                  <tr key={record.id || `day-${index}`}>
-                    <td data-sort={toDateKey(record.working_date) || ""}>
+                  <tr
+                    key={record.id || `day-${index}`}
+                    onClick={openDetail}
+                    className={
+                      openDetail ? "attendance-row-clickable" : undefined
+                    }
+                    style={openDetail ? { cursor: "pointer" } : undefined}
+                  >
+                    <td data-sort={dateKey || ""}>
                       {formatDate(record.working_date)}
                     </td>
                     <td>
@@ -1041,10 +1150,15 @@ function Attendance() {
                     </td>
                     <td>{calculateTotalBreakTime(record)}</td>
                     <td>{calculateWorkingHours(record)}</td>
-                    <td>{calculateOvertimeWorked(record)}</td>
+                    {canViewOvertimeWorked && (
+                      <td>{calculateOvertimeWorked(record)}</td>
+                    )}
                     <td>{calculateTotalHours(record)}</td>
                     {hasPermission(allowedPermissions, "add_user_leave") && (
-                      <td style={{ textAlign: "center" }}>
+                      <td
+                        style={{ textAlign: "center" }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <button
                           type="button"
                           className="action-icons"
@@ -1084,13 +1198,15 @@ function Attendance() {
                       )}
                     </strong>
                   </td>
-                  <td>
-                    <strong>
-                      {formatDurationWithDays(
-                        attendanceColumnTotals.overtimeMinutes
-                      )}
-                    </strong>
-                  </td>
+                  {canViewOvertimeWorked && (
+                    <td>
+                      <strong>
+                        {formatDurationWithDays(
+                          attendanceColumnTotals.overtimeMinutes
+                        )}
+                      </strong>
+                    </td>
+                  )}
                   <td>
                     <strong>
                       {formatDurationWithDays(

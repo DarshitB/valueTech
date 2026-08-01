@@ -1109,58 +1109,77 @@ function Dashboard() {
   const renderAttendanceCard = () => (
     <div className="attendance-card">
       <div className="attendance-card-actions">
-        <div className="attendance-card-buttons-container">
-          <button
-            type="button"
-            className="attendance-card-button check-in-button"
-            onClick={handleCheckIn}
-            disabled={attendanceLoading || isCheckInDisabled()}
-          >
-            <DayInIcon /> Day In
-          </button>
-          <button
-            type="button"
-            className="attendance-card-button lunch-in-button"
-            onClick={handleLunchIn}
-            disabled={attendanceLoading || isLunchInDisabled()}
-          >
-            <LunchInIcon /> Lunch In
-          </button>
-          <button
-            type="button"
-            className="attendance-card-button lunch-out-button"
-            onClick={handleLunchOut}
-            disabled={attendanceLoading || isLunchOutDisabled()}
-          >
-            <LunchOutIcon /> Lunch Out
-          </button>
-          <button
-            type="button"
-            className="attendance-card-button check-out-button"
-            onClick={handleCheckOut}
-            disabled={attendanceLoading || isCheckOutDisabled()}
-          >
-            <DayOutIcon /> Day Out
-          </button>
-        </div>
-        <div className="attendance-card-buttons-container attendance-card-buttons-container--breaks">
-          <button
-            type="button"
-            className="attendance-card-button break-in-button"
-            onClick={handleBreakIn}
-            disabled={attendanceLoading || isBreakInDisabled()}
-          >
-            <BreakInIcon /> Break In
-          </button>
-          <button
-            type="button"
-            className="attendance-card-button break-out-button"
-            onClick={handleBreakOut}
-            disabled={attendanceLoading || isBreakOutDisabled()}
-          >
-            <BreakOutIcon /> Break Out
-          </button>
-        </div>
+        {(canAttendanceDayIn ||
+          canAttendanceLunchIn ||
+          canAttendanceLunchOut ||
+          canAttendanceDayOut) && (
+          <div className="attendance-card-buttons-container">
+            {canAttendanceDayIn && (
+              <button
+                type="button"
+                className="attendance-card-button check-in-button"
+                onClick={handleCheckIn}
+                disabled={attendanceLoading || isCheckInDisabled()}
+              >
+                <DayInIcon /> Day In
+              </button>
+            )}
+            {canAttendanceLunchIn && (
+              <button
+                type="button"
+                className="attendance-card-button lunch-in-button"
+                onClick={handleLunchIn}
+                disabled={attendanceLoading || isLunchInDisabled()}
+              >
+                <LunchInIcon /> Lunch In
+              </button>
+            )}
+            {canAttendanceLunchOut && (
+              <button
+                type="button"
+                className="attendance-card-button lunch-out-button"
+                onClick={handleLunchOut}
+                disabled={attendanceLoading || isLunchOutDisabled()}
+              >
+                <LunchOutIcon /> Lunch Out
+              </button>
+            )}
+            {canAttendanceDayOut && (
+              <button
+                type="button"
+                className="attendance-card-button check-out-button"
+                onClick={handleCheckOut}
+                disabled={attendanceLoading || isCheckOutDisabled()}
+              >
+                <DayOutIcon /> Day Out
+              </button>
+            )}
+          </div>
+        )}
+        {(canAttendanceBreakIn || canAttendanceBreakOut) && (
+          <div className="attendance-card-buttons-container attendance-card-buttons-container--breaks">
+            {canAttendanceBreakIn && (
+              <button
+                type="button"
+                className="attendance-card-button break-in-button"
+                onClick={handleBreakIn}
+                disabled={attendanceLoading || isBreakInDisabled()}
+              >
+                <BreakInIcon /> Break In
+              </button>
+            )}
+            {canAttendanceBreakOut && (
+              <button
+                type="button"
+                className="attendance-card-button break-out-button"
+                onClick={handleBreakOut}
+                disabled={attendanceLoading || isBreakOutDisabled()}
+              >
+                <BreakOutIcon /> Break Out
+              </button>
+            )}
+          </div>
+        )}
       </div>
       <div className="attendance-card-checkin-time">
         {lastAttendance?.checkin_time && !lastAttendance?.checkout_time ? (
@@ -1761,10 +1780,38 @@ function Dashboard() {
     allowedPermissions,
     "view_dashboard_statistics",
   );
-  const hasCheckinPermission = hasPermission(
+  const canAttendanceDayIn = hasPermission(
     allowedPermissions,
-    "view_dashboard_checkin_checkout",
+    "attendance_day_in",
   );
+  const canAttendanceLunchIn = hasPermission(
+    allowedPermissions,
+    "attendance_lunch_in",
+  );
+  const canAttendanceLunchOut = hasPermission(
+    allowedPermissions,
+    "attendance_lunch_out",
+  );
+  const canAttendanceDayOut = hasPermission(
+    allowedPermissions,
+    "attendance_day_out",
+  );
+  const canAttendanceBreakIn = hasPermission(
+    allowedPermissions,
+    "attendance_break_in",
+  );
+  const canAttendanceBreakOut = hasPermission(
+    allowedPermissions,
+    "attendance_break_out",
+  );
+  // Show attendance card if user has any of the action-button permissions
+  const hasCheckinPermission =
+    canAttendanceDayIn ||
+    canAttendanceLunchIn ||
+    canAttendanceLunchOut ||
+    canAttendanceDayOut ||
+    canAttendanceBreakIn ||
+    canAttendanceBreakOut;
   const hasOrderTablePermission = hasPermission(
     allowedPermissions,
     "view_dashboard_order_table",
