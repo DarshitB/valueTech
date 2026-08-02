@@ -9,6 +9,7 @@ import { addHoliday, fetchHolidays } from "../../redux/reducers/holidayReducer";
 import {
   addUserLeave,
   fetchUserLeavesByUserId,
+  removeUserLeave,
 } from "../../redux/reducers/userLeaveReducer";
 import CustomDataTable from "../../components/CustomDataTable";
 import FormModel from "../../components/FormModel";
@@ -774,16 +775,41 @@ function Attendance() {
 
   const handleLeaveSubmit = async (e) => {
     e.preventDefault();
-    if (!leaveForm.leave_type) {
-      toast.error("Please select leave type");
-      return;
-    }
     if (!leaveForm.working_date) {
       toast.error("Date is required");
       return;
     }
 
     const day = toDateOnlyString(leaveForm.working_date);
+    const leaveType = leaveForm.leave_type || null;
+
+    // Clear leave type → remove existing leave for that day
+    if (!leaveType) {
+      if (!leaveForm.id) {
+        toast.info("No leave to remove");
+        return;
+      }
+      setLeaveSubmitting(true);
+      try {
+        await dispatch(removeUserLeave(leaveForm.id)).unwrap();
+        setShowLeaveModal(false);
+        dispatch(
+          fetchUserLeavesByUserId({
+            userId: targetUserId,
+            params: {
+              from: toDateOnlyString(dateRange.from),
+              to: toDateOnlyString(dateRange.to),
+            },
+          })
+        );
+      } catch (err) {
+        // toast handled in reducer
+      } finally {
+        setLeaveSubmitting(false);
+      }
+      return;
+    }
+
     setLeaveSubmitting(true);
     try {
       await dispatch(
@@ -791,7 +817,7 @@ function Attendance() {
           user_id: targetUserId,
           start_date: day,
           end_date: day,
-          leave_type: leaveForm.leave_type,
+          leave_type: leaveType,
           half_day_session: null,
           remarks: leaveForm.remarks?.trim() || null,
         })
@@ -1371,8 +1397,7 @@ function Attendance() {
                           leave_type: val || "",
                         }))
                       }
-                      placeholder="Select leave type"
-                      required
+                      placeholder="Select leave type (optional)"
                     />
                   </div>
                   <div className="form-group">
@@ -1399,9 +1424,11 @@ function Attendance() {
                     >
                       {leaveSubmitting
                         ? "Saving..."
-                        : leaveForm.id
-                          ? "Update Leave"
-                          : "Add Leave"}
+                        : !leaveForm.leave_type && leaveForm.id
+                          ? "Remove Leave"
+                          : leaveForm.id
+                            ? "Update Leave"
+                            : "Add Leave"}
                     </button>
                   </div>
                 </div>

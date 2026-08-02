@@ -133,6 +133,13 @@ function AttendanceDetail() {
     Boolean(detail?.checkout_time) &&
     (isOwnAttendance || canUpdateOthersDayOutRemark);
 
+  // Hide attendance time/break/remark edit logs here; they still save in activity_logs
+  const visibleDetailActivities = useMemo(
+    () =>
+      (detailActivities || []).filter((item) => item.source !== "attendance"),
+    [detailActivities]
+  );
+
   useEffect(() => {
     if (!users || users.length === 0) {
       dispatch(fetchUsers());
@@ -709,10 +716,9 @@ function AttendanceDetail() {
               </h3>
               <div className="activities-wrapper">
                 <div className="activities">
-                  {detailActivities && detailActivities.length > 0 ? (
-                    detailActivities.map((item) => {
+                  {visibleDetailActivities.length > 0 ? (
+                    visibleDetailActivities.map((item) => {
                       const orderMeta = getActivityOrderMeta(item);
-                      const isAttendanceEdit = item.source === "attendance";
                       return (
                         <div
                           className="activity"
@@ -731,7 +737,7 @@ function AttendanceDetail() {
                                   item.activity_at ||
                                     item.changed_at ||
                                     item.created_at,
-                                  isAttendanceEdit
+                                  false
                                 )}
                               </p>
                             </div>

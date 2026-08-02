@@ -1,11 +1,11 @@
 import React, { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { fetchAttendanceByWorkingDate } from "../../redux/reducers/attendanceReducer";
 import { addHoliday, fetchHolidays } from "../../redux/reducers/holidayReducer";
-import { addUserLeave } from "../../redux/reducers/userLeaveReducer";
+import { addUserLeave, removeUserLeave } from "../../redux/reducers/userLeaveReducer";
 import CustomDataTable from "../../components/CustomDataTable";
 import FormModel from "../../components/FormModel";
 import SingleSearchSelect from "../../components/SingleSearchSelect";
@@ -61,6 +61,7 @@ const startOfToday = () => {
 
 function AttendanceDate() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { setTitle } = usePageTitle();
   const allowedPermissions = useSelector(selectPermissions);
 
@@ -515,16 +516,33 @@ function AttendanceDate() {
 
   const handleLeaveSubmit = async (e) => {
     e.preventDefault();
-    if (!leaveForm.leave_type) {
-      toast.error("Please select leave type");
-      return;
-    }
     if (!leaveForm.working_date || !leaveForm.user_id) {
       toast.error("Date and user are required");
       return;
     }
 
     const day = toDateOnlyString(leaveForm.working_date);
+    const leaveType = leaveForm.leave_type || null;
+
+    // Clear leave type → remove existing leave for that user/day
+    if (!leaveType) {
+      if (!leaveForm.id) {
+        toast.info("No leave to remove");
+        return;
+      }
+      setLeaveSubmitting(true);
+      try {
+        await dispatch(removeUserLeave(leaveForm.id)).unwrap();
+        setShowLeaveModal(false);
+        dispatch(fetchAttendanceByWorkingDate(day));
+      } catch (err) {
+        // toast handled in reducer
+      } finally {
+        setLeaveSubmitting(false);
+      }
+      return;
+    }
+
     setLeaveSubmitting(true);
     try {
       await dispatch(
@@ -532,7 +550,7 @@ function AttendanceDate() {
           user_id: leaveForm.user_id,
           start_date: day,
           end_date: day,
-          leave_type: leaveForm.leave_type,
+          leave_type: leaveType,
           half_day_session: null,
           remarks: leaveForm.remarks?.trim() || null,
         })
@@ -661,10 +679,33 @@ function AttendanceDate() {
                         record?.lunch_in &&
                         record?.lunch_out &&
                         getLunchMinutes(record) > 60;
+                      const dateKey = toDateOnlyString(record.working_date);
+                      // Same detail as Users → eye → Attendance → row click
+                      const openDetail =
+                        canViewUserAttendance && record.user_id && dateKey
+                          ? () =>
+                              navigate(
+                                `/users/${record.user_id}/attendance/${dateKey}`
+                              )
+                          : undefined;
 
                       return (
-                        <tr key={record.id}>
-                          <td data-sort={record.user_name || ""}>
+                        <tr
+                          key={record.id}
+                          onClick={openDetail}
+                          className={
+                            openDetail ? "attendance-row-clickable" : undefined
+                          }
+                          style={openDetail ? { cursor: "pointer" } : undefined}
+                        >
+                          <td
+                            data-sort={record.user_name || ""}
+                            onClick={(e) => {
+                              if (canViewUserAttendance && record.user_id) {
+                                e.stopPropagation();
+                              }
+                            }}
+                          >
                             {canViewUserAttendance && record.user_id ? (
                               <Link
                                 to={`/users/${record.user_id}/attendance`}
@@ -735,7 +776,10 @@ function AttendanceDate() {
                           )}
                           <td>{calculateTotalHours(record)}</td>
                           {canAddLeave && (
-                            <td style={{ textAlign: "center" }}>
+                            <td
+                              style={{ textAlign: "center" }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <button
                                 type="button"
                                 className="action-icons"
@@ -920,8 +964,7 @@ function AttendanceDate() {
                           leave_type: val || "",
                         }))
                       }
-                      placeholder="Select leave type"
-                      required
+                      placeholder="Select leave type (optional)"
                     />
                   </div>
                   <div className="form-group">
@@ -948,9 +991,11 @@ function AttendanceDate() {
                     >
                       {leaveSubmitting
                         ? "Saving..."
-                        : leaveForm.id
-                          ? "Update Leave"
-                          : "Add Leave"}
+                        : !leaveForm.leave_type && leaveForm.id
+                          ? "Remove Leave"
+                          : leaveForm.id
+                            ? "Update Leave"
+                            : "Add Leave"}
                     </button>
                   </div>
                 </div>

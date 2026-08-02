@@ -26,6 +26,18 @@ export const addUserLeave = createAsyncThunk(
   }
 );
 
+export const removeUserLeave = createAsyncThunk(
+  "userLeaves/remove",
+  async (id, { rejectWithValue }) => {
+    try {
+      await userLeaveApi.deleteUserLeave(id);
+      return id;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
 const initialState = {
   list: [],
   loading: false,
@@ -67,6 +79,14 @@ const userLeaveSlice = createSlice({
       })
       .addCase(addUserLeave.rejected, (state, action) => {
         toast.error(`Failed to save leave: ${action.payload}`);
+      })
+      .addCase(removeUserLeave.fulfilled, (state, action) => {
+        const id = action.payload;
+        state.list = (state.list || []).filter((l) => String(l.id) !== String(id));
+        toast.success("Leave removed successfully");
+      })
+      .addCase(removeUserLeave.rejected, (state, action) => {
+        toast.error(`Failed to remove leave: ${action.payload}`);
       });
   },
 });
