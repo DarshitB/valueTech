@@ -17,7 +17,7 @@ import { toast } from "react-toastify";
 import "../../pages/dashboard/dashboard.scss";
 
 const DEFAULT_SCHEDULED_MINUTES = 9 * 60;
-const LATE_DAY_IN_BUFFER_MINUTES = 20;
+const LATE_DAY_IN_BUFFER_MINUTES = 15;
 
 const LEAVE_TYPE_OPTIONS = [
   { value: "half_day", label: "Half Day" },
@@ -578,6 +578,10 @@ function AttendanceDate() {
     allowedPermissions,
     "show_attendance_of_all_users"
   );
+  const canViewAttendanceDetail = hasPermission(
+    allowedPermissions,
+    "view_attendance_detail_page"
+  );
 
   return (
     <div className="height-full-occupied attendance-container">
@@ -682,7 +686,10 @@ function AttendanceDate() {
                       const dateKey = toDateOnlyString(record.working_date);
                       // Same detail as Users → eye → Attendance → row click
                       const openDetail =
-                        canViewUserAttendance && record.user_id && dateKey
+                        canViewAttendanceDetail &&
+                        canViewUserAttendance &&
+                        record.user_id &&
+                        dateKey
                           ? () =>
                               navigate(
                                 `/users/${record.user_id}/attendance/${dateKey}`

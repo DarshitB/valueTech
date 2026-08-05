@@ -1363,7 +1363,9 @@
 .attendance-detail-page {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   padding: 0;
 
   /* Shared by Breaks, Work times, Activity, Remarks (all sections) */
@@ -1380,6 +1382,7 @@
   display: flex;
   gap: 24px;
   align-items: stretch;
+  flex-shrink: 0;
 
   .attendance-detail-breaks,
   .attendance-detail-edit {
@@ -1503,11 +1506,20 @@
   gap: 24px;
   align-items: stretch;
   margin-top: 24px;
+  flex: 1 1 auto;
+  min-height: 0;
 
   .attendance-detail-activity {
     flex: 1 1 60%;
     max-width: 60%;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+
+    .attendance-detail-section-title {
+      flex-shrink: 0;
+    }
 
     .activities {
       .activity {
@@ -1524,6 +1536,25 @@
     flex: 1 1 40%;
     max-width: 40%;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  &--activity-only {
+    .attendance-detail-activity {
+      flex: 1 1 100% !important;
+      max-width: 100% !important;
+      width: 100% !important;
+    }
+  }
+
+  &--remarks-only {
+    .attendance-detail-remarks {
+      flex: 1 1 100% !important;
+      max-width: 100% !important;
+      width: 100% !important;
+    }
   }
 
   .attendance-detail-remarks-header {
@@ -1532,6 +1563,7 @@
     justify-content: space-between;
     gap: 12px;
     margin-bottom: 12px;
+    flex-shrink: 0;
 
     .attendance-detail-section-title {
       margin-bottom: 0;
@@ -1550,7 +1582,9 @@
   }
 
   .activities-wrapper {
-    max-height: 320px;
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
     overflow-y: auto;
 
     .activities {
@@ -1662,7 +1696,9 @@
     border: 1px solid #e5e7eb;
     border-radius: 8px;
     padding: 16px 18px;
+    flex: 1 1 auto;
     min-height: 120px;
+    overflow-y: auto;
   }
 
   .attendance-detail-remarks-text {
@@ -1682,6 +1718,10 @@
 }
 
 @media (max-width: 992px) {
+  .attendance-detail-page {
+    overflow: auto;
+  }
+
   .attendance-detail-row {
     flex-direction: column;
 
@@ -1699,13 +1739,26 @@
   }
 
   .attendance-detail-meta-row {
+    flex: 0 0 auto;
     flex-direction: column;
+    min-height: auto;
 
     .attendance-detail-activity,
     .attendance-detail-remarks {
       flex: 1 1 100%;
       max-width: 100%;
       width: 100%;
+      min-height: auto;
+    }
+
+    .activities-wrapper {
+      max-height: 320px;
+      flex: 0 0 auto;
+    }
+
+    .attendance-detail-remarks-card {
+      flex: 0 0 auto;
+      min-height: 120px;
     }
   }
 }

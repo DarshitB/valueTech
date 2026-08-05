@@ -720,8 +720,8 @@ function Dashboard() {
     </div>
   );
 
-  // Same late buffer as Attendance page: Day In after day_start + 20 min → red
-  const LATE_DAY_IN_BUFFER_MINUTES = 20;
+  // Same late buffer as Attendance page: Day In after day_start + 15 min → red
+  const LATE_DAY_IN_BUFFER_MINUTES = 15;
 
   const parseTimeToMinutes = (timeValue) => {
     if (timeValue == null || timeValue === "") return null;

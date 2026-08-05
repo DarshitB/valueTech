@@ -339,6 +339,28 @@ function generateMarineReportHTML(
             overflow: hidden;
         }
 
+        /* Custom Media Block: heading + description + image as one unit */
+        .custom-media-block {
+            display: block;
+            width: 100%;
+        }
+        .custom-media-block > h2 {
+            margin-top: 0;
+        }
+        .custom-media-block .flexible-section-image {
+            width: 100%;
+            height: auto;
+            display: block;
+            margin: 0;
+        }
+        .custom-media-block .splittable-description {
+            display: block;
+            width: 100%;
+        }
+        .custom-media-block .splittable-description p {
+            margin: 0 0 0.5em 0;
+        }
+
         /* Stamp Overlay - appears on all pages */
         .stamp-overlay {
             position: absolute;
@@ -3845,10 +3867,13 @@ function generateMarineReportHTML(
         // exactly like normal text reflow.
         // ============================================
         function splitContentByHeight(sourceElement, liveContainer, pageContentHeight) {
+            // IMPORTANT: .page-content has overflow:hidden, so scrollHeight is
+            // unreliable (often capped to the visible page). Use content
+            // offset bottoms instead so long text is not silently truncated.
             function fits(node) {
                 liveContainer.appendChild(node);
                 void liveContainer.offsetHeight;
-                const ok = liveContainer.scrollHeight <= pageContentHeight;
+                const ok = getUsedContentHeight(liveContainer) <= pageContentHeight;
                 liveContainer.removeChild(node);
                 return ok;
             }
@@ -4075,120 +4100,144 @@ function generateMarineReportHTML(
 
                 if (element === heroPage) continue;
 
-                // Custom Media Block (heading + description + image): keep as
-                // one unit. Page choice is based on heading+description (reliable
-                // to measure). Image always lands on that same page — natural
-                // size if it fits, otherwise shrink to leftover height so a
-                // tall/vertical image never takes a page alone. Uses
-                // getUsedContentHeight (not scrollHeight) because .page-content
-                // has overflow:hidden which made the old check miss overflows.
-                const cmbGroupId = element.getAttribute && element.getAttribute('data-cmb-group');
-                if (cmbGroupId && !element._cmbForceIndividual) {
-                    const groupIndices = [i];
-                    let j = i + 1;
-                    while (
-                        j < allContentElements.length &&
-                        allContentElements[j].getAttribute &&
-                        allContentElements[j].getAttribute('data-cmb-group') === cmbGroupId
-                    ) {
-                        groupIndices.push(j);
-                        j++;
-                    }
-                    const groupElements = groupIndices.map(idx => allContentElements[idx]);
-                    const imageEl = groupElements.find(el => el.tagName === 'IMG') || null;
-                    const textEls = groupElements.filter(el => el !== imageEl);
-
+                // Custom Media Block — ONE simple global flow:
+                //   1) heading
+                //   2) full description (may split across pages; never drop text)
+                //   3) image last (shrink to leftover)
+                // If leftover on current page is < ~45%, start on a new page.
+                if (element.getAttribute && element.getAttribute('data-cmb-block') === 'true') {
                     currentTable = null;
 
-                    const measureUsedFits = (container, els, extraReserve) => {
-                        const clones = els.map(el => el.cloneNode(true));
-                        clones.forEach(c => container.appendChild(c));
-                        void container.offsetHeight;
-                        const used = getUsedContentHeight(container) + (extraReserve || 0);
-                        const fits = used <= pageContentHeight;
-                        clones.forEach(c => c.remove());
-                        return fits;
-                    };
-
-                    // Minimum leftover height before we allow the image on the
-                    // current page. Below this, the image becomes unreadably
-                    // small — move the whole block (heading+description+image)
-                    // to a fresh page instead. Only this threshold changed;
-                    // shrink-to-fit on a dedicated page still applies for tall
-                    // vertical images that need a full page of height.
-                    const MIN_IMAGE_SPACE = Math.max(350, Math.floor(pageContentHeight * 0.45));
-                    const pageHasContent = currentPageContent.children.length > 0;
-                    const fitsHere = measureUsedFits(
-                        currentPageContent,
-                        textEls,
-                        imageEl ? MIN_IMAGE_SPACE : 0
-                    );
-
-                    if (!fitsHere && pageHasContent) {
+                    const startNewPage = () => {
                         currentPageNum++;
                         const newPage = createNewPage(currentPageNum);
                         currentPage.insertAdjacentElement('afterend', newPage);
                         currentPage = newPage;
                         currentPageContent = currentPage.querySelector('.page-content');
-                    }
+                    };
 
-                    // Huge description alone taller than a blank page — keep
-                    // old per-element safety net so text can still split.
-                    if (!measureUsedFits(currentPageContent, textEls, 0)) {
-                        groupElements.forEach(el => { el._cmbForceIndividual = true; });
-                        i = i - 1;
-                        continue;
-                    }
-
-                    textEls.forEach(el => currentPageContent.appendChild(el));
-                    void currentPageContent.offsetHeight;
-
-                    if (imageEl) {
-                        let remainingSpace = Math.max(
-                            pageContentHeight - getUsedContentHeight(currentPageContent),
-                            40
-                        );
-
-                        // Safety: if leftover is still too small after placing
-                        // text (edge case), pull the whole block onto a new
-                        // page so the image is not tiny.
-                        if (remainingSpace < MIN_IMAGE_SPACE && currentPageContent.children.length > textEls.length) {
-                            textEls.forEach(el => el.remove());
-                            if (imageEl.parentNode) imageEl.remove();
-                            currentPageNum++;
-                            const newPage = createNewPage(currentPageNum);
-                            currentPage.insertAdjacentElement('afterend', newPage);
-                            currentPage = newPage;
-                            currentPageContent = currentPage.querySelector('.page-content');
-                            textEls.forEach(el => currentPageContent.appendChild(el));
-                            void currentPageContent.offsetHeight;
-                            remainingSpace = Math.max(
-                                pageContentHeight - getUsedContentHeight(currentPageContent),
-                                40
-                            );
+                    const MIN_IMAGE_SPACE = Math.max(350, Math.floor(pageContentHeight * 0.45));
+                    const img = element.querySelector('img');
+                    const heading = element.querySelector('h1, h2, h3, h4, h5, h6');
+                    // Prefer the dedicated description container; fall back to
+                    // every non-heading/non-image child (handles older markup).
+                    let desc = element.querySelector('.splittable-description');
+                    if (!desc) {
+                        const extras = Array.from(element.children).filter((el) => {
+                            if (el === img || el === heading) return false;
+                            if (el.tagName === 'IMG') return false;
+                            if (el.tagName && /^H[1-6]$/.test(el.tagName)) return false;
+                            return true;
+                        });
+                        if (extras.length === 1) {
+                            desc = extras[0];
+                        } else if (extras.length > 1) {
+                            desc = document.createElement('div');
+                            desc.className = 'splittable-description';
+                            extras.forEach((el) => desc.appendChild(el));
                         }
+                    }
 
-                        imageEl.style.width = '100%';
-                        imageEl.style.height = 'auto';
-                        imageEl.style.objectFit = '';
-                        imageEl.style.maxHeight = '';
-                        currentPageContent.appendChild(imageEl);
+                    const fitImageToRemaining = (targetImg) => {
+                        if (!targetImg || !targetImg.parentNode) return;
+                        targetImg.style.width = '100%';
+                        targetImg.style.height = 'auto';
+                        targetImg.style.maxHeight = '';
+                        targetImg.style.objectFit = '';
                         void currentPageContent.offsetHeight;
 
-                        // Shrink whenever natural size exceeds leftover space
-                        // (vertical images on a dedicated page). Do not shrink
-                        // below MIN on a page that still has prior content —
-                        // that case already moved above.
-                        if (imageEl.offsetHeight > remainingSpace ||
-                            getUsedContentHeight(currentPageContent) > pageContentHeight) {
-                            imageEl.style.height = remainingSpace + 'px';
-                            imageEl.style.maxHeight = remainingSpace + 'px';
-                            imageEl.style.objectFit = 'contain';
+                        const used = getUsedContentHeight(currentPageContent);
+                        if (used <= pageContentHeight) return;
+
+                        const spaceForImage = Math.max(
+                            pageContentHeight - (used - targetImg.offsetHeight),
+                            40
+                        );
+                        targetImg.style.height = spaceForImage + 'px';
+                        targetImg.style.maxHeight = spaceForImage + 'px';
+                        targetImg.style.objectFit = 'contain';
+                        void currentPageContent.offsetHeight;
+                    };
+
+                    const placeDescFully = (sourceDesc) => {
+                        let descNode = sourceDesc;
+                        let safety = 0;
+
+                        while (descNode && safety < 500) {
+                            safety++;
+
+                            const probe = descNode.cloneNode(true);
+                            currentPageContent.appendChild(probe);
+                            void currentPageContent.offsetHeight;
+                            const fitsFully = getUsedContentHeight(currentPageContent) <= pageContentHeight;
+                            probe.remove();
+
+                            if (fitsFully) {
+                                currentPageContent.appendChild(descNode);
+                                void currentPageContent.offsetHeight;
+                                return;
+                            }
+
+                            const { first, remainder } = splitContentByHeight(
+                                descNode,
+                                currentPageContent,
+                                pageContentHeight
+                            );
+
+                            if (first) {
+                                currentPageContent.appendChild(first);
+                                void currentPageContent.offsetHeight;
+                            }
+
+                            if (!remainder) {
+                                // Nothing more from splitter. If nothing fitted on
+                                // this page, force the node onto a fresh page so
+                                // description is never discarded.
+                                if (!first) {
+                                    if (currentPageContent.children.length > 0) startNewPage();
+                                    currentPageContent.appendChild(descNode);
+                                    void currentPageContent.offsetHeight;
+                                }
+                                return;
+                            }
+
+                            startNewPage();
+                            descNode = remainder;
+                        }
+                    };
+
+                    if (currentPageContent.children.length > 0) {
+                        const leftover = pageContentHeight - getUsedContentHeight(currentPageContent);
+                        if (leftover < MIN_IMAGE_SPACE) {
+                            startNewPage();
+                        }
+                    }
+
+                    // 1) Heading
+                    if (heading) {
+                        currentPageContent.appendChild(heading);
+                        void currentPageContent.offsetHeight;
+                        if (getUsedContentHeight(currentPageContent) > pageContentHeight) {
+                            heading.remove();
+                            startNewPage();
+                            currentPageContent.appendChild(heading);
                             void currentPageContent.offsetHeight;
                         }
                     }
 
-                    i = j - 1;
+                    // 2) Full description before image
+                    if (desc) {
+                        placeDescFully(desc);
+                    }
+
+                    // 3) Image last
+                    if (img) {
+                        currentPageContent.appendChild(img);
+                        void currentPageContent.offsetHeight;
+                        fitImageToRemaining(img);
+                    }
+
+                    if (element.parentNode) element.remove();
                     continue;
                 }
 
@@ -4208,7 +4257,7 @@ function generateMarineReportHTML(
                     void currentPageContent.offsetHeight;
                     
                     // Check if just the heading already overflows
-                    if (currentPageContent.scrollHeight > pageContentHeight) {
+                    if (getUsedContentHeight(currentPageContent) > pageContentHeight) {
                         // Heading alone doesn't fit, move to new page
                         element.remove();
                         currentPageNum++;
@@ -4245,6 +4294,10 @@ function generateMarineReportHTML(
                         } else if (nextElement.tagName === 'P') {
                             // For paragraph elements, clone and append
                             testContainer.appendChild(nextElement.cloneNode(true));
+                        } else if (nextElement.getAttribute && nextElement.getAttribute('data-cmb-block') === 'true') {
+                            // Next is a whole custom media block — keep heading
+                            // with it only if there is real room (avoid clipped headings).
+                            testContainer.appendChild(nextElement.cloneNode(true));
                         } else {
                             // For other elements, clone and append
                             testContainer.appendChild(nextElement.cloneNode(true));
@@ -4252,7 +4305,7 @@ function generateMarineReportHTML(
                         
                         currentPageContent.appendChild(testContainer);
                         void currentPageContent.offsetHeight;
-                        const testHeight = currentPageContent.scrollHeight;
+                        const testHeight = getUsedContentHeight(currentPageContent);
                         testContainer.remove();
                         
                         // If heading + first content doesn't fit, move heading to new page
@@ -4311,10 +4364,27 @@ function generateMarineReportHTML(
 
                 void currentPageContent.offsetHeight;
 
-                // Check for overflow
-                if (currentPageContent.scrollHeight > pageContentHeight) {
+                // Check for overflow.
+                // Small buffer so borderline table rows are not clipped by
+                // overflow:hidden at the page edge (keeps multi-page flow intact).
+                const OVERFLOW_EDGE_BUFFER = element._isTableRow ? 12 : 0;
+                if (getUsedContentHeight(currentPageContent) > pageContentHeight - OVERFLOW_EDGE_BUFFER) {
                     if (element._isTableRow) {
-                        // Row doesn't fit, move to new page
+                        // Row doesn't fit, move to new page — but only when this
+                        // page already has other content/rows (avoid loops).
+                        const visibleRows = currentTable
+                            ? Array.from(currentTable.querySelectorAll('tbody tr')).filter(
+                                (tr) => tr.style.visibility !== 'collapse'
+                              )
+                            : [];
+                        const pageHasOtherContent =
+                            currentPageContent.children.length > 1 || visibleRows.length > 1;
+
+                        if (!pageHasOtherContent) {
+                            // Single oversized row on an empty page — keep it.
+                            continue;
+                        }
+
                         element.remove();
                         currentPageNum++;
                         const newPage = createNewPage(currentPageNum);
@@ -4364,7 +4434,28 @@ function generateMarineReportHTML(
                             void currentPageContent.offsetHeight;
                             const usedHeight = getUsedContentHeight(currentPageContent);
                             const remainingSpace = pageContentHeight - usedHeight;
+                            const groupId = element.getAttribute('data-cmb-group');
+                            const groupTextEls = groupId
+                                ? Array.from(currentPageContent.children).filter((el) =>
+                                      el.getAttribute &&
+                                      el.getAttribute('data-cmb-group') === groupId
+                                  )
+                                : [];
                             const MIN_IMAGE_FILL_SPACE = Math.max(350, Math.floor(pageContentHeight * 0.45));
+
+                              // Custom media image: if its heading/description are
+                              // already on this page, ALWAYS stay here and shrink.
+                              // Never send the image alone to the next page.
+                              if (groupId && groupTextEls.length > 0) {
+                                  const fitH = Math.max(remainingSpace, 40);
+                                  element.style.width = '100%';
+                                  element.style.height = fitH + 'px';
+                                  element.style.maxHeight = fitH + 'px';
+                                  element.style.objectFit = 'contain';
+                                  currentPageContent.appendChild(element);
+                                  void currentPageContent.offsetHeight;
+                                  continue;
+                              }
 
                               if (remainingSpace >= MIN_IMAGE_FILL_SPACE) {
                                   element.style.width = '100%';
@@ -4374,18 +4465,7 @@ function generateMarineReportHTML(
                                   currentPageContent.appendChild(element);
                                   void currentPageContent.offsetHeight;
                               } else {
-                                  // Not enough leftover on current page — move to a
-                                  // new page. If this image belongs to a custom media
-                                  // block, also move its heading+description with it
-                                  // so the image never sits alone on a full page.
-                                  const groupId = element.getAttribute('data-cmb-group');
-                                  const groupTextEls = groupId
-                                      ? Array.from(currentPageContent.children).filter((el) =>
-                                            el.getAttribute &&
-                                            el.getAttribute('data-cmb-group') === groupId
-                                        )
-                                      : [];
-
+                                  // Move to a new page; pull any same-group text too.
                                   currentPageNum++;
                                   const newPage = createNewPage(currentPageNum);
                                   currentPage.insertAdjacentElement('afterend', newPage);
@@ -4484,7 +4564,7 @@ function generateMarineReportHTML(
                 currentPageContent.appendChild(lastPageDeclarationEl);
                 void currentPageContent.offsetHeight;
 
-                if (currentPageContent.scrollHeight > pageContentHeight &&
+                if (getUsedContentHeight(currentPageContent) > pageContentHeight &&
                     currentPageContent.children.length > 1) {
                     lastPageDeclarationEl.remove();
                     currentPageNum++;
@@ -4696,19 +4776,21 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName, getNextMa
 
       if (heading || description || imageUrl) {
         const counterValue = getNextMainCounter ? getNextMainCounter() : (field.field_order || "");
-        // Shared group id so the pagination script keeps heading + description +
-        // image of this custom media block together as a single unbreakable unit.
         const cmbGroupId = `${sectionName}-${fieldIdx}`;
-        // Render heading with HTML support
         const renderedHeading = renderFieldValue(heading);
-        html += `<h2 data-cmb-group="${cmbGroupId}"><span class="main-counter">${counterValue}</span>. ${renderedHeading}</h2>`;
+
+        // One wrapper so pagination collects the block as a unit, then places
+        // heading → description → image in order.
+        // Description MUST be a <div>, not <p>: WYSIWYG HTML often contains
+        // nested <p> tags, and browsers close the outer <p> early which drops
+        // most of the description from the DOM.
+        html += `<div class="custom-media-block" data-cmb-block="true" data-cmb-group="${cmbGroupId}">`;
+        html += `<h2><span class="main-counter">${counterValue}</span>. ${renderedHeading}</h2>`;
         if (description) {
-          // Render description with HTML support
           const renderedDescription = renderFieldValue(description);
-          html += `<p class="splittable-description" data-splittable="true" data-cmb-group="${cmbGroupId}">${renderedDescription}</p>`;
+          html += `<div class="splittable-description" data-splittable="true">${renderedDescription}</div>`;
         }
         if (imageUrl) {
-          // Convert relative URLs to absolute if needed
           let fullImageUrl = imageUrl;
           if (imageUrl.startsWith("/") && !imageUrl.startsWith("http")) {
             const baseUrl = process.env.BASE_URL || "http://localhost:5000";
@@ -4720,8 +4802,9 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName, getNextMa
             const baseUrl = process.env.BASE_URL || "http://localhost:5000";
             fullImageUrl = `${baseUrl}/${imageUrl}`;
           }
-          html += `<img src="${fullImageUrl}" class="flexible-section-image" data-fill-remaining="true" data-cmb-group="${cmbGroupId}" style="width: 100%; height: auto;" alt="${heading}">`;
+          html += `<img src="${fullImageUrl}" class="flexible-section-image" style="width: 100%; height: auto;" alt="${heading}">`;
         }
+        html += `</div>`;
       }
     });
   }

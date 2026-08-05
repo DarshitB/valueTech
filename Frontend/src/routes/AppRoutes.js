@@ -191,7 +191,7 @@ const AppRoutes = () => {
         <Route
           path="attendance/:workingDate"
           element={
-            <ProtectedRoute permission="view_dashboard_checkin_checkout">
+            <ProtectedRoute permission="view_attendance_detail_page">
               <AttendanceDetail />
             </ProtectedRoute>
           }
@@ -207,7 +207,7 @@ const AppRoutes = () => {
         <Route
           path="users/:userId/attendance/:workingDate"
           element={
-            <ProtectedRoute permission="show_attendance_of_all_users">
+            <ProtectedRoute permission="view_attendance_detail_page">
               <AttendanceDetail />
             </ProtectedRoute>
           }

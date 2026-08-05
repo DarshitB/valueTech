@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import {
@@ -84,6 +84,14 @@ function AttendanceDetail() {
     allowedPermissions,
     "attendance_user_day_out_remark_update"
   );
+  const canViewUserActivity = hasPermission(
+    allowedPermissions,
+    "view_attendance_details_user_activity"
+  );
+  const canViewDayOutRemarks = hasPermission(
+    allowedPermissions,
+    "view_attendance_details_day_out_remarks"
+  );
 
   const workingDateKey = toDateOnlyString(workingDate);
   // URL may be /attendance/:date (own) or /users/:userId/attendance/:date
@@ -92,6 +100,10 @@ function AttendanceDetail() {
   const isOwnAttendance =
     currentUser?.id != null &&
     String(currentUser.id) === String(targetUserId);
+  const canViewOthersAttendance = hasPermission(
+    allowedPermissions,
+    "show_attendance_of_all_users"
+  );
 
   const targetUser = useMemo(() => {
     const fromList = users.find((u) => String(u.id) === String(targetUserId));
@@ -550,6 +562,10 @@ function AttendanceDetail() {
     }
   };
 
+  if (isViewingOtherUser && !canViewOthersAttendance) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   if (!workingDateKey) {
     return (
       <div className="height-full-occupied attendance-container">
@@ -709,84 +725,98 @@ function AttendanceDetail() {
             )}
           </div>
 
-          <div className="attendance-detail-meta-row">
-            <div className="attendance-detail-activity">
-              <h3 className="attendance-detail-section-title">
-                Activity by the user on the date
-              </h3>
-              <div className="activities-wrapper">
-                <div className="activities">
-                  {visibleDetailActivities.length > 0 ? (
-                    visibleDetailActivities.map((item) => {
-                      const orderMeta = getActivityOrderMeta(item);
-                      return (
-                        <div
-                          className="activity"
-                          key={`${item.source || "order"}-${item.id}`}
-                        >
-                          <div className="activity-icon bg-primary text-white">
-                            {getInitials(item.changed_by_name)}
-                          </div>
-                          <div className="activity-detail">
-                            <div className="activity-title-row">
-                              <p className="activity-description">
-                                {getActivityTitle(item)}
-                              </p>
-                              <p className="activity-time">
-                                {formatActivityClock(
-                                  item.activity_at ||
-                                    item.changed_at ||
-                                    item.created_at,
-                                  false
-                                )}
-                              </p>
+          {(canViewUserActivity || canViewDayOutRemarks) && (
+          <div
+            className={`attendance-detail-meta-row${
+              canViewUserActivity && !canViewDayOutRemarks
+                ? " attendance-detail-meta-row--activity-only"
+                : !canViewUserActivity && canViewDayOutRemarks
+                  ? " attendance-detail-meta-row--remarks-only"
+                  : ""
+            }`}
+          >
+            {canViewUserActivity && (
+              <div className="attendance-detail-activity">
+                <h3 className="attendance-detail-section-title">
+                  Activity by the user on the date
+                </h3>
+                <div className="activities-wrapper">
+                  <div className="activities">
+                    {visibleDetailActivities.length > 0 ? (
+                      visibleDetailActivities.map((item) => {
+                        const orderMeta = getActivityOrderMeta(item);
+                        return (
+                          <div
+                            className="activity"
+                            key={`${item.source || "order"}-${item.id}`}
+                          >
+                            <div className="activity-icon bg-primary text-white">
+                              {getInitials(item.changed_by_name)}
                             </div>
-                            {orderMeta && (
-                              <p className="activity-order-meta">
-                                {orderMeta}
-                              </p>
-                            )}
+                            <div className="activity-detail">
+                              <div className="activity-title-row">
+                                <p className="activity-description">
+                                  {getActivityTitle(item)}
+                                </p>
+                                <p className="activity-time">
+                                  {formatActivityClock(
+                                    item.activity_at ||
+                                      item.changed_at ||
+                                      item.created_at,
+                                    false
+                                  )}
+                                </p>
+                              </div>
+                              {orderMeta && (
+                                <p className="activity-order-meta">
+                                  {orderMeta}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })
+                        );
+                      })
+                    ) : (
+                      <div className="attendance-detail-empty-inline">
+                        No recent activity for this day
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {canViewDayOutRemarks && (
+              <div className="attendance-detail-remarks">
+                <div className="attendance-detail-remarks-header">
+                  <h3 className="attendance-detail-section-title">
+                    Day Out Remarks
+                  </h3>
+                  {canEditDayOutRemark && (
+                    <button
+                      type="button"
+                      className="btn attendance-detail-remark-btn"
+                      onClick={openRemarkModal}
+                    >
+                      Add or Update Remark
+                    </button>
+                  )}
+                </div>
+                <div className="attendance-detail-remarks-card">
+                  {detail?.checkout_remarks ? (
+                    <p className="attendance-detail-remarks-text">
+                      {detail.checkout_remarks}
+                    </p>
                   ) : (
-                    <div className="attendance-detail-empty-inline">
-                      No recent activity for this day
-                    </div>
+                    <p className="attendance-detail-empty-inline">
+                      No remarks added on day out
+                    </p>
                   )}
                 </div>
               </div>
-            </div>
-
-            <div className="attendance-detail-remarks">
-              <div className="attendance-detail-remarks-header">
-                <h3 className="attendance-detail-section-title">
-                  Day Out Remarks
-                </h3>
-                {canEditDayOutRemark && (
-                  <button
-                    type="button"
-                    className="btn attendance-detail-remark-btn"
-                    onClick={openRemarkModal}
-                  >
-                    Add or Update Remark
-                  </button>
-                )}
-              </div>
-              <div className="attendance-detail-remarks-card">
-                {detail?.checkout_remarks ? (
-                  <p className="attendance-detail-remarks-text">
-                    {detail.checkout_remarks}
-                  </p>
-                ) : (
-                  <p className="attendance-detail-empty-inline">
-                    No remarks added on day out
-                  </p>
-                )}
-              </div>
-            </div>
+            )}
           </div>
+          )}
           </>
         )}
       </div>

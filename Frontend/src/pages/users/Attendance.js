@@ -88,6 +88,10 @@ function Attendance() {
     allowedPermissions,
     "view_attendance_overtime_worked"
   );
+  const canViewAttendanceDetail = hasPermission(
+    allowedPermissions,
+    "view_attendance_detail_page"
+  );
 
   // Redux data
   const { list: attendanceList, breaks: attendanceBreaks, loading } = useSelector(
@@ -483,8 +487,8 @@ function Attendance() {
     });
   };
 
-  // Late day-in: more than 20 min after scheduled day_start → red
-  const LATE_DAY_IN_BUFFER_MINUTES = 20;
+  // Late day-in: more than 15 min after scheduled day_start → red
+  const LATE_DAY_IN_BUFFER_MINUTES = 15;
 
   const isDayInLate = (checkinTime) => {
     if (!checkinTime) return false;
@@ -1088,14 +1092,15 @@ function Attendance() {
                   getLunchMinutes(record) > 60;
                 const dateKey = toDateKey(record.working_date);
                 // Own page → /attendance/:date; Users → eye → /users/:id/attendance/:date
-                const openDetail = dateKey
-                  ? () =>
-                      navigate(
-                        isViewingOtherUser
-                          ? `/users/${targetUserId}/attendance/${dateKey}`
-                          : `/attendance/${dateKey}`
-                      )
-                  : undefined;
+                const openDetail =
+                  canViewAttendanceDetail && dateKey
+                    ? () =>
+                        navigate(
+                          isViewingOtherUser
+                            ? `/users/${targetUserId}/attendance/${dateKey}`
+                            : `/attendance/${dateKey}`
+                        )
+                    : undefined;
                 return (
                   <tr
                     key={record.id || `day-${index}`}
