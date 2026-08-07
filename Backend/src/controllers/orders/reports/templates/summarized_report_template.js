@@ -1007,9 +1007,9 @@ function generateSummarizedNormalFieldsHTML(
             <td colspan="8" ${SUMMARIZED_CELL_TEXT_LEFT_ATTR}>${renderFieldValue(formData.disclaimer)}</td>
         </tr>
         <tr class="tyre-image-row">
-            <td colspan="9" style="height:58px; position:relative;">
+            <td colspan="9" style="height:58px; position:relative; overflow: hidden; max-width: 0;">
                 ${formData.tyre_image_base64
-                  ? `<img src="${formData.tyre_image_base64}" style="height:70px; position:relative; z-index:1;" alt="">`
+                  ? `<img src="${formData.tyre_image_base64}" style="max-width: 100%; max-height: 70px; width: auto; height: auto; object-fit: contain; display: block; position:relative; z-index:1;" alt="">`
                   : ""}
             </td>
         </tr>

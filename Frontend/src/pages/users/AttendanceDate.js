@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { fetchAttendanceByWorkingDate } from "../../redux/reducers/attendanceReducer";
@@ -59,9 +59,13 @@ const startOfToday = () => {
   return d;
 };
 
+// In-memory only cache: survives route back/forward, resets on refresh.
+const attendanceDateCacheByPath = {};
+
 function AttendanceDate() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { setTitle } = usePageTitle();
   const allowedPermissions = useSelector(selectPermissions);
 
@@ -73,7 +77,10 @@ function AttendanceDate() {
   } = useSelector((state) => state.attendance);
   const { list: holidays } = useSelector((state) => state.holidays);
 
-  const [selectedDate, setSelectedDate] = useState(startOfToday);
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const cached = attendanceDateCacheByPath[window.location.pathname];
+    return dateOnlyToLocalDate(cached) || startOfToday();
+  });
   const [showHolidayModal, setShowHolidayModal] = useState(false);
   const [holidayForm, setHolidayForm] = useState({
     id: null,
@@ -107,6 +114,12 @@ function AttendanceDate() {
       dispatch(fetchAttendanceByWorkingDate(dateKey));
     }
   }, [dispatch, selectedDate]);
+
+  useEffect(() => {
+    const dateKey = toDateOnlyString(selectedDate);
+    if (!dateKey) return;
+    attendanceDateCacheByPath[location.pathname] = dateKey;
+  }, [selectedDate, location.pathname]);
 
   const parseTimeToMinutes = (timeValue) => {
     if (timeValue == null || timeValue === "") return null;

@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { fetchAttendanceByUserId, fetchBreaksByUserId } from "../../redux/reducers/attendanceReducer";
@@ -75,9 +75,13 @@ const getCurrentMonthRange = () => {
   return { from, to };
 };
 
+// In-memory only cache: survives route back/forward, resets on refresh.
+const attendanceRangeCacheByPath = {};
+
 function Attendance() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { userId } = useParams(); // Get userId from URL params if viewing someone else's attendance
   const { setTitle } = usePageTitle();
 
@@ -105,7 +109,17 @@ function Attendance() {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   // From / To date filter (defaults: current month first → last day)
-  const [dateRange, setDateRange] = useState(getCurrentMonthRange);
+  // Restores on browser back within this app session only.
+  const [dateRange, setDateRange] = useState(() => {
+    const cached = attendanceRangeCacheByPath[window.location.pathname];
+    if (cached?.from && cached?.to) {
+      return {
+        from: dateOnlyToLocalDate(cached.from) || getCurrentMonthRange().from,
+        to: dateOnlyToLocalDate(cached.to) || getCurrentMonthRange().to,
+      };
+    }
+    return getCurrentMonthRange();
+  });
 
   // Company holiday modal
   const [showHolidayModal, setShowHolidayModal] = useState(false);
@@ -161,6 +175,13 @@ function Attendance() {
       })
     );
   }, [dispatch, targetUserId, dateRange.from, dateRange.to]);
+
+  useEffect(() => {
+    const from = toDateOnlyString(dateRange.from);
+    const to = toDateOnlyString(dateRange.to);
+    if (!from || !to) return;
+    attendanceRangeCacheByPath[location.pathname] = { from, to };
+  }, [dateRange.from, dateRange.to, location.pathname]);
 
   // Company holidays for status column
   useEffect(() => {
