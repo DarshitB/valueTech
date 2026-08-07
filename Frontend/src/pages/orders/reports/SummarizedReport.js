@@ -2171,6 +2171,7 @@ function SummarizedReport() {
           key === "valuer_name" ||
           key === "license_no" ||
           key === "ref_no_code" ||
+          key === "ref_no_bank" ||
           key === "disclaimer" ||
           headingFields.includes(key) ||
           (preferTableTotalsForGeneralFields &&
@@ -2291,6 +2292,9 @@ function SummarizedReport() {
       if (preferTableTotalsForGeneralFields) {
         Object.assign(updated, generalFromTableTotalsOnLoad);
       }
+
+      // Always use live order bank initial (matches read-only Ref NO. UI)
+      updated.ref_no_bank = order?.bank_initial || "";
 
       return updated;
     });
@@ -4181,6 +4185,9 @@ function SummarizedReport() {
         reportFormData.report_date_heading || "Report Date",
       );
 
+      // Always use live order bank initial so PDF matches frontend Ref NO. display
+      formData.set("ref_no_bank", order?.bank_initial || "");
+
       // Add invoice_no_date (combined from invoice_no and invoice_date) - always include with fresh computed value
       formData.append("invoice_no_date", combinedInvoiceData || "");
 
@@ -4392,6 +4399,9 @@ function SummarizedReport() {
 
     reportData.report_date_heading =
       reportFormData.report_date_heading || "Report Date";
+
+    // Always use live order bank initial so saved data matches frontend Ref NO. display
+    reportData.ref_no_bank = order?.bank_initial || null;
 
     const invoiceNo = reportFormData.invoice_no || "";
     const invoiceDate = reportFormData.invoice_date || "";

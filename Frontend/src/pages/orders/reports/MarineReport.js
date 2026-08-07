@@ -589,7 +589,8 @@ function MarineReport() {
           key === "flexible_fields" ||
           key === "valuer_name" ||
           key === "license_no" ||
-          key === "ref_no_code"
+          key === "ref_no_code" ||
+          key === "ref_no_bank"
         ) {
           return;
         }
@@ -679,6 +680,9 @@ function MarineReport() {
           updated.vessel_photo_preview = resolveAssetUrl(report.vessel_photo);
         }
       }
+
+      // Always use live order bank initial (matches read-only Ref NO. UI)
+      updated.ref_no_bank = order?.bank_initial || "";
 
       return updated;
     });
@@ -1955,6 +1959,9 @@ function MarineReport() {
     // Always include report_date_heading in payload (even if user did not change it - use preselected default)
     formData.set("report_date_heading", reportFormData.report_date_heading || "Report Date");
 
+    // Always use live order bank initial so PDF matches frontend Ref NO. display
+    formData.set("ref_no_bank", order?.bank_initial || "");
+
     // Ensure disclaimer is always included in payload (even if null/empty/undefined)
     const disclaimerValue = reportFormData.disclaimer ?? "";
     formData.set("disclaimer", disclaimerValue);
@@ -2160,6 +2167,9 @@ function MarineReport() {
     }
     // Always include report_date_heading in payload (even if user did not change it - use preselected default)
     formData.set("report_date_heading", reportFormData.report_date_heading || "Report Date");
+
+    // Always use live order bank initial so saved data matches frontend Ref NO. display
+    formData.set("ref_no_bank", order?.bank_initial || "");
 
     // Ensure disclaimer is always included in payload (even if null/empty/undefined)
     const disclaimerValue = reportFormData.disclaimer ?? "";

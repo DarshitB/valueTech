@@ -604,6 +604,11 @@ exports.generateReport = async (req, res, next) => {
     // Get form data from request body
     const formData = req.body;
 
+    // Always use live order bank initial so PDF matches frontend Ref NO. display
+    if (order.bank_initial != null && String(order.bank_initial).trim() !== "") {
+      formData.ref_no_bank = order.bank_initial;
+    }
+
     const now = new Date();
     const year = now.getFullYear().toString();
     const month = now.toLocaleString("en-US", { month: "short" });
@@ -3368,6 +3373,11 @@ exports.saveReportData = async (req, res, next) => {
 
     // Get form data from request body
     const formData = req.body;
+
+    // Always use live order bank initial so saved data matches frontend Ref NO. display
+    if (order.bank_initial != null && String(order.bank_initial).trim() !== "") {
+      formData.ref_no_bank = order.bank_initial;
+    }
 
     const now = new Date();
     const year = now.getFullYear().toString();

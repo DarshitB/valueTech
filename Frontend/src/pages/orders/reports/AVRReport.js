@@ -532,7 +532,8 @@ function AVRReport() {
           key === "flexible_fields" ||
           key === "surveyor" ||
           key === "license_no" ||
-          key === "ref_no_code"
+          key === "ref_no_code" ||
+          key === "ref_no_bank"
         ) {
           return;
         }
@@ -595,6 +596,9 @@ function AVRReport() {
           updated.loan_amount_in_word = convertNumberToWordsIndian(amount);
         }
       }
+
+      // Always use live order bank initial (matches read-only Ref NO. UI)
+      updated.ref_no_bank = order?.bank_initial || "";
 
       return updated;
     });
@@ -936,6 +940,9 @@ function AVRReport() {
         formData.append(key, ""); // Send empty string for null/empty values
       }
     });
+
+    // Always use live order bank initial so PDF matches frontend Ref NO. display
+    formData.set("ref_no_bank", order?.bank_initial || "");
 
     /* // Debug: Log the form data being sent
     console.log("Form Data being sent:", reportFormData);
@@ -1284,7 +1291,7 @@ function AVRReport() {
                         type="text"
                         className="form-field"
                         name="ref_no_bank"
-                        value={reportFormData.ref_no_bank}
+                        value={order?.bank_initial || ""}
                         onChange={handleFormChange}
                         readOnly
                       />

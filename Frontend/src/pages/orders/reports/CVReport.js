@@ -1008,7 +1008,8 @@ function CVReport() {
           key === "flexible_fields" ||
           key === "valuer_name" ||
           key === "license_no" ||
-          key === "ref_no_code"
+          key === "ref_no_code" ||
+          key === "ref_no_bank"
         ) {
           return;
         }
@@ -1066,6 +1067,9 @@ function CVReport() {
         const currentMonth = new Date().getMonth();
         updated.ref_no_month = `SFW-${months[currentMonth]}-`;
       }
+
+      // Always use live order bank initial (matches read-only Ref NO. UI)
+      updated.ref_no_bank = order?.bank_initial || "";
 
       return updated;
     });
@@ -1739,6 +1743,9 @@ function CVReport() {
       // Always include report_date_heading in payload (even if user did not change it - use preselected default)
       formData.set("report_date_heading", reportFormData.report_date_heading || "Report Date");
 
+      // Always use live order bank initial so PDF matches frontend Ref NO. display
+      formData.set("ref_no_bank", order?.bank_initial || "");
+
       // Add invoice_no_date (combined from invoice_no and invoice_date) - always include with fresh computed value
       formData.append("invoice_no_date", combinedInvoiceData || "");
 
@@ -1905,6 +1912,9 @@ function CVReport() {
 
     reportData.report_date_heading = reportFormData.report_date_heading || "Report Date";
 
+    // Always use live order bank initial so saved data matches frontend Ref NO. display
+    reportData.ref_no_bank = order?.bank_initial || null;
+
     const invoiceNo = reportFormData.invoice_no || "";
     const invoiceDate = reportFormData.invoice_date || "";
     let combinedInvoiceData = "";
@@ -2021,6 +2031,9 @@ function CVReport() {
 
     // Always include report_date_heading in payload (even if user did not change it - use preselected default)
     reportData.report_date_heading = reportFormData.report_date_heading || "Report Date";
+
+    // Always use live order bank initial so saved data matches frontend Ref NO. display
+    reportData.ref_no_bank = order?.bank_initial || null;
 
     // Add invoice_no_date (combined from invoice_no and invoice_date) - always include with fresh computed value
     const invoiceNo = reportFormData.invoice_no || "";

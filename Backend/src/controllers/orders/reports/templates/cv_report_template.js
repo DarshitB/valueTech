@@ -463,8 +463,7 @@ body.single-page{
             </tr>
             <tr>
                 <td style="width: 20%;">REF NO.</td>
-                <td colspan="2">${formData.ref_no_year}/${formData.ref_no_bank
-        }/${formData.state_name}/${formData.ref_no_code}/${formData.ref_no_month}${formData.ref_no_id
+                <td colspan="2">${formData.ref_no_year}/${formData.ref_no_bank}/${formData.state_name}/${formData.ref_no_code}/${formData.ref_no_month}${formData.ref_no_id
         }</td>
                 <td style="text-transform: uppercase;">${formData.report_date_heading}:</td>
                 <td colspan="2">${formData.report_date}</td>
