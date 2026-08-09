@@ -817,16 +817,16 @@ the genuineness of the vehicle documents. To give loan to the applicant is the r
 responsible or concerned for the same.</td>
         </tr>
         <tr class="tyre-image-row">
-            <td colspan="6" style="height: 58px; position: relative; overflow: hidden; max-width: 0;">
+            <td colspan="6" style="height: 58px; position: relative; overflow: hidden; max-width: 0; text-align: center;">
                
                 ${formData.tyre_image_base64
-            ? `<img src="${formData.tyre_image_base64}" style="max-width: 100%; max-height: 70px; width: auto; height: auto; object-fit: contain; display: block; position: relative; z-index:1;" alt="">`
+            ? `<img src="${formData.tyre_image_base64}" style="max-width: 100%; max-height: 70px; width: auto; height: auto; object-fit: contain; object-position: center center; display: block; margin: 0 auto; position: relative; z-index:1;" alt="">`
             : ""
         }
             </td>
         </tr>
         <tr class="signature-row">
-            <td colspan="6" style="height: 48px;position: relative;">
+            <td colspan="6" style="height: 48px;position: relative; text-align: center;">
               ${stampImageBase64
             ? `<img src="${stampImageBase64}" alt="stamp" style="position:absolute; left:50%; bottom: -5px; transform:translateX(calc(-50% - 250px)); height: 125px;  z-index:2; pointer-events:none;" />`
             : ""

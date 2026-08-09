@@ -2622,6 +2622,11 @@ function CEReport() {
           return;
         }
 
+        // When a new chassis file is selected, only send the File (not the old path/URL)
+        if (key === "chassis_no_pencil_impression" && chassisImpressionFile) {
+          return;
+        }
+
         // Handle registration fields with options
         if (key === "registration_no") {
           if (registrationNoOption === "NOT_AVAILABLE") {

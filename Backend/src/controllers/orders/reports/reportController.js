@@ -1,5 +1,7 @@
 const fs = require("fs");
 const path = require("path");
+const http = require("http");
+const https = require("https");
 const puppeteer = require("puppeteer");
 const multer = require("multer");
 
@@ -49,7 +51,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 2 * 1024 * 1024, // 2MB limit
+    fileSize: 10 * 1024 * 1024, // 10MB limit
   },
   fileFilter: function (req, file, cb) {
     // Accept only image files
@@ -506,32 +508,163 @@ function saveChassisImageFromMemoryFile(file, year, month, orderNumber) {
 }
 
 function resolveChassisRelativePath(formValue, existingReport) {
-  const sanitizedInput = sanitizeStoredUploadPath(formValue);
-  if (sanitizedInput) {
-    return sanitizedInput;
-  }
+  const candidates = [
+    formValue,
+    existingReport && existingReport.chassis_no_pencil_impression,
+  ];
 
-  if (existingReport && existingReport.chassis_no_pencil_impression) {
-    const sanitizedExisting = sanitizeStoredUploadPath(
-      existingReport.chassis_no_pencil_impression
-    );
-    if (sanitizedExisting) {
-      return sanitizedExisting;
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== "string") continue;
+    const trimmed = candidate.trim();
+    if (!trimmed || trimmed.startsWith("data:")) continue;
+
+    // Prefer local /uploads path when present
+    const sanitized = sanitizeStoredUploadPath(trimmed);
+    if (sanitized) return sanitized;
+
+    // Absolute URL (R2/CDN or API host with /uploads)
+    if (/^https?:\/\//i.test(trimmed)) {
+      try {
+        const parsed = new URL(trimmed);
+        const fromPathname = sanitizeStoredUploadPath(parsed.pathname);
+        if (fromPathname) return fromPathname;
+      } catch (_) {
+        // keep absolute URL below
+      }
+      return trimmed;
     }
   }
 
   return null;
 }
 
-async function loadChassisImageBase64(relativePath) {
-  const absolutePath = resolveAbsoluteUploadPath(relativePath);
-  if (!absolutePath || !fs.existsSync(absolutePath)) {
-    return null;
+async function downloadUrlToBuffer(url, maxRedirects = 5) {
+  if (!url || typeof url !== "string") {
+    throw new Error("Invalid URL");
   }
 
-  const buffer = fs.readFileSync(absolutePath);
-  const mimeType = getMimeFromExtension(path.extname(absolutePath));
-  return `data:${mimeType};base64,${buffer.toString("base64")}`;
+  const fetchOnce = (targetUrl, redirectsLeft) =>
+    new Promise((resolve, reject) => {
+      const protocol = targetUrl.startsWith("https://") ? https : http;
+      const req = protocol.get(targetUrl, { timeout: 30000 }, (res) => {
+        const status = res.statusCode || 0;
+
+        if (
+          status >= 300 &&
+          status < 400 &&
+          res.headers.location &&
+          redirectsLeft > 0
+        ) {
+          res.resume();
+          const nextUrl = new URL(res.headers.location, targetUrl).toString();
+          fetchOnce(nextUrl, redirectsLeft - 1).then(resolve, reject);
+          return;
+        }
+
+        if (status < 200 || status >= 300) {
+          res.resume();
+          reject(new Error(`HTTP ${status} downloading chassis image`));
+          return;
+        }
+
+        const chunks = [];
+        res.on("data", (chunk) => chunks.push(chunk));
+        res.on("end", () => {
+          resolve({
+            buffer: Buffer.concat(chunks),
+            contentType: res.headers["content-type"] || "",
+          });
+        });
+        res.on("error", reject);
+      });
+
+      req.on("timeout", () => {
+        req.destroy(new Error("Request timeout downloading chassis image"));
+      });
+      req.on("error", reject);
+    });
+
+  return fetchOnce(url, maxRedirects);
+}
+
+function bufferToChassisDataUri(buffer, mimeHint = "", filePathOrUrl = "") {
+  if (!buffer || !buffer.length) return null;
+
+  let mimeType = "";
+  if (typeof mimeHint === "string" && mimeHint.startsWith("image/")) {
+    mimeType = mimeHint.split(";")[0].trim();
+  }
+  if (!mimeType) {
+    try {
+      const pathname = /^https?:\/\//i.test(filePathOrUrl)
+        ? new URL(filePathOrUrl).pathname
+        : filePathOrUrl;
+      mimeType = getMimeFromExtension(path.extname(pathname || ""));
+    } catch (_) {
+      mimeType = "image/jpeg";
+    }
+  }
+
+  return `data:${mimeType || "image/jpeg"};base64,${buffer.toString("base64")}`;
+}
+
+async function loadChassisImageBase64(source) {
+  if (!source || typeof source !== "string") return null;
+  const trimmed = source.trim();
+  if (!trimmed) return null;
+
+  if (trimmed.startsWith("data:")) return trimmed;
+
+  // Remote URL (R2/CDN) — try local mirror first, then download
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const parsed = new URL(trimmed);
+      const localFromPath = resolveAbsoluteUploadPath(parsed.pathname);
+      if (localFromPath && fs.existsSync(localFromPath)) {
+        const buffer = fs.readFileSync(localFromPath);
+        return bufferToChassisDataUri(
+          buffer,
+          "",
+          localFromPath
+        );
+      }
+    } catch (_) {
+      // continue to remote download
+    }
+
+    try {
+      const { buffer, contentType } = await downloadUrlToBuffer(trimmed);
+      return bufferToChassisDataUri(buffer, contentType, trimmed);
+    } catch (err) {
+      console.warn(
+        `[chassis] failed to download image from URL: ${err.message}`
+      );
+      return null;
+    }
+  }
+
+  // Local /uploads path
+  const absolutePath = resolveAbsoluteUploadPath(trimmed);
+  if (absolutePath && fs.existsSync(absolutePath)) {
+    const buffer = fs.readFileSync(absolutePath);
+    return bufferToChassisDataUri(buffer, "", absolutePath);
+  }
+
+  // Local file missing after R2 sync — try public R2 URL for the same key
+  const r2Base = (process.env.R2_PUBLIC_BASE_URL || "").replace(/\/$/, "");
+  if (r2Base && trimmed.startsWith("/uploads/")) {
+    const r2Url = `${r2Base}${trimmed.replace(/^\/uploads/, "")}`;
+    try {
+      const { buffer, contentType } = await downloadUrlToBuffer(r2Url);
+      return bufferToChassisDataUri(buffer, contentType, r2Url);
+    } catch (err) {
+      console.warn(
+        `[chassis] failed to download image from R2 fallback: ${err.message}`
+      );
+    }
+  }
+
+  return null;
 }
 
 function deleteChassisImage(relativePath) {
@@ -652,14 +785,13 @@ exports.generateReport = async (req, res, next) => {
         requestedReportType.toLowerCase()
       )
     ) {
-      chassisImageRelativePath = resolveChassisRelativePath(
-        formData.chassis_no_pencil_impression,
-        existingReport
-      );
-
-      if (chassisImageRelativePath) {
-        existingChassisPath = chassisImageRelativePath;
-      }
+      // Body may send both an old path/URL and a new file under the same field name.
+      // Always prefer a freshly uploaded file for the PDF.
+      const previousChassisSource =
+        resolveChassisRelativePath(
+          formData.chassis_no_pencil_impression,
+          existingReport
+        ) || existingChassisPath;
 
       if (req.file) {
         const saved = await saveChassisImageFromDiskFile(
@@ -670,16 +802,21 @@ exports.generateReport = async (req, res, next) => {
         );
         if (saved.relativePath) {
           if (
-            existingChassisPath &&
-            existingChassisPath !== saved.relativePath
+            previousChassisSource &&
+            previousChassisSource !== saved.relativePath
           ) {
-            deleteChassisImage(existingChassisPath);
+            deleteChassisImage(previousChassisSource);
           }
           chassisImageRelativePath = saved.relativePath;
           existingChassisPath = saved.relativePath;
         }
         if (saved.base64) {
           chassisImageBase64 = saved.base64;
+        }
+      } else {
+        chassisImageRelativePath = previousChassisSource;
+        if (chassisImageRelativePath) {
+          existingChassisPath = chassisImageRelativePath;
         }
       }
 
@@ -689,7 +826,7 @@ exports.generateReport = async (req, res, next) => {
         );
       }
 
-      // Store relative path for database (same for CV, CE, and AVR)
+      // Store relative path / URL for database (same for CV, CE, and AVR)
       if (chassisImageRelativePath) {
         formData.chassis_no_pencil_impression = chassisImageRelativePath;
       } else {
@@ -3386,19 +3523,21 @@ exports.saveReportData = async (req, res, next) => {
 
     const flexibleFields = extractFlexibleFieldsFromFormData(formData);
 
-    let chassisImageRelativePath = resolveChassisRelativePath(
-      formData.chassis_no_pencil_impression,
-      existingReport
-    );
+    let chassisImageRelativePath = null;
+    const previousChassisSource =
+      resolveChassisRelativePath(
+        formData.chassis_no_pencil_impression,
+        existingReport
+      ) || existingChassisPath;
 
-    if (chassisImageRelativePath) {
-      existingChassisPath = chassisImageRelativePath;
-    }
+    const chassisFile =
+      Array.isArray(req.files) && req.files.length > 0
+        ? req.files.find(
+            (file) => file.fieldname === "chassis_no_pencil_impression"
+          )
+        : null;
 
-    if (Array.isArray(req.files) && req.files.length > 0) {
-      const chassisFile = req.files.find(
-        (file) => file.fieldname === "chassis_no_pencil_impression"
-      );
+    if (chassisFile) {
       const storedPath = saveChassisImageFromMemoryFile(
         chassisFile,
         year,
@@ -3406,11 +3545,16 @@ exports.saveReportData = async (req, res, next) => {
         orderNumber
       );
       if (storedPath) {
-        if (existingChassisPath && existingChassisPath !== storedPath) {
-          deleteChassisImage(existingChassisPath);
+        if (previousChassisSource && previousChassisSource !== storedPath) {
+          deleteChassisImage(previousChassisSource);
         }
         chassisImageRelativePath = storedPath;
         existingChassisPath = storedPath;
+      }
+    } else {
+      chassisImageRelativePath = previousChassisSource;
+      if (chassisImageRelativePath) {
+        existingChassisPath = chassisImageRelativePath;
       }
     }
 

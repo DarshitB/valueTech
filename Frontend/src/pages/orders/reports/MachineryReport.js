@@ -1907,6 +1907,11 @@ function MachineryReport() {
           return;
         }
 
+        // When a new chassis file is selected, only send the File (not the old path/URL)
+        if (key === "chassis_no_pencil_impression" && chassisImpressionFile) {
+          return;
+        }
+
         // Default for tax_invoice_copy_heading when empty
         if (key === "tax_invoice_copy_heading" && (!value || String(value).trim() === "")) {
           value = "Proforma Invoice Verified";

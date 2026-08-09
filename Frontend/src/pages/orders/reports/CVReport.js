@@ -1731,6 +1731,11 @@ function CVReport() {
           return;
         }
 
+        // When a new chassis file is selected, only send the File (not the old path/URL)
+        if (key === "chassis_no_pencil_impression" && chassisImpressionFile) {
+          return;
+        }
+
         // Simple logic: if value exists, send it; if null/empty, send null
         // Note: Textarea values (with line breaks, spaces, formatting) are preserved as-is
         if (value !== null && value !== undefined && value !== "") {
