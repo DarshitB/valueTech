@@ -39,3 +39,63 @@ export const saveOrderReport = (orderId, reportData) => {
     },
   });
 }; // Save order report data; supports JSON or multipart payloads
+
+const MARINE_LOCK_REPORT_TYPE = "report_marine";
+
+/** GET current Marine edit lock status (does not acquire). */
+export const getReportEditLock = (
+  orderId,
+  reportType = MARINE_LOCK_REPORT_TYPE
+) =>
+  axios.get(`${ENDPOINT}/${orderId}/lock`, {
+    params: { report_type: reportType },
+  });
+
+/** Acquire / refresh Marine edit lock for the current user. */
+export const acquireReportEditLock = (
+  orderId,
+  reportType = MARINE_LOCK_REPORT_TYPE
+) =>
+  axios.post(`${ENDPOINT}/${orderId}/lock`, {
+    report_type: reportType,
+  });
+
+/** Heartbeat to keep Marine edit lock alive. */
+export const heartbeatReportEditLock = (
+  orderId,
+  reportType = MARINE_LOCK_REPORT_TYPE
+) =>
+  axios.post(`${ENDPOINT}/${orderId}/lock/heartbeat`, {
+    report_type: reportType,
+  });
+
+/**
+ * Release Marine edit lock.
+ * Use keepalive on tab close so the request can finish during unload.
+ */
+export const releaseReportEditLock = (
+  orderId,
+  reportType = MARINE_LOCK_REPORT_TYPE,
+  { keepalive = false } = {}
+) => {
+  if (!keepalive) {
+    return axios.delete(`${ENDPOINT}/${orderId}/lock`, {
+      params: { report_type: reportType },
+    });
+  }
+
+  const token = localStorage.getItem("token");
+  const base =
+    process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
+  const url = `${base}${ENDPOINT}/${orderId}/lock?report_type=${encodeURIComponent(
+    reportType
+  )}`;
+
+  return fetch(url, {
+    method: "DELETE",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    keepalive: true,
+  });
+};

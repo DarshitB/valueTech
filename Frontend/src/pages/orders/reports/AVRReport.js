@@ -1069,7 +1069,7 @@ function AVRReport() {
   }, [reportFormData, flexibleFields, chasisPrintFile]);
 
   // Handle save report data
-  const handleSaveReport = () => {
+  const handleSaveReport = useCallback(() => {
     // Create report data object with only non-empty fields
     const reportData = buildSavePayload();
 
@@ -1097,7 +1097,23 @@ function AVRReport() {
         initialFlexibleFieldsRef.current = flexibleFields;
       }
     });
-  };
+  }, [buildSavePayload, dispatch, id, reportFormData, flexibleFields]);
+
+  // Keyboard shortcut: Ctrl+S (Windows/Linux) / Cmd+S (Mac)
+  useEffect(() => {
+    const onSaveShortcut = (event) => {
+      const isSaveKey =
+        (event.ctrlKey || event.metaKey) &&
+        String(event.key).toLowerCase() === "s";
+      if (!isSaveKey) return;
+
+      event.preventDefault();
+      handleSaveReport();
+    };
+
+    window.addEventListener("keydown", onSaveShortcut);
+    return () => window.removeEventListener("keydown", onSaveShortcut);
+  }, [handleSaveReport]);
 
   // Navigation Blocker - Shows confirmation dialog for unsaved changes
   useEffect(() => {

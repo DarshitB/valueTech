@@ -4559,6 +4559,22 @@ function SummarizedReport() {
     convertNumberToWordsIndian,
   ]);
 
+  // Keyboard shortcut: Ctrl+S (Windows/Linux) / Cmd+S (Mac)
+  useEffect(() => {
+    const onSaveShortcut = (event) => {
+      const isSaveKey =
+        (event.ctrlKey || event.metaKey) &&
+        String(event.key).toLowerCase() === "s";
+      if (!isSaveKey) return;
+
+      event.preventDefault();
+      handleSaveReport();
+    };
+
+    window.addEventListener("keydown", onSaveShortcut);
+    return () => window.removeEventListener("keydown", onSaveShortcut);
+  }, [handleSaveReport]);
+
   // In-app navigation blocker — works with BrowserRouter (no data router needed).
   // Intercepts pushState (Link clicks) and popstate (browser back/forward).
   // Saves silently then navigates. 100% reliable for in-app navigation.

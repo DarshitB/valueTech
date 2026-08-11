@@ -2168,6 +2168,22 @@ function CVReport() {
     canEditRefNoId,
   ]);
 
+  // Keyboard shortcut: Ctrl+S (Windows/Linux) / Cmd+S (Mac)
+  useEffect(() => {
+    const onSaveShortcut = (event) => {
+      const isSaveKey =
+        (event.ctrlKey || event.metaKey) &&
+        String(event.key).toLowerCase() === "s";
+      if (!isSaveKey) return;
+
+      event.preventDefault();
+      handleSaveReport();
+    };
+
+    window.addEventListener("keydown", onSaveShortcut);
+    return () => window.removeEventListener("keydown", onSaveShortcut);
+  }, [handleSaveReport]);
+
   // Function to call external RC API and prefill form data
   const fetchRCDetailsFromExternalAPI = useCallback(
     async (registrationNumber) => {

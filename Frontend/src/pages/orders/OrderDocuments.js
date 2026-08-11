@@ -6,7 +6,7 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { usePageTitle } from "../../context/PageTitleContext";
 import { fetchOrderById } from "../../redux/reducers/orderReducer";
@@ -35,6 +35,7 @@ import { hasPermission } from "../../utils/permissionUtils";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
 import { resolveAssetUrl } from "../../utils/urlUtils";
 import R2StorageBadge from "../../components/R2StorageBadge";
+import { assertCanEnterMarineReport } from "../../utils/marineReportEditLock";
 
 // Constants for security and configuration
 const ALLOWED_FILE_TYPES = [
@@ -123,6 +124,7 @@ const useDocumentState = () => {
 
 function OrderDocuments() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const dispatch = useDispatch();
   const allowedPermissions = useSelector(selectPermissions);
   const currentUser = useSelector((state) => state.auth.user);
@@ -912,7 +914,7 @@ function OrderDocuments() {
   }, [order]);
 
   // Handle report button click
-  const handleGenerateReportClick = useCallback(() => {
+  const handleGenerateReportClick = useCallback(async () => {
     // Check if valuer name is set
     if (!order?.valuer_name || order.valuer_name.trim() === "") {
       showValuerNameError(getReportTypeName());
@@ -927,17 +929,27 @@ function OrderDocuments() {
 
     // Get the report URL and navigate
     const reportUrl = getReportUrl();
-    if (reportUrl) {
-      window.location.href = reportUrl;
-    } else {
+    if (!reportUrl) {
       toast.error("No report type available for this order category");
+      return;
     }
+
+    // Marine-only edit lock pre-check
+    if (reportUrl.includes("/marine-report")) {
+      const canEnter = await assertCanEnterMarineReport(id, currentUser?.id);
+      if (!canEnter) return;
+    }
+
+    navigate(reportUrl);
   }, [
     order,
     isExemptAdmin,
     getReportUrl,
     getReportTypeName,
     showValuerNameError,
+    id,
+    currentUser?.id,
+    navigate,
   ]);
 
   // Drag and drop handlers
@@ -1649,12 +1661,26 @@ function OrderDocuments() {
                               <Link
                                 to={getReportUrl() || "#"}
                                 className="btn primary"
-                                onClick={(e) => {
-                                  if (!getReportUrl()) {
+                                onClick={async (e) => {
+                                  const reportUrl = getReportUrl();
+                                  if (!reportUrl) {
                                     e.preventDefault();
                                     toast.error(
                                       "No report type available for this order category",
                                     );
+                                    return;
+                                  }
+
+                                  if (reportUrl.includes("/marine-report")) {
+                                    e.preventDefault();
+                                    const canEnter =
+                                      await assertCanEnterMarineReport(
+                                        id,
+                                        currentUser?.id
+                                      );
+                                    if (canEnter) {
+                                      navigate(reportUrl);
+                                    }
                                   }
                                 }}
                               >

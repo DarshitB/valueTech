@@ -6,7 +6,7 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchOrderById,
@@ -28,6 +28,7 @@ import {
 } from "../../redux/reducers/orderReportReducer";
 import { fetchOfficers } from "../../redux/reducers/officerReducer";
 import { getUsers } from "../../api/user.api";
+import { assertCanEnterMarineReport } from "../../utils/marineReportEditLock";
 import {
   sendOrderMail,
   getOrderLastMail,
@@ -57,7 +58,6 @@ import {
   ValidateIcon,
   MailInputIcon,
 } from "../../components/icons";
-import { Link } from "react-router-dom";
 import { usePageTitle } from "../../context/PageTitleContext";
 import { hasPermission } from "../../utils/permissionUtils";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
@@ -150,6 +150,7 @@ const MAIL_REGARDS_PHONE = "+91 99209 88549";
 function OrderDetails() {
   // Extract order ID from route parameters
   const { id } = useParams();
+  const navigate = useNavigate();
   // Initialize Redux dispatch function
   const dispatch = useDispatch();
 
@@ -2099,6 +2100,16 @@ function OrderDetails() {
                       to={`/orders/${id}/details/marine-report`}
                       title="Marine Report"
                       className="tooltip-link"
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        const canEnter = await assertCanEnterMarineReport(
+                          id,
+                          currentUser?.id
+                        );
+                        if (canEnter) {
+                          navigate(`/orders/${id}/details/marine-report`);
+                        }
+                      }}
                     >
                       <ReportIcon />
                     </Link>

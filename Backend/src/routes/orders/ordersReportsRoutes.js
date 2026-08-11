@@ -6,12 +6,37 @@ const multer = require("multer");
 const upload = multer();
 
 const reportController = require("../../controllers/orders/reports/reportController");
+const reportEditLockController = require("../../controllers/orders/reports/reportEditLockController");
 const auth = require("../../middleware/auth"); // Middleware to check authentication
 const checkPermission = require("../../middleware/permission"); // Middleware to check user permissions
 const activityLogger = require("../../middleware/activityLogger"); // Middleware to log user activity
 
 // Apply authentication middleware to all routes
 router.use(auth);
+
+/**
+ * Marine report edit lock (one editor at a time).
+ * Register BEFORE /:order_id/:report_type so "lock" is not treated as report_type.
+ */
+router.get(
+  "/:order_id/lock",
+  reportEditLockController.getReportEditLock
+);
+
+router.post(
+  "/:order_id/lock",
+  reportEditLockController.acquireReportEditLock
+);
+
+router.post(
+  "/:order_id/lock/heartbeat",
+  reportEditLockController.heartbeatReportEditLock
+);
+
+router.delete(
+  "/:order_id/lock",
+  reportEditLockController.releaseReportEditLock
+);
 
 /**
  * GET /orders-reports/:order_id/:report_type

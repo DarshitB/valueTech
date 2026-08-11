@@ -6,7 +6,7 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchOrderById,
@@ -18,6 +18,11 @@ import {
   saveOrderReport,
   clearCurrentReport,
 } from "../../../redux/reducers/orderReportReducer";
+import {
+  acquireReportEditLock,
+  heartbeatReportEditLock,
+  releaseReportEditLock,
+} from "../../../api/orderReport.api";
 import { usePageTitle } from "../../../context/PageTitleContext";
 import { resolveAssetUrl } from "../../../utils/urlUtils";
 import SingleSearchSelect from "../../../components/SingleSearchSelect";
@@ -27,6 +32,7 @@ import { hasPermission } from "../../../utils/permissionUtils";
 import "../order.scss";
 import { DeleteIcon, CloseIcon } from "../../../components/icons";
 import { convertNumberToWordsIndian } from "../../../utils/numberToWordsIndian";
+import { MARINE_REPORT_TYPE } from "../../../utils/marineReportEditLock";
 
 /** Stable string id — API returns numeric id; modal keys are always strings. */
 const normalizeFlexibleFieldId = (field, fallbackIndex = 0) => {
@@ -189,6 +195,7 @@ const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "
 
 function MarineReport() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const dispatch = useDispatch();
 
   // Select order data from Redux store
@@ -209,6 +216,12 @@ function MarineReport() {
   const isLoadingData = orderLoading || reportLoading;
   const allowedPermissions = useSelector(selectPermissions);
   const canEditRefNoId = hasPermission(allowedPermissions, "edit_report_ref_no_id");
+
+  // Marine-only: one editor at a time
+  const [hasEditLock, setHasEditLock] = useState(false);
+  const [lockCheckDone, setLockCheckDone] = useState(false);
+  const handleSaveReportRef = useRef(null);
+  const hasEditLockRef = useRef(false);
 
   // Get current date in DD-MM-YYYY format
   const getCurrentDate = useCallback(() => {
@@ -2304,7 +2317,7 @@ function MarineReport() {
   }, [reportFormData, flexibleFields]);
 
   // Handle save report data
-  const handleSaveReport = () => {
+  const handleSaveReport = useCallback(() => {
     const formData = buildSavePayload();
 
     // Dispatch save action with FormData payload (same as generate API)
@@ -2320,7 +2333,104 @@ function MarineReport() {
         initialFlexibleFieldsRef.current = flexibleFields;
       }
     });
-  };
+  }, [buildSavePayload, dispatch, id, reportFormData, flexibleFields]);
+
+  handleSaveReportRef.current = handleSaveReport;
+
+  // Marine-only: acquire edit lock on enter; heartbeat; release on leave
+  useEffect(() => {
+    if (!id) return undefined;
+
+    let cancelled = false;
+    let heartbeatTimer = null;
+    let autoSaveTimer = null;
+
+    const clearTimers = () => {
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
+      if (autoSaveTimer) clearInterval(autoSaveTimer);
+      heartbeatTimer = null;
+      autoSaveTimer = null;
+    };
+
+    const startTimers = () => {
+      // Keep lock alive (TTL is 3 minutes on server)
+      heartbeatTimer = setInterval(() => {
+        heartbeatReportEditLock(id, MARINE_REPORT_TYPE).catch(() => {
+          // Ignore transient heartbeat errors; next tick retries
+        });
+      }, 45 * 1000);
+
+      // Auto-save every 10 minutes from enter
+      autoSaveTimer = setInterval(() => {
+        if (handleSaveReportRef.current) {
+          handleSaveReportRef.current();
+        }
+      }, 10 * 60 * 1000);
+    };
+
+    const acquireLock = async () => {
+      try {
+        await acquireReportEditLock(id, MARINE_REPORT_TYPE);
+        if (cancelled) {
+          // Left before acquire finished — release so we don't hold the lock
+          releaseReportEditLock(id, MARINE_REPORT_TYPE).catch(() => {});
+          return;
+        }
+        hasEditLockRef.current = true;
+        setHasEditLock(true);
+        setLockCheckDone(true);
+        startTimers();
+      } catch (err) {
+        if (cancelled) return;
+        const message =
+          err?.response?.data?.message ||
+          "Another user is already on this Marine report, so you cannot open it right now.";
+        toast.info(message);
+        hasEditLockRef.current = false;
+        setHasEditLock(false);
+        setLockCheckDone(true);
+        navigate(`/orders/${id}/details`, { replace: true });
+      }
+    };
+
+    acquireLock();
+
+    const releaseOnUnload = () => {
+      if (!hasEditLockRef.current) return;
+      releaseReportEditLock(id, MARINE_REPORT_TYPE, { keepalive: true });
+      hasEditLockRef.current = false;
+    };
+
+    window.addEventListener("pagehide", releaseOnUnload);
+    window.addEventListener("beforeunload", releaseOnUnload);
+
+    return () => {
+      cancelled = true;
+      clearTimers();
+      window.removeEventListener("pagehide", releaseOnUnload);
+      window.removeEventListener("beforeunload", releaseOnUnload);
+      if (hasEditLockRef.current) {
+        releaseReportEditLock(id, MARINE_REPORT_TYPE).catch(() => {});
+        hasEditLockRef.current = false;
+      }
+    };
+  }, [id, navigate]);
+
+  // Keyboard shortcut: Ctrl+S (Windows/Linux) / Cmd+S (Mac)
+  useEffect(() => {
+    const onSaveShortcut = (event) => {
+      const isSaveKey =
+        (event.ctrlKey || event.metaKey) &&
+        String(event.key).toLowerCase() === "s";
+      if (!isSaveKey) return;
+
+      event.preventDefault();
+      handleSaveReport();
+    };
+
+    window.addEventListener("keydown", onSaveShortcut);
+    return () => window.removeEventListener("keydown", onSaveShortcut);
+  }, [handleSaveReport]);
 
   // Navigation Blocker - Shows confirmation dialog for unsaved changes
   useEffect(() => {
@@ -2404,6 +2514,32 @@ function MarineReport() {
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, []);
+
+  // Block Marine report UI until edit lock is granted (or redirect if denied)
+  if (!lockCheckDone || !hasEditLock) {
+    return (
+      <section className="order-details-wrapper">
+        <div className="row">
+          <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-xs-12 mb-5">
+            <div className="order-report-container">
+              <h2>Marine Report</h2>
+              <div
+                style={{
+                  padding: "48px 16px",
+                  textAlign: "center",
+                  color: "#333",
+                }}
+              >
+                {!lockCheckDone
+                  ? "Checking report access..."
+                  : "Redirecting..."}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="order-details-wrapper">
