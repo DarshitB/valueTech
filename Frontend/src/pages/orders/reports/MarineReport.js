@@ -33,6 +33,7 @@ import "../order.scss";
 import { DeleteIcon, CloseIcon } from "../../../components/icons";
 import { convertNumberToWordsIndian } from "../../../utils/numberToWordsIndian";
 import { MARINE_REPORT_TYPE } from "../../../utils/marineReportEditLock";
+import MarineVariableMentionBridge from "../../../components/MarineVariableMentionBridge";
 
 /** Stable string id — API returns numeric id; modal keys are always strings. */
 const normalizeFlexibleFieldId = (field, fallbackIndex = 0) => {
@@ -64,6 +65,25 @@ const appendMissingMarineFormFields = (formData, formState) => {
       formData.append(key, "");
     }
   });
+};
+
+/** Uppercase text but keep @vesselName / @vesselType tokens in canonical casing. */
+const uppercasePreservingMarineTokens = (value) => {
+  if (value == null || value === "") return value;
+  const tokens = [];
+  const protectedText = String(value).replace(
+    /@vesselName|@vesselType/gi,
+    (match) => {
+      const canonical =
+        match.toLowerCase() === "@vesselname" ? "@vesselName" : "@vesselType";
+      const idx = tokens.length;
+      tokens.push(canonical);
+      return `\u0000MARINE_VAR_${idx}\u0000`;
+    }
+  );
+  return protectedText
+    .toUpperCase()
+    .replace(/\u0000MARINE_VAR_(\d+)\u0000/g, (_, idx) => tokens[Number(idx)]);
 };
 
 // WYSIWYG Textarea Component - preserves HTML formatting
@@ -222,6 +242,7 @@ function MarineReport() {
   const [lockCheckDone, setLockCheckDone] = useState(false);
   const handleSaveReportRef = useRef(null);
   const hasEditLockRef = useRef(false);
+  const marineFormRef = useRef(null);
 
   // Get current date in DD-MM-YYYY format
   const getCurrentDate = useCallback(() => {
@@ -347,6 +368,9 @@ function MarineReport() {
     proposed_owner_address: "",
     certifications_vessel_note: "",
     disclaimer: "",
+    // Reusable template variables — type @vesselName / @vesselType in other fields
+    var_vessel_name: "",
+    var_vessel_type: "",
   });
 
   // Set initial disclaimer on mount
@@ -520,6 +544,8 @@ function MarineReport() {
       proposed_owner: "",
       proposed_owner_address: "",
       disclaimer: "",
+      var_vessel_name: "",
+      var_vessel_type: "",
     };
 
     // Generate initial disclaimer based on default execute_above value
@@ -918,7 +944,7 @@ function MarineReport() {
     ];
 
     const finalValue = uppercaseFields.includes(name)
-      ? value.toUpperCase()
+      ? uppercasePreservingMarineTokens(value)
       : value;
 
     setReportFormData((prev) => ({
@@ -2564,10 +2590,18 @@ function MarineReport() {
               </div>
             </div>
             <form
+              ref={marineFormRef}
               className="body-form-box"
               onSubmit={handleReportSubmit}
               style={{ position: "relative" }}
             >
+              <MarineVariableMentionBridge
+                containerRef={marineFormRef}
+                variableValues={{
+                  vesselName: reportFormData.var_vessel_name || "",
+                  vesselType: reportFormData.var_vessel_type || "",
+                }}
+              />
               {/* Loading Overlay - Shows when fetching order or report data */}
               {isLoadingData && (
                 <div
@@ -2610,6 +2644,77 @@ function MarineReport() {
                 </div>
               )}
               <div className="row">
+                <div className="col-md-12">
+                  <div
+                    className="form-group"
+                    style={{
+                      marginBottom: "16px",
+                      padding: "12px 14px",
+                      background: "#f7f9fc",
+                      border: "1px solid #e3e8ef",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        marginBottom: "8px",
+                        color: "#333",
+                      }}
+                    >
+                      Report variables
+                    </div>
+                    {/* <div
+                      style={{
+                        fontSize: "13px",
+                        color: "#555",
+                        marginBottom: "12px",
+                      }}
+                    >
+                      Set values once. Type{" "}
+                      <code>@vesselName</code> or <code>@vesselType</code> in
+                      any other field — the form keeps the @ token; the
+                      generated PDF shows the value.
+                    </div> */}
+                    <div className="row">
+                      <div className="col-md-6">
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label>
+                            Vessel Name variable{" "}
+                            <span style={{ color: "#666", fontWeight: 400 }}>
+                              (@vesselName)
+                            </span>
+                          </label>
+                          <input
+                            type="text"
+                            className="form-field"
+                            name="var_vessel_name"
+                            value={reportFormData.var_vessel_name || ""}
+                            onChange={handleFormChange}
+                            placeholder="Value used wherever @vesselName appears"
+                          />
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label>
+                            Vessel Type variable{" "}
+                            <span style={{ color: "#666", fontWeight: 400 }}>
+                              (@vesselType)
+                            </span>
+                          </label>
+                          <input
+                            type="text"
+                            className="form-field"
+                            name="var_vessel_type"
+                            value={reportFormData.var_vessel_type || ""}
+                            onChange={handleFormChange}
+                            placeholder="Value used wherever @vesselType appears"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <div className="col-md-6">
                   <div className="form-group">
                     <label>
@@ -2709,7 +2814,9 @@ function MarineReport() {
                       placeholder="Enter name of the vessel"
                       required
                       onChange={(e) => {
-                        const name_of_the_vessel = e.target.value.toUpperCase();
+                        const name_of_the_vessel = uppercasePreservingMarineTokens(
+                          e.target.value
+                        );
                         setReportFormData({
                           ...reportFormData,
                           name_of_the_vessel,

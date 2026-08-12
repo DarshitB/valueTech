@@ -420,6 +420,84 @@ function inlineMarineReportImages(formData) {
   return cloned;
 }
 
+/**
+ * Marine-only: replace @vesselName / @vesselType in form text with
+ * var_vessel_name / var_vessel_type values before PDF HTML is built.
+ * Source variable fields and image fields are left unchanged.
+ * Does not mutate the original formData (save payload keeps tokens).
+ */
+function applyMarineVesselVariables(formData) {
+  if (!formData || typeof formData !== "object") return formData;
+
+  const vesselName =
+    formData.var_vessel_name != null ? String(formData.var_vessel_name) : "";
+  const vesselType =
+    formData.var_vessel_type != null ? String(formData.var_vessel_type) : "";
+
+  const SKIP_KEYS = new Set([
+    "var_vessel_name",
+    "var_vessel_type",
+    "vessel_photo",
+    "vessel_photo_preview",
+    "vessel_photo_for_template",
+    "vessel_photo_id",
+    "report_type",
+    "order_id",
+    "id",
+    "created_by",
+    "updated_by",
+    "created_at",
+    "updated_at",
+  ]);
+
+  const replaceTokens = (text) =>
+    String(text)
+      // Case-insensitive: fields like name_of_the_vessel auto-uppercase to @VESSELNAME
+      .replace(/@vesselName/gi, vesselName)
+      .replace(/@vesselType/gi, vesselType);
+
+  const walk = (value, parentIsImageFlexibleField = false) => {
+    if (typeof value === "string") {
+      return replaceTokens(value);
+    }
+    if (Array.isArray(value)) {
+      return value.map((item) => {
+        if (item && typeof item === "object") {
+          const sectionName = (item.section_name || "").toString();
+          const isImageSection = sectionName.includes(
+            "HEADING_DESCRIPTION_IMAGE"
+          );
+          return walkObject(item, isImageSection);
+        }
+        return walk(item, false);
+      });
+    }
+    if (value && typeof value === "object") {
+      return walkObject(value, parentIsImageFlexibleField);
+    }
+    return value;
+  };
+
+  const walkObject = (obj, isImageFlexibleField) => {
+    const out = {};
+    for (const [key, val] of Object.entries(obj)) {
+      if (SKIP_KEYS.has(key)) {
+        out[key] = val;
+        continue;
+      }
+      // Keep image path/URL in flexible image sections intact
+      if (isImageFlexibleField && key === "field_3") {
+        out[key] = val;
+        continue;
+      }
+      out[key] = walk(val, false);
+    }
+    return out;
+  };
+
+  return walk(formData, false);
+}
+
 function saveChassisImage(
   buffer,
   mimeType,
@@ -1333,7 +1411,9 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
   // intentionally left untouched.
   let templateFormData = formData;
   if (reportType.toLowerCase() === "report_marine") {
-    templateFormData = inlineMarineReportImages(formData);
+    // Resolve @vesselName / @vesselType for PDF only (DB/UI keep tokens)
+    templateFormData = applyMarineVesselVariables(formData);
+    templateFormData = inlineMarineReportImages(templateFormData);
   }
 
   // Generate HTML content based on report type
@@ -4804,6 +4884,9 @@ function filterValidReportFields(formData, reportType) {
       "date_place_of_last_sire_inspection",
       "valuer_special_remarks",
       "disclaimer",
+      // Reusable @vesselName / @vesselType source values (tokens stay in other fields)
+      "var_vessel_name",
+      "var_vessel_type",
     ],
   };
 
