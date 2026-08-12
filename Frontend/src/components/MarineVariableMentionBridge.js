@@ -1,21 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-export const MARINE_VARIABLE_OPTIONS = [
-  {
-    token: "@vesselName",
-    label: "Vessel Name",
-    valueKey: "vesselName",
-  },
-  {
-    token: "@vesselType",
-    label: "Vessel Type",
-    valueKey: "vesselType",
-  },
-];
-
-const EXCLUDED_INPUT_NAMES = new Set(["var_vessel_name", "var_vessel_type"]);
-
-function isTextualTarget(el) {
+function isTextualTarget(el, excludedInputNames) {
   if (!el || el.disabled || el.readOnly) return false;
 
   // Skip react-select search boxes and other non-report fields
@@ -46,17 +31,17 @@ function isTextualTarget(el) {
     ) {
       return false;
     }
-    if (EXCLUDED_INPUT_NAMES.has(el.name)) return false;
+    if (excludedInputNames.has(el.name)) return false;
     return true;
   }
 
   return false;
 }
 
-function filterOptions(query) {
+function filterOptions(query, variableOptions) {
   const q = String(query || "").toLowerCase();
-  if (!q) return MARINE_VARIABLE_OPTIONS;
-  return MARINE_VARIABLE_OPTIONS.filter((opt) => {
+  if (!q) return variableOptions;
+  return variableOptions.filter((opt) => {
     const tokenBody = opt.token.slice(1).toLowerCase();
     return (
       tokenBody.startsWith(q) ||
@@ -207,7 +192,8 @@ function getCaretViewportRect(el, context) {
  */
 export default function MarineVariableMentionBridge({
   containerRef,
-  variableValues = {},
+  variableOptions = [],
+  excludedInputNames = [],
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -217,7 +203,14 @@ export default function MarineVariableMentionBridge({
   const contextRef = useRef(null);
   const menuRef = useRef(null);
 
-  const options = useMemo(() => filterOptions(query), [query]);
+  const excludedSet = useMemo(
+    () => new Set(excludedInputNames || []),
+    [excludedInputNames]
+  );
+  const options = useMemo(
+    () => filterOptions(query, variableOptions),
+    [query, variableOptions]
+  );
 
   const closeMenu = useCallback(() => {
     setOpen(false);
@@ -229,7 +222,7 @@ export default function MarineVariableMentionBridge({
 
   const updateFromTarget = useCallback(
     (el) => {
-      if (!isTextualTarget(el)) {
+      if (!isTextualTarget(el, excludedSet)) {
         closeMenu();
         return;
       }
@@ -240,7 +233,7 @@ export default function MarineVariableMentionBridge({
         return;
       }
 
-      const filtered = filterOptions(context.query);
+      const filtered = filterOptions(context.query, variableOptions);
       if (filtered.length === 0) {
         closeMenu();
         return;
@@ -257,7 +250,7 @@ export default function MarineVariableMentionBridge({
       const left = Math.min(Math.max(8, rect.left), window.innerWidth - 260);
       setPosition({ top, left });
     },
-    [closeMenu]
+    [closeMenu, excludedSet, variableOptions]
   );
 
   const applyOption = useCallback(
@@ -392,7 +385,7 @@ export default function MarineVariableMentionBridge({
         Insert variable
       </div>
       {options.map((opt, index) => {
-        const preview = variableValues[opt.valueKey];
+        const preview = opt.value || "";
         const isActive = index === activeIndex;
         return (
           <button

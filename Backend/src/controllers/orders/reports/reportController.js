@@ -16,6 +16,7 @@ const MachineryReport = require("../../../models/orders/reports/machineryReport"
 const SummarizedReport = require("../../../models/orders/reports/summarizedReport");
 const CeReport = require("../../../models/orders/reports/ceReport");
 const MarineReport = require("../../../models/orders/reports/marineReport");
+const ReportVariable = require("../../../models/orders/reports/reportVariable");
 const orderMediaDocument = require("../../../models/orders/orderMediaDocument");
 const OrderStatusHistory = require("../../../models/orders/orderStatusHistory");
 const AssetMakesForReports = require("../../../models/orders/assetMakesOfReports");
@@ -421,22 +422,23 @@ function inlineMarineReportImages(formData) {
 }
 
 /**
- * Marine-only: replace @vesselName / @vesselType in form text with
- * var_vessel_name / var_vessel_type values before PDF HTML is built.
- * Source variable fields and image fields are left unchanged.
- * Does not mutate the original formData (save payload keeps tokens).
+ * Marine-only: replace @variable tokens using report_variables values
+ * before PDF HTML is built. Does not mutate the original formData.
  */
 function applyMarineVesselVariables(formData) {
   if (!formData || typeof formData !== "object") return formData;
-
-  const vesselName =
-    formData.var_vessel_name != null ? String(formData.var_vessel_name) : "";
-  const vesselType =
-    formData.var_vessel_type != null ? String(formData.var_vessel_type) : "";
+  const providedVariables = Array.isArray(formData.report_variables)
+    ? formData.report_variables
+    : [];
+  const variableMap = new Map();
+  for (const item of providedVariables) {
+    if (!item || typeof item !== "object") continue;
+    const keyName = item.key_name ? String(item.key_name) : "";
+    if (!keyName) continue;
+    variableMap.set(keyName.toLowerCase(), item.value == null ? "" : String(item.value));
+  }
 
   const SKIP_KEYS = new Set([
-    "var_vessel_name",
-    "var_vessel_type",
     "vessel_photo",
     "vessel_photo_preview",
     "vessel_photo_for_template",
@@ -448,13 +450,15 @@ function applyMarineVesselVariables(formData) {
     "updated_by",
     "created_at",
     "updated_at",
+    "report_variables",
   ]);
 
   const replaceTokens = (text) =>
-    String(text)
-      // Case-insensitive: fields like name_of_the_vessel auto-uppercase to @VESSELNAME
-      .replace(/@vesselName/gi, vesselName)
-      .replace(/@vesselType/gi, vesselType);
+    String(text).replace(/@([A-Za-z0-9]+)/g, (match, rawKey) => {
+      const key = String(rawKey || "").toLowerCase();
+      if (!variableMap.has(key)) return match;
+      return variableMap.get(key);
+    });
 
   const walk = (value, parentIsImageFlexibleField = false) => {
     if (typeof value === "string") {
@@ -496,6 +500,52 @@ function applyMarineVesselVariables(formData) {
   };
 
   return walk(formData, false);
+}
+
+function parseReportVariableValuesPayload(rawValue) {
+  if (!rawValue) return [];
+  let parsed = rawValue;
+  if (typeof rawValue === "string") {
+    try {
+      parsed = JSON.parse(rawValue);
+    } catch (_) {
+      return [];
+    }
+  }
+  if (!Array.isArray(parsed)) return [];
+
+  return parsed
+    .filter((item) => item && typeof item === "object")
+    .map((item) => ({
+      variable_id:
+        item.variable_id != null && !Number.isNaN(Number(item.variable_id))
+          ? Number(item.variable_id)
+          : null,
+      key_name: item.key_name ? String(item.key_name) : null,
+      value: item.value == null ? "" : String(item.value),
+    }))
+    .filter((item) => item.variable_id != null || item.key_name);
+}
+
+async function attachReportVariables(reportType, report) {
+  if (!report || !report.id) return report;
+
+  const definitions = await ReportVariable.getActiveDefinitionsByReportType(
+    reportType
+  );
+  const values = await ReportVariable.getValuesByReportRecordId(report.id);
+  const valueByVariableId = new Map(
+    values.map((v) => [Number(v.variable_id), v.value == null ? "" : String(v.value)])
+  );
+
+  return {
+    ...report,
+    report_variables: definitions.map((def) => ({
+      variable_id: def.id,
+      key_name: def.key_name,
+      value: valueByVariableId.get(Number(def.id)) || "",
+    })),
+  };
 }
 
 function saveChassisImage(
@@ -814,6 +864,9 @@ exports.generateReport = async (req, res, next) => {
 
     // Get form data from request body
     const formData = req.body;
+    let reportVariableValues = parseReportVariableValuesPayload(
+      formData.report_variables
+    );
 
     // Always use live order bank initial so PDF matches frontend Ref NO. display
     if (order.bank_initial != null && String(order.bank_initial).trim() !== "") {
@@ -911,6 +964,22 @@ exports.generateReport = async (req, res, next) => {
         delete formData.chassis_no_pencil_impression;
       }
     }
+
+    if (
+      reportVariableValues.length === 0 &&
+      requestedReportType.toLowerCase() === "report_marine" &&
+      existingReport?.id
+    ) {
+      const existingValues = await ReportVariable.getValuesByReportRecordId(
+        existingReport.id
+      );
+      reportVariableValues = existingValues.map((item) => ({
+        variable_id: item.variable_id,
+        key_name: item.key_name,
+        value: item.value == null ? "" : String(item.value),
+      }));
+    }
+    formData.report_variables = reportVariableValues;
 
     // Handle vessel_photo for marine reports
     if (requestedReportType.toLowerCase() === "report_marine") {
@@ -1056,6 +1125,7 @@ exports.generateReport = async (req, res, next) => {
     const {
       flexible_fields,
       report_type,
+      report_variables,
       tyre_image_base64,
       new_asset_make,
       vessel_photo_preview,
@@ -1136,6 +1206,15 @@ exports.generateReport = async (req, res, next) => {
     } else {
       // Create new report (no existing data)
       report = await ReportModel.createReport(reportData);
+    }
+
+    if (requestedReportType.toLowerCase() === "report_marine") {
+      await ReportVariable.upsertValuesForReportRecord({
+        reportType: requestedReportType.toLowerCase(),
+        reportRecordId: report.id,
+        values: reportVariableValues,
+        userId,
+      });
     }
 
     // Save flexible fields if any
@@ -3276,6 +3355,9 @@ exports.getReportByOrderAndType = async (req, res, next) => {
       }
     }
 
+    // Attach reusable report variables (definitions + values) for frontend.
+    report = await attachReportVariables(report_type.toLowerCase(), report);
+
     // Return the report data
     res.status(200).json({
       success: true,
@@ -3547,6 +3629,9 @@ exports.getReportByChildCategoryAndType = async (req, res, next) => {
       }
     }
 
+    // Attach reusable report variables (definitions + values) for frontend.
+    report = await attachReportVariables(report_type.toLowerCase(), report);
+
     // Return the report data
     res.status(200).json({
       success: true,
@@ -3590,6 +3675,9 @@ exports.saveReportData = async (req, res, next) => {
 
     // Get form data from request body
     const formData = req.body;
+    let reportVariableValues = parseReportVariableValuesPayload(
+      formData.report_variables
+    );
 
     // Always use live order bank initial so saved data matches frontend Ref NO. display
     if (order.bank_initial != null && String(order.bank_initial).trim() !== "") {
@@ -3602,6 +3690,21 @@ exports.saveReportData = async (req, res, next) => {
     const orderNumber = order.order_number;
 
     const flexibleFields = extractFlexibleFieldsFromFormData(formData);
+
+    if (
+      reportVariableValues.length === 0 &&
+      requestedReportType.toLowerCase() === "report_marine" &&
+      existingReport?.id
+    ) {
+      const existingValues = await ReportVariable.getValuesByReportRecordId(
+        existingReport.id
+      );
+      reportVariableValues = existingValues.map((item) => ({
+        variable_id: item.variable_id,
+        key_name: item.key_name,
+        value: item.value == null ? "" : String(item.value),
+      }));
+    }
 
     let chassisImageRelativePath = null;
     const previousChassisSource =
@@ -3766,6 +3869,15 @@ exports.saveReportData = async (req, res, next) => {
     } else {
       // Create new report
       report = await ReportModel.createReport(reportData);
+    }
+
+    if (requestedReportType.toLowerCase() === "report_marine") {
+      await ReportVariable.upsertValuesForReportRecord({
+        reportType: requestedReportType.toLowerCase(),
+        reportRecordId: report.id,
+        values: reportVariableValues,
+        userId,
+      });
     }
 
     // Save flexible fields if any
@@ -4884,9 +4996,6 @@ function filterValidReportFields(formData, reportType) {
       "date_place_of_last_sire_inspection",
       "valuer_special_remarks",
       "disclaimer",
-      // Reusable @vesselName / @vesselType source values (tokens stay in other fields)
-      "var_vessel_name",
-      "var_vessel_type",
     ],
   };
 

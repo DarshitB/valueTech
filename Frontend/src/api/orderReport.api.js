@@ -99,3 +99,16 @@ export const releaseReportEditLock = (
     keepalive: true,
   });
 };
+
+// Generic report variables
+export const getReportVariables = (reportType) =>
+  axios.get(`${ENDPOINT}/variables/${reportType}`);
+
+export const createReportVariable = ({ reportType, keyName }) =>
+  axios.post(`${ENDPOINT}/variables`, {
+    report_type: reportType,
+    key_name: keyName,
+  });
+
+export const deleteReportVariable = (id) =>
+  axios.delete(`${ENDPOINT}/variables/${id}`);

@@ -22,10 +22,14 @@ import {
   acquireReportEditLock,
   heartbeatReportEditLock,
   releaseReportEditLock,
+  getReportVariables,
+  createReportVariable,
+  deleteReportVariable,
 } from "../../../api/orderReport.api";
 import { usePageTitle } from "../../../context/PageTitleContext";
 import { resolveAssetUrl } from "../../../utils/urlUtils";
 import SingleSearchSelect from "../../../components/SingleSearchSelect";
+import FormModel from "../../../components/FormModel";
 import { toast } from "react-toastify";
 import { selectPermissions } from "../../../redux/selectors/authSelectors";
 import { hasPermission } from "../../../utils/permissionUtils";
@@ -67,17 +71,15 @@ const appendMissingMarineFormFields = (formData, formState) => {
   });
 };
 
-/** Uppercase text but keep @vesselName / @vesselType tokens in canonical casing. */
+/** Uppercase text but keep @variable tokens in original casing. */
 const uppercasePreservingMarineTokens = (value) => {
   if (value == null || value === "") return value;
   const tokens = [];
   const protectedText = String(value).replace(
-    /@vesselName|@vesselType/gi,
+    /@[A-Za-z0-9]+/g,
     (match) => {
-      const canonical =
-        match.toLowerCase() === "@vesselname" ? "@vesselName" : "@vesselType";
       const idx = tokens.length;
-      tokens.push(canonical);
+      tokens.push(match);
       return `\u0000MARINE_VAR_${idx}\u0000`;
     }
   );
@@ -368,9 +370,6 @@ function MarineReport() {
     proposed_owner_address: "",
     certifications_vessel_note: "",
     disclaimer: "",
-    // Reusable template variables — type @vesselName / @vesselType in other fields
-    var_vessel_name: "",
-    var_vessel_type: "",
   });
 
   // Set initial disclaimer on mount
@@ -389,6 +388,9 @@ function MarineReport() {
 
   // State for flexible fields
   const [flexibleFields, setFlexibleFields] = useState([]);
+  const [reportVariables, setReportVariables] = useState([]);
+  const [isVariableModalOpen, setIsVariableModalOpen] = useState(false);
+  const [newVariableName, setNewVariableName] = useState("");
 
   // State to track when initial report fetch completes (for robust snapshot timing)
   const [reportFetchCompleted, setReportFetchCompleted] = useState(false);
@@ -410,6 +412,93 @@ function MarineReport() {
   const initialFlexibleFieldsRef = useRef(null);
   // Ref to store the last intercepted navigation target
   const pendingNavRef = useRef(null);
+
+  const mentionVariableOptions = useMemo(
+    () =>
+      reportVariables.map((item) => ({
+        token: `@${item.key_name}`,
+        label: item.key_name,
+        value: item.value || "",
+      })),
+    [reportVariables]
+  );
+
+  const fetchMarineVariables = useCallback(async () => {
+    try {
+      const res = await getReportVariables(MARINE_REPORT_TYPE);
+      const definitions = Array.isArray(res?.data?.data) ? res.data.data : [];
+      setReportVariables((prev) => {
+        const previousByKey = new Map(
+          (prev || []).map((item) => [item.key_name, item.value || ""])
+        );
+        return definitions.map((def) => ({
+          variable_id: def.id,
+          key_name: def.key_name,
+          value: previousByKey.get(def.key_name) || "",
+        }));
+      });
+    } catch (error) {
+      toast.error("Failed to load report variables");
+    }
+  }, []);
+
+  const handleVariableValueChange = useCallback((variableId, value) => {
+    setReportVariables((prev) =>
+      prev.map((item) =>
+        Number(item.variable_id) === Number(variableId)
+          ? { ...item, value }
+          : item
+      )
+    );
+    if (initialFormDataRef.current !== null) isDirtyRef.current = true;
+  }, []);
+
+  const handleCreateVariable = useCallback(async () => {
+    const keyName = String(newVariableName || "").trim();
+    if (!keyName) {
+      toast.error("Variable name is required");
+      return;
+    }
+    if (!/^[A-Za-z0-9]+$/.test(keyName)) {
+      toast.error(
+        "Variable name can contain only letters and numbers (no spaces/special characters)"
+      );
+      return;
+    }
+    try {
+      await createReportVariable({
+        reportType: MARINE_REPORT_TYPE,
+        keyName,
+      });
+      setNewVariableName("");
+      setIsVariableModalOpen(false);
+      await fetchMarineVariables();
+      toast.success("Variable created");
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.message || "Failed to create variable"
+      );
+    }
+  }, [newVariableName, fetchMarineVariables]);
+
+  const handleDeleteVariable = useCallback(
+    async (variableId) => {
+      try {
+        await deleteReportVariable(variableId);
+        setReportVariables((prev) =>
+          prev.filter(
+            (item) => Number(item.variable_id) !== Number(variableId)
+          )
+        );
+        toast.success("Variable deleted");
+      } catch (error) {
+        toast.error(
+          error?.response?.data?.message || "Failed to delete variable"
+        );
+      }
+    },
+    []
+  );
 
   // Function to generate disclaimer based on execute_above value
   const generateDisclaimer = useCallback((executeAbove, formData) => {
@@ -544,8 +633,6 @@ function MarineReport() {
       proposed_owner: "",
       proposed_owner_address: "",
       disclaimer: "",
-      var_vessel_name: "",
-      var_vessel_type: "",
     };
 
     // Generate initial disclaimer based on default execute_above value
@@ -565,6 +652,10 @@ function MarineReport() {
     // Clear the cleared fields tracking when form resets
     clearedFieldsRef.current.clear();
   }, [id, getCurrentDate, generateDisclaimer]);
+
+  useEffect(() => {
+    fetchMarineVariables();
+  }, [fetchMarineVariables]);
 
   // Auto-populate form data when order data is available
   useEffect(() => {
@@ -756,6 +847,22 @@ function MarineReport() {
         return normalized;
       });
       setFlexibleFields(processedFields);
+    }
+
+    if (Array.isArray(report.report_variables)) {
+      setReportVariables((prev) => {
+        const previousByKey = new Map(
+          (prev || []).map((item) => [item.key_name, item.value || ""])
+        );
+        return report.report_variables.map((item) => ({
+          variable_id: item.variable_id,
+          key_name: item.key_name,
+          value:
+            item.value != null
+              ? String(item.value)
+              : previousByKey.get(item.key_name) || "",
+        }));
+      });
     }
   }, [currentReport, id]);
 
@@ -2004,6 +2111,16 @@ function MarineReport() {
     // Ensure disclaimer is always included in payload (even if null/empty/undefined)
     const disclaimerValue = reportFormData.disclaimer ?? "";
     formData.set("disclaimer", disclaimerValue);
+    formData.set(
+      "report_variables",
+      JSON.stringify(
+        reportVariables.map((item) => ({
+          variable_id: item.variable_id,
+          key_name: item.key_name,
+          value: item.value || "",
+        }))
+      )
+    );
 
     // Add flexible fields to FormData with proper sequential ordering
     let formDataIndex = 0;
@@ -2213,6 +2330,16 @@ function MarineReport() {
     // Ensure disclaimer is always included in payload (even if null/empty/undefined)
     const disclaimerValue = reportFormData.disclaimer ?? "";
     formData.set("disclaimer", disclaimerValue);
+    formData.set(
+      "report_variables",
+      JSON.stringify(
+        reportVariables.map((item) => ({
+          variable_id: item.variable_id,
+          key_name: item.key_name,
+          value: item.value || "",
+        }))
+      )
+    );
 
     // Add flexible fields to FormData with proper sequential ordering (same format as generate API)
     let formDataIndex = 0;
@@ -2340,7 +2467,7 @@ function MarineReport() {
     });
 
     return formData;
-  }, [reportFormData, flexibleFields]);
+  }, [reportFormData, flexibleFields, reportVariables, order?.bank_initial]);
 
   // Handle save report data
   const handleSaveReport = useCallback(() => {
@@ -2597,10 +2724,8 @@ function MarineReport() {
             >
               <MarineVariableMentionBridge
                 containerRef={marineFormRef}
-                variableValues={{
-                  vesselName: reportFormData.var_vessel_name || "",
-                  vesselType: reportFormData.var_vessel_type || "",
-                }}
+                variableOptions={mentionVariableOptions}
+                excludedInputNames={["new_variable_name", "report_variable_value"]}
               />
               {/* Loading Overlay - Shows when fetching order or report data */}
               {isLoadingData && (
@@ -2656,63 +2781,80 @@ function MarineReport() {
                   >
                     <div
                       style={{
-                        fontWeight: 600,
-                        marginBottom: "8px",
-                        color: "#333",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "12px",
+                        marginBottom: "10px",
                       }}
                     >
-                      Report variables
+                      <div style={{ fontWeight: 600, color: "#333" }}>
+                        Report variables
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => setIsVariableModalOpen(true)}
+                      >
+                        Add Variable
+                      </button>
                     </div>
-                    {/* <div
-                      style={{
-                        fontSize: "13px",
-                        color: "#555",
-                        marginBottom: "12px",
-                      }}
+                    <div
+                      style={{ fontSize: "13px", color: "#555", marginBottom: "12px" }}
                     >
-                      Set values once. Type{" "}
-                      <code>@vesselName</code> or <code>@vesselType</code> in
-                      any other field — the form keeps the @ token; the
-                      generated PDF shows the value.
-                    </div> */}
-                    <div className="row">
-                      <div className="col-md-6">
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                          <label>
-                            Vessel Name variable{" "}
-                            <span style={{ color: "#666", fontWeight: 400 }}>
-                              (@vesselName)
-                            </span>
-                          </label>
-                          <input
-                            type="text"
-                            className="form-field"
-                            name="var_vessel_name"
-                            value={reportFormData.var_vessel_name || ""}
-                            onChange={handleFormChange}
-                            placeholder="Value used wherever @vesselName appears"
-                          />
-                        </div>
-                      </div>
-                      <div className="col-md-6">
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                          <label>
-                            Vessel Type variable{" "}
-                            <span style={{ color: "#666", fontWeight: 400 }}>
-                              (@vesselType)
-                            </span>
-                          </label>
-                          <input
-                            type="text"
-                            className="form-field"
-                            name="var_vessel_type"
-                            value={reportFormData.var_vessel_type || ""}
-                            onChange={handleFormChange}
-                            placeholder="Value used wherever @vesselType appears"
-                          />
-                        </div>
-                      </div>
+                      Type <code>@</code> in any text field to insert a variable.
                     </div>
+                    {reportVariables.length === 0 ? (
+                      <div style={{ color: "#777", fontSize: "13px" }}>
+                        No variables yet. Click Add Variable.
+                      </div>
+                    ) : (
+                      <div className="row">
+                        {reportVariables.map((item) => (
+                          <div className="col-md-6" key={item.variable_id}>
+                            <div
+                              className="form-group"
+                              style={{
+                                marginBottom: "10px",
+                                border: "1px dashed #ccc",
+                                padding: "10px",
+                                borderRadius: "5px",
+                                position: "relative",
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDeleteVariable(item.variable_id)
+                                }
+                                className="flexible-field-remove-button"
+                                title="Remove variable"
+                              >
+                                <DeleteIcon />
+                              </button>
+                              <label>
+                                <span style={{ color: "#666", fontWeight: 400 }}>
+                                  @{item.key_name}
+                                </span>
+                              </label>
+                              <input
+                                type="text"
+                                className="form-field"
+                                name="report_variable_value"
+                                value={item.value || ""}
+                                onChange={(e) =>
+                                  handleVariableValueChange(
+                                    item.variable_id,
+                                    e.target.value
+                                  )
+                                }
+                                placeholder={`Value for @${item.key_name}`}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="col-md-6">
@@ -11579,6 +11721,60 @@ function MarineReport() {
       >
         {saving ? "Saving..." : "Save"}
       </button>
+
+      {isVariableModalOpen && (
+        <FormModel>
+          {{
+            title: "Add Variable",
+            body: (
+              <form
+                className="body-form-box"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleCreateVariable();
+                }}
+              >
+                <div className="body-form-box">
+                  <div className="form-group">
+                    <label htmlFor="new_variable_name">
+                      Variable name (letters and numbers only)
+                    </label>
+                    <input
+                      type="text"
+                      className="form-field"
+                      id="new_variable_name"
+                      name="new_variable_name"
+                      value={newVariableName}
+                      onChange={(e) => {
+                        // Block spaces/special chars while typing — letters & numbers only
+                        const cleaned = String(e.target.value || "").replace(
+                          /[^A-Za-z0-9]/g,
+                          ""
+                        );
+                        setNewVariableName(cleaned);
+                      }}
+                      placeholder="Example: vesselName"
+                      required
+                    />
+                  </div>
+                  <div style={{ marginTop: "-8px", marginBottom: "12px", fontSize: 12, color: "#666" }}>
+                    Do not type @ here. It will be used as @name in report fields.
+                  </div>
+                  <div className="form-buttons">
+                    <button className="submit-button" type="submit">
+                      Add Variable
+                    </button>
+                  </div>
+                </div>
+              </form>
+            ),
+            onClose: () => {
+              setIsVariableModalOpen(false);
+              setNewVariableName("");
+            },
+          }}
+        </FormModel>
+      )}
 
       {/* Image Selection Modals - One per field */}
       {Object.entries(imageModalOpen)

@@ -7,6 +7,7 @@ const upload = multer();
 
 const reportController = require("../../controllers/orders/reports/reportController");
 const reportEditLockController = require("../../controllers/orders/reports/reportEditLockController");
+const reportVariableController = require("../../controllers/orders/reports/reportVariableController");
 const auth = require("../../middleware/auth"); // Middleware to check authentication
 const checkPermission = require("../../middleware/permission"); // Middleware to check user permissions
 const activityLogger = require("../../middleware/activityLogger"); // Middleware to log user activity
@@ -36,6 +37,25 @@ router.post(
 router.delete(
   "/:order_id/lock",
   reportEditLockController.releaseReportEditLock
+);
+
+/**
+ * Generic report variable definitions (by report type).
+ * Used by Marine now, reusable for other report types later.
+ */
+router.get(
+  "/variables/:report_type",
+  reportVariableController.getVariableDefinitions
+);
+
+router.post(
+  "/variables",
+  reportVariableController.createVariableDefinition
+);
+
+router.delete(
+  "/variables/:id",
+  reportVariableController.deleteVariableDefinition
 );
 
 /**
