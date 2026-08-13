@@ -104,11 +104,28 @@ export const releaseReportEditLock = (
 export const getReportVariables = (reportType) =>
   axios.get(`${ENDPOINT}/variables/${reportType}`);
 
-export const createReportVariable = ({ reportType, keyName }) =>
+export const createReportVariable = ({ reportType, keyName, orderId }) =>
   axios.post(`${ENDPOINT}/variables`, {
     report_type: reportType,
     key_name: keyName,
+    ...(orderId != null ? { order_id: orderId } : {}),
   });
 
-export const deleteReportVariable = (id) =>
-  axios.delete(`${ENDPOINT}/variables/${id}`);
+export const reactivateReportVariable = ({
+  reportType,
+  keyName,
+  variableId,
+  orderId,
+}) =>
+  axios.post(`${ENDPOINT}/variables/reactivate`, {
+    report_type: reportType,
+    key_name: keyName,
+    ...(variableId != null ? { variable_id: variableId } : {}),
+    ...(orderId != null ? { order_id: orderId } : {}),
+  });
+
+export const deleteReportVariable = (id, { orderId } = {}) =>
+  axios.delete(`${ENDPOINT}/variables/${id}`, {
+    params: orderId != null ? { order_id: orderId } : undefined,
+    data: orderId != null ? { order_id: orderId } : undefined,
+  });

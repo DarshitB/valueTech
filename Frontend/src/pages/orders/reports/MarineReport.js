@@ -22,8 +22,10 @@ import {
   acquireReportEditLock,
   heartbeatReportEditLock,
   releaseReportEditLock,
+  getOrderReport,
   getReportVariables,
   createReportVariable,
+  reactivateReportVariable,
   deleteReportVariable,
 } from "../../../api/orderReport.api";
 import { usePageTitle } from "../../../context/PageTitleContext";
@@ -238,6 +240,10 @@ function MarineReport() {
   const isLoadingData = orderLoading || reportLoading;
   const allowedPermissions = useSelector(selectPermissions);
   const canEditRefNoId = hasPermission(allowedPermissions, "edit_report_ref_no_id");
+  const canDeleteReportVariable = hasPermission(
+    allowedPermissions,
+    "delete_report_variable"
+  );
 
   // Marine-only: one editor at a time
   const [hasEditLock, setHasEditLock] = useState(false);
@@ -391,6 +397,8 @@ function MarineReport() {
   const [reportVariables, setReportVariables] = useState([]);
   const [isVariableModalOpen, setIsVariableModalOpen] = useState(false);
   const [newVariableName, setNewVariableName] = useState("");
+  // Only shown when create hits a soft-deleted name; cleared on any name edit.
+  const [reactivatableVariable, setReactivatableVariable] = useState(null);
 
   // State to track when initial report fetch completes (for robust snapshot timing)
   const [reportFetchCompleted, setReportFetchCompleted] = useState(false);
@@ -427,20 +435,64 @@ function MarineReport() {
     try {
       const res = await getReportVariables(MARINE_REPORT_TYPE);
       const definitions = Array.isArray(res?.data?.data) ? res.data.data : [];
+
+      // Load saved values for this order/report so reactivated variables
+      // fill immediately (delete clears local state, values remain in DB).
+      const valueById = new Map();
+      const valueByKey = new Map();
+      if (id) {
+        try {
+          const reportRes = await getOrderReport(id, MARINE_REPORT_TYPE);
+          const reportVars = reportRes?.data?.data?.report?.report_variables;
+          if (Array.isArray(reportVars)) {
+            reportVars.forEach((item) => {
+              const value = item?.value == null ? "" : String(item.value);
+              if (item?.variable_id != null) {
+                valueById.set(Number(item.variable_id), value);
+              }
+              if (item?.key_name != null) {
+                valueByKey.set(String(item.key_name), value);
+              }
+            });
+          }
+        } catch (_) {
+          // Report may not exist yet — definitions-only is fine.
+        }
+      }
+
       setReportVariables((prev) => {
         const previousByKey = new Map(
           (prev || []).map((item) => [item.key_name, item.value || ""])
         );
-        return definitions.map((def) => ({
-          variable_id: def.id,
-          key_name: def.key_name,
-          value: previousByKey.get(def.key_name) || "",
-        }));
+        return definitions.map((def) => {
+          const keyName = def.key_name;
+          // Keep in-progress edits for variables still on screen.
+          // For reactivated/new keys missing from local state, use DB value.
+          if (previousByKey.has(keyName)) {
+            return {
+              variable_id: def.id,
+              key_name: keyName,
+              value: previousByKey.get(keyName) || "",
+            };
+          }
+          const fromDb =
+            (valueById.has(Number(def.id))
+              ? valueById.get(Number(def.id))
+              : null) ??
+            (valueByKey.has(String(keyName))
+              ? valueByKey.get(String(keyName))
+              : "");
+          return {
+            variable_id: def.id,
+            key_name: keyName,
+            value: fromDb || "",
+          };
+        });
       });
     } catch (error) {
       toast.error("Failed to load report variables");
     }
-  }, []);
+  }, [id]);
 
   const handleVariableValueChange = useCallback((variableId, value) => {
     setReportVariables((prev) =>
@@ -466,25 +518,81 @@ function MarineReport() {
       return;
     }
     try {
+      setReactivatableVariable(null);
       await createReportVariable({
         reportType: MARINE_REPORT_TYPE,
         keyName,
+        orderId: id,
       });
       setNewVariableName("");
+      setReactivatableVariable(null);
       setIsVariableModalOpen(false);
       await fetchMarineVariables();
       toast.success("Variable created");
     } catch (error) {
+      const responseData = error?.response?.data;
+      if (
+        error?.response?.status === 409 &&
+        responseData?.code === "VARIABLE_SOFT_DELETED"
+      ) {
+        setReactivatableVariable({
+          variable_id: responseData?.data?.variable_id,
+          key_name: responseData?.data?.key_name || keyName,
+        });
+        toast.error(
+          responseData?.message ||
+            "Variable already exists for this report type"
+        );
+        return;
+      }
+      setReactivatableVariable(null);
+      toast.error(responseData?.message || "Failed to create variable");
+    }
+  }, [newVariableName, fetchMarineVariables, id]);
+
+  const handleReactivateVariable = useCallback(async () => {
+    const keyName = String(
+      reactivatableVariable?.key_name || newVariableName || ""
+    ).trim();
+    if (!keyName) {
+      toast.error("Variable name is required");
+      return;
+    }
+    if (
+      !reactivatableVariable ||
+      String(newVariableName || "").trim() !== String(keyName)
+    ) {
+      setReactivatableVariable(null);
+      return;
+    }
+    try {
+      await reactivateReportVariable({
+        reportType: MARINE_REPORT_TYPE,
+        keyName,
+        variableId: reactivatableVariable.variable_id,
+        orderId: id,
+      });
+      setNewVariableName("");
+      setReactivatableVariable(null);
+      setIsVariableModalOpen(false);
+      await fetchMarineVariables();
+      toast.success("Variable activated");
+    } catch (error) {
       toast.error(
-        error?.response?.data?.message || "Failed to create variable"
+        error?.response?.data?.message || "Failed to activate variable"
       );
     }
-  }, [newVariableName, fetchMarineVariables]);
+  }, [
+    reactivatableVariable,
+    newVariableName,
+    fetchMarineVariables,
+    id,
+  ]);
 
   const handleDeleteVariable = useCallback(
     async (variableId) => {
       try {
-        await deleteReportVariable(variableId);
+        await deleteReportVariable(variableId, { orderId: id });
         setReportVariables((prev) =>
           prev.filter(
             (item) => Number(item.variable_id) !== Number(variableId)
@@ -497,7 +605,7 @@ function MarineReport() {
         );
       }
     },
-    []
+    [id]
   );
 
   // Function to generate disclaimer based on execute_above value
@@ -2794,7 +2902,11 @@ function MarineReport() {
                       <button
                         type="button"
                         className="btn btn-primary"
-                        onClick={() => setIsVariableModalOpen(true)}
+                        onClick={() => {
+                          setReactivatableVariable(null);
+                          setNewVariableName("");
+                          setIsVariableModalOpen(true);
+                        }}
                       >
                         Add Variable
                       </button>
@@ -2822,16 +2934,18 @@ function MarineReport() {
                                 position: "relative",
                               }}
                             >
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleDeleteVariable(item.variable_id)
-                                }
-                                className="flexible-field-remove-button"
-                                title="Remove variable"
-                              >
-                                <DeleteIcon />
-                              </button>
+                              {canDeleteReportVariable && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleDeleteVariable(item.variable_id)
+                                  }
+                                  className="flexible-field-remove-button"
+                                  title="Remove variable"
+                                >
+                                  <DeleteIcon />
+                                </button>
+                              )}
                               <label>
                                 <span style={{ color: "#666", fontWeight: 400 }}>
                                   @{item.key_name}
@@ -11752,6 +11866,8 @@ function MarineReport() {
                           ""
                         );
                         setNewVariableName(cleaned);
+                        // Hide activate CTA as soon as the name changes
+                        setReactivatableVariable(null);
                       }}
                       placeholder="Example: vesselName"
                       required
@@ -11764,6 +11880,21 @@ function MarineReport() {
                     <button className="submit-button" type="submit">
                       Add Variable
                     </button>
+                    {reactivatableVariable &&
+                      String(newVariableName || "").trim() ===
+                        String(reactivatableVariable.key_name || "") && (
+                        <button
+                          className="submit-button"
+                          type="button"
+                          onClick={handleReactivateVariable}
+                          style={{
+                            marginTop: 8,
+                            backgroundColor: "#0d6efd",
+                          }}
+                        >
+                          Activate removed variable
+                        </button>
+                      )}
                   </div>
                 </div>
               </form>
@@ -11771,6 +11902,7 @@ function MarineReport() {
             onClose: () => {
               setIsVariableModalOpen(false);
               setNewVariableName("");
+              setReactivatableVariable(null);
             },
           }}
         </FormModel>

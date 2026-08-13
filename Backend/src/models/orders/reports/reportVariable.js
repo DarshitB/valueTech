@@ -24,6 +24,36 @@ const reportVariable = {
     return row;
   },
 
+  findById: async (id) => {
+    return db("report_variable_master")
+      .select(
+        "id",
+        "report_type",
+        "key_name",
+        "is_active",
+        "deleted_at",
+        "created_at",
+        "updated_at"
+      )
+      .where({ id })
+      .first();
+  },
+
+  findByReportTypeAndKeyName: async (reportType, keyName) => {
+    return db("report_variable_master")
+      .select(
+        "id",
+        "report_type",
+        "key_name",
+        "is_active",
+        "deleted_at",
+        "created_at",
+        "updated_at"
+      )
+      .where({ report_type: reportType, key_name: keyName })
+      .first();
+  },
+
   softDeleteDefinition: async ({ id, userId }) => {
     const [row] = await db("report_variable_master")
       .where({ id })
@@ -32,6 +62,23 @@ const reportVariable = {
         is_active: false,
         deleted_by: userId || null,
         deleted_at: new Date(),
+        updated_by: userId || null,
+        updated_at: new Date(),
+      })
+      .returning("*");
+    return row || null;
+  },
+
+  reactivateDefinition: async ({ id, userId }) => {
+    const [row] = await db("report_variable_master")
+      .where({ id })
+      .where((builder) => {
+        builder.whereNotNull("deleted_at").orWhere({ is_active: false });
+      })
+      .update({
+        is_active: true,
+        deleted_by: null,
+        deleted_at: null,
         updated_by: userId || null,
         updated_at: new Date(),
       })

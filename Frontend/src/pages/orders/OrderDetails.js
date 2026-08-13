@@ -190,7 +190,9 @@ function OrderDetails() {
   } = orderMediaDocumentsState;
   const { list: officers } = useSelector((state) => state.officers);
   // Get CV report data from Redux store
-  const { currentReport } = useSelector((state) => state.orderReports);
+  const { currentReport, loading: orderReportLoading } = useSelector(
+    (state) => state.orderReports
+  );
 
   // Set page title using custom hook
   const { setTitle } = usePageTitle(); // set page title
@@ -209,6 +211,9 @@ function OrderDetails() {
   const [showMailModal, setShowMailModal] = useState(false);
   const [isSendingMail, setIsSendingMail] = useState(false);
   const [mailLastMailLoading, setMailLastMailLoading] = useState(false);
+  // True only after the mail-modal report refetch finishes (avoids stale @variables).
+  const [mailReportReadyForSubject, setMailReportReadyForSubject] =
+    useState(false);
   const [showCompleteConfirmation, setShowCompleteConfirmation] =
     useState(false);
   const [showAuthenticateConfirmation, setShowAuthenticateConfirmation] =
@@ -379,52 +384,70 @@ function OrderDetails() {
 
   // Fetch approved documents and media when mail modal is opened
   useEffect(() => {
-    if (showMailModal && id) {
-      dispatch(fetchApprovedOrderMediaDocuments(id));
-      dispatch(fetchOrderMedia(id)); // Fetch media like OrderImages does
-      // Prevent stale report data from another category/order
-      dispatch(clearCurrentReport());
-
-      // Fetch report data for subject prefill based on category/report type
-      let reportType = "";
-      if (
-        order?.category_name === "COMMERCIAL VEHICLE" ||
-        order?.category_report_type === "report_cv"
-      ) {
-        reportType = "report_cv";
-      } else if (
-        order?.category_name === "CONSTRUCTION EQUIPMENT" ||
-        order?.category_name === "CONSTRUCTION EQUIPMENTS" ||
-        order?.category_report_type === "report_ce"
-      ) {
-        reportType = "report_ce";
-      } else if (
-        order?.category_name === "MACHINERY" ||
-        order?.category_report_type === "report_machinery" ||
-        order?.category_report_type === "report_summarized"
-      ) {
-        reportType =
-          order?.category_report_type === "report_summarized"
-            ? "report_summarized"
-            : "report_machinery";
-      } else if (
-        order?.category_name === "MARINE" ||
-        order?.category_report_type === "report_marine"
-      ) {
-        reportType = "report_marine";
-      } else if (
-        (order?.category_name && order.category_name.toUpperCase().includes("AVR")) ||
-        order?.category_report_type === "report_avr"
-      ) {
-        reportType = "report_avr";
-      }
-
-      if (reportType) {
-        dispatch(
-          fetchOrderReport({ orderId: id, reportType, silent: true })
-        );
-      }
+    if (!showMailModal || !id) {
+      setMailReportReadyForSubject(false);
+      return undefined;
     }
+
+    let cancelled = false;
+    dispatch(fetchApprovedOrderMediaDocuments(id));
+    dispatch(fetchOrderMedia(id)); // Fetch media like OrderImages does
+    // Drop any subject built from stale Redux report (e.g. save response
+    // without report_variables) so fresh fetch can rebuild it.
+    setMailFormData((prev) => ({
+      ...prev,
+      subject: "",
+    }));
+    setMailReportReadyForSubject(false);
+    // Prevent stale report data from another category/order
+    dispatch(clearCurrentReport());
+
+    // Fetch report data for subject prefill based on category/report type
+    let reportType = "";
+    if (
+      order?.category_name === "COMMERCIAL VEHICLE" ||
+      order?.category_report_type === "report_cv"
+    ) {
+      reportType = "report_cv";
+    } else if (
+      order?.category_name === "CONSTRUCTION EQUIPMENT" ||
+      order?.category_name === "CONSTRUCTION EQUIPMENTS" ||
+      order?.category_report_type === "report_ce"
+    ) {
+      reportType = "report_ce";
+    } else if (
+      order?.category_name === "MACHINERY" ||
+      order?.category_report_type === "report_machinery" ||
+      order?.category_report_type === "report_summarized"
+    ) {
+      reportType =
+        order?.category_report_type === "report_summarized"
+          ? "report_summarized"
+          : "report_machinery";
+    } else if (
+      order?.category_name === "MARINE" ||
+      order?.category_report_type === "report_marine"
+    ) {
+      reportType = "report_marine";
+    } else if (
+      (order?.category_name && order.category_name.toUpperCase().includes("AVR")) ||
+      order?.category_report_type === "report_avr"
+    ) {
+      reportType = "report_avr";
+    }
+
+    if (reportType) {
+      dispatch(fetchOrderReport({ orderId: id, reportType, silent: true }))
+        .finally(() => {
+          if (!cancelled) setMailReportReadyForSubject(true);
+        });
+    } else {
+      setMailReportReadyForSubject(true);
+    }
+
+    return () => {
+      cancelled = true;
+    };
   }, [dispatch, id, showMailModal, order?.category_name, order?.category_report_type]);
 
   useEffect(() => {
@@ -483,6 +506,23 @@ function OrderDetails() {
       setMailLastMailLoading(false);
       return;
     }
+    // Subject is rebuilt from live report data for these categories
+    // (Marine variables especially). Do not let last-mail subject win.
+    const hasAutoMailSubject =
+      order?.category_name === "COMMERCIAL VEHICLE" ||
+      order?.category_report_type === "report_cv" ||
+      order?.category_name === "CONSTRUCTION EQUIPMENT" ||
+      order?.category_name === "CONSTRUCTION EQUIPMENTS" ||
+      order?.category_report_type === "report_ce" ||
+      order?.category_name === "MACHINERY" ||
+      order?.category_report_type === "report_machinery" ||
+      order?.category_report_type === "report_summarized" ||
+      order?.category_name === "MARINE" ||
+      order?.category_report_type === "report_marine" ||
+      (order?.category_name &&
+        order.category_name.toUpperCase().includes("AVR")) ||
+      order?.category_report_type === "report_avr";
+
     let cancelled = false;
     setMailLastMailLoading(true);
     getOrderLastMail(id)
@@ -494,7 +534,11 @@ function OrderDetails() {
             to: Array.isArray(row.to) ? row.to : [],
             cc: Array.isArray(row.cc) ? row.cc : [],
             bcc: Array.isArray(row.bcc) ? row.bcc : [],
-            subject: row.subject != null ? String(row.subject) : "",
+            subject: hasAutoMailSubject
+              ? prev.subject
+              : row.subject != null
+                ? String(row.subject)
+                : "",
             assetIdentificationNumber: "",
             comments: row.comments != null && String(row.comments).trim() !== ""
               ? String(row.comments)
@@ -535,7 +579,12 @@ function OrderDetails() {
     return () => {
       cancelled = true;
     };
-  }, [showMailModal, id]);
+  }, [
+    showMailModal,
+    id,
+    order?.category_name,
+    order?.category_report_type,
+  ]);
 
   // Fetch users for mentions with error handling
   useEffect(() => {
@@ -582,13 +631,40 @@ function OrderDetails() {
     return cleaned;
   }, []);
 
+  // Resolve @variable tokens using report_variables (Marine flexible variables)
+  const resolveReportVariableTokens = useCallback((text, reportVariables) => {
+    if (text == null || text === "") return "";
+    const source = String(text);
+    const valueByKey = new Map();
+    (Array.isArray(reportVariables) ? reportVariables : []).forEach((item) => {
+      if (!item?.key_name) return;
+      valueByKey.set(
+        String(item.key_name).toLowerCase(),
+        item.value == null ? "" : String(item.value)
+      );
+    });
+    if (valueByKey.size === 0) return source;
+    return source.replace(/@([A-Za-z0-9]+)/g, (match, key) => {
+      const normalized = String(key).toLowerCase();
+      return valueByKey.has(normalized) ? valueByKey.get(normalized) : match;
+    });
+  }, []);
+
   // Prefill email subject for COMMERCIAL VEHICLE / CONSTRUCTION EQUIPMENT orders
   useEffect(() => {
+    const isMarineMailSubject =
+      order?.category_name === "MARINE" ||
+      order?.category_report_type === "report_marine";
+
     if (
       showMailModal &&
+      mailReportReadyForSubject &&
+      !orderReportLoading &&
       currentReport?.order_id === Number(id) &&
       currentReport?.report &&
-      !mailFormData.subject // Only prefill if subject is empty
+      // Wait for empty subject, or always rebuild Marine so @variables resolve
+      // from the freshly fetched report_variables (not a stale save snapshot).
+      (!mailFormData.subject || isMarineMailSubject)
     ) {
       const report = currentReport.report;
       const subCategoryName = order.sub_category_name || "";
@@ -653,6 +729,79 @@ function OrderDetails() {
           lafId ? `LAF ID-${lafId}` : "",
         ].filter(Boolean);
         subject = parts.join("_");
+      } else if (
+        (order?.category_name &&
+          order.category_name.toUpperCase().includes("AVR")) ||
+        order?.category_report_type === "report_avr"
+      ) {
+        const customerName = order?.customer_name_2 || "";
+        const machineSerialNo = report.machine_serial_no || "";
+        const lanNo = report.lan_no || "";
+
+        // Build subject:
+        // AVR REPORT_(customer_name_2)_(Category)_SERIAL NO.(Machine Serial No)_LAN.(LAN No)
+        const parts = [
+          "AVR REPORT",
+          customerName,
+          categoryPart,
+          machineSerialNo ? `SERIAL NO.${machineSerialNo}` : "",
+          lanNo ? `LAN.${lanNo}` : "",
+        ].filter(Boolean);
+        subject = parts.join("_");
+      } else if (
+        order?.category_name === "MARINE" ||
+        order?.category_report_type === "report_marine"
+      ) {
+        const reportVariables = report.report_variables || [];
+        const customerName = resolveReportVariableTokens(
+          order?.customer_name_2 || "",
+          reportVariables
+        );
+        const vesselName = resolveReportVariableTokens(
+          report.name_of_the_vessel || "",
+          reportVariables
+        );
+        const imoOrRegdType = String(report.imo_or_regd_type || "")
+          .trim()
+          .toUpperCase();
+        const imoOrRegdNo = resolveReportVariableTokens(
+          report.imo_or_regd_no || "",
+          reportVariables
+        );
+        const mmsiNo = resolveReportVariableTokens(
+          report.mmsi_no || "",
+          reportVariables
+        );
+
+        // Based on imo_or_regd_type selector:
+        // IMO NO.  -> MMSI NUMBER - {mmsi_no} & IMO - {imo_or_regd_no}
+        // REGD. NO. -> REDG NO - {imo_or_regd_no} & MMSI NUMBER - {mmsi_no}
+        let identityPart = "";
+        if (imoOrRegdType === "IMO NO.") {
+          identityPart = [
+            mmsiNo ? `MMSI NUMBER - ${mmsiNo}` : "",
+            imoOrRegdNo ? `IMO - ${imoOrRegdNo}` : "",
+          ]
+            .filter(Boolean)
+            .join(" & ");
+        } else if (imoOrRegdType === "REGD. NO.") {
+          identityPart = [
+            imoOrRegdNo ? `REDG NO - ${imoOrRegdNo}` : "",
+            mmsiNo ? `MMSI NUMBER - ${mmsiNo}` : "",
+          ]
+            .filter(Boolean)
+            .join(" & ");
+        }
+
+        // Build subject:
+        // VALUATION REPORT FOR_(customer_name_2)_(name_of_the_vessel)_(identityPart)
+        const parts = [
+          "VALUATION REPORT FOR",
+          customerName,
+          vesselName,
+          identityPart,
+        ].filter(Boolean);
+        subject = parts.join("_");
       }
 
       if (subject) {
@@ -662,24 +811,31 @@ function OrderDetails() {
       if (
         subject &&
         subject !== "Valuation Report" &&
-        subject !== "VALUATION REPORT"
+        subject !== "VALUATION REPORT" &&
+        subject !== "VALUATION REPORT FOR"
       ) {
-        setMailFormData((prev) => ({
-          ...prev,
-          subject: subject,
-        }));
+        setMailFormData((prev) =>
+          prev.subject === subject ? prev : { ...prev, subject }
+        );
       }
     }
   }, [
     showMailModal,
+    mailReportReadyForSubject,
+    orderReportLoading,
+    id,
     order?.category_name,
     order?.category_report_type,
     order?.sub_category_name,
     order?.child_category_name,
     order?.bank_name,
+    order?.customer_name_2,
+    currentReport?.order_id,
     currentReport?.report,
+    currentReport?.report?.report_variables,
     mailFormData.subject,
     formatRegistrationNumber,
+    resolveReportVariableTokens,
   ]);
 
   // Prefill Customer Name and Asset Identification Number when report data is fetched

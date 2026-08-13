@@ -3920,8 +3920,14 @@ exports.saveReportData = async (req, res, next) => {
     }
 
     // Get the complete report data with flexible fields for response
-    const completeReport = await ReportModel.findByOrderIdWithFlexibleFields(
+    let completeReport = await ReportModel.findByOrderIdWithFlexibleFields(
       order_id
+    );
+    // Keep Redux/currentReport in sync with variable values after save
+    // (mail subject resolution depends on report_variables).
+    completeReport = await attachReportVariables(
+      requestedReportType.toLowerCase(),
+      completeReport
     );
 
     // Create status history entry for report details saved (just logging, not updating status)

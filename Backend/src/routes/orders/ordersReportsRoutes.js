@@ -53,8 +53,14 @@ router.post(
   reportVariableController.createVariableDefinition
 );
 
+router.post(
+  "/variables/reactivate",
+  reportVariableController.reactivateVariableDefinition
+);
+
 router.delete(
   "/variables/:id",
+  checkPermission("delete_report_variable"),
   reportVariableController.deleteVariableDefinition
 );
 
