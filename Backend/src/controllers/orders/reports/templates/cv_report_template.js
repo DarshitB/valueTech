@@ -140,7 +140,7 @@ function generateCVReportHTML(
         }
         
         body {
-            font-family: sans-serif;
+            font-family: Arial, sans-serif;
             padding: 0px;
             margin: 0px;
             box-sizing: border-box;

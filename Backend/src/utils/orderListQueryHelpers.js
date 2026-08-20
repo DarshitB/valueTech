@@ -256,6 +256,38 @@ function applyRequestFilters(queryBuilder, query = {}) {
   const dateTo = parseDateParam(query.date_to, true);
   if (dateFrom) queryBuilder.andWhere("orders.created_at", ">=", dateFrom);
   if (dateTo) queryBuilder.andWhere("orders.created_at", "<=", dateTo);
+
+  // Filter by any "Mail sent" activity in range (order can match multiple days
+  // if mail was sent on each of those days — not only last mail).
+  let mailSentFrom = parseDateParam(query.mail_sent_from, false);
+  let mailSentTo = parseDateParam(query.mail_sent_to, true);
+  if (mailSentFrom && !mailSentTo) {
+    mailSentTo = new Date(mailSentFrom);
+    mailSentTo.setHours(23, 59, 59, 999);
+  }
+  if (mailSentTo && !mailSentFrom) {
+    mailSentFrom = new Date(mailSentTo);
+    mailSentFrom.setHours(0, 0, 0, 0);
+  }
+  if (mailSentFrom || mailSentTo) {
+    queryBuilder.whereExists(function () {
+      this.select(db.raw("1"))
+        .from("order_status_history as osh_mail")
+        .whereRaw("osh_mail.order_id = orders.id")
+        .andWhere(function () {
+          this.where("osh_mail.status_id", 13).orWhereRaw(
+            "LOWER(TRIM(osh_mail.activity_extra)) = ?",
+            ["mail sent"]
+          );
+        });
+      if (mailSentFrom) {
+        this.andWhere("osh_mail.changed_at", ">=", mailSentFrom);
+      }
+      if (mailSentTo) {
+        this.andWhere("osh_mail.changed_at", "<=", mailSentTo);
+      }
+    });
+  }
 }
 
 async function distinctNonEmpty(queryBuilder, columnExpr, alias) {

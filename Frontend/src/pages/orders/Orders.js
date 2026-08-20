@@ -33,24 +33,31 @@ const ORDERS_TABLE_ENTRIES_KEY = "customDataTable_entriesPerPage";
 const buildOrdersApiDateParams = (
   selectedDatePreset,
   selectedDateRange,
-  getDateRangeFromPreset
+  getDateRangeFromPreset,
+  { fromKey = "date_from", toKey = "date_to" } = {}
 ) => {
   if (selectedDatePreset && selectedDatePreset !== "fromTo") {
     const range = getDateRangeFromPreset(selectedDatePreset);
     if (range) {
       return {
-        date_from: range.start.toISOString(),
-        date_to: range.end.toISOString(),
+        [fromKey]: range.start.toISOString(),
+        [toKey]: range.end.toISOString(),
       };
     }
   }
 
   const params = {};
   if (selectedDateRange.start) {
-    params.date_from = selectedDateRange.start.toISOString();
+    params[fromKey] = selectedDateRange.start.toISOString();
   }
   if (selectedDateRange.end) {
-    params.date_to = selectedDateRange.end.toISOString();
+    params[toKey] = selectedDateRange.end.toISOString();
+  }
+  // Single-day support: only one side picked → still send that day
+  if (selectedDateRange.start && !selectedDateRange.end) {
+    params[toKey] = selectedDateRange.start.toISOString();
+  } else if (!selectedDateRange.start && selectedDateRange.end) {
+    params[fromKey] = selectedDateRange.end.toISOString();
   }
   return params;
 };
@@ -152,6 +159,7 @@ function Orders() {
       "view_payment_status_filter",
       "view_category_filter",
       "view_date_filter",
+      "view_mail_sent_date_filter",
       "view_created_by_filter",
       "view_user_assigned_filter",
     ];
@@ -262,6 +270,25 @@ function Orders() {
       end: savedEnd ? new Date(savedEnd) : null,
     };
   });
+
+  // Mail-sent date filter (any mail send event in range via status history)
+  const [selectedMailSentDatePreset, setSelectedMailSentDatePreset] = useState(
+    () => localStorage.getItem("filter_orders_mailSentDatePreset") || ""
+  );
+  const [selectedMailSentDateRange, setSelectedMailSentDateRange] = useState(
+    () => {
+      const savedStart = localStorage.getItem(
+        "filter_orders_mailSentDateRangeStart"
+      );
+      const savedEnd = localStorage.getItem(
+        "filter_orders_mailSentDateRangeEnd"
+      );
+      return {
+        start: savedStart ? new Date(savedStart) : null,
+        end: savedEnd ? new Date(savedEnd) : null,
+      };
+    }
+  );
 
   const [ordersPage, setOrdersPage] = useState(1);
   const [ordersLimit, setOrdersLimit] = useState(() => {
@@ -894,6 +921,8 @@ function Orders() {
     setSelectedR2State("");
     setSelectedDatePreset("");
     setSelectedDateRange({ start: null, end: null });
+    setSelectedMailSentDatePreset("");
+    setSelectedMailSentDateRange({ start: null, end: null });
 
     // Clear from localStorage
     localStorage.removeItem("filter_orders_orderType");
@@ -915,6 +944,9 @@ function Orders() {
     localStorage.removeItem("filter_orders_datePreset");
     localStorage.removeItem("filter_orders_dateRangeStart");
     localStorage.removeItem("filter_orders_dateRangeEnd");
+    localStorage.removeItem("filter_orders_mailSentDatePreset");
+    localStorage.removeItem("filter_orders_mailSentDateRangeStart");
+    localStorage.removeItem("filter_orders_mailSentDateRangeEnd");
   };
 
   // Helper function to get date range based on preset
@@ -1086,6 +1118,13 @@ function Orders() {
         selectedDateRangeEnd: selectedDateRange.end
           ? selectedDateRange.end.toISOString()
           : "",
+        selectedMailSentDatePreset,
+        selectedMailSentDateRangeStart: selectedMailSentDateRange.start
+          ? selectedMailSentDateRange.start.toISOString()
+          : "",
+        selectedMailSentDateRangeEnd: selectedMailSentDateRange.end
+          ? selectedMailSentDateRange.end.toISOString()
+          : "",
         debouncedOrdersSearch,
       }),
     [
@@ -1107,6 +1146,8 @@ function Orders() {
       selectedR2State,
       selectedDatePreset,
       selectedDateRange,
+      selectedMailSentDatePreset,
+      selectedMailSentDateRange,
       debouncedOrdersSearch,
     ]
   );
@@ -1148,6 +1189,16 @@ function Orders() {
         )
       );
 
+      Object.assign(
+        params,
+        buildOrdersApiDateParams(
+          selectedMailSentDatePreset,
+          selectedMailSentDateRange,
+          getDateRangeFromPreset,
+          { fromKey: "mail_sent_from", toKey: "mail_sent_to" }
+        )
+      );
+
       if (debouncedOrdersSearch) {
         params.search = debouncedOrdersSearch;
       }
@@ -1173,6 +1224,8 @@ function Orders() {
       selectedR2State,
       selectedDatePreset,
       selectedDateRange,
+      selectedMailSentDatePreset,
+      selectedMailSentDateRange,
       debouncedOrdersSearch,
     ]
   );
@@ -1250,7 +1303,10 @@ function Orders() {
       selectedR2State !== "" ||
       selectedDatePreset !== "" ||
       selectedDateRange.start !== null ||
-      selectedDateRange.end !== null
+      selectedDateRange.end !== null ||
+      selectedMailSentDatePreset !== "" ||
+      selectedMailSentDateRange.start !== null ||
+      selectedMailSentDateRange.end !== null
     );
   }, [
     selectedOrderType,
@@ -1271,6 +1327,8 @@ function Orders() {
     selectedR2State,
     selectedDatePreset,
     selectedDateRange,
+    selectedMailSentDatePreset,
+    selectedMailSentDateRange,
   ]);
 
   // Compute users options (show all users except specific roles)
@@ -1390,11 +1448,11 @@ function Orders() {
               />
             )}
             {hasPermission(allowedPermissions, "view_date_filter") && (
-              <>
+              <div className="date-filter-group">
                 <SingleSearchSelect
                   className="search-selector"
                   options={[
-                    { value: "", label: "Date Preset" },
+                    { value: "", label: "Created Date Preset" },
                     { value: "today", label: "Today" },
                     { value: "thisWeek", label: "This Week" },
                     { value: "thisMonth", label: "This Month" },
@@ -1419,10 +1477,10 @@ function Orders() {
                       localStorage.removeItem("filter_orders_dateRangeEnd");
                     }
                   }}
-                  placeholder="Date Preset"
+                  placeholder="Created Date Preset"
                 />
                 {selectedDatePreset === "fromTo" && (
-                  <>
+                  <div className="date-range-inputs">
                     <div className="date-picker-wrapper">
                       <DatePicker
                         selected={selectedDateRange.start}
@@ -1451,8 +1509,8 @@ function Orders() {
                         selectsStart
                         startDate={selectedDateRange.start}
                         endDate={selectedDateRange.end}
-                        placeholderText="Start Date"
-                        className="form-field search-selector"
+                        placeholderText="Created Start Date"
+                        className="form-field"
                         dateFormat="d MMM yyyy"
                         renderCustomHeader={renderDatePickerHeader}
                         showMonthDropdown
@@ -1489,8 +1547,8 @@ function Orders() {
                         startDate={selectedDateRange.start}
                         endDate={selectedDateRange.end}
                         minDate={selectedDateRange.start}
-                        placeholderText="End Date"
-                        className="form-field search-selector"
+                        placeholderText="Created End Date"
+                        className="form-field"
                         dateFormat="d MMM yyyy"
                         renderCustomHeader={renderDatePickerHeader}
                         showMonthDropdown
@@ -1498,9 +1556,139 @@ function Orders() {
                         dropdownMode="select"
                       />
                     </div>
-                  </>
+                  </div>
                 )}
-              </>
+              </div>
+            )}
+            {hasPermission(allowedPermissions, "view_mail_sent_date_filter") && (
+              <div className="date-filter-group">
+                <SingleSearchSelect
+                  className="search-selector"
+                  options={[
+                    { value: "", label: "Mail Sent Preset" },
+                    { value: "today", label: "Today" },
+                    { value: "thisWeek", label: "This Week" },
+                    { value: "thisMonth", label: "This Month" },
+                    { value: "fromTo", label: "From-To Date" },
+                  ]}
+                  value={selectedMailSentDatePreset || null}
+                  onChange={(value) => {
+                    const val = value || "";
+                    const previousValue = selectedMailSentDatePreset;
+                    setSelectedMailSentDatePreset(val);
+                    localStorage.setItem(
+                      "filter_orders_mailSentDatePreset",
+                      val
+                    );
+                    if (previousValue === "fromTo" && val !== "fromTo") {
+                      setSelectedMailSentDateRange({ start: null, end: null });
+                      localStorage.removeItem(
+                        "filter_orders_mailSentDateRangeStart"
+                      );
+                      localStorage.removeItem(
+                        "filter_orders_mailSentDateRangeEnd"
+                      );
+                    }
+                    if (val && val !== "fromTo") {
+                      setSelectedMailSentDateRange({ start: null, end: null });
+                      localStorage.removeItem(
+                        "filter_orders_mailSentDateRangeStart"
+                      );
+                      localStorage.removeItem(
+                        "filter_orders_mailSentDateRangeEnd"
+                      );
+                    }
+                  }}
+                  placeholder="Mail Sent Preset"
+                />
+                {selectedMailSentDatePreset === "fromTo" && (
+                  <div className="date-range-inputs">
+                    <div className="date-picker-wrapper">
+                      <DatePicker
+                        selected={selectedMailSentDateRange.start}
+                        onChange={(date) => {
+                          setSelectedMailSentDateRange((prev) => ({
+                            ...prev,
+                            start: date,
+                          }));
+                          if (date) {
+                            localStorage.setItem(
+                              "filter_orders_mailSentDateRangeStart",
+                              date.toISOString()
+                            );
+                          } else {
+                            localStorage.removeItem(
+                              "filter_orders_mailSentDateRangeStart"
+                            );
+                          }
+                          if (
+                            !selectedMailSentDatePreset &&
+                            (date || selectedMailSentDateRange.end)
+                          ) {
+                            setSelectedMailSentDatePreset("fromTo");
+                            localStorage.setItem(
+                              "filter_orders_mailSentDatePreset",
+                              "fromTo"
+                            );
+                          }
+                        }}
+                        selectsStart
+                        startDate={selectedMailSentDateRange.start}
+                        endDate={selectedMailSentDateRange.end}
+                        placeholderText="Mail Sent Start"
+                        className="form-field"
+                        dateFormat="d MMM yyyy"
+                        renderCustomHeader={renderDatePickerHeader}
+                        showMonthDropdown
+                        showYearDropdown
+                        dropdownMode="select"
+                      />
+                    </div>
+                    <div className="date-picker-wrapper">
+                      <DatePicker
+                        selected={selectedMailSentDateRange.end}
+                        onChange={(date) => {
+                          setSelectedMailSentDateRange((prev) => ({
+                            ...prev,
+                            end: date,
+                          }));
+                          if (date) {
+                            localStorage.setItem(
+                              "filter_orders_mailSentDateRangeEnd",
+                              date.toISOString()
+                            );
+                          } else {
+                            localStorage.removeItem(
+                              "filter_orders_mailSentDateRangeEnd"
+                            );
+                          }
+                          if (
+                            !selectedMailSentDatePreset &&
+                            (selectedMailSentDateRange.start || date)
+                          ) {
+                            setSelectedMailSentDatePreset("fromTo");
+                            localStorage.setItem(
+                              "filter_orders_mailSentDatePreset",
+                              "fromTo"
+                            );
+                          }
+                        }}
+                        selectsEnd
+                        startDate={selectedMailSentDateRange.start}
+                        endDate={selectedMailSentDateRange.end}
+                        minDate={selectedMailSentDateRange.start}
+                        placeholderText="Mail Sent End"
+                        className="form-field"
+                        dateFormat="d MMM yyyy"
+                        renderCustomHeader={renderDatePickerHeader}
+                        showMonthDropdown
+                        showYearDropdown
+                        dropdownMode="select"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
             {hasActiveFilters && (
               <button

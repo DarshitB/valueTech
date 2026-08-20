@@ -21,7 +21,7 @@ function generateCVReportHTML(formData, extraData, bgPath) {
             background-size: cover;
             background-repeat: no-repeat;
             background-position: center;
-            font-family: sans-serif;
+            font-family: Arial, sans-serif;
             padding: 30px 25px;
             margin: 0px;
         }

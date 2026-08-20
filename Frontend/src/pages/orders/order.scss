@@ -298,6 +298,8 @@
     flex-wrap: wrap;
     margin-bottom: 15px;
     align-items: center;
+    container-type: inline-size;
+    container-name: orders-filter-row;
 
     .css-b62m3t-container {
       min-width: 200px;
@@ -309,6 +311,57 @@
 
     .clear-filters-btn {
       margin-left: auto;
+    }
+
+    // Keep preset + start/end as one unit; preset width matches sibling filters
+    .date-filter-group {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      gap: 0;
+      flex: 0 0 auto;
+      margin: 0;
+      padding: 0;
+
+      > .search-selector {
+        // 20% of the filter ROW (cqi), not of this group
+        flex: 0 0 auto !important;
+        width: max(200px, calc(20cqi - 8px)) !important;
+        min-width: max(200px, calc(20cqi - 8px)) !important;
+        max-width: max(200px, calc(20cqi - 8px)) !important;
+        margin: 0 !important;
+      }
+
+      .date-range-inputs {
+        display: flex;
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: 0;
+        margin: 0;
+        padding: 0;
+      }
+
+      .date-picker-wrapper {
+        flex: 0 0 auto;
+        margin: 0 !important;
+        padding: 0 !important;
+        min-width: 150px;
+
+        .react-datepicker-wrapper {
+          width: 150px;
+          min-width: 150px;
+          margin: 0;
+        }
+
+        input {
+          border-radius: 0;
+        }
+      }
+
+      .date-range-inputs .date-picker-wrapper:last-child input {
+        border-top-right-radius: 5px;
+        border-bottom-right-radius: 5px;
+      }
     }
 
     &.advanced-filters-content {
