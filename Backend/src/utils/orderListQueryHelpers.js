@@ -123,6 +123,20 @@ function parsePagination(query = {}) {
 
 function parseDateParam(value, endOfDay = false) {
   if (!value) return null;
+
+  // Prefer YYYY-MM-DD calendar dates so client timezone ISO shifts
+  // (e.g. IST midnight → previous UTC day) do not move the filter day.
+  const dateOnly = String(value).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (dateOnly) {
+    const year = Number(dateOnly[1]);
+    const monthIndex = Number(dateOnly[2]) - 1;
+    const day = Number(dateOnly[3]);
+    if (endOfDay) {
+      return new Date(year, monthIndex, day, 23, 59, 59, 999);
+    }
+    return new Date(year, monthIndex, day, 0, 0, 0, 0);
+  }
+
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
   if (endOfDay) {
@@ -257,8 +271,9 @@ function applyRequestFilters(queryBuilder, query = {}) {
   if (dateFrom) queryBuilder.andWhere("orders.created_at", ">=", dateFrom);
   if (dateTo) queryBuilder.andWhere("orders.created_at", "<=", dateTo);
 
-  // Filter by any "Mail sent" activity in range (order can match multiple days
-  // if mail was sent on each of those days — not only last mail).
+  // Filter by real "Mail sent" activity only.
+  // Do NOT use status_id=13 alone — that is "Order Finalized" and also used for
+  // manual complete (e.g. activity_extra "Manually set to Completed by admin").
   let mailSentFrom = parseDateParam(query.mail_sent_from, false);
   let mailSentTo = parseDateParam(query.mail_sent_to, true);
   if (mailSentFrom && !mailSentTo) {
@@ -274,12 +289,10 @@ function applyRequestFilters(queryBuilder, query = {}) {
       this.select(db.raw("1"))
         .from("order_status_history as osh_mail")
         .whereRaw("osh_mail.order_id = orders.id")
-        .andWhere(function () {
-          this.where("osh_mail.status_id", 13).orWhereRaw(
-            "LOWER(TRIM(osh_mail.activity_extra)) = ?",
-            ["mail sent"]
-          );
-        });
+        .andWhereRaw(
+          "LOWER(TRIM(COALESCE(osh_mail.activity_extra, ''))) = ?",
+          ["mail sent"]
+        );
       if (mailSentFrom) {
         this.andWhere("osh_mail.changed_at", ">=", mailSentFrom);
       }

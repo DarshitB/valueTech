@@ -30,6 +30,28 @@ import "react-datepicker/dist/react-datepicker.css";
 
 const ORDERS_TABLE_ENTRIES_KEY = "customDataTable_entriesPerPage";
 
+const toApiDateParam = (date) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const parseLocalDateParam = (value) => {
+  if (!value) return null;
+  const dateOnly = String(value).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnly) {
+    return new Date(
+      Number(dateOnly[1]),
+      Number(dateOnly[2]) - 1,
+      Number(dateOnly[3])
+    );
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
 const buildOrdersApiDateParams = (
   selectedDatePreset,
   selectedDateRange,
@@ -40,24 +62,22 @@ const buildOrdersApiDateParams = (
     const range = getDateRangeFromPreset(selectedDatePreset);
     if (range) {
       return {
-        [fromKey]: range.start.toISOString(),
-        [toKey]: range.end.toISOString(),
+        [fromKey]: toApiDateParam(range.start),
+        [toKey]: toApiDateParam(range.end),
       };
     }
   }
 
   const params = {};
-  if (selectedDateRange.start) {
-    params[fromKey] = selectedDateRange.start.toISOString();
-  }
-  if (selectedDateRange.end) {
-    params[toKey] = selectedDateRange.end.toISOString();
-  }
+  const start = toApiDateParam(selectedDateRange.start);
+  const end = toApiDateParam(selectedDateRange.end);
+  if (start) params[fromKey] = start;
+  if (end) params[toKey] = end;
   // Single-day support: only one side picked → still send that day
-  if (selectedDateRange.start && !selectedDateRange.end) {
-    params[toKey] = selectedDateRange.start.toISOString();
-  } else if (!selectedDateRange.start && selectedDateRange.end) {
-    params[fromKey] = selectedDateRange.end.toISOString();
+  if (start && !end) {
+    params[toKey] = start;
+  } else if (!start && end) {
+    params[fromKey] = end;
   }
   return params;
 };
@@ -266,8 +286,8 @@ function Orders() {
     const savedStart = localStorage.getItem("filter_orders_dateRangeStart");
     const savedEnd = localStorage.getItem("filter_orders_dateRangeEnd");
     return {
-      start: savedStart ? new Date(savedStart) : null,
-      end: savedEnd ? new Date(savedEnd) : null,
+      start: parseLocalDateParam(savedStart),
+      end: parseLocalDateParam(savedEnd),
     };
   });
 
@@ -284,8 +304,8 @@ function Orders() {
         "filter_orders_mailSentDateRangeEnd"
       );
       return {
-        start: savedStart ? new Date(savedStart) : null,
-        end: savedEnd ? new Date(savedEnd) : null,
+        start: parseLocalDateParam(savedStart),
+        end: parseLocalDateParam(savedEnd),
       };
     }
   );
@@ -1492,7 +1512,7 @@ function Orders() {
                           if (date) {
                             localStorage.setItem(
                               "filter_orders_dateRangeStart",
-                              date.toISOString()
+                              toApiDateParam(date)
                             );
                           } else {
                             localStorage.removeItem("filter_orders_dateRangeStart");
@@ -1512,6 +1532,7 @@ function Orders() {
                         placeholderText="Created Start Date"
                         className="form-field"
                         dateFormat="d MMM yyyy"
+                        openToDate={selectedDateRange.start || new Date()}
                         renderCustomHeader={renderDatePickerHeader}
                         showMonthDropdown
                         showYearDropdown
@@ -1529,7 +1550,7 @@ function Orders() {
                           if (date) {
                             localStorage.setItem(
                               "filter_orders_dateRangeEnd",
-                              date.toISOString()
+                              toApiDateParam(date)
                             );
                           } else {
                             localStorage.removeItem("filter_orders_dateRangeEnd");
@@ -1550,6 +1571,11 @@ function Orders() {
                         placeholderText="Created End Date"
                         className="form-field"
                         dateFormat="d MMM yyyy"
+                        openToDate={
+                          selectedDateRange.end ||
+                          selectedDateRange.start ||
+                          new Date()
+                        }
                         renderCustomHeader={renderDatePickerHeader}
                         showMonthDropdown
                         showYearDropdown
@@ -1607,20 +1633,26 @@ function Orders() {
                       <DatePicker
                         selected={selectedMailSentDateRange.start}
                         onChange={(date) => {
-                          setSelectedMailSentDateRange((prev) => ({
-                            ...prev,
-                            start: date,
-                          }));
-                          if (date) {
-                            localStorage.setItem(
-                              "filter_orders_mailSentDateRangeStart",
-                              date.toISOString()
-                            );
-                          } else {
-                            localStorage.removeItem(
-                              "filter_orders_mailSentDateRangeStart"
-                            );
-                          }
+                          setSelectedMailSentDateRange((prev) => {
+                            const nextEnd = prev.end || date;
+                            if (date) {
+                              localStorage.setItem(
+                                "filter_orders_mailSentDateRangeStart",
+                                toApiDateParam(date)
+                              );
+                              if (nextEnd) {
+                                localStorage.setItem(
+                                  "filter_orders_mailSentDateRangeEnd",
+                                  toApiDateParam(nextEnd)
+                                );
+                              }
+                            } else {
+                              localStorage.removeItem(
+                                "filter_orders_mailSentDateRangeStart"
+                              );
+                            }
+                            return { start: date, end: nextEnd };
+                          });
                           if (
                             !selectedMailSentDatePreset &&
                             (date || selectedMailSentDateRange.end)
@@ -1638,6 +1670,9 @@ function Orders() {
                         placeholderText="Mail Sent Start"
                         className="form-field"
                         dateFormat="d MMM yyyy"
+                        openToDate={
+                          selectedMailSentDateRange.start || new Date()
+                        }
                         renderCustomHeader={renderDatePickerHeader}
                         showMonthDropdown
                         showYearDropdown
@@ -1655,7 +1690,7 @@ function Orders() {
                           if (date) {
                             localStorage.setItem(
                               "filter_orders_mailSentDateRangeEnd",
-                              date.toISOString()
+                              toApiDateParam(date)
                             );
                           } else {
                             localStorage.removeItem(
@@ -1680,6 +1715,11 @@ function Orders() {
                         placeholderText="Mail Sent End"
                         className="form-field"
                         dateFormat="d MMM yyyy"
+                        openToDate={
+                          selectedMailSentDateRange.end ||
+                          selectedMailSentDateRange.start ||
+                          new Date()
+                        }
                         renderCustomHeader={renderDatePickerHeader}
                         showMonthDropdown
                         showYearDropdown

@@ -119,10 +119,12 @@ function formatActivityTime(dateString) {
     return `Yesterday at ${timeStr}`;
   }
 
-  // For older dates: "15 Dec at 7:30 PM"
+  // For older dates: always include year so filters are not confused
+  // (e.g. "17 Aug" vs "17 Aug 2024" vs "17 Aug 2026")
   const day = date.getDate();
   const month = monthAbbr[date.getMonth()];
-  return `${day} ${month} at ${timeStr}`;
+  const year = date.getFullYear();
+  return `${day} ${month} ${year} at ${timeStr}`;
 }
 
 /**
