@@ -26,6 +26,7 @@ import { hasPermission } from "../../utils/permissionUtils";
 import { toast } from "react-toastify";
 import { Link } from "react-router-dom";
 import { searchOrdersByRegistration } from "../../api/order.api";
+import { useUppercaseField } from "../../utils/useUppercaseField";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
@@ -147,6 +148,10 @@ function Orders() {
   const [showRegistrationMatchModal, setShowRegistrationMatchModal] =
     useState(false);
   const registrationSearchSeq = useRef(0);
+  const {
+    inputRef: registrationInputRef,
+    applyUppercaseChange: applyRegistrationUppercase,
+  } = useUppercaseField(formData.registration_number);
 
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [confirmDeleteName, setConfirmDeleteName] = useState("");
@@ -2562,21 +2567,21 @@ function Orders() {
                         className="form-field"
                         id="registrationNumber"
                         name="registrationNumber"
+                        ref={registrationInputRef}
                         value={formData.registration_number}
                         onChange={(e) => {
                           // Only allow TELECALLER to change this field if they have permission
-                          if (!isTelecaller) {
-                            const registration_number =
-                              e.target.value.toUpperCase();
-                            setFormData({
-                              ...formData,
+                          if (isTelecaller) return;
+                          applyRegistrationUppercase(e, (registration_number) => {
+                            setFormData((prev) => ({
+                              ...prev,
                               registration_number,
-                            });
+                            }));
                             if (registrationMatches.length > 0) {
                               setRegistrationMatches([]);
                               setShowRegistrationMatchModal(false);
                             }
-                          }
+                          });
                         }}
                         onBlur={(e) => {
                           searchRegistrationMatches(e.target.value, {

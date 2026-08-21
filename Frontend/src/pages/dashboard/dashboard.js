@@ -31,6 +31,7 @@ import { selectPermissions } from "../../redux/selectors/authSelectors";
 import { hasPermission } from "../../utils/permissionUtils";
 import { toast } from "react-toastify";
 import { searchOrdersByRegistration } from "../../api/order.api";
+import { useUppercaseField } from "../../utils/useUppercaseField";
 import CustomDataTable from "../../components/CustomDataTable";
 import "./dashboard.scss";
 import {
@@ -489,6 +490,10 @@ function Dashboard() {
   const [showRegistrationMatchModal, setShowRegistrationMatchModal] =
     useState(false);
   const registrationSearchSeq = useRef(0);
+  const {
+    inputRef: registrationInputRef,
+    applyUppercaseChange: applyRegistrationUppercase,
+  } = useUppercaseField(formData.registration_number);
 
   // Helper: is current user a MANAGER editing an existing order?
   const isManagerEditing = isManager && isEdit;
@@ -4087,6 +4092,7 @@ function Dashboard() {
                         className="form-field"
                         id="registrationNumber"
                         name="registrationNumber"
+                        ref={registrationInputRef}
                         value={formData.registration_number}
                         onChange={(e) => {
                           const canEditRegistrationField = hasPermission(
@@ -4096,16 +4102,16 @@ function Dashboard() {
 
                           if (!canEditRegistrationField) return;
 
-                          const registration_number =
-                            e.target.value.toUpperCase();
-                          setFormData({
-                            ...formData,
-                            registration_number,
+                          applyRegistrationUppercase(e, (registration_number) => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              registration_number,
+                            }));
+                            if (registrationMatches.length > 0) {
+                              setRegistrationMatches([]);
+                              setShowRegistrationMatchModal(false);
+                            }
                           });
-                          if (registrationMatches.length > 0) {
-                            setRegistrationMatches([]);
-                            setShowRegistrationMatchModal(false);
-                          }
                         }}
                         onBlur={(e) => {
                           searchRegistrationMatches(e.target.value, {
