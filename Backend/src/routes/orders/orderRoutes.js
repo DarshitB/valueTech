@@ -17,6 +17,10 @@ router.get("/", orderController.getAll);
 // Get orders that are finalized (status 13) or on hold (status 14)
 router.get("/finalized-and-on-hold-orders", orderController.getAllWithWoStatus);
 router.get("/by-order-number/:orderNumber", orderController.getByOrderNumber);
+router.get(
+  "/by-registration",
+  orderController.searchByRegistrationNumber
+);
 // Get finalized orders by child category (status 13 only)
 router.get(
   "/child-category/:child_category_id/finalized",

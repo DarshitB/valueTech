@@ -25,6 +25,7 @@ import { selectPermissions } from "../../redux/selectors/authSelectors";
 import { hasPermission } from "../../utils/permissionUtils";
 import { toast } from "react-toastify";
 import { Link } from "react-router-dom";
+import { searchOrdersByRegistration } from "../../api/order.api";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
@@ -142,6 +143,10 @@ function Orders() {
   const [isEdit, setIsEdit] = useState(false);
   const [editOrderId, setEditOrderId] = useState(null);
   const [showFormModal, setShowFormModal] = useState(false);
+  const [registrationMatches, setRegistrationMatches] = useState([]);
+  const [showRegistrationMatchModal, setShowRegistrationMatchModal] =
+    useState(false);
+  const registrationSearchSeq = useRef(0);
 
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [confirmDeleteName, setConfirmDeleteName] = useState("");
@@ -549,9 +554,45 @@ function Orders() {
     }
   }, [isBankOfficer, currentUser, officers, allChildCategories, dispatch]);
 
+  const resetRegistrationMatchState = () => {
+    registrationSearchSeq.current += 1;
+    setRegistrationMatches([]);
+    setShowRegistrationMatchModal(false);
+  };
+
+  const searchRegistrationMatches = async (
+    rawValue,
+    { excludeOrderId = null, openModal = false } = {}
+  ) => {
+    const value = String(rawValue || "").trim();
+    if (!value) {
+      setRegistrationMatches([]);
+      setShowRegistrationMatchModal(false);
+      return;
+    }
+
+    const excludeId = excludeOrderId ?? editOrderId;
+    const seq = ++registrationSearchSeq.current;
+    try {
+      const response = await searchOrdersByRegistration(value);
+      if (seq !== registrationSearchSeq.current) return;
+      const list = (
+        Array.isArray(response?.data?.data) ? response.data.data : []
+      ).filter((order) => Number(order.id) !== Number(excludeId));
+      setRegistrationMatches(list);
+      setShowRegistrationMatchModal(openModal && list.length > 0);
+    } catch {
+      if (seq !== registrationSearchSeq.current) return;
+      setRegistrationMatches([]);
+      setShowRegistrationMatchModal(false);
+    }
+  };
+
   // Open Add Order Form
   const openAddModal = () => {
     setIsEdit(false);
+    setEditOrderId(null);
+    resetRegistrationMatchState();
 
     setFormData({
       customer_name: "",
@@ -575,6 +616,7 @@ function Orders() {
   const openEditModal = (order) => {
     setIsEdit(true);
     setEditOrderId(order.id);
+    resetRegistrationMatchState();
 
     setFormData({
       customer_name: order.customer_name || "",
@@ -592,6 +634,10 @@ function Orders() {
       created_at: order.created_at ? new Date(order.created_at) : null,
     });
     setShowFormModal(true);
+    searchRegistrationMatches(order.registration_number, {
+      excludeOrderId: order.id,
+      openModal: false,
+    });
   };
 
   // Submit Add/Edit
@@ -783,6 +829,7 @@ function Orders() {
 
     // Close modal after submit
     setShowFormModal(false);
+    resetRegistrationMatchState();
   };
 
   // Confirm delete
@@ -2510,24 +2557,45 @@ function Orders() {
                     <label htmlFor="registrationNumber">
                       Registration Number
                     </label>
-                    <input
-                      className="form-field"
-                      id="registrationNumber"
-                      name="registrationNumber"
-                      value={formData.registration_number}
-                      onChange={(e) => {
-                        // Only allow TELECALLER to change this field if they have permission
-                        if (!isTelecaller) {
-                          const registration_number =
-                            e.target.value.toUpperCase();
-                          setFormData({
-                            ...formData,
-                            registration_number,
+                    <div className="registration-number-row">
+                      <input
+                        className="form-field"
+                        id="registrationNumber"
+                        name="registrationNumber"
+                        value={formData.registration_number}
+                        onChange={(e) => {
+                          // Only allow TELECALLER to change this field if they have permission
+                          if (!isTelecaller) {
+                            const registration_number =
+                              e.target.value.toUpperCase();
+                            setFormData({
+                              ...formData,
+                              registration_number,
+                            });
+                            if (registrationMatches.length > 0) {
+                              setRegistrationMatches([]);
+                              setShowRegistrationMatchModal(false);
+                            }
+                          }
+                        }}
+                        onBlur={(e) => {
+                          searchRegistrationMatches(e.target.value, {
+                            openModal: true,
                           });
-                        }
-                      }}
-                      disabled={isTelecaller}
-                    />
+                        }}
+                        disabled={isTelecaller}
+                      />
+                      {registrationMatches.length > 0 && (
+                        <button
+                          type="button"
+                          className="registration-match-btn"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => setShowRegistrationMatchModal(true)}
+                        >
+                          Previous orders ({registrationMatches.length})
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="form-group">
@@ -2714,6 +2782,7 @@ function Orders() {
               setShowFormModal(false);
               setIsEdit(false);
               setEditOrderId(null);
+              resetRegistrationMatchState();
 
               // Reset form data (will be properly initialized when opening again)
               setFormData({
@@ -2732,6 +2801,63 @@ function Orders() {
                 created_at: null,
               });
             },
+          }}
+        </FormModel>
+      )}
+
+      {showFormModal && showRegistrationMatchModal && (
+        <FormModel className="stacked-modal" size="xl">
+          {{
+            title: "Previous orders with this registration number",
+            body: (
+              <div className="registration-match-modal-body">
+                {registrationMatches.length === 0 ? (
+                  <p>No matching orders found.</p>
+                ) : (
+                  <div className="registration-match-table-wrap">
+                    <table className="registration-match-table">
+                      <thead>
+                        <tr>
+                          <th>Order Number</th>
+                          <th>Registration Number</th>
+                          <th>Customer Name</th>
+                          <th>Bank</th>
+                          <th>Officer</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {registrationMatches.map((order) => (
+                          <tr key={order.id}>
+                            <td>
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_details"
+                              ) ? (
+                                <Link
+                                  className="get-me-inside"
+                                  to={`/orders/${order.id}/details`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {order.order_number || "-"}
+                                </Link>
+                              ) : (
+                                order.order_number || "-"
+                              )}
+                            </td>
+                            <td>{order.registration_number || "-"}</td>
+                            <td>{order.customer_name_2 || "-"}</td>
+                            <td>{order.bank_name || "-"}</td>
+                            <td>{order.officer_name || "-"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ),
+            onClose: () => setShowRegistrationMatchModal(false),
           }}
         </FormModel>
       )}

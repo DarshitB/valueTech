@@ -17,6 +17,10 @@ export const getFinalizedOrdersByChildCategory = (childCategoryId) =>
 export const getOrderById = (id) => axios.get(`${ENDPOINT}/${id}`); // Get order by ID
 export const getOrderByOrderNumber = (orderNumber) =>
   axios.get(`${ENDPOINT}/by-order-number/${encodeURIComponent(orderNumber)}`);
+
+export const searchOrdersByRegistration = (q) =>
+  axios.get(`${ENDPOINT}/by-registration`, { params: { q } });
+
 export const getOrderR2SyncStatus = (id) =>
   axios.get(`${ENDPOINT}/${id}/r2-sync-status`);
 

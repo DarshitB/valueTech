@@ -19,6 +19,10 @@ const {
 } = require("../../utils/r2Helper");
 const { computeR2CoverageForOrder } = require("../../utils/r2CoverageHelper");
 const { resolveOrderReportType } = require("../../utils/resolveOrderReportType");
+const {
+  extractIdentifierTokens,
+  identifiersMatch,
+} = require("../../utils/registrationIdentifier");
 
 // Helper functions to get names by IDs
 async function getUserName(userId) {
@@ -454,6 +458,53 @@ exports.getByOrderNumber = async (req, res, next) => {
       ...order,
       report_type: reportType,
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /orders/by-registration?q=
+// Match Create Order registration_number using normalized identifier tokens.
+exports.searchByRegistrationNumber = async (req, res, next) => {
+  try {
+    const query = String(req.query.q || req.query.registration_number || "").trim();
+    const queryTokens = extractIdentifierTokens(query);
+
+    if (!query || queryTokens.length === 0) {
+      return res.json({ data: [], query_tokens: queryTokens });
+    }
+
+    const rows = await db("orders")
+      .leftJoin("officers", "orders.officer_id", "officers.id")
+      .leftJoin("users as officer_user", "officers.user_id", "officer_user.id")
+      .leftJoin("bank_branch", "officers.branch_id", "bank_branch.id")
+      .leftJoin("bank", "bank_branch.bank_id", "bank.id")
+      .select(
+        "orders.id",
+        "orders.order_number",
+        "orders.registration_number",
+        "orders.customer_name_2",
+        "bank.name as bank_name",
+        "officer_user.name as officer_name",
+        "orders.created_at"
+      )
+      .whereNull("orders.deleted_at")
+      .whereRaw("NULLIF(BTRIM(orders.registration_number), '') IS NOT NULL")
+      .orderBy("orders.created_at", "desc");
+
+    const data = rows
+      .filter((row) => identifiersMatch(query, row.registration_number))
+      .slice(0, 100)
+      .map((row) => ({
+        id: row.id,
+        order_number: row.order_number,
+        registration_number: row.registration_number,
+        customer_name_2: row.customer_name_2 || null,
+        bank_name: row.bank_name || null,
+        officer_name: row.officer_name || null,
+      }));
+
+    res.json({ data, query_tokens: queryTokens });
   } catch (err) {
     next(err);
   }

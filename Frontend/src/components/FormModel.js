@@ -3,10 +3,10 @@ import "./ConfirmationModal.scss";
 import "./FormModel.scss";
 import { CloseIcon } from "./icons";
 
-const FormModel = ({ children, size }) => {
+const FormModel = ({ children, size, className = "" }) => {
   const { title, body, onClose } = children;
   return (
-    <div className="modal-overlay form-model">
+    <div className={`modal-overlay form-model ${className}`.trim()}>
       <div className={`modal-dialog ${size}`}>
         <div className="modal-content">
           <div className="model-header">
