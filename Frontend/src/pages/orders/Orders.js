@@ -2824,10 +2824,12 @@ function Orders() {
                       <thead>
                         <tr>
                           <th>Order Number</th>
+                          <th>Date of Creation</th>
                           <th>Registration Number</th>
                           <th>Customer Name</th>
                           <th>Bank</th>
                           <th>Officer</th>
+                          <th>Order Status</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2850,10 +2852,12 @@ function Orders() {
                                 order.order_number || "-"
                               )}
                             </td>
+                            <td>{formatDate(order.created_at)}</td>
                             <td>{order.registration_number || "-"}</td>
                             <td>{order.customer_name_2 || "-"}</td>
                             <td>{order.bank_name || "-"}</td>
                             <td>{order.officer_name || "-"}</td>
+                            <td>{order.current_status_name || "-"}</td>
                           </tr>
                         ))}
                       </tbody>

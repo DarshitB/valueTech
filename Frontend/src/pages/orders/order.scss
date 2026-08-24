@@ -608,6 +608,26 @@
         color: $base-font-color;
       }
 
+      .registration-match-details-btn {
+        display: block;
+        width: 100%;
+        margin: -8px 0 16px;
+        border: none;
+        border-radius: 5px;
+        background-color: $color-danger;
+        color: #fff;
+        padding: 8px 12px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+
+        &:hover,
+        &:focus {
+          outline: none;
+          filter: brightness(0.92);
+        }
+      }
+
       .order-details-info-sets {
         .order-details-info-set {
           display: flex;

@@ -65,6 +65,7 @@ import { resolveAssetUrl } from "../../utils/urlUtils";
 import FormModel from "../../components/FormModel";
 import SingleSearchSelect from "../../components/SingleSearchSelect";
 import { toast } from "react-toastify";
+import { searchOrdersByRegistration } from "../../api/order.api";
 import ConfirmationModal from "../../components/ConfirmationModal";
 
 // Utility: Convert date to 'time ago' string
@@ -359,6 +360,9 @@ function OrderDetails() {
 
   // Track removed documents (by ID) - documents user removes from mail attachments
   const [removedDocumentIds, setRemovedDocumentIds] = useState([]);
+  const [registrationMatches, setRegistrationMatches] = useState([]);
+  const [showRegistrationMatchModal, setShowRegistrationMatchModal] =
+    useState(false);
 
   // Fetch order details, comments, and media documents when component mounts or ID changes
   useEffect(() => {
@@ -373,6 +377,34 @@ function OrderDetails() {
       }
     }
   }, [dispatch, id, allowedPermissions]);
+
+  useEffect(() => {
+    const registration = String(order?.registration_number || "").trim();
+    const orderId = order?.id;
+    if (!registration || !orderId) {
+      setRegistrationMatches([]);
+      setShowRegistrationMatchModal(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await searchOrdersByRegistration(registration);
+        if (cancelled) return;
+        const list = (
+          Array.isArray(response?.data?.data) ? response.data.data : []
+        ).filter((row) => Number(row.id) !== Number(orderId));
+        setRegistrationMatches(list);
+      } catch {
+        if (!cancelled) setRegistrationMatches([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [order?.id, order?.registration_number]);
 
   // Officers for mail to/cc/bcc — scoped to order bank (developer_admin still gets all via API)
   useEffect(() => {
@@ -1120,6 +1152,24 @@ function OrderDetails() {
     } catch (error) {
       console.error("Error formatting date:", error);
       return dateString; // Return original if formatting fails
+    }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "-";
+    try {
+      const date = new Date(dateString);
+      if (Number.isNaN(date.getTime())) return "-";
+      return new Intl.DateTimeFormat("en-US", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      }).format(date);
+    } catch {
+      return "-";
     }
   };
 
@@ -2781,6 +2831,15 @@ function OrderDetails() {
               >
                 <div className="order-details-info-card">
                   <h6>General Information</h6>
+                  {registrationMatches.length > 0 && (
+                    <button
+                      type="button"
+                      className="registration-match-details-btn"
+                      onClick={() => setShowRegistrationMatchModal(true)}
+                    >
+                      Previous order with same reg. ({registrationMatches.length})
+                    </button>
+                  )}
                   <div className="order-details-info-sets">
                     {/* Category, asset category, subcategory, and registration number */}
                     <div className="order-details-info-set">
@@ -3921,6 +3980,67 @@ function OrderDetails() {
               }
               setShowMailModal(false);
             },
+          }}
+        </FormModel>
+      )}
+
+      {showRegistrationMatchModal && (
+        <FormModel className="stacked-modal" size="xl">
+          {{
+            title: "Previous orders with this registration number",
+            body: (
+              <div className="registration-match-modal-body">
+                {registrationMatches.length === 0 ? (
+                  <p>No matching orders found.</p>
+                ) : (
+                  <div className="registration-match-table-wrap">
+                    <table className="registration-match-table">
+                      <thead>
+                        <tr>
+                          <th>Order Number</th>
+                          <th>Date of Creation</th>
+                          <th>Registration Number</th>
+                          <th>Customer Name</th>
+                          <th>Bank</th>
+                          <th>Officer</th>
+                          <th>Order Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {registrationMatches.map((match) => (
+                          <tr key={match.id}>
+                            <td>
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_details"
+                              ) ? (
+                                <Link
+                                  className="get-me-inside"
+                                  to={`/orders/${match.id}/details`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {match.order_number || "-"}
+                                </Link>
+                              ) : (
+                                match.order_number || "-"
+                              )}
+                            </td>
+                            <td>{formatDate(match.created_at)}</td>
+                            <td>{match.registration_number || "-"}</td>
+                            <td>{match.customer_name_2 || "-"}</td>
+                            <td>{match.bank_name || "-"}</td>
+                            <td>{match.officer_name || "-"}</td>
+                            <td>{match.current_status_name || "-"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ),
+            onClose: () => setShowRegistrationMatchModal(false),
           }}
         </FormModel>
       )}

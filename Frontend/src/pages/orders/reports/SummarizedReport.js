@@ -517,6 +517,7 @@ const getDefaultSummarizedTableData = () => ({
   manualEstimatedFairValueGrandTotal: "",
   /** Saved custom labels for fixed columns (keyed by column id). */
   fixedColumnHeaders: {},
+  hideInReportColumnIds: [],
 });
 
 const SUMMARIZED_VERTICAL_MERGE_BLOCKLIST = new Set([
@@ -2510,6 +2511,7 @@ function SummarizedReport() {
             .map((c) => ({
               ...c,
               allowSum: Boolean(c.allowSum),
+              hideInReport: Boolean(c.hideInReport),
             }))
         : [];
       const rows = Array.isArray(parsed?.rows) ? parsed.rows : [];
@@ -2525,6 +2527,16 @@ function SummarizedReport() {
         typeof parsed.verticalMergeValues === "object"
           ? parsed.verticalMergeValues
           : {};
+      const hideInReportColumnIds = [
+        ...new Set([
+          ...(Array.isArray(parsed?.hideInReportColumnIds)
+            ? parsed.hideInReportColumnIds.map(String).filter(Boolean)
+            : []),
+          ...dynamicColumns
+            .filter((c) => c.hideInReport)
+            .map((c) => String(c.id)),
+        ]),
+      ];
       setSummarizedTableData({
         dynamicColumns,
         rows: normalizeSummarizedRows(rows, dynamicColumns),
@@ -2538,6 +2550,7 @@ function SummarizedReport() {
           !Array.isArray(parsed.fixedColumnHeaders)
             ? parsed.fixedColumnHeaders
             : {},
+        hideInReportColumnIds,
       });
     } catch (err) {
       setSummarizedTableData(getDefaultSummarizedTableData());
@@ -2752,6 +2765,67 @@ function SummarizedReport() {
       });
     },
     [summarizedTableData, handleSummarizedTableDataChange],
+  );
+
+  const isSummarizedColumnHiddenInReport = useCallback(
+    (columnId) => {
+      if (!columnId) return false;
+      if (
+        Array.isArray(summarizedTableData.hideInReportColumnIds) &&
+        summarizedTableData.hideInReportColumnIds.includes(columnId)
+      ) {
+        return true;
+      }
+      return Boolean(
+        (summarizedTableData.dynamicColumns || []).find(
+          (col) => col.id === columnId,
+        )?.hideInReport,
+      );
+    },
+    [
+      summarizedTableData.hideInReportColumnIds,
+      summarizedTableData.dynamicColumns,
+    ],
+  );
+
+  const handleSummarizedHideInReportChange = useCallback(
+    (columnId, hideInReport) => {
+      const nextIds = new Set(summarizedTableData.hideInReportColumnIds || []);
+      if (hideInReport) nextIds.add(columnId);
+      else nextIds.delete(columnId);
+      const nextDynamicColumns = (summarizedTableData.dynamicColumns || []).map(
+        (col) => (col.id === columnId ? { ...col, hideInReport } : col),
+      );
+      handleSummarizedTableDataChange({
+        ...summarizedTableData,
+        hideInReportColumnIds: [...nextIds],
+        dynamicColumns: nextDynamicColumns,
+      });
+    },
+    [summarizedTableData, handleSummarizedTableDataChange],
+  );
+
+  const renderSummarizedHideInReportCheckbox = useCallback(
+    (columnId) => (
+      <label
+        className="d-flex align-items-center gap-2 mb-0"
+        style={{
+          fontSize: "12px",
+          fontWeight: 500,
+          cursor: "pointer",
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={isSummarizedColumnHiddenInReport(columnId)}
+          onChange={(e) =>
+            handleSummarizedHideInReportChange(columnId, e.target.checked)
+          }
+        />
+        Hide
+      </label>
+    ),
+    [handleSummarizedHideInReportChange, isSummarizedColumnHiddenInReport],
   );
 
   const formatSummarizedGrandTotalCell = useCallback(
@@ -3138,6 +3212,7 @@ function SummarizedReport() {
       id: `dynamic_col_${Date.now()}_${nextIndex}`,
       header: "",
       allowSum: false,
+      hideInReport: false,
     };
     const nextDynamicColumns = [
       ...(summarizedTableData.dynamicColumns || []),
@@ -7320,9 +7395,14 @@ function SummarizedReport() {
                                   width: `${getSummarizedColumnWidth(SUMMARIZED_SR_NO_COLUMN.id)}px`,
                                 }}
                               >
-                                {renderSummarizedFixedHeaderContent(
-                                  SUMMARIZED_SR_NO_COLUMN,
-                                )}
+                                <div className="d-flex flex-column gap-1">
+                                  {renderSummarizedFixedHeaderContent(
+                                    SUMMARIZED_SR_NO_COLUMN,
+                                  )}
+                                  {renderSummarizedHideInReportCheckbox(
+                                    SUMMARIZED_SR_NO_COLUMN.id,
+                                  )}
+                                </div>
                               </th>
                             )}
                             {SUMMARIZED_TRAILING_COLUMNS.filter((col) =>
@@ -7335,7 +7415,10 @@ function SummarizedReport() {
                                   width: `${getSummarizedColumnWidth(col.id)}px`,
                                 }}
                               >
-                                {renderSummarizedFixedHeaderContent(col)}
+                                <div className="d-flex flex-column gap-1">
+                                  {renderSummarizedFixedHeaderContent(col)}
+                                  {renderSummarizedHideInReportCheckbox(col.id)}
+                                </div>
                               </th>
                             ))}
                             {SUMMARIZED_FIXED_START_COLUMNS.filter((col) =>
@@ -7348,7 +7431,10 @@ function SummarizedReport() {
                                   width: `${getSummarizedColumnWidth(col.id)}px`,
                                 }}
                               >
-                                {renderSummarizedFixedHeaderContent(col)}
+                                <div className="d-flex flex-column gap-1">
+                                  {renderSummarizedFixedHeaderContent(col)}
+                                  {renderSummarizedHideInReportCheckbox(col.id)}
+                                </div>
                               </th>
                             ))}
                             {(summarizedTableData.dynamicColumns || []).map(
@@ -7409,6 +7495,7 @@ function SummarizedReport() {
                                       />
                                       Allow sum
                                     </label>
+                                    {renderSummarizedHideInReportCheckbox(col.id)}
                                   </div>
                                 </th>
                               ),
@@ -7423,7 +7510,10 @@ function SummarizedReport() {
                                   width: `${getSummarizedColumnWidth(col.id)}px`,
                                 }}
                               >
-                                {renderSummarizedFixedHeaderContent(col)}
+                                <div className="d-flex flex-column gap-1">
+                                  {renderSummarizedFixedHeaderContent(col)}
+                                  {renderSummarizedHideInReportCheckbox(col.id)}
+                                </div>
                               </th>
                             ))}
                             <th style={{ minWidth: "160px", width: "160px" }}>

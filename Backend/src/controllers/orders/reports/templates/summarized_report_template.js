@@ -176,14 +176,35 @@ function resolveSummarizedNoteText(formData) {
   return "";
 }
 
+function getHiddenInReportColumnIds(tableData) {
+  const hidden = new Set();
+  const listed = Array.isArray(tableData?.hideInReportColumnIds)
+    ? tableData.hideInReportColumnIds
+    : [];
+  listed.forEach((id) => {
+    if (id) hidden.add(String(id));
+  });
+  const dynamic = Array.isArray(tableData?.dynamicColumns)
+    ? tableData.dynamicColumns
+    : [];
+  dynamic.forEach((col) => {
+    if (col && col.id && col.hideInReport) hidden.add(String(col.id));
+  });
+  return hidden;
+}
+
 /** Omit columns with no data in any row (summarized appendix table only). */
 function getVisibleOrderedColumns(tableData) {
   const all = getOrderedColumns(tableData);
+  const hidden = getHiddenInReportColumnIds(tableData);
+  const notHidden = all.filter((col) => !hidden.has(String(col.id)));
   const rows = Array.isArray(tableData?.rows) ? tableData.rows : [];
-  if (rows.length === 0) return all;
-  const visible = all.filter((col) => hasSummarizedColumnData(rows, col.id, tableData));
-  // Keep full header set when only title/merged rows exist (no per-column cell data yet).
-  return visible.length > 0 ? visible : all;
+  if (rows.length === 0) return notHidden;
+  const visible = notHidden.filter((col) =>
+    hasSummarizedColumnData(rows, col.id, tableData)
+  );
+  // Keep remaining headers when only title/merged rows exist (no per-column cell data yet).
+  return visible.length > 0 ? visible : notHidden;
 }
 
 function parseCurrencyValue(val) {

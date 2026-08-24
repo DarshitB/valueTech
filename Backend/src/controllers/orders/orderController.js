@@ -479,6 +479,11 @@ exports.searchByRegistrationNumber = async (req, res, next) => {
       .leftJoin("users as officer_user", "officers.user_id", "officer_user.id")
       .leftJoin("bank_branch", "officers.branch_id", "bank_branch.id")
       .leftJoin("bank", "bank_branch.bank_id", "bank.id")
+      .leftJoin(
+        "order_status_master",
+        "orders.current_status_id",
+        "order_status_master.id"
+      )
       .select(
         "orders.id",
         "orders.order_number",
@@ -486,7 +491,8 @@ exports.searchByRegistrationNumber = async (req, res, next) => {
         "orders.customer_name_2",
         "bank.name as bank_name",
         "officer_user.name as officer_name",
-        "orders.created_at"
+        "orders.created_at",
+        "order_status_master.name as current_status_name"
       )
       .whereNull("orders.deleted_at")
       .whereRaw("NULLIF(BTRIM(orders.registration_number), '') IS NOT NULL")
@@ -498,10 +504,12 @@ exports.searchByRegistrationNumber = async (req, res, next) => {
       .map((row) => ({
         id: row.id,
         order_number: row.order_number,
+        created_at: row.created_at || null,
         registration_number: row.registration_number,
         customer_name_2: row.customer_name_2 || null,
         bank_name: row.bank_name || null,
         officer_name: row.officer_name || null,
+        current_status_name: row.current_status_name || null,
       }));
 
     res.json({ data, query_tokens: queryTokens });
