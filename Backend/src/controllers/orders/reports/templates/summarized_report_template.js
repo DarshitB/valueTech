@@ -271,14 +271,13 @@ function computeSummarizedGrandTotals(rows) {
   return totals;
 }
 
-/** Sum integer digits-only values per column (matches SummarizedReport.js flex "Allow sum" columns). */
+/** Sum currency-formatted values per column (matches SummarizedReport.js "Allow sum"). */
 function computeSummarizedDynamicAllowSumTotal(rows, colId) {
   if (!Array.isArray(rows) || !colId) return 0;
   let sum = 0;
   for (const row of rows) {
     if (!row || isSummarizedMergedTitleRow(row)) continue;
-    const raw = String(row[colId] ?? "").replace(/\D/g, "");
-    if (raw) sum += parseInt(raw, 10) || 0;
+    sum += parseCurrencyValue(row[colId]);
   }
   return sum;
 }
@@ -323,7 +322,9 @@ function renderSummarizedGrandTotalRow(tableData, orderedColumns) {
       const meta = dynamicMetaById.get(col.id);
       if (meta.allowSum) {
         const dynTotal = computeSummarizedDynamicAllowSumTotal(rows, col.id);
-        html += `<td style="font-weight:700;background-color:#f9fafb;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${renderFieldValue(String(dynTotal))}</td>`;
+        const rounded = Math.round((dynTotal + Number.EPSILON) * 100) / 100;
+        const formatted = formatIndianCurrencyInputString(rounded.toFixed(2));
+        html += `<td style="font-weight:700;background-color:#f9fafb;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${renderFieldValue(formatted)}</td>`;
       } else {
         html += "<td></td>";
       }

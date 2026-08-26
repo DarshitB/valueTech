@@ -2738,13 +2738,16 @@ function SummarizedReport() {
       let sum = 0;
       rows.forEach((row) => {
         if (isSummarizedMergedTitleRow(row)) return;
-        const raw = String(row?.[col.id] ?? "").replace(/\D/g, "");
-        sum += raw ? parseInt(raw, 10) || 0 : 0;
+        sum += parseCurrency(String(row?.[col.id] ?? ""));
       });
       totals[col.id] = sum;
     });
     return totals;
-  }, [summarizedTableData.dynamicColumns, summarizedTableData.rows]);
+  }, [
+    summarizedTableData.dynamicColumns,
+    summarizedTableData.rows,
+    parseCurrency,
+  ]);
 
   const handleSummarizedDynamicAllowSumChange = useCallback(
     (columnId, allowSum) => {
@@ -2753,10 +2756,15 @@ function SummarizedReport() {
       );
       const nextRows =
         allowSum === true
-          ? (summarizedTableData.rows || []).map((row) => ({
-              ...row,
-              [columnId]: String(row[columnId] ?? "").replace(/\D/g, ""),
-            }))
+          ? (summarizedTableData.rows || []).map((row) => {
+              if (isSummarizedMergedTitleRow(row)) return row;
+              return {
+                ...row,
+                [columnId]: handleCurrencyFormatting(
+                  String(row[columnId] ?? ""),
+                ),
+              };
+            })
           : summarizedTableData.rows;
       handleSummarizedTableDataChange({
         ...summarizedTableData,
@@ -2764,7 +2772,11 @@ function SummarizedReport() {
         rows: nextRows,
       });
     },
-    [summarizedTableData, handleSummarizedTableDataChange],
+    [
+      summarizedTableData,
+      handleSummarizedTableDataChange,
+      handleCurrencyFormatting,
+    ],
   );
 
   const isSummarizedColumnHiddenInReport = useCallback(
@@ -3591,13 +3603,13 @@ function SummarizedReport() {
       cellContent = (
         <input
           type="text"
-          inputMode="numeric"
-          autoComplete="off"
           className="form-field mb-0"
           style={summarizedInputStyle}
           value={cellValue}
-          onChange={(e) => setCellValue(e.target.value.replace(/\D/g, ""))}
-          placeholder="0"
+          onChange={(e) =>
+            setCellValue(handleCurrencyFormatting(e.target.value))
+          }
+          placeholder="0.00"
         />
       );
     } else {
@@ -7664,8 +7676,10 @@ function SummarizedReport() {
                               (col) => (
                                 <td key={`grand-total-dynamic-${col.id}`}>
                                   {col.allowSum
-                                    ? (summarizedDynamicColumnTotals[col.id] ??
-                                      0)
+                                    ? formatSummarizedGrandTotalCell(
+                                        summarizedDynamicColumnTotals[col.id] ??
+                                          0,
+                                      )
                                     : ""}
                                 </td>
                               ),
