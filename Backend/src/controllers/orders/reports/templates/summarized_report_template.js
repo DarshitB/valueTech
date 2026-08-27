@@ -1164,14 +1164,15 @@ function generateSummarizedTableAppendixHTML(formData, stampImageBase64) {
     font-size: 10px;
     font-weight: 700;
     text-align: center !important;
-    background: #993366 !important;
-    color: #fff !important;
+    background:  #e8beda !important;
+    color: #000 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     color-adjust: exact !important;
   }
   .summary-table thead tr:nth-child(3) th {
-    background: #e8beda !important;
+    background: #993366 !important;
+    color: #fff !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     color-adjust: exact !important;
