@@ -624,6 +624,24 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
 
         return Boolean(univerAPI.executeCommand("univer.command.redo"));
       },
+      openFind: () => {
+        const univerAPI = univerApiRef.current;
+        if (!univerAPI?.executeCommand) {
+          return false;
+        }
+
+        return Boolean(univerAPI.executeCommand("ui.operation.open-find-dialog"));
+      },
+      openReplace: () => {
+        const univerAPI = univerApiRef.current;
+        if (!univerAPI?.executeCommand) {
+          return false;
+        }
+
+        return Boolean(
+          univerAPI.executeCommand("ui.operation.open-replace-dialog")
+        );
+      },
       isFocused: () => {
         const root = rootRef.current;
         const activeElement = document.activeElement;

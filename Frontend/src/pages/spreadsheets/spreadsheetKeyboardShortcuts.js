@@ -1,5 +1,21 @@
 import { useEffect } from "react";
 
+function isSpreadsheetEditorContext(element, spreadsheet) {
+  if (spreadsheet?.isFocused?.()) {
+    return true;
+  }
+
+  if (!(element instanceof Element)) {
+    return false;
+  }
+
+  return Boolean(
+    element.closest(".spreadsheet-editor-container") ||
+      element.closest("[data-u-comp='find-replace-dialog']") ||
+      element.closest(".univer-find-input")
+  );
+}
+
 function isEditableElement(element) {
   if (!(element instanceof HTMLElement)) {
     return false;
@@ -41,14 +57,42 @@ function isEditableElement(element) {
 /**
  * Spreadsheet-only keyboard shortcuts.
  * - Cmd/Ctrl+S -> existing manual save callback
+ * - Cmd/Ctrl+F -> Univer find (blocks native browser find on the editor)
+ * - Ctrl+H -> Univer replace (does not steal Cmd+H on macOS)
  * - Cmd/Ctrl+Shift+Z and Ctrl+Y -> Univer redo command
  *
  * Undo (Cmd/Ctrl+Z) is intentionally untouched.
+ * These listeners are mounted only on the spreadsheet editor page.
  */
 export function useSpreadsheetKeyboardShortcuts({ spreadsheetRef, onManualSave }) {
   useEffect(() => {
     const handleKeyDown = (event) => {
       const spreadsheet = spreadsheetRef?.current;
+      const hasModifier = event.metaKey || event.ctrlKey;
+      if (!hasModifier || event.altKey) {
+        return;
+      }
+
+      const key = String(event.key || "").toLowerCase();
+      const inEditorContext = isSpreadsheetEditorContext(
+        event.target,
+        spreadsheet
+      );
+
+      // Cmd/Ctrl+F: keep find inside the sheet; do not open browser find.
+      if (key === "f" && inEditorContext) {
+        event.preventDefault();
+        spreadsheet?.openFind?.();
+        return;
+      }
+
+      // Ctrl+H: open replace. Leave Cmd+H alone on macOS (hides the window).
+      if (key === "h" && inEditorContext && event.ctrlKey) {
+        event.preventDefault();
+        spreadsheet?.openReplace?.();
+        return;
+      }
+
       if (!spreadsheet?.isFocused?.()) {
         return;
       }
@@ -57,13 +101,6 @@ export function useSpreadsheetKeyboardShortcuts({ spreadsheetRef, onManualSave }
       if (isEditableElement(target)) {
         return;
       }
-
-      const hasModifier = event.metaKey || event.ctrlKey;
-      if (!hasModifier || event.altKey) {
-        return;
-      }
-
-      const key = String(event.key || "").toLowerCase();
 
       // Cmd/Ctrl+S: reuse exact save handler used by the Save button.
       if (key === "s") {
