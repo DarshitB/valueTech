@@ -14,7 +14,28 @@ import {
   createDatabaseProviderRegistry,
   installDatabaseDropdown,
 } from "./dropdown";
-import { isLocalOnlyRealtimeCommand } from "./realtime/localOnlyCommands";
+import {
+  isLocalFormulaResultRelay,
+  isLocalOnlyRealtimeCommand,
+} from "./realtime/localOnlyCommands";
+import {
+  SET_RANGE_VALUES_MUTATION_ID,
+  bindCommandParamsToLocalWorkbook,
+  createFormulaCalculationController,
+  disableUniverAutoRangeValueRecalc,
+  shouldScheduleFormulaCalculation,
+  waitForWorkbookFormulas,
+} from "./realtime/forceFormulaCalculation";
+import {
+  installLargerSelectionFillHandle,
+  normalizeSelectionBorderColor,
+  paintLocalSelectionBorder,
+} from "./selectionFillHandle";
+import {
+  disablePresenceHighlightPointerEvents,
+  installPresenceHighlightPointerPassthrough,
+} from "./presenceHighlightPointerEvents";
+import { installHyperlinkClickOpen } from "./hyperlinkClickOpen";
 import "./styles.css";
 
 function PresenceMarkerLabel({ popup }) {
@@ -77,6 +98,7 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
     isApplyingRemoteCommandRef,
     onApplyingRemoteCommandChange,
     databaseProviderFetchers = null,
+    selectionBorderColor = null,
   },
   ref
 ) {
@@ -100,7 +122,15 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
   const latestPresenceMarkersRef = useRef([]);
   const presenceResyncRafRef = useRef(0);
   const presenceForceResyncRafRef = useRef(0);
+  const selectionBorderColorRef = useRef(null);
+  const formulaCalculationControllerRef = useRef(null);
+  const restoreUniverRangeRecalcRef = useRef(() => {});
+  const formulaResultWorkbookSyncSkipCountRef = useRef(0);
+  const formulaPersistFlushGateRef = useRef(false);
   const [isInitializing, setIsInitializing] = useState(true);
+
+  selectionBorderColorRef.current =
+    normalizeSelectionBorderColor(selectionBorderColor);
 
   useEffect(() => {
     onWorkbookChangeRef.current = onWorkbookChange;
@@ -122,11 +152,19 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
     onReadyRef.current = onReady;
   }, [onReady]);
 
+  useEffect(() => {
+    paintLocalSelectionBorder(
+      univerApiRef.current,
+      selectionBorderColorRef.current
+    );
+  }, [selectionBorderColor]);
+
   const shouldSkipLocalWorkbookSync = () => {
     return (
       remoteApplyDepthRef.current > 0 ||
       isApplyingRemoteCommandLocalRef.current ||
-      Boolean(isApplyingRemoteCommandRef?.current)
+      Boolean(isApplyingRemoteCommandRef?.current) ||
+      formulaPersistFlushGateRef.current
     );
   };
 
@@ -212,7 +250,7 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
   };
 
   const createPresenceHighlight = (range, borderColor) => {
-    return range.highlight({
+    const disposable = range.highlight({
       strokeWidth: 2,
       stroke: borderColor,
       fill: "rgba(0, 0, 0, 0)",
@@ -220,8 +258,9 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
       columnHeaderFill: "rgba(0, 0, 0, 0)",
       rowHeaderStroke: borderColor,
       columnHeaderStroke: borderColor,
-      autofillStroke: borderColor,
     });
+    disablePresenceHighlightPointerEvents(univerApiRef.current);
+    return disposable;
   };
 
   const createPresenceMarkerParts = (worksheet, marker) => {
@@ -464,6 +503,10 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
           await workbook.endEditingAsync(true);
         }
 
+        await formulaCalculationControllerRef.current?.flushBeforePersist(
+          univerApiRef.current
+        );
+
         const workbookData = sanitizeWorkbookSnapshotForPersistence(
           workbook.save()
         );
@@ -541,6 +584,8 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
         try {
           univerAPI.disposeUnit(unitId);
           workbookRef.current = univerAPI.createWorkbook(mutableSnapshot);
+          restoreUniverRangeRecalcRef.current =
+            disableUniverAutoRangeValueRecalc(univerAPI);
 
           const nextWorkbook = workbookRef.current;
           if (!nextWorkbook) {
@@ -596,9 +641,34 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
         onApplyingRemoteCommandChange?.(true);
 
         try {
-          const result = await Promise.resolve(
-            univerAPI.executeCommand(normalizedCommandId, commandParams ?? undefined)
+          const localCommandParams = bindCommandParamsToLocalWorkbook(
+            univerAPI,
+            commandParams ?? undefined
           );
+
+          const result = await Promise.resolve(
+            univerAPI.executeCommand(
+              normalizedCommandId,
+              localCommandParams ?? undefined
+            )
+          );
+
+          if (
+            shouldScheduleFormulaCalculation(
+              normalizedCommandId,
+              localCommandParams,
+              null
+            )
+          ) {
+            formulaCalculationControllerRef.current?.schedule(
+              univerAPI,
+              localCommandParams,
+              { immediate: true }
+            );
+            await formulaCalculationControllerRef.current?.flushBeforePersist(
+              univerAPI
+            );
+          }
 
           const stateAfterReplay = captureRealtimeState(univerAPI);
           lastRealtimeWorkbookSignatureRef.current =
@@ -623,6 +693,14 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
         }
 
         return Boolean(univerAPI.executeCommand("univer.command.redo"));
+      },
+      insertCellLineBreak: () => {
+        const univerAPI = univerApiRef.current;
+        if (!univerAPI?.executeCommand) {
+          return false;
+        }
+
+        return Boolean(univerAPI.executeCommand("doc.command.break-line"));
       },
       openFind: () => {
         const univerAPI = univerApiRef.current;
@@ -665,15 +743,143 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
     let univerAPI;
     const changeEventDisposables = [];
     let databaseDropdownDisposable = () => {};
+    let selectionFillHandleDisposable = () => {};
+    let presencePointerPassthroughDisposable = () => {};
+    let hyperlinkClickOpenDisposable = () => {};
 
     setIsInitializing(true);
+    formulaCalculationControllerRef.current?.dispose();
+    formulaCalculationControllerRef.current = createFormulaCalculationController({
+      onPersistFlushChange: (isFlushing) => {
+        formulaPersistFlushGateRef.current = Boolean(isFlushing);
+      },
+    });
 
+    // Must register before createCompanyUniver so this runs before Univer's
+    // window-capture shortcut handler.
+    const handleCellEnterShortcut = (event) => {
+      if (isDisposed) {
+        return;
+      }
+
+      if (String(event.key || "").toLowerCase() !== "enter" || event.shiftKey) {
+        return;
+      }
+
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        (target.closest("[data-u-comp='find-replace-dialog']") ||
+          target.closest(".univer-find-input"))
+      ) {
+        return;
+      }
+
+      const workbook =
+        workbookRef.current || univerApiRef.current?.getActiveWorkbook?.();
+      if (!workbook) {
+        return;
+      }
+
+      const isEditing = Boolean(workbook.isCellEditing?.());
+      const isCmdOrCtrlEnter =
+        (event.metaKey || event.ctrlKey) && !event.altKey;
+      const isAltOrOptionEnter =
+        event.altKey && !event.metaKey && !event.ctrlKey;
+      const isPlainEnter =
+        !event.metaKey && !event.ctrlKey && !event.altKey;
+
+      if (isEditing) {
+        if (isCmdOrCtrlEnter) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          univerApiRef.current?.executeCommand?.("doc.command.break-line");
+          return;
+        }
+
+        if (isAltOrOptionEnter) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+
+        return;
+      }
+
+      if (!isPlainEnter) {
+        return;
+      }
+
+      const root = rootRef.current;
+      const activeElement = document.activeElement;
+      const isInSheet =
+        (root && target instanceof Node && root.contains(target)) ||
+        (root &&
+          activeElement instanceof Node &&
+          root.contains(activeElement));
+      const isOnPageBody =
+        Boolean(root) &&
+        (target === document.body ||
+          target === document.documentElement ||
+          activeElement === document.body);
+
+      if (!isInSheet && !isOnPageBody) {
+        return;
+      }
+
+      if (
+        activeElement instanceof HTMLElement &&
+        !activeElement.closest("[data-u-comp='editor']")
+      ) {
+        const tagName = activeElement.tagName.toLowerCase();
+        if (
+          tagName === "input" ||
+          tagName === "textarea" ||
+          tagName === "select" ||
+          activeElement.isContentEditable
+        ) {
+          return;
+        }
+      }
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      workbook.startEditing?.();
+    };
+
+    window.addEventListener("keydown", handleCellEnterShortcut, true);
+
+    void (async () => {
     try {
       ({ univerAPI } = createCompanyUniver(container));
       univerApiRef.current = univerAPI;
+      selectionFillHandleDisposable = installLargerSelectionFillHandle(
+        univerAPI,
+        () => selectionBorderColorRef.current
+      );
+      presencePointerPassthroughDisposable =
+        installPresenceHighlightPointerPassthrough(univerAPI);
+      hyperlinkClickOpenDisposable = installHyperlinkClickOpen(univerAPI);
 
-      const notifyWorkbookChange = () => {
+      const notifyWorkbookChange = (event = {}) => {
         if (shouldSkipLocalWorkbookSync()) {
+          return;
+        }
+
+        // Formula-engine result writes are not user edits. Treating them as
+        // dirty retriggered autosave in a Saving... loop after persist recalc.
+        if (formulaResultWorkbookSyncSkipCountRef.current > 0) {
+          formulaResultWorkbookSyncSkipCountRef.current -= 1;
+          return;
+        }
+
+        const payload = event?.payload;
+        if (
+          isLocalFormulaResultRelay({
+            id: payload?.id ?? event?.id,
+            params: payload?.params ?? event?.params,
+            options: event?.options,
+          })
+        ) {
           return;
         }
 
@@ -699,6 +905,22 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
           stateAfterCommand.workbookSignature;
         lastRealtimeActiveCellRef.current = stateAfterCommand.activeCell;
 
+        // Recalc dependents after a typed cell write. Peer applies recalc in
+        // executeRealtimeCommand so this path stays single-user debounce only.
+        if (
+          !shouldSkipLocalRealtimeCommandPublish() &&
+          shouldScheduleFormulaCalculation(
+            event?.id,
+            event?.params,
+            event?.options
+          )
+        ) {
+          formulaCalculationControllerRef.current?.schedule(
+            univerAPI,
+            event?.params
+          );
+        }
+
         if (shouldSkipLocalRealtimeCommandPublish()) {
           return;
         }
@@ -712,21 +934,9 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
           return;
         }
 
-        const commandType = event?.type;
-        const enumCommandType = univerAPI?.Enum?.CommandType;
-        const OPERATION_TYPE =
-          enumCommandType?.OPERATION != null ? enumCommandType.OPERATION : 1;
-        const COMMAND_TYPE =
-          enumCommandType?.COMMAND != null ? enumCommandType.COMMAND : 0;
-        const MUTATION_TYPE =
-          enumCommandType?.MUTATION != null ? enumCommandType.MUTATION : 2;
-
-        const category =
-          commandType === OPERATION_TYPE
-            ? "selection/navigation"
-            : commandType === MUTATION_TYPE || commandType === COMMAND_TYPE
-              ? "workbook-mutation"
-              : "unknown";
+        if (isLocalFormulaResultRelay(event)) {
+          return;
+        }
 
         const commandParams =
           event?.params &&
@@ -823,6 +1033,29 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
       };
 
       if (univerAPI?.addEvent && univerAPI?.Event) {
+        // Mark formula-result writes before SheetValueChanged so autosave
+        // does not treat Message `v` updates as a new user edit.
+        if (univerAPI.Event.BeforeCommandExecute) {
+          changeEventDisposables.push(
+            univerAPI.addEvent(univerAPI.Event.BeforeCommandExecute, (event) => {
+              if (
+                String(event?.id ?? "").trim() !== SET_RANGE_VALUES_MUTATION_ID
+              ) {
+                return;
+              }
+
+              if (!isLocalFormulaResultRelay(event)) {
+                return;
+              }
+
+              formulaResultWorkbookSyncSkipCountRef.current += 1;
+              queueMicrotask(() => {
+                formulaResultWorkbookSyncSkipCountRef.current = 0;
+              });
+            })
+          );
+        }
+
         const changeEvents = [
           univerAPI.Event.SheetValueChanged,
           univerAPI.Event.SheetEditStarted,
@@ -859,11 +1092,23 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
           ? structuredClone(snapshot)
           : JSON.parse(JSON.stringify(snapshot));
       workbookRef.current = univerAPI.createWorkbook(mutableSnapshot);
+      restoreUniverRangeRecalcRef.current =
+        disableUniverAutoRangeValueRecalc(univerAPI);
 
       const initialRealtimeState = captureRealtimeState(univerAPI);
       lastRealtimeWorkbookSignatureRef.current =
         initialRealtimeState.workbookSignature;
       lastRealtimeActiveCellRef.current = initialRealtimeState.activeCell;
+
+      try {
+        await waitForWorkbookFormulas(univerAPI);
+      } catch {
+        // Open the sheet even if the first formula pass times out.
+      }
+
+      if (isDisposed) {
+        return;
+      }
 
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -904,9 +1149,11 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
         onErrorRef.current?.(error);
       }
     }
+    })();
 
     return () => {
       isDisposed = true;
+      window.removeEventListener("keydown", handleCellEnterShortcut, true);
       selectionReadyRef.current = false;
       remoteApplyDepthRef.current = 0;
       isApplyingRemoteCommandLocalRef.current = false;
@@ -926,6 +1173,15 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
       clearPresenceMarkers();
       changeEventDisposables.forEach((disposable) => disposable?.dispose?.());
       databaseDropdownDisposable?.();
+      selectionFillHandleDisposable?.();
+      presencePointerPassthroughDisposable?.();
+      hyperlinkClickOpenDisposable?.();
+      restoreUniverRangeRecalcRef.current?.();
+      restoreUniverRangeRecalcRef.current = () => {};
+      formulaCalculationControllerRef.current?.dispose();
+      formulaCalculationControllerRef.current = null;
+      formulaResultWorkbookSyncSkipCountRef.current = 0;
+      formulaPersistFlushGateRef.current = false;
       workbookRef.current = null;
       univerApiRef.current = null;
       univerAPI?.dispose();

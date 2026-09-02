@@ -13,8 +13,9 @@ import {
 /**
  * Apply remote workbook snapshots from the shared realtime connection.
  *
- * Phase 2.5: queues remote snapshots while local changes are pending, applies
- * in strict server sequence order, and ignores duplicates/stale packets.
+ * Phase 2.5: queues remote commands, applies in server sequence order, and
+ * ignores duplicates/stale packets. Incoming commands are not blocked by a
+ * pending local publish.
  */
 export function useSpreadsheetWorkbookSubscriber({
   spreadsheetRef,

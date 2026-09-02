@@ -43,13 +43,16 @@ export function createWorkbookSyncCoordinator() {
 }
 
 /**
+ * Hold remotes only while this client is applying or publishing, so
+ * executeCommand is not re-entered. Do not hold for localChangesPending:
+ * that blocked incoming live updates until a local publish succeeded, which
+ * never happened if the server dropped the local sequence.
+ *
  * @param {ReturnType<typeof createWorkbookSyncCoordinator>} coordinator
  */
 export function shouldHoldRemoteApplies(coordinator, isApplyingRemoteWorkbook) {
   return (
-    coordinator.localChangesPending ||
-    coordinator.publishInFlight ||
-    Boolean(isApplyingRemoteWorkbook)
+    coordinator.publishInFlight || Boolean(isApplyingRemoteWorkbook)
   );
 }
 

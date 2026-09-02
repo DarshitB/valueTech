@@ -178,6 +178,12 @@ function SpreadsheetRealtimeSurface({
     spreadsheet.syncPresenceMarkers(presenceMarkers);
   }, [spreadsheetRef, isSpreadsheetReady, presenceMarkers]);
 
+  const currentUserOverlayColor = useMemo(() => {
+    const marker = presenceMarkers.find((entry) => entry?.isCurrentUser);
+    const color = marker?.identity?.borderColor;
+    return typeof color === "string" && color.trim() ? color.trim() : null;
+  }, [presenceMarkers]);
+
   return (
     <>
       <CompanySpreadsheet
@@ -192,6 +198,7 @@ function SpreadsheetRealtimeSurface({
         onError={handleSpreadsheetError}
         isApplyingRemoteCommandRef={isApplyingRemoteCommandRef}
         onApplyingRemoteCommandChange={handleApplyingRemoteCommandChange}
+        selectionBorderColor={currentUserOverlayColor}
       />
     </>
   );

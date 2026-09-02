@@ -62,6 +62,8 @@ function isEditableElement(element) {
  * - Cmd/Ctrl+Shift+Z and Ctrl+Y -> Univer redo command
  *
  * Undo (Cmd/Ctrl+Z) is intentionally untouched.
+ * Cell newline (Cmd/Ctrl+Enter) is handled in CompanySpreadsheet so it
+ * runs before Univer's own shortcut listener.
  * These listeners are mounted only on the spreadsheet editor page.
  */
 export function useSpreadsheetKeyboardShortcuts({ spreadsheetRef, onManualSave }) {

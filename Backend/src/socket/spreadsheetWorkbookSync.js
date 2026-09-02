@@ -28,6 +28,7 @@ const { roomName } = require("./spreadsheetPresence");
 const { nextSequence, clearSequence } = require("./workbookSyncSequence");
 const {
   isDuplicateClientSequence,
+  clearUserDedup,
   clearSpreadsheetDedup,
 } = require("./commandRelayDedup");
 
@@ -197,6 +198,10 @@ function registerSpreadsheetWorkbookSync(io, socket) {
 
     const previousSpreadsheetId = trackedSpreadsheetId;
     trackedSpreadsheetId = spreadsheetId;
+
+    if (socket.user?.id != null) {
+      clearUserDedup(spreadsheetId, socket.user.id);
+    }
 
     if (previousSpreadsheetId && previousSpreadsheetId !== spreadsheetId) {
       scheduleRelayCleanupIfRoomEmpty(io, previousSpreadsheetId);

@@ -5,8 +5,16 @@ import {
   enqueueLocalCommand,
   endPublishInFlight,
   recoverStuckPublish,
-  shouldHoldRemoteApplies,
 } from "./workbookSyncCoordinator";
+
+/**
+ * client_sequence must stay unique while the server still remembers this
+ * user's old 1, 2, 3… values (room not empty). Starting at 0 after refresh
+ * made the server silently drop every new command.
+ */
+function createClientSequenceSeed() {
+  return Date.now() + Math.floor(Math.random() * 1_000_000);
+}
 
 /**
  * Publish local workbook snapshots over the shared realtime connection.
@@ -22,7 +30,7 @@ export function useSpreadsheetWorkbookPublisher({
   syncCoordinator,
 }) {
   const { socket, spreadsheetId, isRoomReady } = useSpreadsheetRealtime();
-  const clientSequenceRef = useRef(0);
+  const clientSequenceRef = useRef(createClientSequenceSeed());
   const pendingPublishRef = useRef(false);
   const processPendingPublishRef = useRef(async () => {});
 
@@ -39,7 +47,7 @@ export function useSpreadsheetWorkbookPublisher({
   }, [syncCoordinator]);
 
   useEffect(() => {
-    clientSequenceRef.current = 0;
+    clientSequenceRef.current = createClientSequenceSeed();
     if (syncCoordinator) {
       syncCoordinator.lastPublishedClientSequence = 0;
       syncCoordinator.publishedGeneration = 0;

@@ -4,7 +4,9 @@
  * Tracks (spreadsheetId, userId, client_sequence) tuples so reconnect
  * retries do not broadcast the same command twice.
  *
- * Cleared when the spreadsheet Socket.IO room is emptied.
+ * Per-user keys are cleared on spreadsheet:join so a refreshed client that
+ * starts sequences over is not silently dropped while others stay in the room.
+ * The full spreadsheet set is still cleared when the Socket.IO room is emptied.
  */
 
 const seenKeys = new Set();
@@ -32,6 +34,27 @@ function isDuplicateClientSequence(spreadsheetId, userId, clientSequence) {
 }
 
 /**
+ * Remove duplicate-tracking entries for one user in a spreadsheet room.
+ * Does not touch other users' keys.
+ *
+ * @param {string} spreadsheetId
+ * @param {number|string} userId
+ */
+function clearUserDedup(spreadsheetId, userId) {
+  if (!spreadsheetId || userId == null || userId === "") {
+    return;
+  }
+
+  const prefix = `${spreadsheetId}:${userId}:`;
+
+  for (const key of seenKeys) {
+    if (key.startsWith(prefix)) {
+      seenKeys.delete(key);
+    }
+  }
+}
+
+/**
  * Remove duplicate-tracking entries for a spreadsheet room.
  *
  * @param {string} spreadsheetId
@@ -48,5 +71,6 @@ function clearSpreadsheetDedup(spreadsheetId) {
 
 module.exports = {
   isDuplicateClientSequence,
+  clearUserDedup,
   clearSpreadsheetDedup,
 };
