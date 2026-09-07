@@ -1,6 +1,7 @@
 /**
  * Univer commands that must stay local to the current user.
- * Zoom is a viewport preference (Google Sheets behavior), not shared workbook state.
+ * Zoom and scroll are viewport preferences (Google Sheets behavior), not shared
+ * workbook state. Relaying them moved a peer's screen when they had done nothing.
  * Find-dialog operations are local UI only — replace still syncs via workbook mutations.
  * Hyperlink popups/panels are local UI only — adding/removing a link still syncs.
  * Formula calculation results are local — each client computes them. Relaying
@@ -10,6 +11,13 @@ export const LOCAL_ONLY_REALTIME_COMMAND_IDS = new Set([
   "sheet.operation.set-zoom-ratio",
   "sheet.command.change-zoom-ratio",
   "sheet.command.set-zoom-ratio",
+  "sheet.operation.set-scroll",
+  "sheet.command.set-scroll-relative",
+  "sheet.command.scroll-view",
+  "sheet.command.scroll-to-cell",
+  "sheet.command.scroll-view-reset",
+  "sheet.operation.scroll-to-range",
+  "sheet.operation.scroll-to-cell",
   "ui.operation.open-find-dialog",
   "ui.operation.open-replace-dialog",
   "ui.operation.go-to-next-match",
