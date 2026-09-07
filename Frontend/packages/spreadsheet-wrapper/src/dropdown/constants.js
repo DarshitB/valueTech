@@ -11,6 +11,7 @@ export const DATABASE_DROPDOWN_MENU_IDS = {
   ASSET_CATEGORY: "company.database-dropdown.asset-category",
   SUB_CATEGORY: "company.database-dropdown.sub-category",
   FIELD_VERIFIER: "company.database-dropdown.field-verifier",
+  MANAGER: "company.database-dropdown.manager",
   REMOVE: "company.remove-database-dropdown",
 };
 
@@ -24,4 +25,5 @@ export const DATABASE_PROVIDER_IDS = {
   ASSET_CATEGORY: "asset_category",
   SUB_CATEGORY: "sub_category",
   FIELD_VERIFIER: "field_verifier",
+  MANAGER: "manager",
 };

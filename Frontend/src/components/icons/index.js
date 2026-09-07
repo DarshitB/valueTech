@@ -49,4 +49,6 @@ export {
   TrashIcon,
   CommentBirdIcon,
   MediaNotificationIcon,
+  PinIcon,
+  ArchiveIcon,
 } from "./Icons";

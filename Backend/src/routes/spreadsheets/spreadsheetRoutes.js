@@ -9,8 +9,38 @@ const spreadsheetSavePermission = require("../../middleware/spreadsheetSavePermi
 
 router.use(auth);
 
-router.get("/", checkPermission("view_spreadsheet"), spreadsheetController.getAll);
+router.get(
+  "/",
+  checkPermission("view_spreadsheet"),
+  (req, res, next) => {
+    if (String(req.query.archived || "").toLowerCase() !== "true") {
+      return next();
+    }
+    return checkPermission("view_archive_spreadsheet")(req, res, next);
+  },
+  spreadsheetController.getAll
+);
 router.post("/", checkPermission("add_spreadsheet"), spreadsheetController.create);
+router.post(
+  "/:id/pin",
+  checkPermission("view_spreadsheet"),
+  spreadsheetController.pin
+);
+router.delete(
+  "/:id/pin",
+  checkPermission("view_spreadsheet"),
+  spreadsheetController.unpin
+);
+router.post(
+  "/:id/archive",
+  checkPermission("create_archive_spreadsheet"),
+  spreadsheetController.archive
+);
+router.delete(
+  "/:id/archive",
+  checkPermission("create_archive_spreadsheet"),
+  spreadsheetController.unarchive
+);
 router.get("/:id", checkPermission("view_spreadsheet"), spreadsheetController.getById);
 router.put("/:id", spreadsheetEditPermission(), spreadsheetController.update);
 router.delete(

@@ -301,6 +301,14 @@ const AppRoutes = () => {
           }
         />
         <Route
+          path="spreadsheet/archived"
+          element={
+            <ProtectedRoute permission="view_spreadsheet">
+              <Spreadsheets archived />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="spreadsheet/:id"
           element={
             <ProtectedRoute permission="view_spreadsheet">

@@ -8,9 +8,21 @@ const DETAIL_COLUMNS = [
 ];
 
 const spreadsheet = {
-  findAll: (userId, isDeveloperAdmin = false, trx = db) => {
+  findAll: (
+    userId,
+    isDeveloperAdmin = false,
+    { archived = false } = {},
+    trx = db
+  ) => {
     const query = trx("spreadsheets")
       .leftJoin("users as created_user", "spreadsheets.created_by", "created_user.id")
+      .leftJoin("users as archived_user", "spreadsheets.archived_by", "archived_user.id")
+      .leftJoin("spreadsheet_pins", function () {
+        this.on("spreadsheet_pins.spreadsheet_id", "=", "spreadsheets.id").andOnVal(
+          "spreadsheet_pins.user_id",
+          userId
+        );
+      })
       .select(
         "spreadsheets.id",
         "spreadsheets.name",
@@ -18,9 +30,22 @@ const spreadsheet = {
         "spreadsheets.created_by",
         "spreadsheets.created_at",
         "spreadsheets.updated_at",
-        "created_user.name as created_by_name"
+        "spreadsheets.archived_at",
+        "spreadsheets.archived_by",
+        "created_user.name as created_by_name",
+        "archived_user.name as archived_by_name",
+        trx.raw("(spreadsheet_pins.id IS NOT NULL) as is_pinned")
       )
-      .whereNull("spreadsheets.deleted_at")
+      .whereNull("spreadsheets.deleted_at");
+
+    if (archived) {
+      query.whereNotNull("spreadsheets.archived_at");
+    } else {
+      query.whereNull("spreadsheets.archived_at");
+    }
+
+    query
+      .orderByRaw("CASE WHEN spreadsheet_pins.id IS NULL THEN 1 ELSE 0 END")
       .orderBy("spreadsheets.created_at", "desc");
 
     if (!isDeveloperAdmin) {
@@ -179,6 +204,44 @@ const spreadsheet = {
         deleted_by: deletedBy,
         updated_at: trx.fn.now(),
         updated_by: deletedBy,
+      }),
+
+  findPin: (spreadsheetId, userId, trx = db) =>
+    trx("spreadsheet_pins")
+      .select("id")
+      .where({ spreadsheet_id: spreadsheetId, user_id: userId })
+      .first(),
+
+  insertPin: (spreadsheetId, userId, trx = db) =>
+    trx("spreadsheet_pins")
+      .insert({
+        spreadsheet_id: spreadsheetId,
+        user_id: userId,
+      })
+      .onConflict(["spreadsheet_id", "user_id"])
+      .ignore(),
+
+  deletePin: (spreadsheetId, userId, trx = db) =>
+    trx("spreadsheet_pins")
+      .where({ spreadsheet_id: spreadsheetId, user_id: userId })
+      .del(),
+
+  archive: (id, archivedBy, trx = db) =>
+    trx("spreadsheets")
+      .where({ id })
+      .whereNull("deleted_at")
+      .update({
+        archived_at: trx.fn.now(),
+        archived_by: archivedBy,
+      }),
+
+  unarchive: (id, trx = db) =>
+    trx("spreadsheets")
+      .where({ id })
+      .whereNull("deleted_at")
+      .update({
+        archived_at: null,
+        archived_by: null,
       }),
 };
 module.exports = spreadsheet;

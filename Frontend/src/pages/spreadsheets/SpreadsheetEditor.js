@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
 import {
   clearSelectedSpreadsheet,
   fetchSpreadsheetById,
@@ -289,6 +289,10 @@ function SpreadsheetEditor() {
   }, []);
 
   useEffect(() => {
+    if (String(id).toLowerCase() === "archived") {
+      return undefined;
+    }
+
     dispatch(fetchSpreadsheetById(id));
 
     return () => {
@@ -327,6 +331,10 @@ function SpreadsheetEditor() {
       clearSavedStatusTimer();
     };
   }, [clearAutosaveTimer, clearSavedStatusTimer]);
+
+  if (String(id).toLowerCase() === "archived") {
+    return <Navigate to="/spreadsheet/archived" replace />;
+  }
 
   if (detailLoading) {
     return (

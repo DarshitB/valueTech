@@ -5,12 +5,21 @@ import {
   addSpreadsheet,
   editSpreadsheet,
   removeSpreadsheet,
+  pinSpreadsheetById,
+  unpinSpreadsheetById,
+  archiveSpreadsheetById,
+  unarchiveSpreadsheetById,
 } from "../../redux/reducers/spreadsheetReducer";
 import CustomDataTable from "../../components/CustomDataTable";
 import FormModel from "../../components/FormModel";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import SingleSearchSelect from "../../components/SingleSearchSelect";
-import { DeleteIcon, EditIcon } from "../../components/icons";
+import {
+  ArchiveIcon,
+  DeleteIcon,
+  EditIcon,
+  PinIcon,
+} from "../../components/icons";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
 import { hasPermission } from "../../utils/permissionUtils";
 import { usePageTitle } from "../../context/PageTitleContext";
@@ -18,10 +27,13 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { getUsers } from "../../api/user.api";
 
-function Spreadsheets() {
+const PINNED_ICON_COLOR = "#f59e0b";
+
+function Spreadsheets({ archived = false }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { setTitle } = usePageTitle();
+  const showArchived = Boolean(archived);
 
   const { list: spreadsheets, loading, saving } = useSelector(
     (state) => state.spreadsheets
@@ -29,6 +41,14 @@ function Spreadsheets() {
   const allowedPermissions = useSelector(selectPermissions);
   const currentUser = useSelector((state) => state.auth.user);
   const canAddSpreadsheet = hasPermission(allowedPermissions, "add_spreadsheet");
+  const canArchiveSpreadsheet = hasPermission(
+    allowedPermissions,
+    "create_archive_spreadsheet"
+  );
+  const canViewArchivedSpreadsheets = hasPermission(
+    allowedPermissions,
+    "view_archive_spreadsheet"
+  );
   const roleName = currentUser?.role?.name || "";
   const isDeveloperAdmin = roleName.toLowerCase() === "developer_admin";
 
@@ -51,14 +71,27 @@ function Spreadsheets() {
   const [canEditAssignments, setCanEditAssignments] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [confirmDeleteName, setConfirmDeleteName] = useState("");
+  const [confirmArchiveId, setConfirmArchiveId] = useState(null);
+  const [confirmArchiveName, setConfirmArchiveName] = useState("");
+  const [confirmUnarchiveId, setConfirmUnarchiveId] = useState(null);
+  const [confirmUnarchiveName, setConfirmUnarchiveName] = useState("");
 
   useEffect(() => {
-    setTitle("Spreadsheets");
-  }, [setTitle]);
+    setTitle(showArchived ? "Archived Spreadsheets" : "Spreadsheets");
+  }, [setTitle, showArchived]);
 
   useEffect(() => {
-    dispatch(fetchSpreadsheets());
-  }, [dispatch]);
+    if (showArchived && !canViewArchivedSpreadsheets) {
+      navigate("/spreadsheet", { replace: true });
+    }
+  }, [showArchived, canViewArchivedSpreadsheets, navigate]);
+
+  useEffect(() => {
+    if (showArchived && !canViewArchivedSpreadsheets) {
+      return;
+    }
+    dispatch(fetchSpreadsheets(showArchived));
+  }, [dispatch, showArchived, canViewArchivedSpreadsheets]);
 
   useEffect(() => {
     let mounted = true;
@@ -184,7 +217,7 @@ function Spreadsheets() {
 
       if (action.type.endsWith("fulfilled")) {
         closeCreateModal();
-        dispatch(fetchSpreadsheets());
+        dispatch(fetchSpreadsheets(showArchived));
       }
     } catch (error) {
       toast.error("Failed to create spreadsheet");
@@ -237,6 +270,40 @@ function Spreadsheets() {
       toast.error("Failed to delete spreadsheet");
     }
   };
+
+  const handleTogglePin = async (event, spreadsheet) => {
+    event.stopPropagation();
+    const action = spreadsheet.is_pinned
+      ? unpinSpreadsheetById(spreadsheet.id)
+      : pinSpreadsheetById(spreadsheet.id);
+    await dispatch(action);
+  };
+
+  const handleConfirmArchive = async () => {
+    if (!canArchiveSpreadsheet) {
+      toast.error("You don't have permission to archive spreadsheets.");
+      return;
+    }
+    const result = await dispatch(archiveSpreadsheetById(confirmArchiveId));
+    if (archiveSpreadsheetById.fulfilled.match(result)) {
+      setConfirmArchiveId(null);
+      setConfirmArchiveName("");
+    }
+  };
+
+  const handleConfirmUnarchive = async () => {
+    if (!canArchiveSpreadsheet) {
+      toast.error("You don't have permission to restore spreadsheets.");
+      return;
+    }
+    const result = await dispatch(unarchiveSpreadsheetById(confirmUnarchiveId));
+    if (unarchiveSpreadsheetById.fulfilled.match(result)) {
+      setConfirmUnarchiveId(null);
+      setConfirmUnarchiveName("");
+    }
+  };
+
+  const columnCount = showArchived ? 9 : 7;
 
   const renderSpreadsheetForm = (onSubmit, submitLabel, submittingLabel) => (
     <form
@@ -312,11 +379,26 @@ function Spreadsheets() {
         <CustomDataTable>
           {{
             buttons: (
-              canAddSpreadsheet && (
-                <button className="btn" type="button" onClick={openCreateModal}>
-                  New Spreadsheet
-                </button>
-              )
+              <div className="add-action-buttons">
+                {canAddSpreadsheet && !showArchived && (
+                  <button className="btn" type="button" onClick={openCreateModal}>
+                    New Spreadsheet
+                  </button>
+                )}
+                {(canViewArchivedSpreadsheets || showArchived) && (
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={() =>
+                      navigate(
+                        showArchived ? "/spreadsheet" : "/spreadsheet/archived"
+                      )
+                    }
+                  >
+                    {showArchived ? "Active Sheets" : "Archived Sheets"}
+                  </button>
+                )}
+              </div>
             ),
             header: (
               <tr>
@@ -326,15 +408,23 @@ function Spreadsheets() {
                 <th style={{ width: "160px" }}>Created By</th>
                 <th style={{ width: "180px" }}>Created At</th>
                 <th style={{ width: "180px" }}>Updated At</th>
-                <th style={{ width: "120px", textAlign: "center" }}>Action</th>
+                {showArchived && (
+                  <th style={{ width: "160px" }}>Archived By</th>
+                )}
+                {showArchived && (
+                  <th style={{ width: "180px" }}>Archived At</th>
+                )}
+                <th style={{ width: "240px", textAlign: "center" }}>Action</th>
               </tr>
             ),
             rows:
               spreadsheets.length === 0
                 ? [
                     <tr key="empty">
-                      <td colSpan={7} className="text-center">
-                        No spreadsheets found
+                      <td colSpan={columnCount} className="text-center">
+                        {showArchived
+                          ? "No archived spreadsheets"
+                          : "No spreadsheets found"}
                       </td>
                     </tr>,
                   ]
@@ -350,7 +440,60 @@ function Spreadsheets() {
                       <td>{spreadsheet.created_by_name || "-"}</td>
                       <td>{formatDate(spreadsheet.created_at)}</td>
                       <td>{formatDate(spreadsheet.updated_at)}</td>
-                      <td style={{ textAlign: "center" }}>
+                      {showArchived && (
+                        <td>{spreadsheet.archived_by_name || "-"}</td>
+                      )}
+                      {showArchived && (
+                        <td>{formatDate(spreadsheet.archived_at)}</td>
+                      )}
+                      <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
+                        <button
+                          className="action-icons line-action-icon tooltip-link"
+                          type="button"
+                          title={
+                            spreadsheet.is_pinned
+                              ? "Unpin this sheet"
+                              : "Pin this sheet"
+                          }
+                          onClick={(event) => handleTogglePin(event, spreadsheet)}
+                        >
+                          <PinIcon
+                            color={
+                              spreadsheet.is_pinned
+                                ? PINNED_ICON_COLOR
+                                : "currentColor"
+                            }
+                            filled={Boolean(spreadsheet.is_pinned)}
+                          />
+                        </button>
+                        {canArchiveSpreadsheet &&
+                          (showArchived ? (
+                            <button
+                              className="action-icons line-action-icon tooltip-link"
+                              type="button"
+                              title="Restore this sheet"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setConfirmUnarchiveId(spreadsheet.id);
+                                setConfirmUnarchiveName(spreadsheet.name);
+                              }}
+                            >
+                              <ArchiveIcon color={PINNED_ICON_COLOR} />
+                            </button>
+                          ) : (
+                            <button
+                              className="action-icons line-action-icon tooltip-link"
+                              type="button"
+                              title="Archive this sheet"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setConfirmArchiveId(spreadsheet.id);
+                                setConfirmArchiveName(spreadsheet.name);
+                              }}
+                            >
+                              <ArchiveIcon />
+                            </button>
+                          ))}
                         {canEditSpreadsheet(spreadsheet) && (
                           <button
                             className="action-icons"
@@ -424,6 +567,30 @@ function Spreadsheets() {
           onCancel={() => {
             setConfirmDeleteId(null);
             setConfirmDeleteName("");
+          }}
+        />
+      )}
+
+      {canArchiveSpreadsheet && confirmArchiveId && (
+        <ConfirmationModal
+          title="Archive Spreadsheet"
+          message={`Archive <span class="danger">${confirmArchiveName}</span> for everyone?`}
+          onConfirm={handleConfirmArchive}
+          onCancel={() => {
+            setConfirmArchiveId(null);
+            setConfirmArchiveName("");
+          }}
+        />
+      )}
+
+      {canArchiveSpreadsheet && confirmUnarchiveId && (
+        <ConfirmationModal
+          title="Restore Spreadsheet"
+          message={`Restore <span class="danger">${confirmUnarchiveName}</span> to the active list?`}
+          onConfirm={handleConfirmUnarchive}
+          onCancel={() => {
+            setConfirmUnarchiveId(null);
+            setConfirmUnarchiveName("");
           }}
         />
       )}

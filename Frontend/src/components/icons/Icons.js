@@ -1655,3 +1655,52 @@ export const BreakOutIcon = ({
     </svg>
   );
 };
+
+export const PinIcon = ({
+  color = "currentColor",
+  filled = false,
+  className = "",
+  ...props
+}) => {
+  return (
+    <svg
+      viewBox="0 0 50 50"
+      width="30"
+      height="30"
+      fill={color}
+      className={`icon ${className}`}
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+      style={{ transform: "rotate(22deg)", ...(props.style || {}) }}
+    >
+      <path
+        fill={color}
+        d="M25 7c-4.8 0-8.7 3.7-8.7 8.2 0 2.6 1.3 4.9 3.4 6.4V24h-5.6c-1.1 0-2 .9-2 2s.9 2 2 2H23v13.4c0 1.1.9 2 2 2s2-.9 2-2V28h8.9c1.1 0 2-.9 2-2s-.9-2-2-2h-5.6v-2.4c2.1-1.5 3.4-3.8 3.4-6.4C33.7 10.7 29.8 7 25 7z"
+      />
+    </svg>
+  );
+};
+
+export const ArchiveIcon = ({
+  color = "currentColor",
+  className = "",
+  ...props
+}) => {
+  return (
+    <svg
+      viewBox="0 0 50 50"
+      width="30"
+      height="30"
+      fill={color}
+      className={`icon ${className}`}
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
+      <path
+        fill={color}
+        fillRule="evenodd"
+        d="M10 11.5h30a2.5 2.5 0 0 1 2.5 2.5v6.2a2 2 0 0 1-1.5 1.9V38a3.5 3.5 0 0 1-3.5 3.5H12.5A3.5 3.5 0 0 1 9 38V22.1a2 2 0 0 1-1.5-1.9V14a2.5 2.5 0 0 1 2.5-2.5zM12.5 22.5h25V37a.5.5 0 0 1-.5.5H13a.5.5 0 0 1-.5-.5V22.5zM20 28.2h10a1.6 1.6 0 1 1 0 3.2H20a1.6 1.6 0 1 1 0-3.2z"
+      />
+    </svg>
+  );
+};

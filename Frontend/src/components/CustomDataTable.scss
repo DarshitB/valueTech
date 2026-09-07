@@ -111,6 +111,11 @@
           outline: none;
           border-color: $primary-color;
         }
+        &.line-action-icon {
+          border-radius: 0;
+          overflow: visible;
+          padding: 4px;
+        }
       }
       .dataTable-table-heading-tr {
         .dataTable-table-heading-th {

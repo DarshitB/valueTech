@@ -12,6 +12,7 @@ const protectIfProtectedRole = require("../../middleware/protectIfProtectedRole"
 router.use(auth); // Apply authentication middleware to all routes
 
 router.get("/", userController.getAll);
+router.get("/managers", userController.getManagers);
 router.get("/:id", userController.getById);
 router.post("/check-mobile", userController.findByMobile);
 router.post("/check-email", userController.checkEmailExistence);

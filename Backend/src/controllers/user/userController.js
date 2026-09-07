@@ -18,6 +18,15 @@ exports.getAll = async (req, res, next) => {
   }
 };
 
+exports.getManagers = async (req, res, next) => {
+  try {
+    const managers = await User.findManagers();
+    res.json(managers);
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.getById = async (req, res, next) => {
   try {
     const { id } = req.params;

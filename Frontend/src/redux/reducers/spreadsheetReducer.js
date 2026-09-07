@@ -5,8 +5,10 @@ import { toast } from "react-toastify";
 // Fetch all spreadsheets
 export const fetchSpreadsheets = createAsyncThunk(
   "spreadsheets/fetchAll",
-  async () => {
-    const res = await spreadsheetApi.getSpreadsheets();
+  async (archived) => {
+    const res = await spreadsheetApi.getSpreadsheets({
+      archived: archived === true,
+    });
     return res.data.data;
   }
 );
@@ -59,6 +61,54 @@ export const removeSpreadsheet = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       await spreadsheetApi.deleteSpreadsheet(id);
+      return id;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+export const pinSpreadsheetById = createAsyncThunk(
+  "spreadsheets/pin",
+  async (id, { rejectWithValue }) => {
+    try {
+      await spreadsheetApi.pinSpreadsheet(id);
+      return id;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+export const unpinSpreadsheetById = createAsyncThunk(
+  "spreadsheets/unpin",
+  async (id, { rejectWithValue }) => {
+    try {
+      await spreadsheetApi.unpinSpreadsheet(id);
+      return id;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+export const archiveSpreadsheetById = createAsyncThunk(
+  "spreadsheets/archive",
+  async (id, { rejectWithValue }) => {
+    try {
+      await spreadsheetApi.archiveSpreadsheet(id);
+      return id;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+export const unarchiveSpreadsheetById = createAsyncThunk(
+  "spreadsheets/unarchive",
+  async (id, { rejectWithValue }) => {
+    try {
+      await spreadsheetApi.unarchiveSpreadsheet(id);
       return id;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || err.message);
@@ -176,6 +226,43 @@ const spreadsheetSlice = createSlice({
       })
       .addCase(removeSpreadsheet.rejected, (state, action) => {
         toast.error(`Failed to delete spreadsheet: ${action.payload}`);
+      })
+
+      .addCase(pinSpreadsheetById.fulfilled, (state, action) => {
+        state.list = [
+          ...state.list.filter(
+            (item) => item.id === action.payload
+          ).map((item) => ({ ...item, is_pinned: true })),
+          ...state.list.filter((item) => item.id !== action.payload),
+        ];
+      })
+      .addCase(pinSpreadsheetById.rejected, (state, action) => {
+        toast.error(`Failed to pin spreadsheet: ${action.payload}`);
+      })
+      .addCase(unpinSpreadsheetById.fulfilled, (state, action) => {
+        const next = state.list.map((item) =>
+          item.id === action.payload ? { ...item, is_pinned: false } : item
+        );
+        const pinned = next.filter((item) => item.is_pinned);
+        const rest = next.filter((item) => !item.is_pinned);
+        state.list = [...pinned, ...rest];
+      })
+      .addCase(unpinSpreadsheetById.rejected, (state, action) => {
+        toast.error(`Failed to unpin spreadsheet: ${action.payload}`);
+      })
+      .addCase(archiveSpreadsheetById.fulfilled, (state, action) => {
+        state.list = state.list.filter((item) => item.id !== action.payload);
+        toast.success("Spreadsheet archived");
+      })
+      .addCase(archiveSpreadsheetById.rejected, (state, action) => {
+        toast.error(`Failed to archive spreadsheet: ${action.payload}`);
+      })
+      .addCase(unarchiveSpreadsheetById.fulfilled, (state, action) => {
+        state.list = state.list.filter((item) => item.id !== action.payload);
+        toast.success("Spreadsheet restored");
+      })
+      .addCase(unarchiveSpreadsheetById.rejected, (state, action) => {
+        toast.error(`Failed to restore spreadsheet: ${action.payload}`);
       })
 
       // Save workbook snapshot

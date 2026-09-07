@@ -93,9 +93,13 @@ function Layout() {
     dispatch(logout());
   };
 
+  const isSpreadsheetArchivedList =
+    location.pathname.replace(/\/+$/, "").toLowerCase() ===
+    "/spreadsheet/archived";
   const isSpreadsheetRoute =
     location.pathname.startsWith("/spreadsheet/") &&
-    location.pathname.length > "/spreadsheet/".length;
+    location.pathname.length > "/spreadsheet/".length &&
+    !isSpreadsheetArchivedList;
 
   const resolvedTitle = title || pageTitle;
 

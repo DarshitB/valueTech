@@ -85,5 +85,14 @@ export function createDatabaseProviderRegistry(fetchers = {}) {
     });
   }
 
+  if (typeof fetchers.manager === "function") {
+    providers.push({
+      id: DATABASE_PROVIDER_IDS.MANAGER,
+      label: "Manager",
+      fetchRecords: fetchers.manager,
+      optionFields: { labelField: "name", valueField: "name" },
+    });
+  }
+
   return createProviderRegistry(providers);
 }

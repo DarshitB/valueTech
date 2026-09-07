@@ -188,6 +188,19 @@ const user = {
       .whereIn("id", ids)
       .whereNull("deleted_at"), // Find multiple users by IDs
 
+  findManagers: () =>
+    db("users")
+      .leftJoin("roles", "users.role_id", "roles.id")
+      .select(
+        "users.id",
+        "users.name",
+        "users.email",
+        "roles.name as role_name"
+      )
+      .whereNull("users.deleted_at")
+      .whereRaw("UPPER(COALESCE(roles.name, '')) LIKE ?", ["%MANAGER%"])
+      .orderBy("users.name", "asc"),
+
   create: (data) => db("users").insert(data).returning("*"), // Create a new user
 
   update: (id, data) => db("users").where({ id }).update(data).returning("*"), // Update a user by ID

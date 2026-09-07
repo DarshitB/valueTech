@@ -1,6 +1,49 @@
 import { syncDatabaseDropdownShell } from "./dataValidationShell.js";
 import { DEBUG_DATABASE_DROPDOWN } from "./metadata.js";
 
+function buildDatabaseDropdownSelectTitle(label) {
+  const name = String(label || "item").trim() || "item";
+  const article = /^[aeiou]/i.test(name) ? "an" : "a";
+  return `Select ${article} ${name}`;
+}
+
+function applyListDropdownTitle(title) {
+  const root = document.querySelector('[data-u-comp="sheets-dropdown-list"]');
+  if (!root) {
+    return false;
+  }
+
+  for (const child of root.children) {
+    const className = String(child.className || "");
+    const text = String(child.textContent || "").trim();
+    if (
+      (className.includes("univer-pt-2") &&
+        className.includes("univer-text-xs")) ||
+      text === "Select an item" ||
+      text === "Select items"
+    ) {
+      child.textContent = title;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function scheduleListDropdownTitle(title) {
+  const apply = () => applyListDropdownTitle(title);
+  if (apply()) {
+    return;
+  }
+
+  requestAnimationFrame(() => {
+    if (apply()) {
+      return;
+    }
+    window.setTimeout(apply, 16);
+  });
+}
+
 function buildSheetLocation({ workbook, worksheet, row, column }) {
   return {
     workbook: workbook.getWorkbook(),
@@ -52,6 +95,9 @@ export async function openDatabaseDropdownForCell({
 
   const currentValue = range.getValue();
   const defaultValue = currentValue == null ? "" : String(currentValue);
+  const selectTitle = buildDatabaseDropdownSelectTitle(
+    registry.get(providerId)?.label
+  );
 
   return new Promise((resolve) => {
     requestAnimationFrame(() => {
@@ -65,6 +111,7 @@ export async function openDatabaseDropdownForCell({
             defaultValue,
             showSearch: true,
             showEdit: false,
+            title: selectTitle,
             onChange: (selectedValues) => {
               const selectedValue = Array.isArray(selectedValues)
                 ? selectedValues[0] ?? ""
@@ -83,6 +130,7 @@ export async function openDatabaseDropdownForCell({
         });
 
         setActiveDropdownDisposable?.(disposable);
+        scheduleListDropdownTitle(selectTitle);
         resolve(true);
       } catch (error) {
         if (DEBUG_DATABASE_DROPDOWN) {

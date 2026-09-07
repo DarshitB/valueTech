@@ -106,13 +106,45 @@ function validateSavePayload(body) {
   return { workbook_data };
 }
 
+function parseArchivedQuery(value) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized === "true" || normalized === "1";
+}
+
+function toBooleanFlag(value) {
+  return value === true || value === "t" || value === "true" || value === 1;
+}
+
+async function assertSpreadsheetAccess(req, spreadsheetId) {
+  const spreadsheet = await Spreadsheet.findById(spreadsheetId);
+  if (!spreadsheet) {
+    throw new NotFoundError("Spreadsheet not found");
+  }
+
+  const assignedUserIds = await Spreadsheet.getAssignedUserIds(spreadsheetId);
+  const isDevAdmin = isDeveloperAdmin(req.user?.role_name);
+  const canAccess =
+    isDevAdmin ||
+    Number(spreadsheet.created_by) === Number(req.user.id) ||
+    assignedUserIds.includes(Number(req.user.id));
+
+  if (!canAccess) {
+    throw new NotFoundError("Spreadsheet not found");
+  }
+
+  return spreadsheet;
+}
+
 /**
  * GET /api/spreadsheets
  */
 exports.getAll = async (req, res, next) => {
   try {
     const isDevAdmin = isDeveloperAdmin(req.user?.role_name);
-    const spreadsheets = await Spreadsheet.findAll(req.user.id, isDevAdmin);
+    const archived = parseArchivedQuery(req.query.archived);
+    const spreadsheets = await Spreadsheet.findAll(req.user.id, isDevAdmin, {
+      archived,
+    });
     const assignmentMap = await Spreadsheet.getAssignedUserIdsMap(
       spreadsheets.map((sheet) => sheet.id)
     );
@@ -121,6 +153,7 @@ exports.getAll = async (req, res, next) => {
       success: true,
       data: spreadsheets.map((sheet) => ({
         ...sheet,
+        is_pinned: toBooleanFlag(sheet.is_pinned),
         assigned_user_ids: assignmentMap[sheet.id] || [],
       })),
     });
@@ -382,6 +415,84 @@ exports.softDelete = async (req, res, next) => {
     res.status(204).json({
       success: true,
       message: "Spreadsheet deleted successfully.",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/spreadsheets/:id/pin
+ */
+exports.pin = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    validateSpreadsheetId(id);
+    await assertSpreadsheetAccess(req, id);
+    await Spreadsheet.insertPin(id, req.user.id);
+
+    res.json({
+      success: true,
+      data: { id, is_pinned: true },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * DELETE /api/spreadsheets/:id/pin
+ */
+exports.unpin = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    validateSpreadsheetId(id);
+    await assertSpreadsheetAccess(req, id);
+    await Spreadsheet.deletePin(id, req.user.id);
+
+    res.json({
+      success: true,
+      data: { id, is_pinned: false },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/spreadsheets/:id/archive
+ */
+exports.archive = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    validateSpreadsheetId(id);
+    await assertSpreadsheetAccess(req, id);
+    await Spreadsheet.archive(id, req.user.id);
+
+    res.json({
+      success: true,
+      message: "Spreadsheet archived successfully.",
+      data: { id },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * DELETE /api/spreadsheets/:id/archive
+ */
+exports.unarchive = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    validateSpreadsheetId(id);
+    await assertSpreadsheetAccess(req, id);
+    await Spreadsheet.unarchive(id);
+
+    res.json({
+      success: true,
+      message: "Spreadsheet restored successfully.",
+      data: { id },
     });
   } catch (error) {
     next(error);

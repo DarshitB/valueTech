@@ -7,6 +7,7 @@ import { getCategories } from "../../api/category.api";
 import { getSubCategories } from "../../api/subcategory.api";
 import { getChildCategories } from "../../api/childCategory.api";
 import { getFieldVerifiers } from "../../api/fieldVerifier.api";
+import { getManagers } from "../../api/user.api";
 
 /**
  * API fetchers for spreadsheet Database Dropdown providers.
@@ -22,4 +23,5 @@ export const databaseDropdownFetchers = {
   assetCategory: async () => (await getSubCategories()).data,
   subCategory: async () => (await getChildCategories()).data,
   fieldVerifier: async () => (await getFieldVerifiers()).data,
+  manager: async () => (await getManagers()).data,
 };
