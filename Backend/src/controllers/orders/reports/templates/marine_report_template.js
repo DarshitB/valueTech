@@ -43,6 +43,9 @@ function generateMarineReportHTML(
 
   const isVkaValuer =
     String(formData.valuer_name || "").trim().toUpperCase() === "V.K. ASSOCIATES";
+  const hasStampImage = Boolean(
+    stampImageBase64 && String(stampImageBase64).trim()
+  );
 
   // Helper function to convert number to word (e.g., 1 -> ONE, 2 -> TWO)
   const numberToWord = (num) => {
@@ -439,6 +442,16 @@ function generateMarineReportHTML(
             width: 150px;
             height: 150px;
             opacity: 1;
+        }
+
+        /* No stamp file: collapse the reserved stamp box so valuer text sits under the heading */
+        .last-page-declaration .stamp-signature.no-stamp .left-stamp,
+        .last-page-declaration .stamp-signature .left-stamp:empty {
+            display: none;
+            width: 0;
+            height: 0;
+            margin: 0;
+            padding: 0;
         }
 
         .last-page-declaration .stamp-signature .left-stamp img {
@@ -925,7 +938,7 @@ function generateMarineReportHTML(
     <div class="page first-page" data-page="1">
         <!-- Stamp Overlay on First Page -->
         ${
-          stampImageBase64
+          hasStampImage
             ? `<div class="stamp-overlay">
             <img src="${stampImageBase64}" alt="Stamp">
         </div>`
@@ -3816,14 +3829,14 @@ function generateMarineReportHTML(
             <!-- Last Page Declaration -->
             <div class="last-page-declaration">
                 <div class="declaration-text">ISSUED WITHOUT PREJUDICE</div>
-                <div class="stamp-signature">
-                    <div class="left-stamp">
-                        ${
-                          stampImageBase64
-                            ? `<img src="${stampImageBase64}" alt="Stamp">`
-                            : ""
-                        }
-                    </div>
+                <div class="stamp-signature${hasStampImage ? "" : " no-stamp"}">
+                    ${
+                      hasStampImage
+                        ? `<div class="left-stamp">
+                        <img src="${stampImageBase64}" alt="Stamp">
+                    </div>`
+                        : ""
+                    }
                     <div class="right-text">
                         <div>${getValue(formData.valuer_name)},</div>
                         <div>MUMBAI SURVEYOR</div>
@@ -4587,7 +4600,7 @@ function generateMarineReportHTML(
 
             // Add stamp overlay to subsequent pages
             ${
-              stampImageBase64
+              hasStampImage
                 ? `const stampOverlay = document.createElement('div');
             stampOverlay.className = 'stamp-overlay';
             stampOverlay.innerHTML = '<img src="${stampImageBase64}" alt="Stamp">';

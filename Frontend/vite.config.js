@@ -13,6 +13,9 @@ const appIndexHtml = resolve(rootDir, "index.html");
  */
 function getCraClientEnvDefines(mode) {
   const env = loadEnv(mode, process.cwd(), "REACT_APP_");
+  const collaborationFlagDefaults = {
+    REACT_APP_SPREADSHEET_COLLAB_V2: "",
+  };
   const defines = {
     "process.env.NODE_ENV": JSON.stringify(
       mode === "production" ? "production" : "development"
@@ -20,9 +23,11 @@ function getCraClientEnvDefines(mode) {
     "process.env.PUBLIC_URL": JSON.stringify(""),
   };
 
-  Object.entries(env).forEach(([key, value]) => {
-    defines[`process.env.${key}`] = JSON.stringify(value);
-  });
+  Object.entries({ ...collaborationFlagDefaults, ...env }).forEach(
+    ([key, value]) => {
+      defines[`process.env.${key}`] = JSON.stringify(value);
+    }
+  );
 
   return defines;
 }

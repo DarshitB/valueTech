@@ -119,12 +119,24 @@ export const unarchiveSpreadsheetById = createAsyncThunk(
 // Save spreadsheet workbook snapshot
 export const saveSpreadsheetById = createAsyncThunk(
   "spreadsheets/saveById",
-  async ({ id, workbook_data }, { rejectWithValue }) => {
+  async ({ id, workbook_data, base_revision, personal_draft }, { rejectWithValue }) => {
     try {
-      const res = await spreadsheetApi.saveSpreadsheet(id, { workbook_data });
+      const payload = { workbook_data };
+      if (base_revision !== undefined) {
+        payload.base_revision = base_revision;
+      }
+      if (personal_draft !== undefined) {
+        payload.personal_draft = personal_draft;
+      }
+      const res = await spreadsheetApi.saveSpreadsheet(id, payload);
       return res.data;
     } catch (err) {
-      return rejectWithValue(err.response?.data?.message || err.message);
+      return rejectWithValue({
+        message: err.response?.data?.message || err.message,
+        status: err.response?.status,
+        code: err.response?.data?.code,
+        details: err.response?.data?.details,
+      });
     }
   }
 );

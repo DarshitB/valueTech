@@ -15,29 +15,29 @@
  * spreadsheet:leave and disconnect. Does not modify Phase 2.1 presence.
  */
 
-const { validate: isUuid } = require("uuid");
 const activeCellStore = require("./activeCellStore");
-const { roomName } = require("./spreadsheetPresence");
-
-function validateSpreadsheetId(spreadsheetId) {
-  return (
-    typeof spreadsheetId === "string" &&
-    spreadsheetId.length > 0 &&
-    isUuid(spreadsheetId)
-  );
-}
-
-function validateCell(cell) {
-  return typeof cell === "string" && cell.trim().length > 0;
-}
-
-function validateWorksheetId(worksheetId) {
-  return typeof worksheetId === "string" && worksheetId.trim().length > 0;
-}
-
-function isInSpreadsheetRoom(socket, spreadsheetId) {
-  return socket.rooms.has(roomName(spreadsheetId));
-}
+const {
+  PAYLOAD_LIMITS,
+  RATE_LIMITS,
+  consumeSocketRateLimit,
+  emitSpreadsheetError,
+  isPayloadWithinLimit,
+  normalizeSocketPayload,
+  resolveRequestId,
+  roomName,
+  validateCell,
+  validateClientSequence,
+  validateRequestId,
+  validateSpreadsheetId,
+  validateWorksheetId,
+} = require("./spreadsheetProtocol");
+const {
+  authorizeSpreadsheetSocketEvent,
+  isSocketInSpreadsheetRoom,
+} = require("./spreadsheetSocketAccess");
+const {
+  leaveSpreadsheetSession,
+} = require("./spreadsheetSessionLifecycle");
 
 /**
  * Broadcast active-cell update to every other socket in the room.
@@ -57,128 +57,163 @@ function broadcastActiveCell(socket, spreadsheetId, payload) {
 }
 
 /**
- * Clear active-cell for this socket and notify remaining users in the room.
- *
- * @param {import("socket.io").Socket} socket
- */
-function clearAndBroadcast(socket) {
-  const cleared = activeCellStore.clearBySocket(socket.id);
-  if (!cleared) return;
-
-  broadcastActiveCell(socket, cleared.spreadsheetId, {
-    userId: cleared.userId,
-    userName: cleared.userName,
-    worksheetId: cleared.worksheetId,
-    cell: null,
-  });
-}
-
-/**
- * Send the current active-cell snapshot to a newly joined socket only.
- * One event per existing user; excludes the joining user.
- *
- * @param {import("socket.io").Socket} socket
- * @param {string} spreadsheetId
- */
-function emitActiveCellsSnapshot(socket, spreadsheetId) {
-  const cells = activeCellStore.getCells(spreadsheetId);
-
-  for (const entry of cells) {
-    if (entry.userId === socket.user.id) continue;
-
-    socket.emit("spreadsheet:active-cell", {
-      spreadsheet_id: spreadsheetId,
-      userId: entry.userId,
-      userName: entry.userName,
-      worksheet_id: entry.worksheetId,
-      cell: entry.cell,
-    });
-  }
-}
-
-/**
  * Register active-cell event handlers on a connected socket.
  *
  * @param {import("socket.io").Server} io
  * @param {import("socket.io").Socket} socket
  */
-function registerSpreadsheetActiveCell(io, socket) {
+function registerSpreadsheetActiveCell(
+  io,
+  socket,
+  { authorize = authorizeSpreadsheetSocketEvent } = {}
+) {
   // Publish the user's currently focused cell
-  socket.on("spreadsheet:active-cell", (payload = {}) => {
+  socket.on("spreadsheet:active-cell", async (payload = {}, acknowledgement) => {
+    payload = normalizeSocketPayload(payload);
     const spreadsheetId = payload.spreadsheet_id;
     const worksheetId = payload.worksheet_id;
     const cell = payload.cell;
+    const clientSequence = payload.client_sequence;
+    const requestId = resolveRequestId(payload);
 
-    if (!validateSpreadsheetId(spreadsheetId)) {
-      socket.emit("spreadsheet:error", {
-        message: "Valid spreadsheet_id is required",
-      });
+    if (
+      !validateRequestId(payload.request_id) ||
+      !isPayloadWithinLimit(payload, PAYLOAD_LIMITS.activeCell)
+    ) {
+      emitSpreadsheetError(
+        socket,
+        {
+          code: "INVALID_ACTIVE_CELL_REQUEST",
+          message: "Active-cell payload is invalid or too large",
+          eventName: "spreadsheet:active-cell",
+          requestId,
+          spreadsheetId: null,
+        },
+        acknowledgement
+      );
       return;
     }
 
-    if (!validateWorksheetId(worksheetId)) {
-      socket.emit("spreadsheet:error", {
-        message: "worksheet_id must be a non-empty string",
-      });
+    if (
+      !consumeSocketRateLimit(
+        socket,
+        "spreadsheet:active-cell",
+        RATE_LIMITS.activeCell
+      )
+    ) {
+      emitSpreadsheetError(
+        socket,
+        {
+          code: "RATE_LIMITED",
+          message: "Too many active-cell updates",
+          eventName: "spreadsheet:active-cell",
+          requestId,
+          spreadsheetId: validateSpreadsheetId(spreadsheetId)
+            ? spreadsheetId
+            : null,
+        },
+        acknowledgement
+      );
       return;
     }
 
-    if (!validateCell(cell)) {
-      socket.emit("spreadsheet:error", {
-        message: "cell must be a non-empty string",
-      });
+    if (
+      !validateSpreadsheetId(spreadsheetId) ||
+      !validateWorksheetId(worksheetId) ||
+      !validateCell(cell) ||
+      (clientSequence != null && !validateClientSequence(clientSequence))
+    ) {
+      emitSpreadsheetError(
+        socket,
+        {
+          code: "INVALID_ACTIVE_CELL_REQUEST",
+          message:
+            "Valid spreadsheet_id, worksheet_id, cell and client_sequence are required",
+          eventName: "spreadsheet:active-cell",
+          requestId,
+          spreadsheetId: validateSpreadsheetId(spreadsheetId)
+            ? spreadsheetId
+            : null,
+        },
+        acknowledgement
+      );
       return;
     }
 
     // Only sockets currently in the spreadsheet room may publish
-    if (!isInSpreadsheetRoom(socket, spreadsheetId)) {
-      socket.emit("spreadsheet:error", {
-        message: "You must join the spreadsheet room before publishing active-cell",
-      });
+    if (!isSocketInSpreadsheetRoom(socket, spreadsheetId)) {
+      emitSpreadsheetError(
+        socket,
+        {
+          code: "ROOM_MEMBERSHIP_REQUIRED",
+          message:
+            "You must join the spreadsheet room before publishing active-cell",
+          eventName: "spreadsheet:active-cell",
+          requestId,
+          spreadsheetId,
+        },
+        acknowledgement
+      );
       return;
     }
 
-    const trimmedCell = cell.trim();
-    const trimmedWorksheetId = worksheetId.trim();
+    try {
+      const access = await authorize({ socket, spreadsheetId });
+      if (!access.allowed) {
+        leaveSpreadsheetSession(io, socket, spreadsheetId);
+        emitSpreadsheetError(
+          socket,
+          {
+            code: "SPREADSHEET_ACCESS_REVOKED",
+            message: "Spreadsheet access has been revoked",
+            eventName: "spreadsheet:active-cell",
+            requestId,
+            spreadsheetId,
+          },
+          acknowledgement
+        );
+        return;
+      }
 
-    activeCellStore.set(spreadsheetId, {
-      userId: socket.user.id,
-      userName: socket.user.name,
-      socketId: socket.id,
-      worksheetId: trimmedWorksheetId,
-      cell: trimmedCell,
-    });
+      const trimmedCell = cell.trim().toUpperCase();
+      const trimmedWorksheetId = worksheetId.trim();
 
-    broadcastActiveCell(socket, spreadsheetId, {
-      userId: socket.user.id,
-      userName: socket.user.name,
-      worksheetId: trimmedWorksheetId,
-      cell: trimmedCell,
-    });
-  });
+      activeCellStore.set(spreadsheetId, {
+        userId: socket.user.id,
+        userName: socket.user.name,
+        socketId: socket.id,
+        worksheetId: trimmedWorksheetId,
+        cell: trimmedCell,
+      });
 
-  // Clear active-cell when the user leaves a spreadsheet room
-  socket.on("spreadsheet:leave", (payload = {}) => {
-    if (!validateSpreadsheetId(payload.spreadsheet_id)) return;
-    clearAndBroadcast(socket);
-  });
+      broadcastActiveCell(socket, spreadsheetId, {
+        userId: socket.user.id,
+        userName: socket.user.name,
+        worksheetId: trimmedWorksheetId,
+        cell: trimmedCell,
+      });
 
-  // On join: clear previous active-cell, then send existing cursors to this socket only
-  socket.on("spreadsheet:join", (payload = {}) => {
-    const spreadsheetId = payload.spreadsheet_id;
-    if (!validateSpreadsheetId(spreadsheetId)) return;
-
-    clearAndBroadcast(socket);
-
-    // Presence join runs first — only send snapshot if the room join succeeded
-    if (!isInSpreadsheetRoom(socket, spreadsheetId)) return;
-
-    emitActiveCellsSnapshot(socket, spreadsheetId);
-  });
-
-  // Clear active-cell on disconnect
-  socket.on("disconnect", () => {
-    clearAndBroadcast(socket);
+      if (typeof acknowledgement === "function") {
+        acknowledgement({
+          ok: true,
+          spreadsheet_id: spreadsheetId,
+          request_id: requestId,
+          client_sequence: clientSequence ?? null,
+        });
+      }
+    } catch {
+      emitSpreadsheetError(
+        socket,
+        {
+          code: "AUTHORIZATION_UNAVAILABLE",
+          message: "Unable to verify spreadsheet access",
+          eventName: "spreadsheet:active-cell",
+          requestId,
+          spreadsheetId,
+        },
+        acknowledgement
+      );
+    }
   });
 }
 

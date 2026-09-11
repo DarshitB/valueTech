@@ -1,11 +1,27 @@
 import { useCallback, useEffect, useRef } from "react";
+import { useSelector } from "react-redux";
 import { useSpreadsheetRealtime } from "../realtime/spreadsheet";
 import {
+  acknowledgeLocalCommand,
   beginPublishInFlight,
+  clearLocalCommandInFlight,
   enqueueLocalCommand,
   endPublishInFlight,
+  markLocalCommandInFlight,
+  peekNextLocalCommand,
   recoverStuckPublish,
 } from "./workbookSyncCoordinator";
+import { recordSpreadsheetCollaborationEvent } from "../realtime/spreadsheet/collaborationTelemetry";
+import { createSpreadsheetRequestId } from "../realtime/spreadsheet/protocolRequest";
+import { getSpreadsheetCollaborationConfig } from "../realtime/spreadsheet/collaborationConfig";
+import {
+  getOrCreateSpreadsheetClientId,
+  nextSpreadsheetClientSequence,
+  persistSpreadsheetOutbox,
+  removeSpreadsheetOutbox,
+  loadSpreadsheetOutbox,
+} from "../realtime/spreadsheet/collaborationOutbox";
+import { shouldKeepRealtimeCommandLocal } from "@spreadsheet-wrapper/realtime/localOnlyCommands";
 
 /**
  * client_sequence must stay unique while the server still remembers this
@@ -16,12 +32,39 @@ function createClientSequenceSeed() {
   return Date.now() + Math.floor(Math.random() * 1_000_000);
 }
 
+function emitSpreadsheetCommand(socket, payload) {
+  return new Promise((resolve) => {
+    if (!socket) {
+      resolve({ ok: false, code: "SOCKET_UNAVAILABLE" });
+      return;
+    }
+
+    if (typeof socket.timeout === "function") {
+      socket.timeout(10_000).emit(
+        "spreadsheet:command",
+        payload,
+        (error, response) => {
+          if (error) {
+            resolve({ ok: false, code: "ACK_TIMEOUT" });
+            return;
+          }
+          resolve(response || { ok: false, code: "ACK_MISSING" });
+        }
+      );
+      return;
+    }
+
+    socket.emit("spreadsheet:command", payload, (response) => {
+      resolve(response || { ok: false, code: "ACK_MISSING" });
+    });
+  });
+}
+
 /**
  * Publish local workbook snapshots over the shared realtime connection.
  *
- * Phase 2.5: integrates queued remote snapshots before serializing so local
- * publishes include already-delivered peer state. Tracks publish generations
- * so unpublished local edits are never overwritten by remote applies.
+ * V1 removes a command as soon as it is emitted. Authoritative V2 keeps the
+ * operation until the matching ACK, then retries the same identity.
  */
 export function useSpreadsheetWorkbookPublisher({
   isSpreadsheetReady,
@@ -29,10 +72,81 @@ export function useSpreadsheetWorkbookPublisher({
   isApplyingRemoteCommandRef,
   syncCoordinator,
 }) {
-  const { socket, spreadsheetId, isRoomReady } = useSpreadsheetRealtime();
+  const {
+    socket,
+    spreadsheetId,
+    isRoomReady,
+    collaborationProtocol,
+    reportAuthoritativeRevision,
+  } = useSpreadsheetRealtime();
+  const currentUserId = useSelector((state) => state.auth.user?.id);
   const clientSequenceRef = useRef(createClientSequenceSeed());
+  const clientIdRef = useRef(null);
   const pendingPublishRef = useRef(false);
   const processPendingPublishRef = useRef(async () => {});
+  const restoredOutboxKeyRef = useRef(null);
+  const delayedRetryTimerRef = useRef(0);
+  const isAuthoritativeV2 = collaborationProtocol === "v2";
+  const offlineQueueEnabled =
+    getSpreadsheetCollaborationConfig().offlineQueueEnabled;
+  // In-memory ACK queue is required for V2. Browser persistence is only for
+  // the offline-queue flag — otherwise stale localStorage rebroadcasts old cells.
+  const useReliableOutbox = isAuthoritativeV2 || offlineQueueEnabled;
+  const persistOutboxToStorage = offlineQueueEnabled;
+  const safeUndoEnabled = getSpreadsheetCollaborationConfig().safeUndoEnabled;
+
+  if (!clientIdRef.current) {
+    clientIdRef.current = currentUserId
+      ? getOrCreateSpreadsheetClientId(currentUserId)
+      : createSpreadsheetRequestId("client");
+  }
+
+  const persistOutbox = useCallback(() => {
+    if (
+      !persistOutboxToStorage ||
+      !currentUserId ||
+      !spreadsheetId ||
+      !syncCoordinator
+    ) {
+      return;
+    }
+
+    const entries = syncCoordinator.localCommandQueue.map((entry) => ({
+      operationId: entry.operationId,
+      clientId: entry.clientId,
+      clientSequence: entry.clientSequence,
+      commandId: entry.commandId,
+      commandParams: entry.commandParams &&
+        typeof entry.commandParams === "object" &&
+        !Array.isArray(entry.commandParams)
+        ? entry.commandParams
+        : {},
+      requestId: entry.requestId || entry.operationId,
+    }));
+
+    if (entries.length === 0) {
+      removeSpreadsheetOutbox(currentUserId, spreadsheetId);
+      return;
+    }
+
+    const persisted = persistSpreadsheetOutbox(
+      currentUserId,
+      spreadsheetId,
+      entries
+    );
+    if (!persisted.ok) {
+      recordSpreadsheetCollaborationEvent("outbox_persist_failed", {
+        spreadsheetId,
+        reason: persisted.reason || "UNKNOWN",
+        queueSize: entries.length,
+      });
+    }
+  }, [
+    currentUserId,
+    spreadsheetId,
+    syncCoordinator,
+    persistOutboxToStorage,
+  ]);
 
   const resumePendingPublish = useCallback(() => {
     if (
@@ -47,12 +161,71 @@ export function useSpreadsheetWorkbookPublisher({
   }, [syncCoordinator]);
 
   useEffect(() => {
+    if (currentUserId) {
+      clientIdRef.current = getOrCreateSpreadsheetClientId(currentUserId);
+    }
+  }, [currentUserId]);
+
+  useEffect(() => {
     clientSequenceRef.current = createClientSequenceSeed();
+    restoredOutboxKeyRef.current = null;
     if (syncCoordinator) {
       syncCoordinator.lastPublishedClientSequence = 0;
       syncCoordinator.publishedGeneration = 0;
     }
-  }, [spreadsheetId, syncCoordinator]);
+
+    // Offline queue is off: drop any leftover V2 outbox so old cell writes
+    // cannot rebroadcast after refresh.
+    if (!persistOutboxToStorage && currentUserId && spreadsheetId) {
+      removeSpreadsheetOutbox(currentUserId, spreadsheetId);
+    }
+  }, [
+    spreadsheetId,
+    syncCoordinator,
+    persistOutboxToStorage,
+    currentUserId,
+  ]);
+
+  useEffect(() => {
+    if (
+      !persistOutboxToStorage ||
+      !currentUserId ||
+      !spreadsheetId ||
+      !syncCoordinator
+    ) {
+      return;
+    }
+
+    const restoreKey = `${currentUserId}:${spreadsheetId}`;
+    if (restoredOutboxKeyRef.current === restoreKey) {
+      return;
+    }
+    restoredOutboxKeyRef.current = restoreKey;
+
+    if (syncCoordinator.localCommandQueue.length > 0) {
+      return;
+    }
+
+    const loaded = loadSpreadsheetOutbox(currentUserId, spreadsheetId);
+    if (!loaded.ok || loaded.entries.length === 0) {
+      return;
+    }
+
+    loaded.entries.forEach((entry) => {
+      enqueueLocalCommand(syncCoordinator, entry);
+    });
+    syncCoordinator.localChangesPending = true;
+    pendingPublishRef.current = true;
+    recordSpreadsheetCollaborationEvent("outbox_restored", {
+      spreadsheetId,
+      queueSize: loaded.entries.length,
+    });
+  }, [
+    currentUserId,
+    spreadsheetId,
+    syncCoordinator,
+    persistOutboxToStorage,
+  ]);
 
   const canPublish = useCallback(() => {
     const isApplyingRemote =
@@ -110,49 +283,176 @@ export function useSpreadsheetWorkbookPublisher({
         return;
       }
 
-      while (coordinator.localCommandQueue.length > 0) {
-        if (!canPublish()) {
-          pendingPublishRef.current = true;
-          break;
+      if (useReliableOutbox) {
+        while (peekNextLocalCommand(coordinator)) {
+          if (!canPublish()) {
+            pendingPublishRef.current = true;
+            break;
+          }
+
+          const nextCommand = peekNextLocalCommand(coordinator);
+          if (!nextCommand?.commandId) {
+            break;
+          }
+
+          markLocalCommandInFlight(coordinator, nextCommand.operationId);
+          const clientSequence = nextCommand.clientSequence;
+          const requestId =
+            nextCommand.requestId || nextCommand.operationId;
+          coordinator.lastPublishedClientSequence = clientSequence;
+
+          const payload = {
+            spreadsheet_id: spreadsheetId,
+            command_id: nextCommand.commandId,
+            command_params:
+              nextCommand.commandParams &&
+              typeof nextCommand.commandParams === "object" &&
+              !Array.isArray(nextCommand.commandParams)
+                ? nextCommand.commandParams
+                : {},
+            client_sequence: clientSequence,
+            client_id: nextCommand.clientId || clientIdRef.current,
+            request_id: requestId,
+            operation_id: nextCommand.operationId,
+          };
+
+          const emitStartedAt = Date.now();
+          const response = await emitSpreadsheetCommand(socket, payload);
+          const ackLatencyMs = Math.max(0, Date.now() - emitStartedAt);
+          recordSpreadsheetCollaborationEvent("command_emitted", {
+            spreadsheetId,
+            commandId: nextCommand.commandId,
+            clientSequence,
+            requestId,
+            protocol: isAuthoritativeV2 ? "v2" : "v1-offline-queue",
+            ack_latency_ms: ackLatencyMs,
+          });
+
+          if (response?.ok) {
+            acknowledgeLocalCommand(coordinator, {
+              operationId: nextCommand.operationId,
+              requestId,
+              clientId: nextCommand.clientId,
+              clientSequence,
+            });
+            recordSpreadsheetCollaborationEvent("command_ack_local", {
+              spreadsheetId,
+              commandId: nextCommand.commandId,
+              clientSequence,
+              requestId,
+              protocol: isAuthoritativeV2 ? "v2" : "v1-offline-queue",
+              ack_latency_ms: ackLatencyMs,
+            });
+            persistOutbox();
+            if (
+              isAuthoritativeV2 &&
+              Number.isSafeInteger(response.revision)
+            ) {
+              reportAuthoritativeRevision(response.revision);
+            }
+          } else {
+            clearLocalCommandInFlight(coordinator);
+            pendingPublishRef.current = true;
+            recordSpreadsheetCollaborationEvent("command_rejected", {
+              spreadsheetId,
+              commandId: nextCommand.commandId,
+              clientSequence,
+              requestId,
+              code: response?.code || "UNKNOWN",
+              protocol: isAuthoritativeV2 ? "v2" : "v1-offline-queue",
+              ack_latency_ms: ackLatencyMs,
+            });
+            if (delayedRetryTimerRef.current) {
+              clearTimeout(delayedRetryTimerRef.current);
+            }
+            delayedRetryTimerRef.current = setTimeout(() => {
+              delayedRetryTimerRef.current = 0;
+              void processPendingPublishRef.current();
+            }, 1000);
+            break;
+          }
         }
+      } else {
+        while (coordinator.localCommandQueue.length > 0) {
+          if (!canPublish()) {
+            pendingPublishRef.current = true;
+            break;
+          }
 
-        const nextCommand = coordinator.localCommandQueue.shift();
-        if (!nextCommand?.commandId) {
-          continue;
+          const nextCommand = coordinator.localCommandQueue.shift();
+          if (!nextCommand?.commandId) {
+            continue;
+          }
+
+          clientSequenceRef.current += 1;
+          const clientSequence = clientSequenceRef.current;
+          coordinator.lastPublishedClientSequence = clientSequence;
+          const requestId = createSpreadsheetRequestId("command");
+
+          socket.emit(
+            "spreadsheet:command",
+            {
+              spreadsheet_id: spreadsheetId,
+              command_id: nextCommand.commandId,
+              command_params:
+                nextCommand.commandParams &&
+                typeof nextCommand.commandParams === "object" &&
+                !Array.isArray(nextCommand.commandParams)
+                  ? nextCommand.commandParams
+                  : {},
+              client_sequence: clientSequence,
+              client_id: clientIdRef.current,
+              request_id: requestId,
+            },
+            (response) => {
+              if (response?.ok === false) {
+                recordSpreadsheetCollaborationEvent("command_rejected", {
+                  spreadsheetId,
+                  commandId: nextCommand.commandId,
+                  clientSequence,
+                  requestId,
+                  code: response.code || "UNKNOWN",
+                });
+              }
+            }
+          );
+          recordSpreadsheetCollaborationEvent("command_emitted", {
+            spreadsheetId,
+            commandId: nextCommand.commandId,
+            clientSequence,
+            requestId,
+          });
         }
-
-        clientSequenceRef.current += 1;
-        coordinator.lastPublishedClientSequence = clientSequenceRef.current;
-
-        socket.emit("spreadsheet:command", {
-          spreadsheet_id: spreadsheetId,
-          command_id: nextCommand.commandId,
-          command_params:
-            nextCommand.commandParams &&
-            typeof nextCommand.commandParams === "object" &&
-            !Array.isArray(nextCommand.commandParams)
-              ? nextCommand.commandParams
-              : {},
-          client_sequence: clientSequenceRef.current,
-        });
       }
 
       coordinator.publishedGeneration = generationAtPublish;
       coordinator.localChangesPending =
-        coordinator.changeGeneration > generationAtPublish;
+        coordinator.changeGeneration > generationAtPublish ||
+        coordinator.localCommandQueue.length > 0;
 
       await coordinator.flushRemoteQueue();
 
-      if (coordinator.changeGeneration > coordinator.publishedGeneration) {
+      if (
+        coordinator.changeGeneration > coordinator.publishedGeneration ||
+        coordinator.localCommandQueue.length > 0
+      ) {
         pendingPublishRef.current = true;
       }
-    } catch {
+    } catch (error) {
       coordinator.localChangesPending = true;
       pendingPublishRef.current = true;
+      clearLocalCommandInFlight(coordinator);
+      recordSpreadsheetCollaborationEvent("publish_failed", {
+        spreadsheetId,
+        reason: error?.message || "unknown",
+      });
     } finally {
       endPublishInFlight(coordinator);
 
-      if (pendingPublishRef.current || coordinator.localChangesPending) {
+      if (
+        (pendingPublishRef.current || coordinator.localChangesPending) &&
+        !delayedRetryTimerRef.current
+      ) {
         pendingPublishRef.current = true;
         void processPendingPublishRef.current();
       }
@@ -161,7 +461,16 @@ export function useSpreadsheetWorkbookPublisher({
         void coordinator.flushRemoteQueue();
       }
     }
-  }, [canPublish, socket, spreadsheetId, syncCoordinator]);
+  }, [
+    canPublish,
+    isAuthoritativeV2,
+    persistOutbox,
+    reportAuthoritativeRevision,
+    socket,
+    spreadsheetId,
+    syncCoordinator,
+    useReliableOutbox,
+  ]);
 
   processPendingPublishRef.current = processPendingPublish;
 
@@ -177,23 +486,61 @@ export function useSpreadsheetWorkbookPublisher({
       return;
     }
 
-    const queued = enqueueLocalCommand(syncCoordinator, {
-      commandId: commandPayload?.commandId,
-      commandParams: commandPayload?.commandParams ?? null,
-    });
+    const commandId = String(commandPayload?.commandId ?? "").trim();
+    if (
+      shouldKeepRealtimeCommandLocal(commandId, {
+        safeUndoEnabled,
+      })
+    ) {
+      return;
+    }
+
+    const operationId = useReliableOutbox
+      ? createSpreadsheetRequestId("command")
+      : null;
+    const queued = enqueueLocalCommand(
+      syncCoordinator,
+      useReliableOutbox
+        ? {
+            commandId: commandPayload?.commandId,
+            commandParams: commandPayload?.commandParams ?? null,
+            operationId,
+            requestId: operationId,
+            clientId: clientIdRef.current,
+            clientSequence: nextSpreadsheetClientSequence(currentUserId),
+          }
+        : {
+            commandId: commandPayload?.commandId,
+            commandParams: commandPayload?.commandParams ?? null,
+          }
+    );
     if (!queued) {
       return;
     }
 
+    if (useReliableOutbox) {
+      persistOutbox();
+    }
+
+    recordSpreadsheetCollaborationEvent("command_queued", {
+      spreadsheetId,
+      commandId: commandPayload?.commandId || null,
+      queueSize: syncCoordinator.localCommandQueue.length,
+    });
     syncCoordinator.changeGeneration += 1;
     syncCoordinator.localChangesPending = true;
     pendingPublishRef.current = true;
     void processPendingPublish();
   }, [
+    currentUserId,
+    persistOutbox,
     processPendingPublish,
+    safeUndoEnabled,
+    spreadsheetId,
     syncCoordinator,
     isApplyingRemoteCommand,
     isApplyingRemoteCommandRef,
+    useReliableOutbox,
   ]);
 
   useEffect(() => {
@@ -204,6 +551,7 @@ export function useSpreadsheetWorkbookPublisher({
     socket?.connected,
     spreadsheetId,
     isApplyingRemoteCommand,
+    collaborationProtocol,
     processPendingPublish,
     resumePendingPublish,
   ]);
@@ -224,5 +572,14 @@ export function useSpreadsheetWorkbookPublisher({
     };
   }, [socket, resumePendingPublish]);
 
+  useEffect(() => {
+    return () => {
+      if (delayedRetryTimerRef.current) {
+        clearTimeout(delayedRetryTimerRef.current);
+        delayedRetryTimerRef.current = 0;
+      }
+    };
+  }, []);
+
   return { publishWorkbookUpdate };
-};
+}

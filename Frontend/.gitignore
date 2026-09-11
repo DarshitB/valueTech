@@ -16,6 +16,9 @@ service-account.json
 # Ignore build
 /build
 /dist
+/docs
+/tests
+/test-results
 
 # Ignore package-lock.json
 package-lock.json

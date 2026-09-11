@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { getSpreadsheetCollaborationConfig } from "../../realtime/spreadsheet/collaborationConfig";
 
 function isSpreadsheetEditorContext(element, spreadsheet) {
   if (spreadsheet?.isFocused?.()) {
@@ -59,14 +60,18 @@ function isEditableElement(element) {
  * - Cmd/Ctrl+S -> existing manual save callback
  * - Cmd/Ctrl+F -> Univer find (blocks native browser find on the editor)
  * - Ctrl+H -> Univer replace (does not steal Cmd+H on macOS)
- * - Cmd/Ctrl+Shift+Z and Ctrl+Y -> Univer redo command
+ * - Cmd/Ctrl+Z -> safe undo when Phase 6 flag is on; otherwise Univer-native
+ * - Cmd/Ctrl+Shift+Z and Ctrl+Y -> redo (safe when Phase 6 flag is on)
  *
- * Undo (Cmd/Ctrl+Z) is intentionally untouched.
  * Cell newline (Cmd/Ctrl+Enter) is handled in CompanySpreadsheet so it
  * runs before Univer's own shortcut listener.
  * These listeners are mounted only on the spreadsheet editor page.
  */
-export function useSpreadsheetKeyboardShortcuts({ spreadsheetRef, onManualSave }) {
+export function useSpreadsheetKeyboardShortcuts({
+  spreadsheetRef,
+  onManualSave,
+  onUnsafeUndoBlocked,
+}) {
   useEffect(() => {
     const handleKeyDown = (event) => {
       const spreadsheet = spreadsheetRef?.current;
@@ -111,17 +116,47 @@ export function useSpreadsheetKeyboardShortcuts({ spreadsheetRef, onManualSave }
         return;
       }
 
+      const safeUndoEnabled =
+        getSpreadsheetCollaborationConfig().safeUndoEnabled;
+
       // Cmd/Ctrl+Shift+Z: redo
       if (key === "z" && event.shiftKey) {
         event.preventDefault();
-        spreadsheet.redo?.();
+        if (!safeUndoEnabled) {
+          spreadsheet.redo?.();
+          return;
+        }
+        const result = spreadsheet.redo?.();
+        if (result === "blocked" || result === "unavailable") {
+          onUnsafeUndoBlocked?.("redo");
+        }
         return;
       }
 
       // Ctrl+Y (Windows): redo
       if (key === "y" && event.ctrlKey && !event.metaKey && !event.shiftKey) {
         event.preventDefault();
-        spreadsheet.redo?.();
+        if (!safeUndoEnabled) {
+          spreadsheet.redo?.();
+          return;
+        }
+        const result = spreadsheet.redo?.();
+        if (result === "blocked" || result === "unavailable") {
+          onUnsafeUndoBlocked?.("redo");
+        }
+        return;
+      }
+
+      // Cmd/Ctrl+Z: undo (safe path when Phase 6 flag is on)
+      if (key === "z" && !event.shiftKey) {
+        if (!safeUndoEnabled) {
+          return;
+        }
+        event.preventDefault();
+        const result = spreadsheet.undo?.();
+        if (result === "blocked" || result === "unavailable") {
+          onUnsafeUndoBlocked?.("undo");
+        }
       }
     };
 
@@ -129,6 +164,5 @@ export function useSpreadsheetKeyboardShortcuts({ spreadsheetRef, onManualSave }
     return () => {
       window.removeEventListener("keydown", handleKeyDown, true);
     };
-  }, [spreadsheetRef, onManualSave]);
+  }, [spreadsheetRef, onManualSave, onUnsafeUndoBlocked]);
 }
-

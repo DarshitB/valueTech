@@ -1,4 +1,5 @@
 export { default } from "./CompanySpreadsheet";
+export { overlayInProgressEdit, buildCommittedSetRangeValuesParams } from "./inProgressEditSnapshot";
 export { createCompanyUniver } from "./createUniver";
 export { resolveWorkbookSnapshot } from "./workbookData";
 export {
@@ -12,5 +13,12 @@ export {
 } from "./dropdown";
 export {
   isLocalOnlyRealtimeCommand,
+  isUndoRedoRealtimeCommand,
+  shouldKeepRealtimeCommandLocal,
   LOCAL_ONLY_REALTIME_COMMAND_IDS,
 } from "./realtime/localOnlyCommands";
+export {
+  clearLocalUndoRedoStacks,
+  trySafeLocalUndo,
+  trySafeLocalRedo,
+} from "./realtime/safeUndo";

@@ -32,6 +32,8 @@ function join(spreadsheetId, user) {
 
   const room = rooms.get(spreadsheetId);
   const existing = room.get(userId);
+  const replacedSocketId =
+    existing && existing.socketId !== socketId ? existing.socketId : null;
 
   // Drop stale socket index if the user is reconnecting
   if (existing && existing.socketId !== socketId) {
@@ -40,6 +42,7 @@ function join(spreadsheetId, user) {
 
   room.set(userId, { userId, userName, socketId });
   socketIndex.set(socketId, { spreadsheetId, userId });
+  return { replacedSocketId };
 }
 
 /**

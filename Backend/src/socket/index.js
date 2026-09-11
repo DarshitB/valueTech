@@ -7,7 +7,11 @@ const { Server } = require("socket.io");
 const socketAuth = require("./socketAuth");
 const { registerSpreadsheetPresence } = require("./spreadsheetPresence");
 const { registerSpreadsheetActiveCell } = require("./spreadsheetActiveCell");
+const { registerSpreadsheetCellLeases } = require("./spreadsheetCellLeases");
 const { registerSpreadsheetWorkbookSync } = require("./spreadsheetWorkbookSync");
+const {
+  setSpreadsheetSocketServer,
+} = require("./spreadsheetSocketRegistry");
 
 const ALLOWED_ORIGINS = [
   "http://localhost:3000",
@@ -31,12 +35,14 @@ const ALLOWED_ORIGINS = [
  */
 function initSocket(httpServer) {
   const io = new Server(httpServer, {
+    maxHttpBufferSize: 300 * 1024,
     cors: {
       origin: ALLOWED_ORIGINS,
       methods: ["GET", "POST"],
       credentials: true,
     },
   });
+  setSpreadsheetSocketServer(io);
 
   // Authenticate every connection with the same JWT rules as REST APIs
   io.use(socketAuth);
@@ -44,6 +50,7 @@ function initSocket(httpServer) {
   io.on("connection", (socket) => {
     registerSpreadsheetPresence(io, socket);
     registerSpreadsheetActiveCell(io, socket);
+    registerSpreadsheetCellLeases(io, socket);
     registerSpreadsheetWorkbookSync(io, socket);
   });
 

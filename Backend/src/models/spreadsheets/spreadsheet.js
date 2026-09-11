@@ -5,6 +5,8 @@ const DETAIL_COLUMNS = [
   ...LIST_COLUMNS,
   "workbook_data",
   "current_version",
+  "current_revision",
+  "snapshot_revision",
 ];
 
 const spreadsheet = {
@@ -76,6 +78,74 @@ const spreadsheet = {
       .where({ spreadsheet_id: spreadsheetId })
       .orderBy("version", "desc")
       .first(),
+
+  lockRevisionState: (spreadsheetId, trx = db) =>
+    trx("spreadsheets")
+      .select("id", "current_revision", "snapshot_revision", "current_version")
+      .where({ id: spreadsheetId })
+      .whereNull("deleted_at")
+      .forUpdate()
+      .first(),
+
+  updateWorkbookCheckpoint: (
+    spreadsheetId,
+    { workbookData, updatedBy, snapshotRevision },
+    trx = db
+  ) =>
+    trx("spreadsheets")
+      .where({ id: spreadsheetId })
+      .whereNull("deleted_at")
+      .update({
+        workbook_data: workbookData,
+        snapshot_revision: snapshotRevision,
+        updated_at: trx.fn.now(),
+        updated_by: updatedBy,
+      })
+      .returning([
+        "id",
+        "workbook_data",
+        "snapshot_revision",
+        "current_revision",
+        "updated_at",
+        "updated_by",
+      ]),
+
+  getPersonalDraft: (spreadsheetId, userId, trx = db) =>
+    trx("spreadsheet_personal_drafts")
+      .select("sheet_id", "row", "column", "document_data", "updated_at")
+      .where({
+        spreadsheet_id: spreadsheetId,
+        user_id: userId,
+      })
+      .first(),
+
+  upsertPersonalDraft: (spreadsheetId, userId, draft, trx = db) =>
+    trx("spreadsheet_personal_drafts")
+      .insert({
+        spreadsheet_id: spreadsheetId,
+        user_id: userId,
+        sheet_id: draft.sheetId,
+        row: draft.row,
+        column: draft.column,
+        document_data: draft.documentData,
+        updated_at: trx.fn.now(),
+      })
+      .onConflict(["spreadsheet_id", "user_id"])
+      .merge({
+        sheet_id: draft.sheetId,
+        row: draft.row,
+        column: draft.column,
+        document_data: draft.documentData,
+        updated_at: trx.fn.now(),
+      }),
+
+  deletePersonalDraft: (spreadsheetId, userId, trx = db) =>
+    trx("spreadsheet_personal_drafts")
+      .where({
+        spreadsheet_id: spreadsheetId,
+        user_id: userId,
+      })
+      .del(),
 
   updateAuditFields: (id, updatedBy, trx = db) =>
     trx("spreadsheets")

@@ -1,4 +1,4 @@
-import { isLocalOnlyRealtimeCommand } from "@spreadsheet-wrapper";
+import { isLocalOnlyRealtimeCommand } from "@spreadsheet-wrapper/realtime/localOnlyCommands";
 
 /** Max applied sequence IDs retained for duplicate detection. */
 const MAX_APPLIED_SEQUENCES = 1000;
@@ -130,7 +130,7 @@ export function pruneRemoteQueue(coordinator) {
 export function enqueueRemoteWorkbookUpdate(coordinator, update) {
   const { sequence } = update;
 
-  if (typeof sequence !== "number" || !Number.isFinite(sequence)) {
+  if (!Number.isSafeInteger(sequence) || sequence <= 0) {
     return false;
   }
 
@@ -174,10 +174,60 @@ export function enqueueRemoteWorkbookUpdate(coordinator, update) {
 }
 
 /**
+ * Inspect the remote queue head without mutating it.
+ *
+ * V1 may skip gaps. V2 must pause and request replay instead.
+ *
+ * @param {ReturnType<typeof createWorkbookSyncCoordinator>} coordinator
+ * @returns {{
+ *   action: "empty" | "apply" | "drop_stale" | "gap",
+ *   index?: number,
+ *   expectedSequence?: number,
+ *   receivedSequence?: number,
+ * }}
+ */
+export function inspectRemoteQueueHead(coordinator) {
+  if (!coordinator?.remoteQueue?.length) {
+    return { action: "empty" };
+  }
+
+  const expectedSequence = coordinator.lastAppliedSequence + 1;
+  const nextIndex = coordinator.remoteQueue.findIndex(
+    (entry) => entry.sequence === expectedSequence
+  );
+
+  if (nextIndex >= 0) {
+    return { action: "apply", index: nextIndex, expectedSequence };
+  }
+
+  const lowest = coordinator.remoteQueue[0];
+  if (!lowest || lowest.sequence <= coordinator.lastAppliedSequence) {
+    return { action: "drop_stale" };
+  }
+
+  return {
+    action: "gap",
+    expectedSequence,
+    receivedSequence: lowest.sequence,
+  };
+}
+
+export function shouldSkipRemoteSequenceGap(protocol) {
+  return protocol !== "v2";
+}
+
+/**
  * Queue a local command for realtime publishing.
  *
  * @param {ReturnType<typeof createWorkbookSyncCoordinator>} coordinator
- * @param {{ commandId: string, commandParams?: any }} command
+ * @param {{
+ *   commandId: string,
+ *   commandParams?: any,
+ *   operationId?: string,
+ *   clientId?: string,
+ *   clientSequence?: number,
+ *   requestId?: string,
+ * }} command
  * @returns {boolean}
  */
 export function enqueueLocalCommand(coordinator, command) {
@@ -189,8 +239,90 @@ export function enqueueLocalCommand(coordinator, command) {
   coordinator.localCommandQueue.push({
     commandId,
     commandParams: command?.commandParams ?? null,
+    operationId: command?.operationId || null,
+    clientId: command?.clientId || null,
+    clientSequence: command?.clientSequence || null,
+    requestId: command?.requestId || null,
+    inFlight: false,
   });
   return true;
+}
+
+export function peekNextLocalCommand(coordinator) {
+  const head = coordinator.localCommandQueue[0];
+  if (!head || head.inFlight) {
+    return null;
+  }
+  return head;
+}
+
+export function markLocalCommandInFlight(coordinator, operationId) {
+  const entry = coordinator.localCommandQueue.find(
+    (item) => item.operationId === operationId
+  );
+  if (!entry) {
+    return false;
+  }
+  entry.inFlight = true;
+  return true;
+}
+
+export function clearLocalCommandInFlight(coordinator) {
+  coordinator.localCommandQueue.forEach((entry) => {
+    entry.inFlight = false;
+  });
+}
+
+export function acknowledgeLocalCommand(coordinator, identity = {}) {
+  const index = coordinator.localCommandQueue.findIndex((entry) => {
+    if (
+      identity.operationId &&
+      entry.operationId &&
+      entry.operationId === identity.operationId
+    ) {
+      return true;
+    }
+    if (
+      identity.requestId &&
+      entry.requestId &&
+      entry.requestId === identity.requestId
+    ) {
+      return true;
+    }
+    return Boolean(
+      identity.clientId &&
+        Number.isSafeInteger(identity.clientSequence) &&
+        entry.clientId === identity.clientId &&
+        entry.clientSequence === identity.clientSequence
+    );
+  });
+
+  if (index < 0) {
+    return false;
+  }
+
+  coordinator.localCommandQueue.splice(index, 1);
+  return true;
+}
+
+export function findOwnQueuedOperation(coordinator, identity = {}) {
+  return (
+    coordinator.localCommandQueue.find((entry) => {
+      if (
+        identity.operationId &&
+        entry.operationId &&
+        entry.operationId === identity.operationId
+      ) {
+        return true;
+      }
+      return Boolean(
+        identity.clientId &&
+          Number.isSafeInteger(identity.clientSequence) &&
+          entry.clientId === identity.clientId &&
+          entry.clientSequence === identity.clientSequence
+      );
+    }) || null
+  );
 }
 
 /**
@@ -211,6 +343,7 @@ export function recoverStuckPublish(coordinator) {
   coordinator.publishInFlight = false;
   coordinator.publishInFlightSince = 0;
   coordinator.localChangesPending = true;
+  clearLocalCommandInFlight(coordinator);
   return true;
 }
 

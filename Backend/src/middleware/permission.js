@@ -1,5 +1,7 @@
-const db = require("../../db");
 const { PROTECTED_ROLE } = require("../constants/protectedRoles");
+const {
+  roleHasPermission,
+} = require("../services/spreadsheets/spreadsheetAccessPolicy");
 
 module.exports = function (permissionName) {
   return async function (req, res, next) {
@@ -10,20 +12,8 @@ module.exports = function (permissionName) {
       return next();
     }
 
-    const permission = await db("permissions")
-      .join(
-        "role_permissions",
-        "permissions.id",
-        "role_permissions.permission_id"
-      )
-      .where({
-        "permissions.name": permissionName,
-        "role_permissions.role_id": role_id,
-      })
-      .whereNull("role_permissions.deleted_at")
-      .first(); // Check if the role has the specified permission
-
-    if (!permission) {
+    const allowed = await roleHasPermission(role_id, permissionName);
+    if (!allowed) {
       return res
         .status(403)
         .json({ message: "Forbidden: You lack this permission" });

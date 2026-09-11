@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Navigate, useParams } from "react-router-dom";
+import { overlayInProgressEdit } from "@spreadsheet-wrapper";
 import {
   clearSelectedSpreadsheet,
   fetchSpreadsheetById,
@@ -8,7 +9,10 @@ import {
 } from "../../redux/reducers/spreadsheetReducer";
 import { usePageTitle } from "../../context/PageTitleContext";
 import { useSpreadsheetActiveCellPublisher } from "../../hooks/useSpreadsheetActiveCellPublisher";
-import { SpreadsheetRealtimeProvider } from "../../realtime/spreadsheet";
+import {
+  SpreadsheetRealtimeProvider,
+  useSpreadsheetRealtime,
+} from "../../realtime/spreadsheet";
 import { SpreadsheetSessionColorProvider } from "./SpreadsheetSessionColorContext";
 import SpreadsheetPresencePanel from "./SpreadsheetPresencePanel";
 import SpreadsheetRealtimeSurface from "./SpreadsheetRealtimeSurface";
@@ -16,6 +20,13 @@ import { useSpreadsheetKeyboardShortcuts } from "./spreadsheetKeyboardShortcuts"
 import { useSpreadsheetUnsavedNavigationGuard } from "../../hooks/useSpreadsheetUnsavedNavigationGuard";
 import { toast } from "react-toastify";
 import NotFound from "../NotFound";
+import { recordSpreadsheetCollaborationEvent } from "../../realtime/spreadsheet/collaborationTelemetry";
+import { getSpreadsheetCollaborationConfig } from "../../realtime/spreadsheet/collaborationConfig";
+import {
+  buildCheckpointSavePayload,
+  isStaleCheckpointError,
+  readCheckpointRevision,
+} from "../../realtime/spreadsheet/checkpointSave";
 
 const AUTOSAVE_DELAY_MS = 3000;
 const SAVED_STATUS_DISPLAY_MS = 2000;
@@ -37,10 +48,38 @@ function SpreadsheetRealtimeEditorContent({
   editorSaving,
   isDirty,
   onManualSave,
+  restoreInProgressEdit = null,
+  onAuthoritativeRevision = null,
 }) {
   const { localCell, localWorksheetId, publishActiveCell } =
     useSpreadsheetActiveCellPublisher();
-  useSpreadsheetKeyboardShortcuts({ spreadsheetRef, onManualSave });
+  const { lastAuthoritativeRevision, collaborationProtocol } =
+    useSpreadsheetRealtime();
+  const notifyUnsafeUndoBlocked = useCallback(() => {
+    toast.info(
+      "Nothing left to undo here. A collaborator changed the sheet.",
+      { toastId: "spreadsheet-safe-undo-blocked" }
+    );
+  }, []);
+  useSpreadsheetKeyboardShortcuts({
+    spreadsheetRef,
+    onManualSave,
+    onUnsafeUndoBlocked: notifyUnsafeUndoBlocked,
+  });
+
+  useEffect(() => {
+    if (
+      collaborationProtocol === "v2" &&
+      Number.isSafeInteger(lastAuthoritativeRevision) &&
+      lastAuthoritativeRevision >= 0
+    ) {
+      onAuthoritativeRevision?.(lastAuthoritativeRevision);
+    }
+  }, [
+    collaborationProtocol,
+    lastAuthoritativeRevision,
+    onAuthoritativeRevision,
+  ]);
 
   return (
     <div className="height-full-occupied spreadsheet-editor-container">
@@ -94,6 +133,7 @@ function SpreadsheetRealtimeEditorContent({
         localCell={localCell}
         localWorksheetId={localWorksheetId}
         publishActiveCell={publishActiveCell}
+        restoreInProgressEdit={restoreInProgressEdit}
       />
     </div>
   );
@@ -120,6 +160,9 @@ function SpreadsheetEditor() {
   const savingInProgressRef = useRef(false);
   const pendingSaveRef = useRef(false);
   const saveProcessorRunningRef = useRef(false);
+  const currentRevisionRef = useRef(0);
+  const checkpointsEnabled =
+    getSpreadsheetCollaborationConfig().checkpointsEnabled;
   const [saveStatus, setSaveStatus] = useState("idle");
   const [isDirty, setIsDirty] = useState(false);
   const [isSavingInProgress, setIsSavingInProgress] = useState(false);
@@ -172,6 +215,62 @@ function SpreadsheetEditor() {
     setSaveStatus("failed");
   }, [clearSavedStatusTimer]);
 
+  const collectSavePayload = useCallback(async () => {
+    if (!checkpointsEnabled) {
+      const workbookData = await spreadsheetRef.current?.getWorkbookData?.();
+      return workbookData ? { workbook_data: workbookData } : null;
+    }
+
+    const workbookData =
+      spreadsheetRef.current?.getWorkbookDataForSync?.() ||
+      (await spreadsheetRef.current?.getWorkbookData?.());
+    if (!workbookData) {
+      return null;
+    }
+
+    return buildCheckpointSavePayload({
+      workbookData,
+      baseRevision: currentRevisionRef.current,
+      personalDraft: spreadsheetRef.current?.getInProgressEdit?.() || null,
+    });
+  }, [checkpointsEnabled]);
+
+  const dispatchSave = useCallback(
+    async (payload) => {
+      const result = await dispatch(
+        saveSpreadsheetById({
+          id,
+          ...payload,
+        })
+      );
+
+      if (saveSpreadsheetById.fulfilled.match(result)) {
+        const nextRevision = readCheckpointRevision(result.payload?.data);
+        if (nextRevision != null) {
+          currentRevisionRef.current = nextRevision;
+        }
+        return { ok: true, result };
+      }
+
+      if (
+        checkpointsEnabled &&
+        isStaleCheckpointError({
+          response: {
+            status: result.payload?.status,
+            data: result.payload,
+          },
+        })
+      ) {
+        // Do NOT advance base_revision and retry the same local workbook — that
+        // permanently publishes a stale snapshot at the live head revision.
+        return { ok: false, stale: true, result };
+      }
+
+      return { ok: false, stale: false, result };
+    },
+    [checkpointsEnabled, dispatch, id]
+  );
+
   const runSaveQueue = useCallback(
     async (initialForce = false) => {
       if (saveProcessorRunningRef.current) {
@@ -191,26 +290,45 @@ function SpreadsheetEditor() {
 
           try {
             showSavingStatus();
+            recordSpreadsheetCollaborationEvent("snapshot_save_started", {
+              spreadsheetId: id,
+              generation: generationAtSave,
+            });
 
-            const workbookData =
-              await spreadsheetRef.current?.getWorkbookData?.();
+            const payload = await collectSavePayload();
 
-            if (!workbookData) {
+            if (!payload) {
               showFailedStatus();
               break;
             }
 
-            const result = await dispatch(
-              saveSpreadsheetById({
-                id,
-                workbook_data: workbookData,
-              })
-            );
+            let saveResult = await dispatchSave(payload);
+            if (!saveResult.ok && saveResult.stale) {
+              recordSpreadsheetCollaborationEvent("snapshot_save_failed", {
+                spreadsheetId: id,
+                generation: generationAtSave,
+                reason: "stale_checkpoint",
+              });
+              showFailedStatus();
+              // Reload canonical snapshot+revisions instead of force-saving stale data.
+              dispatch(fetchSpreadsheetById(id));
+              break;
+            }
 
-            if (!saveSpreadsheetById.fulfilled.match(result)) {
+            if (!saveResult.ok) {
+              recordSpreadsheetCollaborationEvent("snapshot_save_failed", {
+                spreadsheetId: id,
+                generation: generationAtSave,
+                reason: "request_rejected",
+              });
               showFailedStatus();
               break;
             }
+
+            recordSpreadsheetCollaborationEvent("snapshot_save_succeeded", {
+              spreadsheetId: id,
+              generation: generationAtSave,
+            });
 
             if (changeGenerationRef.current !== generationAtSave) {
               force = false;
@@ -226,7 +344,12 @@ function SpreadsheetEditor() {
             markClean();
             showSavedStatus();
             break;
-          } catch {
+          } catch (error) {
+            recordSpreadsheetCollaborationEvent("snapshot_save_failed", {
+              spreadsheetId: id,
+              generation: generationAtSave,
+              reason: error?.message || "unknown",
+            });
             showFailedStatus();
             break;
           } finally {
@@ -238,7 +361,17 @@ function SpreadsheetEditor() {
         saveProcessorRunningRef.current = false;
       }
     },
-    [dispatch, id, markClean, setSavingInProgress, showFailedStatus, showSavedStatus, showSavingStatus]
+    [
+      collectSavePayload,
+      dispatch,
+      dispatchSave,
+      id,
+      markClean,
+      setSavingInProgress,
+      showFailedStatus,
+      showSavedStatus,
+      showSavingStatus,
+    ]
   );
 
   const saveWorkbook = useCallback(
@@ -308,6 +441,17 @@ function SpreadsheetEditor() {
 
   useEffect(() => {
     if (selected?.id) {
+      // Checkpoint base must match the loaded workbook snapshot revision.
+      // Live V2 head is advanced separately via onAuthoritativeRevision.
+      const snapshotRevision = Number(selected.workbook_revision);
+      if (Number.isSafeInteger(snapshotRevision) && snapshotRevision >= 0) {
+        currentRevisionRef.current = snapshotRevision;
+      } else {
+        const headRevision = Number(selected.current_revision);
+        currentRevisionRef.current = Number.isSafeInteger(headRevision)
+          ? headRevision
+          : 0;
+      }
       markClean();
       changeGenerationRef.current = 0;
       pendingSaveRef.current = false;
@@ -316,7 +460,27 @@ function SpreadsheetEditor() {
       clearSavedStatusTimer();
       setSaveStatus("idle");
     }
-  }, [selected?.id, clearSavedStatusTimer, markClean, setSavingInProgress]);
+  }, [
+    selected?.id,
+    selected?.workbook_revision,
+    selected?.current_revision,
+    clearSavedStatusTimer,
+    markClean,
+    setSavingInProgress,
+  ]);
+
+  const editorWorkbookData = useMemo(() => {
+    const snapshot = selected?.workbook_data;
+    if (!snapshot || !checkpointsEnabled || !selected?.personal_draft) {
+      return snapshot;
+    }
+
+    const clone =
+      typeof structuredClone === "function"
+        ? structuredClone(snapshot)
+        : JSON.parse(JSON.stringify(snapshot));
+    return overlayInProgressEdit(clone, selected.personal_draft);
+  }, [checkpointsEnabled, selected?.personal_draft, selected?.workbook_data]);
 
   const shouldGuardNavigation =
     Boolean(selected?.id) && (isDirty || isSavingInProgress);
@@ -331,6 +495,23 @@ function SpreadsheetEditor() {
       clearSavedStatusTimer();
     };
   }, [clearAutosaveTimer, clearSavedStatusTimer]);
+
+  const handleAuthoritativeRevision = useCallback((revision) => {
+    if (!Number.isSafeInteger(revision) || revision < 0) {
+      return;
+    }
+    if (revision > currentRevisionRef.current) {
+      currentRevisionRef.current = revision;
+    }
+  }, []);
+
+  const initialRealtimeRevision = useMemo(() => {
+    const snapshotRevision = Number(selected?.workbook_revision);
+    if (Number.isSafeInteger(snapshotRevision) && snapshotRevision >= 0) {
+      return snapshotRevision;
+    }
+    return null;
+  }, [selected?.workbook_revision]);
 
   if (String(id).toLowerCase() === "archived") {
     return <Navigate to="/spreadsheet/archived" replace />;
@@ -374,18 +555,25 @@ function SpreadsheetEditor() {
   }
 
   return (
-    <SpreadsheetRealtimeProvider spreadsheetId={realtimeSpreadsheetId}>
+    <SpreadsheetRealtimeProvider
+      spreadsheetId={realtimeSpreadsheetId}
+      initialRevision={initialRealtimeRevision}
+    >
       <SpreadsheetSessionColorProvider>
         <SpreadsheetRealtimeEditorContent
           spreadsheetRef={spreadsheetRef}
           workbookName={selected.name}
-          workbookData={selected.workbook_data}
+          workbookData={editorWorkbookData}
+          restoreInProgressEdit={
+            checkpointsEnabled ? selected.personal_draft : null
+          }
           onWorkbookChange={handleWorkbookChange}
           onError={handleSpreadsheetError}
           saveStatus={saveStatus}
           editorSaving={editorSaving}
           isDirty={isDirty}
           onManualSave={handleManualSave}
+          onAuthoritativeRevision={handleAuthoritativeRevision}
         />
       </SpreadsheetSessionColorProvider>
     </SpreadsheetRealtimeProvider>

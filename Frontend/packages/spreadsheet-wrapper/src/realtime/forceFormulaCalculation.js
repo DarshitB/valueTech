@@ -255,16 +255,13 @@ function resolveLocalWorkbookContext(univerAPI, params) {
       : paramUnitId || localUnitId || "";
 
   const requestedSheetId =
-    (typeof params?.subUnitId === "string" && params.subUnitId) ||
-    (typeof params?.sheetId === "string" && params.sheetId) ||
+    (typeof params?.subUnitId === "string" && params.subUnitId.trim()) ||
+    (typeof params?.sheetId === "string" && params.sheetId.trim()) ||
     "";
 
   let sheet = null;
   if (workbook && requestedSheetId && typeof workbook.getSheetBySheetId === "function") {
     sheet = workbook.getSheetBySheetId(requestedSheetId);
-  }
-  if (!sheet) {
-    sheet = workbook?.getActiveSheet?.() || null;
   }
 
   const localSheetId =
@@ -272,7 +269,7 @@ function resolveLocalWorkbookContext(univerAPI, params) {
     requestedSheetId ||
     "";
 
-  return { unitId, sheetId: localSheetId };
+  return { unitId, sheetId: localSheetId, sheetFound: Boolean(sheet) };
 }
 
 /**
@@ -288,7 +285,10 @@ export function bindCommandParamsToLocalWorkbook(univerAPI, commandParams) {
     return commandParams;
   }
 
-  const { unitId, sheetId } = resolveLocalWorkbookContext(univerAPI, commandParams);
+  const { unitId, sheetId, sheetFound } = resolveLocalWorkbookContext(
+    univerAPI,
+    commandParams
+  );
   const next = { ...commandParams };
   const paramUnitId =
     typeof commandParams.unitId === "string" ? commandParams.unitId : "";
@@ -299,7 +299,16 @@ export function bindCommandParamsToLocalWorkbook(univerAPI, commandParams) {
     next.unitId = unitId;
   }
 
-  if (sheetId) {
+  const requestedSheetId =
+    (typeof commandParams.subUnitId === "string" &&
+      commandParams.subUnitId.trim()) ||
+    (typeof commandParams.sheetId === "string" &&
+      commandParams.sheetId.trim()) ||
+    "";
+
+  // Never retarget a peer cell onto this client's active tab. Sheet1!A1 and
+  // Sheet2!A1 are different cells even when both users are in A1.
+  if (requestedSheetId && sheetFound && sheetId) {
     next.subUnitId = sheetId;
   }
 
@@ -314,10 +323,9 @@ function resolveLastRow(univerAPI, sheetId) {
     }
 
     const sheet =
-      (typeof sheetId === "string" &&
-        sheetId &&
-        workbook.getSheetBySheetId?.(sheetId)) ||
-      workbook.getActiveSheet?.();
+      typeof sheetId === "string" && sheetId
+        ? workbook.getSheetBySheetId?.(sheetId)
+        : null;
 
     const lastRow = sheet?.getLastRow?.();
     if (Number.isInteger(lastRow) && lastRow >= 0) {

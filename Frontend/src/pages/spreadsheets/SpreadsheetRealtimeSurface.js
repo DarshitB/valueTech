@@ -4,12 +4,23 @@ import { useSelector } from "react-redux";
 import { useSpreadsheetActiveCells } from "../../hooks/useSpreadsheetActiveCells";
 import { useSpreadsheetWorkbookPublisher } from "../../hooks/useSpreadsheetWorkbookPublisher";
 import { useSpreadsheetWorkbookSubscriber } from "../../hooks/useSpreadsheetWorkbookSubscriber";
+import { useSpreadsheetCellLeases } from "../../hooks/useSpreadsheetCellLeases";
+import { useSpreadsheetCellLeasePublisher } from "../../hooks/useSpreadsheetCellLeasePublisher";
 import { createWorkbookSyncCoordinator } from "../../hooks/workbookSyncCoordinator";
+import {
+  isLeaseExpired,
+  isSameLeaseLocation,
+  leaseToCellAddress,
+} from "../../realtime/spreadsheet/cellLease";
 import {
   resolveUserInitials,
 } from "./spreadsheetPresenceColors";
+import { toast } from "react-toastify";
 import { useSpreadsheetSessionColors } from "./SpreadsheetSessionColorContext";
 import { databaseDropdownFetchers } from "./databaseDropdownFetchers";
+import {
+  getSpreadsheetCollaborationConfig,
+} from "../../realtime/spreadsheet/collaborationConfig";
 
 /**
  * Realtime-aware surface for the spreadsheet editor.
@@ -27,6 +38,7 @@ function SpreadsheetRealtimeSurface({
   localCell,
   localWorksheetId,
   publishActiveCell,
+  restoreInProgressEdit = null,
 }) {
   const activeCellsByUserId = useSpreadsheetActiveCells();
   const { getUserIdentity } = useSpreadsheetSessionColors();
@@ -61,6 +73,55 @@ function SpreadsheetRealtimeSurface({
     syncCoordinator: syncCoordinatorRef.current,
   });
 
+  const { leasesByKey, isCellEditBlocked } = useSpreadsheetCellLeases();
+  const notifyCellLeaseHeld = useCallback(() => {
+    toast.info("This cell is being edited by someone else.", {
+      toastId: "spreadsheet-cell-lease-held",
+    });
+  }, []);
+
+  const {
+    acquireCellLease,
+    releaseCellLease,
+    publishCellDraft,
+    localLease,
+    abandonLocalLease,
+  } = useSpreadsheetCellLeasePublisher({
+    onLeaseDenied: () => {
+      notifyCellLeaseHeld();
+      spreadsheetRef.current?.abortCellEditing?.();
+    },
+  });
+
+  const handleIsCellEditBlocked = useCallback(
+    (location) => {
+      const blocked = isCellEditBlocked({
+        ...location,
+        currentUserId,
+      });
+      if (blocked) {
+        notifyCellLeaseHeld();
+      }
+      return blocked;
+    },
+    [isCellEditBlocked, currentUserId, notifyCellLeaseHeld]
+  );
+
+  useEffect(() => {
+    const local = localLease?.current;
+    if (!local) return;
+
+    const takenByPeer = [...leasesByKey.values()].some(
+      (lease) =>
+        !isLeaseExpired(lease) &&
+        isSameLeaseLocation(lease, local) &&
+        String(lease.userId) !== String(currentUserId)
+    );
+    if (!takenByPeer) return;
+
+    abandonLocalLease();
+  }, [abandonLocalLease, currentUserId, leasesByKey, localLease]);
+
   const presenceMarkers = useMemo(() => {
     const normalizedActiveWorksheetId =
       typeof localWorksheetId === "string" ? localWorksheetId.trim() : "";
@@ -77,18 +138,32 @@ function SpreadsheetRealtimeSurface({
       return worksheetId.trim() === normalizedActiveWorksheetId;
     };
 
+    const remoteLeases = [...leasesByKey.values()].filter((lease) => {
+      if (isLeaseExpired(lease)) return false;
+      if (!isOnActiveWorksheet(lease.worksheetId)) return false;
+      if (currentUserId == null) return true;
+      return String(lease.userId) !== String(currentUserId);
+    });
+    const leasedUserIds = new Set(
+      remoteLeases.map((lease) => String(lease.userId))
+    );
+
     const remoteEntries = Object.values(activeCellsByUserId).filter(
       (entry) => {
         if (!entry?.cell) return false;
         if (!isOnActiveWorksheet(entry.worksheetId)) return false;
         if (currentUserId == null) return true;
+        if (leasedUserIds.has(String(entry.userId))) return false;
         return String(entry.userId) !== String(currentUserId);
       }
     );
 
     const normalizedLocalCell =
       typeof localCell === "string" ? localCell.trim() : "";
-    const markerUsers = remoteEntries.map((entry) => ({
+    const markerUsers = [
+      ...remoteEntries,
+      ...remoteLeases,
+    ].map((entry) => ({
       userId: entry.userId,
       userName: entry.userName,
     }));
@@ -106,18 +181,35 @@ function SpreadsheetRealtimeSurface({
 
     const initialsByUserId = resolveUserInitials(markerUsers);
 
-    const markers = remoteEntries.map((entry) => ({
-      userId: entry.userId,
-      userName: entry.userName,
-      cell: entry.cell,
-      worksheetId: entry.worksheetId,
-      identity: getUserIdentity(
-        entry.userId,
-        entry.userName,
-        initialsByUserId.get(String(entry.userId))
-      ),
-      isCurrentUser: false,
-    }));
+    const markers = [
+      ...remoteLeases.map((lease) => ({
+        userId: lease.userId,
+        userName: lease.userName,
+        cell: leaseToCellAddress(lease),
+        worksheetId: lease.worksheetId,
+        identity: getUserIdentity(
+          lease.userId,
+          lease.userName,
+          initialsByUserId.get(String(lease.userId))
+        ),
+        isCurrentUser: false,
+        isLease: true,
+        preview: lease.preview || "",
+      })),
+      ...remoteEntries.map((entry) => ({
+        userId: entry.userId,
+        userName: entry.userName,
+        cell: entry.cell,
+        worksheetId: entry.worksheetId,
+        identity: getUserIdentity(
+          entry.userId,
+          entry.userName,
+          initialsByUserId.get(String(entry.userId))
+        ),
+        isCurrentUser: false,
+        isLease: false,
+      })),
+    ];
 
     if (
       currentUserId != null &&
@@ -135,12 +227,14 @@ function SpreadsheetRealtimeSurface({
           initialsByUserId.get(String(currentUserId))
         ),
         isCurrentUser: true,
+        isLease: false,
       });
     }
 
     return markers;
   }, [
     activeCellsByUserId,
+    leasesByKey,
     currentUserId,
     currentUserName,
     localCell,
@@ -184,6 +278,9 @@ function SpreadsheetRealtimeSurface({
     return typeof color === "string" && color.trim() ? color.trim() : null;
   }, [presenceMarkers]);
 
+  const safeUndoEnabled =
+    getSpreadsheetCollaborationConfig().safeUndoEnabled;
+
   return (
     <>
       <CompanySpreadsheet
@@ -194,11 +291,17 @@ function SpreadsheetRealtimeSurface({
         onWorkbookChange={onWorkbookChange}
         onWorkbookRealtimeChange={publishWorkbookUpdate}
         onActiveCellChange={publishActiveCell}
+        isCellEditBlocked={handleIsCellEditBlocked}
+        onCellEditStart={acquireCellLease}
+        onCellEditChange={publishCellDraft}
+        onCellEditEnd={releaseCellLease}
+        initialInProgressEdit={restoreInProgressEdit}
         onReady={handleSpreadsheetReady}
         onError={handleSpreadsheetError}
         isApplyingRemoteCommandRef={isApplyingRemoteCommandRef}
         onApplyingRemoteCommandChange={handleApplyingRemoteCommandChange}
         selectionBorderColor={currentUserOverlayColor}
+        safeUndoEnabled={safeUndoEnabled}
       />
     </>
   );

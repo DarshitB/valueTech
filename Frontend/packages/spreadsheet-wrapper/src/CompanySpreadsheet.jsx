@@ -7,17 +7,29 @@ import {
 } from "react";
 
 import { createCompanyUniver } from "./createUniver";
-import { getActiveCellAddress, getActiveCellFromUniver, getActiveSheetIdFromUniver, restoreActiveCellSelection } from "./cellAddress";
+import { getActiveCellAddress, getActiveCellFromUniver, getActiveSheetIdFromUniver, restoreActiveCellSelection, toCellAddress } from "./cellAddress";
 import { resolveWorkbookSnapshot } from "./workbookData";
 import { sanitizeWorkbookSnapshotForPersistence } from "./workbookSnapshotSanitizer";
 import {
   createDatabaseProviderRegistry,
   installDatabaseDropdown,
 } from "./dropdown";
+import { applyDatabaseDropdownShell } from "./dropdown/dataValidationShell";
+import {
+  getDatabaseProviderId,
+  setDatabaseProviderId,
+} from "./dropdown/metadata";
 import {
   isLocalFormulaResultRelay,
   isLocalOnlyRealtimeCommand,
+  shouldKeepRealtimeCommandLocal,
+  shouldPreserveActiveWorksheetOnRemoteCommand,
 } from "./realtime/localOnlyCommands";
+import {
+  clearLocalUndoRedoStacks,
+  trySafeLocalRedo,
+  trySafeLocalUndo,
+} from "./realtime/safeUndo";
 import {
   SET_RANGE_VALUES_MUTATION_ID,
   bindCommandParamsToLocalWorkbook,
@@ -26,6 +38,12 @@ import {
   shouldScheduleFormulaCalculation,
   waitForWorkbookFormulas,
 } from "./realtime/forceFormulaCalculation";
+import {
+  readLocalEditLocation,
+  remoteCommandTouchesLocalEdit,
+  withSuppressedEditorRefresh,
+} from "./realtime/remoteEditorRefreshGuard";
+import { createIdleCellEditCommitController, commitOpenCellEditStaySelected } from "./realtime/idleCellEditCommit";
 import {
   installLargerSelectionFillHandle,
   normalizeSelectionBorderColor,
@@ -36,7 +54,34 @@ import {
   installPresenceHighlightPointerPassthrough,
 } from "./presenceHighlightPointerEvents";
 import { installHyperlinkClickOpen } from "./hyperlinkClickOpen";
+import { overlayInProgressEdit, buildCommittedSetRangeValuesParams } from "./inProgressEditSnapshot";
+import { suppressClipboardPermissionWarning } from "./clipboardPermissionWarning";
+import { installDeleteSheetConfirmName } from "./deleteSheetConfirmName";
 import "./styles.css";
+
+function getEditLocation(params) {
+  const row = params?.row;
+  const column = params?.column;
+  const worksheetId =
+    params?.worksheet?.getSheetId?.() ||
+    params?.worksheetId ||
+    null;
+
+  if (
+    !Number.isInteger(row) ||
+    !Number.isInteger(column) ||
+    typeof worksheetId !== "string" ||
+    worksheetId.trim().length === 0
+  ) {
+    return null;
+  }
+
+  return {
+    row,
+    column,
+    worksheetId: worksheetId.trim(),
+  };
+}
 
 function PresenceMarkerLabel({ popup }) {
   const extraProps = popup?.extraProps ?? {};
@@ -61,6 +106,8 @@ function PresenceMarkerLabel({ popup }) {
       }}
     >
       {userName}
+      {extraProps.isLease ? " is editing" : ""}
+      {extraProps.preview ? `: ${extraProps.preview}` : ""}
     </div>
   );
 }
@@ -95,10 +142,16 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
     onWorkbookChange,
     onWorkbookRealtimeChange,
     onActiveCellChange,
+    isCellEditBlocked,
+    onCellEditStart,
+    onCellEditChange,
+    onCellEditEnd,
     isApplyingRemoteCommandRef,
     onApplyingRemoteCommandChange,
     databaseProviderFetchers = null,
     selectionBorderColor = null,
+    initialInProgressEdit = null,
+    safeUndoEnabled = false,
   },
   ref
 ) {
@@ -109,6 +162,10 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
   const onWorkbookChangeRef = useRef(onWorkbookChange);
   const onWorkbookRealtimeChangeRef = useRef(onWorkbookRealtimeChange);
   const onActiveCellChangeRef = useRef(onActiveCellChange);
+  const isCellEditBlockedRef = useRef(isCellEditBlocked);
+  const onCellEditStartRef = useRef(onCellEditStart);
+  const onCellEditChangeRef = useRef(onCellEditChange);
+  const onCellEditEndRef = useRef(onCellEditEnd);
   const onErrorRef = useRef(onError);
   const onReadyRef = useRef(onReady);
   const lastPublishedActiveCellRef = useRef(null);
@@ -127,10 +184,19 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
   const restoreUniverRangeRecalcRef = useRef(() => {});
   const formulaResultWorkbookSyncSkipCountRef = useRef(0);
   const formulaPersistFlushGateRef = useRef(false);
+  const inProgressEditRef = useRef(null);
+  const restoringDraftRef = useRef(false);
+  const pendingDraftCommitRef = useRef(false);
+  // Only leave-cell commits are queued here (never remote CommandExecuted echoes).
+  const deferredLeaveCellPublishesRef = useRef([]);
+  const initialInProgressEditRef = useRef(initialInProgressEdit);
+  const safeUndoEnabledRef = useRef(Boolean(safeUndoEnabled));
+  const idleCellEditCommitRef = useRef(null);
   const [isInitializing, setIsInitializing] = useState(true);
 
   selectionBorderColorRef.current =
     normalizeSelectionBorderColor(selectionBorderColor);
+  safeUndoEnabledRef.current = Boolean(safeUndoEnabled);
 
   useEffect(() => {
     onWorkbookChangeRef.current = onWorkbookChange;
@@ -143,6 +209,22 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
   useEffect(() => {
     onActiveCellChangeRef.current = onActiveCellChange;
   }, [onActiveCellChange]);
+
+  useEffect(() => {
+    isCellEditBlockedRef.current = isCellEditBlocked;
+  }, [isCellEditBlocked]);
+
+  useEffect(() => {
+    onCellEditStartRef.current = onCellEditStart;
+  }, [onCellEditStart]);
+
+  useEffect(() => {
+    onCellEditChangeRef.current = onCellEditChange;
+  }, [onCellEditChange]);
+
+  useEffect(() => {
+    onCellEditEndRef.current = onCellEditEnd;
+  }, [onCellEditEnd]);
 
   useEffect(() => {
     onErrorRef.current = onError;
@@ -161,6 +243,7 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
 
   const shouldSkipLocalWorkbookSync = () => {
     return (
+      restoringDraftRef.current ||
       remoteApplyDepthRef.current > 0 ||
       isApplyingRemoteCommandLocalRef.current ||
       Boolean(isApplyingRemoteCommandRef?.current) ||
@@ -182,6 +265,52 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
       isApplyingRemoteCommandLocalRef.current ||
       Boolean(isApplyingRemoteCommandRef?.current)
     );
+  };
+
+  const flushDeferredLeaveCellPublishes = () => {
+    if (shouldSkipLocalRealtimeCommandPublish()) {
+      return;
+    }
+    const pending = deferredLeaveCellPublishesRef.current;
+    if (!pending.length) {
+      return;
+    }
+    deferredLeaveCellPublishesRef.current = [];
+    pending.forEach((payload) => {
+      onWorkbookRealtimeChangeRef.current?.(payload);
+    });
+  };
+
+  // Peer insert/delete remaps the open editor; keep draft row/col in sync.
+  const syncInProgressEditToRemappedEditor = (univerAPI) => {
+    const current = inProgressEditRef.current;
+    if (!current?.documentData) {
+      return;
+    }
+
+    const remapped = readLocalEditLocation(univerAPI, null);
+    if (
+      !remapped?.worksheetId ||
+      !Number.isInteger(remapped.row) ||
+      !Number.isInteger(remapped.column)
+    ) {
+      return;
+    }
+
+    if (
+      current.sheetId === remapped.worksheetId &&
+      current.row === remapped.row &&
+      current.column === remapped.column
+    ) {
+      return;
+    }
+
+    inProgressEditRef.current = {
+      ...current,
+      sheetId: remapped.worksheetId,
+      row: remapped.row,
+      column: remapped.column,
+    };
   };
 
   const captureRealtimeState = (univerAPI) => {
@@ -231,6 +360,8 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
       cell,
       String(marker?.userName ?? ""),
       marker?.isCurrentUser ? "1" : "0",
+      marker?.isLease ? "1" : "0",
+      String(marker?.preview ?? ""),
       identity.borderColor || "",
       identity.labelBackground || "",
       identity.labelColor || "",
@@ -249,9 +380,9 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
     presenceMarkerStateRef.current.delete(markerKey);
   };
 
-  const createPresenceHighlight = (range, borderColor) => {
+  const createPresenceHighlight = (range, borderColor, strokeWidth = 2) => {
     const disposable = range.highlight({
-      strokeWidth: 2,
+      strokeWidth,
       stroke: borderColor,
       fill: "rgba(0, 0, 0, 0)",
       rowHeaderFill: "rgba(0, 0, 0, 0)",
@@ -276,7 +407,11 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
 
     const identity = marker?.identity ?? marker?.color ?? {};
     const borderColor = identity.borderColor || "#2563eb";
-    const highlightDisposable = createPresenceHighlight(range, borderColor);
+    const highlightDisposable = createPresenceHighlight(
+      range,
+      borderColor,
+      marker?.isLease ? 3 : 2
+    );
     let popupDisposable = null;
 
     if (!marker?.isCurrentUser && marker?.userName) {
@@ -290,6 +425,11 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
           userName: marker.userName,
           backgroundColor: identity.labelBackground || borderColor,
           color: identity.labelColor || "#ffffff",
+          isLease: Boolean(marker.isLease),
+          preview:
+            typeof marker.preview === "string" && marker.preview.trim()
+              ? marker.preview.trim().slice(0, 24)
+              : "",
         },
       });
     }
@@ -495,14 +635,6 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
           throw new Error("Spreadsheet workbook is not ready to export.");
         }
 
-        if (
-          typeof workbook.isCellEditing === "function" &&
-          typeof workbook.endEditingAsync === "function" &&
-          workbook.isCellEditing()
-        ) {
-          await workbook.endEditingAsync(true);
-        }
-
         await formulaCalculationControllerRef.current?.flushBeforePersist(
           univerApiRef.current
         );
@@ -510,7 +642,10 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
         const workbookData = sanitizeWorkbookSnapshotForPersistence(
           workbook.save()
         );
-        return workbookData;
+        return overlayInProgressEdit(
+          workbookData,
+          inProgressEditRef.current
+        );
       },
       getWorkbookDataForSync: () => {
         const workbook =
@@ -633,6 +768,14 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
         if (isLocalOnlyRealtimeCommand(normalizedCommandId)) {
           return true;
         }
+        if (
+          safeUndoEnabledRef.current &&
+          shouldKeepRealtimeCommandLocal(normalizedCommandId, {
+            safeUndoEnabled: true,
+          })
+        ) {
+          return true;
+        }
 
         isApplyingRemoteCommandLocalRef.current = true;
         if (isApplyingRemoteCommandRef) {
@@ -645,35 +788,83 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
             univerAPI,
             commandParams ?? undefined
           );
+          const previousSheetId = shouldPreserveActiveWorksheetOnRemoteCommand(
+            normalizedCommandId
+          )
+            ? getActiveSheetIdFromUniver(univerAPI)
+            : null;
 
-          const result = await Promise.resolve(
-            univerAPI.executeCommand(
-              normalizedCommandId,
-              localCommandParams ?? undefined
-            )
+          const localEdit = readLocalEditLocation(
+            univerAPI,
+            inProgressEditRef.current
           );
+          const suppressEditorRefresh =
+            Boolean(localEdit) &&
+            !remoteCommandTouchesLocalEdit(localCommandParams, localEdit);
 
-          if (
-            shouldScheduleFormulaCalculation(
-              normalizedCommandId,
-              localCommandParams,
-              null
-            )
-          ) {
-            formulaCalculationControllerRef.current?.schedule(
-              univerAPI,
-              localCommandParams,
-              { immediate: true }
-            );
-            await formulaCalculationControllerRef.current?.flushBeforePersist(
-              univerAPI
-            );
-          }
+          const result = await withSuppressedEditorRefresh(
+            univerAPI,
+            suppressEditorRefresh,
+            async () => {
+              const applied = await Promise.resolve(
+                univerAPI.executeCommand(
+                  normalizedCommandId,
+                  localCommandParams ?? undefined,
+                  { fromCollab: true }
+                )
+              );
+
+              const workbook = univerAPI.getActiveWorkbook?.();
+              const currentSheetId = getActiveSheetIdFromUniver(univerAPI);
+              if (
+                previousSheetId &&
+                currentSheetId &&
+                currentSheetId !== previousSheetId &&
+                workbook?.getSheetBySheetId?.(previousSheetId)
+              ) {
+                await Promise.resolve(
+                  univerAPI.executeCommand(
+                    "sheet.operation.set-worksheet-active",
+                    {
+                      unitId: workbook.getUnitId?.(),
+                      subUnitId: previousSheetId,
+                    },
+                    { fromCollab: true, onlyLocal: true }
+                  )
+                );
+              }
+
+              if (
+                shouldScheduleFormulaCalculation(
+                  normalizedCommandId,
+                  localCommandParams,
+                  null
+                )
+              ) {
+                formulaCalculationControllerRef.current?.schedule(
+                  univerAPI,
+                  localCommandParams,
+                  { immediate: true }
+                );
+                await formulaCalculationControllerRef.current?.flushBeforePersist(
+                  univerAPI
+                );
+              }
+
+              return applied;
+            }
+          );
 
           const stateAfterReplay = captureRealtimeState(univerAPI);
           lastRealtimeWorkbookSignatureRef.current =
             stateAfterReplay.workbookSignature;
           lastRealtimeActiveCellRef.current = stateAfterReplay.activeCell;
+
+          if (safeUndoEnabledRef.current && result) {
+            clearLocalUndoRedoStacks(univerAPI);
+          }
+
+          syncInProgressEditToRemappedEditor(univerAPI);
 
           return Boolean(result);
         } catch {
@@ -684,15 +875,32 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
             isApplyingRemoteCommandRef.current = false;
           }
           onApplyingRemoteCommandChange?.(false);
+          flushDeferredLeaveCellPublishes();
         }
+      },
+      undo: () => {
+        const univerAPI = univerApiRef.current;
+        if (!univerAPI?.executeCommand) {
+          return "unavailable";
+        }
+        if (!safeUndoEnabledRef.current) {
+          return univerAPI.executeCommand("univer.command.undo")
+            ? "undone"
+            : "blocked";
+        }
+        return trySafeLocalUndo(univerAPI);
       },
       redo: () => {
         const univerAPI = univerApiRef.current;
         if (!univerAPI?.executeCommand) {
-          return false;
+          return "unavailable";
         }
-
-        return Boolean(univerAPI.executeCommand("univer.command.redo"));
+        if (!safeUndoEnabledRef.current) {
+          return univerAPI.executeCommand("univer.command.redo")
+            ? "redone"
+            : "blocked";
+        }
+        return trySafeLocalRedo(univerAPI);
       },
       insertCellLineBreak: () => {
         const univerAPI = univerApiRef.current;
@@ -730,6 +938,60 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
             root.contains(activeElement)
         );
       },
+      getInProgressEdit: () => {
+        const edit = inProgressEditRef.current;
+        if (
+          !edit?.sheetId ||
+          !Number.isInteger(edit.row) ||
+          !Number.isInteger(edit.column) ||
+          !edit.documentData
+        ) {
+          return null;
+        }
+
+        return {
+          sheetId: edit.sheetId,
+          row: edit.row,
+          column: edit.column,
+          documentData: edit.documentData,
+        };
+      },
+      abortCellEditing: () => {
+        const workbook =
+          workbookRef.current ||
+          univerApiRef.current?.getActiveWorkbook?.() ||
+          null;
+        if (!workbook?.isCellEditing?.()) {
+          return false;
+        }
+        if (typeof workbook.abortEditingAsync === "function") {
+          void workbook.abortEditingAsync();
+          return true;
+        }
+        if (typeof workbook.endEditingAsync === "function") {
+          void workbook.endEditingAsync(false);
+          return true;
+        }
+        return false;
+      },
+      endCellEditing: (save = true) => {
+        const workbook =
+          workbookRef.current ||
+          univerApiRef.current?.getActiveWorkbook?.() ||
+          null;
+        if (!workbook?.isCellEditing?.()) {
+          return false;
+        }
+        if (typeof workbook.endEditingAsync === "function") {
+          void workbook.endEditingAsync(Boolean(save));
+          return true;
+        }
+        if (save === false && typeof workbook.abortEditingAsync === "function") {
+          void workbook.abortEditingAsync();
+          return true;
+        }
+        return false;
+      },
       syncPresenceMarkers,
     }),
     [workbookName, isApplyingRemoteCommandRef, onApplyingRemoteCommandChange]
@@ -746,8 +1008,19 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
     let selectionFillHandleDisposable = () => {};
     let presencePointerPassthroughDisposable = () => {};
     let hyperlinkClickOpenDisposable = () => {};
+    let clipboardPermissionWarningDisposable = () => {};
+    let deleteSheetConfirmNameDisposable = () => {};
 
     setIsInitializing(true);
+    inProgressEditRef.current = null;
+    idleCellEditCommitRef.current?.dispose();
+    idleCellEditCommitRef.current = createIdleCellEditCommitController({
+      onIdleCommit: () => {
+        // Keep typed text, leave edit mode, stay on the same cell.
+        // Do not use endEditingAsync(true): that sends Enter and moves down.
+        commitOpenCellEditStaySelected(univerApiRef.current);
+      },
+    });
     formulaCalculationControllerRef.current?.dispose();
     formulaCalculationControllerRef.current = createFormulaCalculationController({
       onPersistFlushChange: (isFlushing) => {
@@ -852,6 +1125,10 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
     try {
       ({ univerAPI } = createCompanyUniver(container));
       univerApiRef.current = univerAPI;
+      clipboardPermissionWarningDisposable =
+        suppressClipboardPermissionWarning(univerAPI);
+      deleteSheetConfirmNameDisposable =
+        installDeleteSheetConfirmName(univerAPI);
       selectionFillHandleDisposable = installLargerSelectionFillHandle(
         univerAPI,
         () => selectionBorderColorRef.current
@@ -888,6 +1165,19 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
       };
 
       const notifyRealtimeCommand = (event = {}) => {
+        const isFormulaEngineEvent = isLocalFormulaResultRelay(event);
+
+        // Formula entry first performs a local-only normalization write, then
+        // finishes the original set-range-values command. Advancing the
+        // signature for that nested write made the original formula look
+        // unchanged, so it was never published to collaborators.
+        if (
+          isFormulaEngineEvent &&
+          event?.options?.applyFormulaCalculationResult !== true
+        ) {
+          return;
+        }
+
         const stateAfterCommand = captureRealtimeState(univerAPI);
         const previousWorkbookSignature = lastRealtimeWorkbookSignatureRef.current;
         const previousActiveCell = lastRealtimeActiveCellRef.current;
@@ -930,11 +1220,15 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
           return;
         }
 
-        if (isLocalOnlyRealtimeCommand(commandId)) {
+        if (
+          shouldKeepRealtimeCommandLocal(commandId, {
+            safeUndoEnabled: safeUndoEnabledRef.current,
+          })
+        ) {
           return;
         }
 
-        if (isLocalFormulaResultRelay(event)) {
+        if (isFormulaEngineEvent) {
           return;
         }
 
@@ -950,6 +1244,10 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
         if (!workbookChanged) {
           return;
         }
+
+        // Sheet add/delete/rename does not fire SheetValueChanged, so cell-only
+        // autosave would leave those tab changes unsaved across refresh.
+        notifyWorkbookChange(event);
 
         onWorkbookRealtimeChangeRef.current?.({
           commandId,
@@ -1056,17 +1354,140 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
           );
         }
 
-        const changeEvents = [
-          univerAPI.Event.SheetValueChanged,
-          univerAPI.Event.SheetEditStarted,
-          univerAPI.Event.SheetEditChanging,
-        ].filter(Boolean);
-
-        changeEvents.forEach((eventName) => {
+        if (univerAPI.Event.SheetValueChanged) {
           changeEventDisposables.push(
-            univerAPI.addEvent(eventName, notifyWorkbookChange)
+            univerAPI.addEvent(
+              univerAPI.Event.SheetValueChanged,
+              notifyWorkbookChange
+            )
           );
-        });
+        }
+
+        if (univerAPI.Event.BeforeSheetEditStart) {
+          changeEventDisposables.push(
+            univerAPI.addEvent(
+              univerAPI.Event.BeforeSheetEditStart,
+              (params) => {
+                const location = getEditLocation(params);
+                if (
+                  location &&
+                  isCellEditBlockedRef.current?.(location)
+                ) {
+                  params.cancel = true;
+                }
+              }
+            )
+          );
+        }
+
+        if (univerAPI.Event.SheetEditStarted) {
+          changeEventDisposables.push(
+            univerAPI.addEvent(
+              univerAPI.Event.SheetEditStarted,
+              (params) => {
+                if (!restoringDraftRef.current) {
+                  inProgressEditRef.current = null;
+                  notifyWorkbookChange(params);
+                }
+                // Idle countdown starts/resets only after typing activity below.
+                // Opening the editor alone does not start the 20s timer.
+                idleCellEditCommitRef.current?.clear();
+                const location = getEditLocation(params);
+                if (location) {
+                  onCellEditStartRef.current?.(location);
+                }
+              }
+            )
+          );
+        }
+
+        if (univerAPI.Event.SheetEditChanging) {
+          changeEventDisposables.push(
+            univerAPI.addEvent(
+              univerAPI.Event.SheetEditChanging,
+              (params) => {
+                const documentData = params?.value?.getData?.();
+                const sheetId = params?.worksheet?.getSheetId?.();
+
+                if (
+                  documentData &&
+                  sheetId &&
+                  Number.isInteger(params?.row) &&
+                  Number.isInteger(params?.column)
+                ) {
+                  inProgressEditRef.current = {
+                    sheetId,
+                    row: params.row,
+                    column: params.column,
+                    documentData:
+                      typeof structuredClone === "function"
+                        ? structuredClone(documentData)
+                        : JSON.parse(JSON.stringify(documentData)),
+                  };
+                  const location = getEditLocation(params);
+                  if (location) {
+                    onCellEditChangeRef.current?.(location, documentData);
+                  }
+                }
+
+                idleCellEditCommitRef.current?.bump();
+                notifyWorkbookChange(params);
+              }
+            )
+          );
+        }
+
+        if (univerAPI.Event.SheetEditEnded) {
+          changeEventDisposables.push(
+            univerAPI.addEvent(univerAPI.Event.SheetEditEnded, (params) => {
+              idleCellEditCommitRef.current?.clear();
+              const edit = inProgressEditRef.current;
+              const endedLocation = getEditLocation(params);
+              const shouldForceRealtimeCommit =
+                pendingDraftCommitRef.current && params?.isConfirm !== false;
+              const leaveDuringRemoteApply =
+                params?.isConfirm !== false &&
+                Boolean(edit) &&
+                shouldSkipLocalRealtimeCommandPublish();
+              pendingDraftCommitRef.current = false;
+              inProgressEditRef.current = null;
+              onCellEditEndRef.current?.(endedLocation);
+              // Leaving the editor must persist the committed cell. Autosave
+              // during typing saved a snapshot without this draft.
+              notifyWorkbookChange(params);
+              if ((shouldForceRealtimeCommit || leaveDuringRemoteApply) && edit) {
+                const remappedEdit =
+                  endedLocation != null
+                    ? {
+                        ...edit,
+                        sheetId: endedLocation.worksheetId,
+                        row: endedLocation.row,
+                        column: endedLocation.column,
+                      }
+                    : edit;
+                const workbook = univerAPI.getActiveWorkbook?.();
+                const commandParams = buildCommittedSetRangeValuesParams(
+                  remappedEdit,
+                  workbook?.getId?.() || workbook?.getUnitId?.() || ""
+                );
+                if (commandParams) {
+                  const payload = {
+                    commandId: SET_RANGE_VALUES_MUTATION_ID,
+                    commandParams,
+                  };
+                  // B5: CommandExecuted publish is skipped while a peer apply is
+                  // in flight — queue only this leave-cell commit (do not queue
+                  // remote echoes from notifyRealtimeCommand).
+                  if (shouldSkipLocalRealtimeCommandPublish()) {
+                    deferredLeaveCellPublishesRef.current.push(payload);
+                  } else {
+                    onWorkbookRealtimeChangeRef.current?.(payload);
+                  }
+                }
+              }
+            })
+          );
+        }
 
         if (univerAPI.Event.CommandExecuted) {
           changeEventDisposables.push(
@@ -1141,6 +1562,29 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
 
           setIsInitializing(false);
           onReadyRef.current?.();
+
+          const restoredEdit = initialInProgressEditRef.current;
+          if (
+            restoredEdit?.sheetId &&
+            Number.isInteger(restoredEdit.row) &&
+            Number.isInteger(restoredEdit.column)
+          ) {
+            const workbook = univerAPI.getActiveWorkbook?.();
+            const sheet = workbook?.getSheetBySheetId?.(restoredEdit.sheetId);
+            if (sheet) {
+              restoreActiveCellSelection(
+                sheet,
+                toCellAddress(restoredEdit.row, restoredEdit.column)
+              );
+              restoringDraftRef.current = true;
+              pendingDraftCommitRef.current = true;
+              inProgressEditRef.current = restoredEdit;
+              workbook.startEditing?.();
+              queueMicrotask(() => {
+                restoringDraftRef.current = false;
+              });
+            }
+          }
         });
       });
     } catch (error) {
@@ -1159,6 +1603,7 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
       isApplyingRemoteCommandLocalRef.current = false;
       lastRealtimeWorkbookSignatureRef.current = null;
       lastRealtimeActiveCellRef.current = null;
+      deferredLeaveCellPublishesRef.current = [];
       if (isApplyingRemoteCommandRef) {
         isApplyingRemoteCommandRef.current = false;
       }
@@ -1176,12 +1621,17 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
       selectionFillHandleDisposable?.();
       presencePointerPassthroughDisposable?.();
       hyperlinkClickOpenDisposable?.();
+      clipboardPermissionWarningDisposable?.();
+      deleteSheetConfirmNameDisposable?.();
       restoreUniverRangeRecalcRef.current?.();
       restoreUniverRangeRecalcRef.current = () => {};
       formulaCalculationControllerRef.current?.dispose();
       formulaCalculationControllerRef.current = null;
+      idleCellEditCommitRef.current?.dispose();
+      idleCellEditCommitRef.current = null;
       formulaResultWorkbookSyncSkipCountRef.current = 0;
       formulaPersistFlushGateRef.current = false;
+      inProgressEditRef.current = null;
       workbookRef.current = null;
       univerApiRef.current = null;
       univerAPI?.dispose();

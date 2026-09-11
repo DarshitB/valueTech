@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSpreadsheetRealtime } from "../realtime/spreadsheet";
+import { createSpreadsheetRequestId } from "../realtime/spreadsheet/protocolRequest";
+import { recordSpreadsheetCollaborationEvent } from "../realtime/spreadsheet/collaborationTelemetry";
 
 /**
  * Publish the local user's active cell through the shared realtime connection.
@@ -14,6 +16,7 @@ export function useSpreadsheetActiveCellPublisher() {
   const socketRef = useRef(socket);
   const spreadsheetIdRef = useRef(spreadsheetId);
   const isRoomReadyRef = useRef(isRoomReady);
+  const clientSequenceRef = useRef(0);
 
   socketRef.current = socket;
   spreadsheetIdRef.current = spreadsheetId;
@@ -33,11 +36,27 @@ export function useSpreadsheetActiveCellPublisher() {
       return;
     }
 
-    activeSocket.emit("spreadsheet:active-cell", {
-      spreadsheet_id: activeSpreadsheetId,
-      worksheet_id: worksheetId,
-      cell,
-    });
+    clientSequenceRef.current += 1;
+    const requestId = createSpreadsheetRequestId("active-cell");
+    activeSocket.emit(
+      "spreadsheet:active-cell",
+      {
+        spreadsheet_id: activeSpreadsheetId,
+        worksheet_id: worksheetId,
+        cell,
+        client_sequence: clientSequenceRef.current,
+        request_id: requestId,
+      },
+      (response) => {
+        if (response?.ok === false) {
+          recordSpreadsheetCollaborationEvent("active_cell_rejected", {
+            spreadsheetId: activeSpreadsheetId,
+            code: response.code || "UNKNOWN",
+            requestId,
+          });
+        }
+      }
+    );
   }, []);
 
   const publishActiveCell = useCallback(
@@ -85,6 +104,7 @@ export function useSpreadsheetActiveCellPublisher() {
 
   useEffect(() => {
     if (!socket || !spreadsheetId) {
+      clientSequenceRef.current = 0;
       localCellRef.current = null;
       localWorksheetIdRef.current = null;
       setLocalCell(null);

@@ -36,7 +36,6 @@
     "build:cra": "react-scripts build",
     "dev:vite": "vite",
     "build:vite": "vite build",
-    "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {

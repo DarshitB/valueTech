@@ -8,22 +8,31 @@ const {
   syncSpreadsheetAssignments,
 } = require("../../services/spreadsheets/spreadsheetService");
 const {
+  getPersonalDraftForUser,
+  saveRevisionedCheckpoint,
+} = require("../../services/spreadsheets/spreadsheetCheckpointService");
+const {
+  getSpreadsheetCollaborationConfig,
+} = require("../../config/spreadsheetCollaboration");
+const {
+  recordSpreadsheetCollaborationEvent,
+} = require("../../socket/spreadsheetCollaborationTelemetry");
+const {
+  assertSpreadsheetAccess: assertSpreadsheetAccessPolicy,
+  isDeveloperAdmin,
+} = require("../../services/spreadsheets/spreadsheetAccessPolicy");
+const {
   AppError,
   BadRequestError,
   NotFoundError,
 } = require("../../utils/customErrors");
 const { createEmptyWorkbookData } = require("../../utils/univerWorkbookHelper");
+const logger = require("../../utils/logger");
+const {
+  revalidateSpreadsheetRoomAccess,
+} = require("../../socket/spreadsheetAccessRevocation");
 
 const MAX_NAME_LENGTH = 255;
-const DEVELOPER_ADMIN_ROLE = "developer_admin";
-
-function isDeveloperAdmin(roleNameRaw) {
-  const normalized = String(roleNameRaw || "").toLowerCase().trim();
-  if (normalized === DEVELOPER_ADMIN_ROLE) return true;
-
-  const tokens = normalized.split(/[^a-z0-9]+/).filter(Boolean);
-  return tokens.includes("developer") && tokens.includes("admin");
-}
 
 function validateSpreadsheetId(id) {
   if (!id || typeof id !== "string" || !isUuid(id)) {
@@ -93,7 +102,7 @@ function normalizeAssignedUserIds(assignedUserIds) {
 }
 
 function validateSavePayload(body) {
-  const { workbook_data } = body;
+  const { workbook_data, base_revision, personal_draft } = body;
 
   if (workbook_data === undefined || workbook_data === null) {
     throw new BadRequestError("workbook_data is required");
@@ -103,7 +112,11 @@ function validateSavePayload(body) {
     throw new BadRequestError("workbook_data must be an object");
   }
 
-  return { workbook_data };
+  return {
+    workbook_data,
+    base_revision: base_revision === undefined ? null : base_revision,
+    personal_draft: personal_draft === undefined ? null : personal_draft,
+  };
 }
 
 function parseArchivedQuery(value) {
@@ -115,24 +128,13 @@ function toBooleanFlag(value) {
   return value === true || value === "t" || value === "true" || value === 1;
 }
 
-async function assertSpreadsheetAccess(req, spreadsheetId) {
-  const spreadsheet = await Spreadsheet.findById(spreadsheetId);
-  if (!spreadsheet) {
-    throw new NotFoundError("Spreadsheet not found");
-  }
-
-  const assignedUserIds = await Spreadsheet.getAssignedUserIds(spreadsheetId);
-  const isDevAdmin = isDeveloperAdmin(req.user?.role_name);
-  const canAccess =
-    isDevAdmin ||
-    Number(spreadsheet.created_by) === Number(req.user.id) ||
-    assignedUserIds.includes(Number(req.user.id));
-
-  if (!canAccess) {
-    throw new NotFoundError("Spreadsheet not found");
-  }
-
-  return spreadsheet;
+async function assertSpreadsheetAccess(req, spreadsheetId, trx = db) {
+  const decision = await assertSpreadsheetAccessPolicy({
+    spreadsheetId,
+    user: req.user,
+    trx,
+  });
+  return decision.spreadsheet;
 }
 
 /**
@@ -170,20 +172,11 @@ exports.getById = async (req, res, next) => {
     const { id } = req.params;
     validateSpreadsheetId(id);
 
-    const spreadsheet = await Spreadsheet.findById(id);
-    if (!spreadsheet) {
-      throw new NotFoundError("Spreadsheet not found");
-    }
+    const spreadsheet = await assertSpreadsheetAccess(req, id);
     const assignedUserIds = await Spreadsheet.getAssignedUserIds(id);
-    const isDevAdmin = isDeveloperAdmin(req.user?.role_name);
-    const canAccess =
-      isDevAdmin ||
-      Number(spreadsheet.created_by) === Number(req.user.id) ||
-      assignedUserIds.includes(Number(req.user.id));
-
-    if (!canAccess) {
-      throw new NotFoundError("Spreadsheet not found");
-    }
+    const personalDraft = getSpreadsheetCollaborationConfig().checkpointsEnabled
+      ? await getPersonalDraftForUser(id, req.user.id)
+      : null;
 
     res.json({
       success: true,
@@ -193,6 +186,9 @@ exports.getById = async (req, res, next) => {
         description: spreadsheet.description,
         workbook_data: spreadsheet.workbook_data,
         version: spreadsheet.current_version,
+        workbook_revision: spreadsheet.snapshot_revision,
+        current_revision: spreadsheet.current_revision,
+        personal_draft: personalDraft,
         created_at: spreadsheet.created_at,
         updated_at: spreadsheet.updated_at,
         assigned_user_ids: assignedUserIds,
@@ -213,21 +209,46 @@ exports.save = async (req, res, next) => {
     const { id } = req.params;
     validateSpreadsheetId(id);
 
-    const { workbook_data } = validateSavePayload(req.body);
+    const { workbook_data, base_revision, personal_draft } =
+      validateSavePayload(req.body);
     const { id: userId } = req.user;
 
-    const spreadsheet = await Spreadsheet.findById(id, trx);
-    if (!spreadsheet) {
-      throw new NotFoundError("Spreadsheet not found");
-    }
-    const assignedUserIds = await Spreadsheet.getAssignedUserIds(id, trx);
-    const isDevAdmin = isDeveloperAdmin(req.user?.role_name);
-    const canAccess =
-      isDevAdmin ||
-      Number(spreadsheet.created_by) === Number(userId) ||
-      assignedUserIds.includes(Number(userId));
-    if (!canAccess) {
-      throw new NotFoundError("Spreadsheet not found");
+    await assertSpreadsheetAccess(req, id, trx);
+
+    if (getSpreadsheetCollaborationConfig().checkpointsEnabled) {
+      const checkpoint = await saveRevisionedCheckpoint(
+        {
+          spreadsheetId: id,
+          workbookData: workbook_data,
+          baseRevision: base_revision,
+          updatedBy: userId,
+          personalDraft: personal_draft,
+        },
+        trx
+      );
+
+      await trx.commit();
+
+      recordSpreadsheetCollaborationEvent("checkpoint_saved", {
+        spreadsheetId: id,
+        userId,
+        currentRevision: checkpoint.currentRevision,
+        snapshotRevision: checkpoint.snapshotRevision,
+        previousSnapshotRevision: checkpoint.previousSnapshotRevision,
+        version: checkpoint.version,
+        checkpoint_lag_revisions: checkpoint.checkpointLagRevisions,
+      });
+
+      res.json({
+        success: true,
+        message: "Spreadsheet saved successfully.",
+        data: {
+          current_revision: checkpoint.currentRevision,
+          snapshot_revision: checkpoint.snapshotRevision,
+          version: checkpoint.version,
+        },
+      });
+      return;
     }
 
     await updateSpreadsheet(
@@ -327,18 +348,10 @@ exports.update = async (req, res, next) => {
     const { name, description, assigned_user_ids } = validateCreatePayload(req.body);
     const { id: userId } = req.user;
 
-    const spreadsheet = await Spreadsheet.findById(id);
-    if (!spreadsheet) {
-      throw new NotFoundError("Spreadsheet not found");
-    }
+    const spreadsheet = await assertSpreadsheetAccess(req, id);
     const existingAssignments = await Spreadsheet.getAssignedUserIds(id);
     const isDevAdmin = isDeveloperAdmin(req.user?.role_name);
     const isCreator = Number(spreadsheet.created_by) === Number(userId);
-    const canAccess =
-      isDevAdmin || isCreator || existingAssignments.includes(Number(userId));
-    if (!canAccess) {
-      throw new NotFoundError("Spreadsheet not found");
-    }
     const canManageAssignments = isDevAdmin || isCreator;
     if (!canManageAssignments && assigned_user_ids.length > 0) {
       throw new AppError("You are not allowed to assign users", 403);
@@ -369,6 +382,11 @@ exports.update = async (req, res, next) => {
       }
 
       await trx.commit();
+      await revalidateSpreadsheetRoomAccess(id).catch((error) => {
+        logger.error(
+          `[SpreadsheetCollaboration] access revalidation failed for ${id}: ${error.message}`
+        );
+      });
 
       res.json({
         success: true,
@@ -396,21 +414,14 @@ exports.softDelete = async (req, res, next) => {
     const { id } = req.params;
     validateSpreadsheetId(id);
 
-    const spreadsheet = await Spreadsheet.findById(id);
-    if (!spreadsheet) {
-      throw new NotFoundError("Spreadsheet not found");
-    }
-    const assignedUserIds = await Spreadsheet.getAssignedUserIds(id);
-    const isDevAdmin = isDeveloperAdmin(req.user?.role_name);
-    const canAccess =
-      isDevAdmin ||
-      Number(spreadsheet.created_by) === Number(req.user.id) ||
-      assignedUserIds.includes(Number(req.user.id));
-    if (!canAccess) {
-      throw new NotFoundError("Spreadsheet not found");
-    }
+    await assertSpreadsheetAccess(req, id);
 
     await Spreadsheet.softDelete(id, req.user.id);
+    await revalidateSpreadsheetRoomAccess(id).catch((error) => {
+      logger.error(
+        `[SpreadsheetCollaboration] access revalidation failed for ${id}: ${error.message}`
+      );
+    });
 
     res.status(204).json({
       success: true,

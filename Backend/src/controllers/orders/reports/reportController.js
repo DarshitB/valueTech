@@ -1388,8 +1388,8 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
         bgImageFileName = "marine-vs.webp"; // Marine letterhead for VTS
         stampPngFile = "marine-vs-stamp.png";
       } else if (name === "VISHAL D. KOTHARI") {
-        bgImageFileName = "marine-vs.webp"; // Marine letterhead for VDK
-        stampPngFile = "marine-vs-stamp.png";
+        bgImageFileName = "marine-vdk.webp"; // Marine letterhead for VDK
+        stampPngFile = null; // empty stamp → no overlay on any page
       } else {
         // Default marine letterhead
         bgImageFileName = "marine-vs.webp";
@@ -1441,6 +1441,12 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
 
   // Background image path
   const bgPath = path.join(process.cwd(), "public", "img", bgImageFileName);
+
+  // Blank / missing stamp file means do not overlay a stamp on any page.
+  stampPngFile =
+    typeof stampPngFile === "string" && stampPngFile.trim()
+      ? stampPngFile.trim()
+      : null;
 
   // Convert background image to base64 (optimized)
   let bgImageBase64 = null;
