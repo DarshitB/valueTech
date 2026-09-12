@@ -48,6 +48,9 @@ export const updateOrderToStatus9 = (id) =>
 export const updateOrderStatusDirect = (id, payload) =>
   axios.patch(`${ENDPOINT}/${id}/update-status-direct`, payload);
 
+// All order statuses (for status change dropdowns)
+export const getOrderStatuses = () => axios.get(`${ENDPOINT}/statuses`);
+
 export const updateStatusAfterUnderReview = (id, payload) =>
   axios.patch(`${ENDPOINT}/${id}/update-status-after-under-review`, payload); // Update order status after under review
 

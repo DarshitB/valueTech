@@ -17,6 +17,7 @@ router.get("/", orderController.getAll);
 // Get orders that are finalized (status 13) or on hold (status 14)
 router.get("/finalized-and-on-hold-orders", orderController.getAllWithWoStatus);
 router.get("/by-order-number/:orderNumber", orderController.getByOrderNumber);
+router.get("/statuses", orderController.getAllStatuses);
 router.get(
   "/by-registration",
   orderController.searchByRegistrationNumber
@@ -75,7 +76,29 @@ router.patch(
 );
 router.patch(
   "/:id/update-status-direct",
-  checkPermission("edit_order"), // Direct status change
+  // Dashboard Status button: edit_order_status_db
+  // Order Details complete/hold/etc: edit_order
+  async (req, res, next) => {
+    try {
+      const { PROTECTED_ROLE } = require("../../constants/protectedRoles");
+      const {
+        roleHasPermission,
+      } = require("../../services/spreadsheets/spreadsheetAccessPolicy");
+      const { role_id, role_name } = req.user || {};
+      if (role_name === PROTECTED_ROLE) return next();
+      const allowed =
+        (await roleHasPermission(role_id, "edit_order_status_db")) ||
+        (await roleHasPermission(role_id, "edit_order"));
+      if (!allowed) {
+        return res
+          .status(403)
+          .json({ message: "Forbidden: You lack this permission" });
+      }
+      return next();
+    } catch (err) {
+      return next(err);
+    }
+  },
   activityLogger("orders", (req) => req.params.id), // Log update
   orderController.updateOrderStatusDirect
 );

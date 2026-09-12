@@ -870,8 +870,18 @@ exports.update = async (req, res, next) => {
     // Determine new order status based on field_verifier_id, manager_id, supervisor_number, and driver_number
     // IMPORTANT: Only update status if current status is lower than the new status
     let newStatusId;
+    // undefined = leave unchanged; null/"" = clear assignment
     let finalManagerId =
-      manager_id !== undefined ? manager_id : existingOrder.manager_id;
+      manager_id === undefined
+        ? existingOrder.manager_id
+        : manager_id === null || manager_id === ""
+          ? null
+          : manager_id;
+
+    // Manager explicitly cleared (x in edit modal) → also clear field verifier
+    const managerExplicitlyCleared =
+      manager_id !== undefined &&
+      (manager_id === null || manager_id === "");
 
     // Reset manager if Telecaller changed place of inspection
     if (resetManagerAndFieldVerifier) {
@@ -886,12 +896,14 @@ exports.update = async (req, res, next) => {
       driver_number !== undefined ? driver_number : existingOrder.driver_number;
     const currentManagerId = finalManagerId;
     let currentFieldVerifierId =
-      field_verifier_id !== undefined
-        ? field_verifier_id
-        : existingOrder.field_verifier_id;
+      field_verifier_id === undefined
+        ? existingOrder.field_verifier_id
+        : field_verifier_id === null || field_verifier_id === ""
+          ? null
+          : field_verifier_id;
 
-    // Reset field verifier if Telecaller changed place of inspection
-    if (resetManagerAndFieldVerifier) {
+    // Reset field verifier if place changed, or manager was cleared
+    if (resetManagerAndFieldVerifier || managerExplicitlyCleared) {
       currentFieldVerifierId = null;
     }
 
@@ -934,8 +946,19 @@ exports.update = async (req, res, next) => {
       newStatusId = existingOrder.current_status_id;
     }
 
-    // Helper function to handle empty strings for integer fields
-    const getIntegerValue = (value, defaultValue) => {
+    // undefined = leave unchanged; null/"" = clear (nullable FKs like officer/telecaller/FV)
+    const getNullableInteger = (value, defaultValue) => {
+      if (value === undefined) {
+        return defaultValue;
+      }
+      if (value === null || value === "") {
+        return null;
+      }
+      return value;
+    };
+
+    // Legacy: empty/null child_category keeps existing (not part of assignment clear UX)
+    const getChildCategoryValue = (value, defaultValue) => {
       if (value === undefined || value === null || value === "") {
         return defaultValue;
       }
@@ -963,19 +986,23 @@ exports.update = async (req, res, next) => {
         driver_number !== undefined
           ? driver_number
           : existingOrder.driver_number,
-      child_category_id: getIntegerValue(
+      child_category_id: getChildCategoryValue(
         child_category_id,
         existingOrder.child_category_id
       ),
-      officer_id: getIntegerValue(officer_id, existingOrder.officer_id),
+      officer_id: getNullableInteger(officer_id, existingOrder.officer_id),
       manager_id: finalManagerId,
-      telecaller_id: getIntegerValue(
+      telecaller_id: getNullableInteger(
         telecaller_id,
         existingOrder.telecaller_id
       ),
-      field_verifier_id: resetManagerAndFieldVerifier
-        ? null
-        : getIntegerValue(field_verifier_id, existingOrder.field_verifier_id),
+      field_verifier_id:
+        resetManagerAndFieldVerifier || managerExplicitlyCleared
+          ? null
+          : getNullableInteger(
+              field_verifier_id,
+              existingOrder.field_verifier_id
+            ),
       registration_number:
         registration_number !== undefined
           ? registration_number
@@ -1325,14 +1352,14 @@ exports.softDelete = async (req, res, next) => {
 }; */
 
 // Get All Order Statuses (for dropdowns)
-/* exports.getAllStatuses = async (req, res, next) => {
+exports.getAllStatuses = async (req, res, next) => {
   try {
     const statuses = await OrderStatusMaster.getAllStatuses();
     res.json(statuses);
   } catch (err) {
     next(err);
   }
-}; */
+};
 
 /**
  * PATCH /orders/:id/attributes

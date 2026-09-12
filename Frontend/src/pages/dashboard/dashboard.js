@@ -7,6 +7,7 @@ import {
   editOrder,
   removeOrder,
   updateOrderAttributes,
+  updateOrderStatusDirect,
 } from "../../redux/reducers/orderReducer";
 import { fetchUsers } from "../../redux/reducers/userReducer";
 import { fetchOfficers } from "../../redux/reducers/officerReducer";
@@ -30,7 +31,7 @@ import SingleSearchSelect from "../../components/SingleSearchSelect";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
 import { hasPermission } from "../../utils/permissionUtils";
 import { toast } from "react-toastify";
-import { searchOrdersByRegistration } from "../../api/order.api";
+import { searchOrdersByRegistration, getOrderStatuses } from "../../api/order.api";
 import { useUppercaseField } from "../../utils/useUppercaseField";
 import CustomDataTable from "../../components/CustomDataTable";
 import "./dashboard.scss";
@@ -514,6 +515,15 @@ function Dashboard() {
     valuer_name: "",
     admin_user_ids: [],
   });
+
+  // State for change-order-status modal
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [statusOrderId, setStatusOrderId] = useState(null);
+  const [statusOrderNumber, setStatusOrderNumber] = useState("");
+  const [selectedStatusId, setSelectedStatusId] = useState(null);
+  const [orderStatusOptions, setOrderStatusOptions] = useState([]);
+  const [statusOptionsLoading, setStatusOptionsLoading] = useState(false);
+  const [isUpdatingOrderStatus, setIsUpdatingOrderStatus] = useState(false);
 
   // Helper: count today's orders (by created date)
   const isSameDay = isSameOrderDay;
@@ -1309,6 +1319,67 @@ function Dashboard() {
       admin_user_ids: assignedUserIds,
     });
     setShowAttributesModal(true);
+  };
+
+  const closeStatusModal = () => {
+    setShowStatusModal(false);
+    setStatusOrderId(null);
+    setStatusOrderNumber("");
+    setSelectedStatusId(null);
+    setIsUpdatingOrderStatus(false);
+  };
+
+  const openStatusModal = async (order) => {
+    setStatusOrderId(order.id);
+    setStatusOrderNumber(order.order_number || "");
+    setSelectedStatusId(
+      order.current_status_id != null ? Number(order.current_status_id) : null,
+    );
+    setShowStatusModal(true);
+
+    if (orderStatusOptions.length > 0) return;
+
+    setStatusOptionsLoading(true);
+    try {
+      const res = await getOrderStatuses();
+      const list = Array.isArray(res?.data) ? res.data : [];
+      setOrderStatusOptions(list);
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Failed to load order statuses";
+      toast.error(typeof msg === "string" ? msg : "Failed to load order statuses");
+    } finally {
+      setStatusOptionsLoading(false);
+    }
+  };
+
+  const handleStatusUpdateSubmit = async () => {
+    if (!statusOrderId) return;
+    if (selectedStatusId == null || selectedStatusId === "") {
+      toast.warning("Please select an order status");
+      return;
+    }
+
+    setIsUpdatingOrderStatus(true);
+    try {
+      await dispatch(
+        updateOrderStatusDirect({
+          id: statusOrderId,
+          data: {
+            status_id: Number(selectedStatusId),
+            note: "Status updated from dashboard",
+          },
+        }),
+      ).unwrap();
+      closeStatusModal();
+    } catch (err) {
+      // errors toasted in reducer
+    } finally {
+      setIsUpdatingOrderStatus(false);
+    }
   };
 
   // Handle Order Attributes Submit
@@ -3422,6 +3493,14 @@ function Dashboard() {
                             )}
                             {hasPermission(
                               allowedPermissions,
+                              "view_order_table_place_of_inspection_db",
+                            ) && (
+                              <th style={{ width: "220px" }}>
+                                Place of Inspection
+                              </th>
+                            )}
+                            {hasPermission(
+                              allowedPermissions,
                               "view_order_table_payment_status_db",
                             ) && (
                               <th style={{ width: "200px" }}>Payment Status</th>
@@ -3467,7 +3546,12 @@ function Dashboard() {
                               "view_order_table_action_db",
                             ) && (
                               <th
-                                style={{ textAlign: "center", width: "200px" }}
+                                className="order-table-action-col"
+                                style={{
+                                  textAlign: "center",
+                                  minWidth: "220px",
+                                  width: "220px",
+                                }}
                               >
                                 Action
                               </th>
@@ -3690,6 +3774,10 @@ function Dashboard() {
                               ) && <td>{order.registration_number || "-"}</td>}
                               {hasPermission(
                                 allowedPermissions,
+                                "view_order_table_place_of_inspection_db",
+                              ) && <td>{order.place_of_inspection || "-"}</td>}
+                              {hasPermission(
+                                allowedPermissions,
                                 "view_order_table_payment_status_db",
                               ) && <td>{order.payment_status || "-"}</td>}
                               {hasPermission(
@@ -3745,7 +3833,14 @@ function Dashboard() {
                                 allowedPermissions,
                                 "view_order_table_action_db",
                               ) && (
-                                <td style={{ textAlign: "center" }}>
+                                <td
+                                  className="order-table-action-col"
+                                  style={{
+                                    textAlign: "center",
+                                    minWidth: "220px",
+                                  }}
+                                >
+                                  <div className="order-table-actions">
                                   {hasPermission(
                                     allowedPermissions,
                                     "edit_order_db",
@@ -3758,6 +3853,22 @@ function Dashboard() {
                                       }}
                                     >
                                       <EditIcon />
+                                    </button>
+                                  )}
+                                  {hasPermission(
+                                    allowedPermissions,
+                                    "edit_order_status_db",
+                                  ) && (
+                                    <button
+                                      type="button"
+                                      className="order-status-action-btn"
+                                      title="Change order status"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openStatusModal(order);
+                                      }}
+                                    >
+                                      Status
                                     </button>
                                   )}
                                   {hasPermission(
@@ -3799,6 +3910,7 @@ function Dashboard() {
                                       <MoreIcon />
                                     </button>
                                   )}
+                                  </div>
                                 </td>
                               )}
                             </tr>
@@ -4635,6 +4747,62 @@ function Dashboard() {
                 admin_user_ids: [],
               });
             },
+          }}
+        </FormModel>
+      )}
+
+      {/* Change Order Status Modal */}
+      {showStatusModal && (
+        <FormModel>
+          {{
+            title: statusOrderNumber
+              ? `Change Status - ${statusOrderNumber}`
+              : "Change Order Status",
+            body: (
+              <form
+                className="body-form-box"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleStatusUpdateSubmit();
+                }}
+              >
+                <div className="body-form-box">
+                  <div className="form-group">
+                    <label htmlFor="dashboardOrderStatus">Order Status</label>
+                    <SingleSearchSelect
+                      id="dashboardOrderStatus"
+                      className="search-selector"
+                      options={orderStatusOptions.map((status) => ({
+                        value: status.id,
+                        label: status.name,
+                      }))}
+                      value={selectedStatusId}
+                      onChange={(val) => setSelectedStatusId(val)}
+                      placeholder={
+                        statusOptionsLoading
+                          ? "Loading statuses..."
+                          : "Select order status"
+                      }
+                      disabled={statusOptionsLoading || isUpdatingOrderStatus}
+                    />
+                  </div>
+                  <div className="form-buttons">
+                    <button
+                      className="submit-button"
+                      type="submit"
+                      disabled={
+                        statusOptionsLoading ||
+                        isUpdatingOrderStatus ||
+                        selectedStatusId == null
+                      }
+                    >
+                      {isUpdatingOrderStatus ? "Updating..." : "Update Status"}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            ),
+            onClose: closeStatusModal,
           }}
         </FormModel>
       )}

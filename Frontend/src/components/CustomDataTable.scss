@@ -201,6 +201,46 @@
         thead {
           z-index: 0;
         }
+
+        .order-table-action-col {
+          min-width: 220px;
+          vertical-align: middle;
+        }
+
+        .order-table-actions {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: center;
+          gap: 0;
+          min-width: 200px;
+        }
+
+        .order-status-action-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          height: 28px;
+          padding: 0 12px;
+          border: none;
+          border-radius: 999px;
+          background-color: $primary-color;
+          color: #fff;
+          font-size: 12px;
+          font-weight: 600;
+          line-height: 1;
+          cursor: pointer;
+          white-space: nowrap;
+
+          &:hover {
+            opacity: 0.92;
+          }
+
+          &:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(88, 100, 189, 0.25);
+          }
+        }
       }
     }
   }

@@ -26,6 +26,7 @@ import {
   buildCheckpointSavePayload,
   isStaleCheckpointError,
   readCheckpointRevision,
+  readStaleCheckpointRevision,
 } from "../../realtime/spreadsheet/checkpointSave";
 
 const AUTOSAVE_DELAY_MS = 3000;
@@ -282,6 +283,8 @@ function SpreadsheetEditor() {
       setSavingInProgress(true);
 
       let force = initialForce;
+      // One aligned retry after STALE_CHECKPOINT — never refetch/remount the editor.
+      let staleRetried = false;
 
       try {
         while (force || dirtyRef.current) {
@@ -309,9 +312,21 @@ function SpreadsheetEditor() {
                 generation: generationAtSave,
                 reason: "stale_checkpoint",
               });
+              // Align save base to live head from 409 details. Do NOT
+              // fetchSpreadsheetById — that clears `selected`, remounts the
+              // editor (Loading…), and flushes in-progress edits.
+              const liveRevision = readStaleCheckpointRevision({
+                response: { data: saveResult.result?.payload },
+              });
+              if (liveRevision != null) {
+                currentRevisionRef.current = liveRevision;
+              }
+              if (!staleRetried && dirtyRef.current) {
+                staleRetried = true;
+                force = false;
+                continue;
+              }
               showFailedStatus();
-              // Reload canonical snapshot+revisions instead of force-saving stale data.
-              dispatch(fetchSpreadsheetById(id));
               break;
             }
 
@@ -363,7 +378,6 @@ function SpreadsheetEditor() {
     },
     [
       collectSavePayload,
-      dispatch,
       dispatchSave,
       id,
       markClean,
@@ -443,6 +457,8 @@ function SpreadsheetEditor() {
     if (selected?.id) {
       // Checkpoint base must match the loaded workbook snapshot revision.
       // Live V2 head is advanced separately via onAuthoritativeRevision.
+      // Only re-init when opening a sheet — not when revision fields change
+      // (that reset base behind live head and caused STALE + remount wipe).
       const snapshotRevision = Number(selected.workbook_revision);
       if (Number.isSafeInteger(snapshotRevision) && snapshotRevision >= 0) {
         currentRevisionRef.current = snapshotRevision;
@@ -460,14 +476,7 @@ function SpreadsheetEditor() {
       clearSavedStatusTimer();
       setSaveStatus("idle");
     }
-  }, [
-    selected?.id,
-    selected?.workbook_revision,
-    selected?.current_revision,
-    clearSavedStatusTimer,
-    markClean,
-    setSavingInProgress,
-  ]);
+  }, [selected?.id, clearSavedStatusTimer, markClean, setSavingInProgress]);
 
   const editorWorkbookData = useMemo(() => {
     const snapshot = selected?.workbook_data;

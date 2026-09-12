@@ -2185,6 +2185,10 @@ function Orders() {
                   ) && <th style={{ width: "200px" }}>Registration Number</th>}
                   {hasPermission(
                     allowedPermissions,
+                    "view_order_table_place_of_inspection"
+                  ) && <th style={{ width: "220px" }}>Place of Inspection</th>}
+                  {hasPermission(
+                    allowedPermissions,
                     "view_order_table_created_at"
                   ) && <th style={{ width: "180px" }}>Created At</th>}
                   {hasPermission(
@@ -2318,6 +2322,10 @@ function Orders() {
                     allowedPermissions,
                     "view_order_table_registration_number"
                   ) && <td>{order.registration_number || "-"}</td>}
+                  {hasPermission(
+                    allowedPermissions,
+                    "view_order_table_place_of_inspection"
+                  ) && <td>{order.place_of_inspection || "-"}</td>}
                   {hasPermission(
                     allowedPermissions,
                     "view_order_table_created_at"
