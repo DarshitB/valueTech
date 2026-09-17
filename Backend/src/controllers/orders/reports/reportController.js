@@ -1710,7 +1710,9 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
             wrapperPaddingBottom - actualBottomSpace - SAFETY_MARGIN;
 
           // Calculate thead heights
-          const theadRows = Array.from(thead.querySelectorAll("tr"));
+          // Only direct rows — nested <tr> inside WYSIWYG cell tables must not
+          // be treated as report rows (that duplicates Comp/C-1 tables on rebuild).
+          const theadRows = Array.from(thead.querySelectorAll(":scope > tr"));
           let baseTheadHeight = 0;
 
           theadRows.forEach((row) => {
@@ -1719,7 +1721,7 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
             }
           });
 
-          const tbodyRows = Array.from(tbody.querySelectorAll("tr"));
+          const tbodyRows = Array.from(tbody.querySelectorAll(":scope > tr"));
           const firstPageTheadHeight = baseTheadHeight;
           const firstPageAvailable = realAvailable - firstPageTheadHeight;
 
@@ -1993,6 +1995,22 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
         if (!thead || !tbody)
           return { success: false, error: "thead/tbody not found" };
 
+        // CV/CE/Machinery tables ship with inline min-height so a single page
+        // can stretch. Measuring offsetHeight while that min-height is active
+        // distributes empty space into row heights, so small wrap changes
+        // (flex left align / no uppercase) make the splitter pack fewer rows
+        // and leave blank bottoms. Measure true content height for those types.
+        const reportTypeLower = reportType?.toLowerCase();
+        const shouldUnstretchForMeasure =
+          reportTypeLower === "report_cv" ||
+          reportTypeLower === "report_ce" ||
+          reportTypeLower === "report_machinery";
+        if (shouldUnstretchForMeasure) {
+          origTable.style.minHeight = "0px";
+          origTable.style.height = "auto";
+          void origTable.offsetHeight;
+        }
+
         const wrapperStyle = wrapper ? getComputedStyle(wrapper) : null;
         const wrapperPaddingTop = wrapperStyle
           ? parseInt(wrapperStyle.paddingTop)
@@ -2002,7 +2020,7 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
           : 0;
 
         // Calculate REAL available space - A4 landscape for summarized, Legal portrait for others
-        const isSummarizedReport = reportType?.toLowerCase() === "report_summarized";
+        const isSummarizedReport = reportTypeLower === "report_summarized";
         const PAGE_HEIGHT_PX = isSummarizedReport
           ? Math.round(8.27 * 96) // 794px for A4 landscape
           : 14 * 96; // 1344px for Legal portrait
@@ -2030,7 +2048,11 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
         const SUMMARIZED_MERGE_TAIL_SLACK_PX = 12;
         const SUMMARIZED_STAMP_HEIGHT_BUFFER_PX = 80;
 
-        const SAFETY_MARGIN = isSummarizedReport ? 15 : 30;
+        const SAFETY_MARGIN = isSummarizedReport
+          ? 15
+          : shouldUnstretchForMeasure
+            ? 50
+            : 30;
         const realAvailable =
           PAGE_HEIGHT_PX -
           actualSpacerHeight -
@@ -2040,7 +2062,9 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
           SAFETY_MARGIN;
 
         // Calculate thead heights
-        const theadRows = Array.from(thead.querySelectorAll("tr"));
+        // Only direct rows — nested <tr> inside WYSIWYG cell tables must not
+        // be treated as report rows (that duplicates Comp/C-1 tables on rebuild).
+        const theadRows = Array.from(thead.querySelectorAll(":scope > tr"));
         let baseTheadHeight = 0;
         let generalDetailsRows = [];
 
@@ -2063,7 +2087,7 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
         });
 
         // Find Proposed Owner rows
-        const tbodyRows = Array.from(tbody.querySelectorAll("tr"));
+        const tbodyRows = Array.from(tbody.querySelectorAll(":scope > tr"));
 
         let proposedOwnerNameRow = null;
         let proposedOwnerAddressRow = null;
@@ -2504,6 +2528,82 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
           finalWrapper.appendChild(table);
         });
 
+        // If a built page is still taller than one PDF page, Chromium splits it
+        // again and the footer page number repeats (PAGE 2 on two sheets).
+        // Move overflowing tbody rows forward until each table fits.
+        if (shouldUnstretchForMeasure && tables.length > 0) {
+          const maxPageContentHeight = PAGE_HEIGHT_PX - 4;
+          for (let t = 0; t < tables.length; t++) {
+            const table = tables[t];
+            table.style.minHeight = "0px";
+            table.style.height = "auto";
+            const tb = table.querySelector("tbody");
+            if (!tb) continue;
+
+            let guard = 0;
+            while (
+              table.offsetHeight > maxPageContentHeight &&
+              tb.rows.length > 1 &&
+              guard < 200
+            ) {
+              guard++;
+              const lastRow = tb.rows[tb.rows.length - 1];
+              let rowsToMove = [lastRow];
+              // Keep tyre + signature together when moving
+              if (
+                lastRow.classList.contains("signature-row") &&
+                tb.rows.length >= 2 &&
+                tb.rows[tb.rows.length - 2].classList.contains("tyre-image-row")
+              ) {
+                rowsToMove = [tb.rows[tb.rows.length - 2], lastRow];
+              } else if (
+                lastRow.classList.contains("tyre-image-row") &&
+                t + 1 < tables.length
+              ) {
+                // Prefer moving tyre with following signature if already on next page
+                rowsToMove = [lastRow];
+              }
+
+              let nextTable = tables[t + 1];
+              if (!nextTable) {
+                nextTable = table.cloneNode(false);
+                if (origTable.className) nextTable.className = origTable.className;
+                nextTable.style.cssText =
+                  "width:100%; border-collapse:collapse; margin-top:0; margin-bottom:0; min-height:0; height:auto;";
+                nextTable.style.pageBreakAfter = "always";
+                const clonedThead = table.querySelector("thead");
+                if (clonedThead) nextTable.appendChild(clonedThead.cloneNode(true));
+                const newTb = document.createElement("tbody");
+                nextTable.appendChild(newTb);
+                if (tfoot) nextTable.appendChild(tfoot.cloneNode(true));
+                table.classList.remove("last-page");
+                table.style.pageBreakAfter = "always";
+                finalWrapper.appendChild(nextTable);
+                tables.push(nextTable);
+              }
+
+              const nextTb = nextTable.querySelector("tbody");
+              if (!nextTb) break;
+              for (let r = rowsToMove.length - 1; r >= 0; r--) {
+                nextTb.insertBefore(rowsToMove[r], nextTb.firstChild);
+              }
+              void table.offsetHeight;
+            }
+
+            if (t < tables.length - 1) {
+              table.style.pageBreakAfter = "always";
+              table.classList.remove("last-page");
+            } else {
+              table.style.pageBreakAfter = "auto";
+              table.classList.add("last-page");
+            }
+          }
+
+          if (needsFooter) {
+            tables.forEach((table, idx) => setPageNumber(table, idx + 1));
+          }
+        }
+
         if (tables.length === 1) {
           document.body.classList.add("single-page");
           // Single-page normal-fields: only mark last-page for non-summarized
@@ -2565,8 +2665,20 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
         const noteEl = summaryRoot.querySelector(".summary-note");
         const stampSourceImg = summaryRoot.querySelector(".summary-stamp-source img");
         const footerEl = summaryRoot.querySelector(".summary-footer-row");
+        // Empty note box still exists in HTML for the stamp source — ignore it
+        // so we do not open a blank extra page after grand total.
+        const noteHasVisibleText = (() => {
+          if (!noteEl) return false;
+          const clone = noteEl.cloneNode(true);
+          clone
+            .querySelectorAll(".summary-stamp-source")
+            .forEach((el) => el.remove());
+          const text = (clone.textContent || "").replace(/\s+/g, "");
+          return text.length > 0;
+        })();
+        const visibleNoteEl = noteHasVisibleText ? noteEl : null;
 
-        const allRows = Array.from(tbody.querySelectorAll("tr"));
+        const allRows = Array.from(tbody.querySelectorAll(":scope > tr"));
         if (allRows.length === 0) return;
 
         const grandRows = allRows.filter((row) =>
@@ -2584,7 +2696,7 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
         const spacerRow = thead.querySelector(".spacer-row");
         const spacerHeight = spacerRow ? spacerRow.offsetHeight : 180;
 
-        const theadRows = Array.from(thead.querySelectorAll("tr")).filter(
+        const theadRows = Array.from(thead.querySelectorAll(":scope > tr")).filter(
           (row) => !row.classList.contains("spacer-row")
         );
         const theadContentHeight = theadRows.reduce(
@@ -2593,10 +2705,12 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
         );
 
         const footerHeight = footerEl ? footerEl.offsetHeight : 30;
-        const noteHeight = noteEl ? noteEl.offsetHeight + 8 : 0;
-        const noteStampRowHeight = stampSourceImg
-          ? Math.max(noteHeight, 140) + 10
-          : noteHeight;
+        const noteHeight = visibleNoteEl ? visibleNoteEl.offsetHeight + 8 : 0;
+        const noteStampRowHeight = visibleNoteEl
+          ? stampSourceImg
+            ? Math.max(noteHeight, 140) + 10
+            : noteHeight
+          : 0;
         const grandRowsHeight = grandRows.reduce((sum, row) => sum + row.offsetHeight, 0);
 
         const baseAvailable =
@@ -2852,7 +2966,7 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
             }
           });
 
-          const allRows = Array.from(tbody.querySelectorAll("tr")).filter(
+          const allRows = Array.from(tbody.querySelectorAll(":scope > tr")).filter(
             (row) => !row.classList.contains("summary-grand-total-row")
           );
           if (allRows.length === 0) return;
@@ -2938,7 +3052,7 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
         );
 
         const noteFitsOnLastTablePage = (() => {
-          if (!noteEl || pages.length === 0) return true;
+          if (!visibleNoteEl || pages.length === 0) return true;
           const lastIdx = pages.length - 1;
           const lastChunk = pages[lastIdx];
           const isFirstAndLastPage = lastIdx === 0;
@@ -2948,7 +3062,8 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
           const tableCapacity = isFirstAndLastPage ? firstPageAvailable : baseAvailable;
           return tableRowsHeight + noteStampRowHeight <= tableCapacity;
         })();
-        const appendNoteOnSeparatePage = Boolean(noteEl) && !noteFitsOnLastTablePage;
+        const appendNoteOnSeparatePage =
+          Boolean(visibleNoteEl) && !noteFitsOnLastTablePage;
 
         summaryRoot.innerHTML = "";
 
@@ -3007,7 +3122,7 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
 
           pageBlock.appendChild(table);
 
-          if ((isLast || isSingle) && noteEl && !appendNoteOnSeparatePage) {
+          if ((isLast || isSingle) && visibleNoteEl && !appendNoteOnSeparatePage) {
             if (stampSourceImg) {
               const noteStampRow = document.createElement("div");
               noteStampRow.className = "summary-note-stamp-row";
@@ -3017,15 +3132,16 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
               stampHolder.appendChild(stampSourceImg.cloneNode(true));
               noteStampRow.appendChild(stampHolder);
 
-              const noteClone = noteEl.cloneNode(true);
+              const noteClone = visibleNoteEl.cloneNode(true);
               noteStampRow.appendChild(noteClone);
               pageBlock.appendChild(noteStampRow);
             } else {
-              pageBlock.appendChild(noteEl.cloneNode(true));
+              pageBlock.appendChild(visibleNoteEl.cloneNode(true));
             }
           }
 
-          if (stampSourceImg && pages.length > 1 && !isLast) {
+          // Stamp on every table page that does not already carry the note+stamp row.
+          if (stampSourceImg && !(isLast && visibleNoteEl && !appendNoteOnSeparatePage)) {
             const pageStamp = stampSourceImg.cloneNode(true);
             pageStamp.className = "summary-stamp-per-page";
             pageBlock.appendChild(pageStamp);
@@ -3034,7 +3150,7 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
           summaryRoot.appendChild(pageBlock);
         });
 
-        if (appendNoteOnSeparatePage && noteEl) {
+        if (appendNoteOnSeparatePage && visibleNoteEl) {
           const notePageNo = startPage + pages.length;
           const noteBlock = document.createElement("div");
           noteBlock.className = "summary-appendix-page";
@@ -3055,10 +3171,10 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
             stampHolder.appendChild(stampSourceImg.cloneNode(true));
             noteStampRow.appendChild(stampHolder);
 
-            noteStampRow.appendChild(noteEl.cloneNode(true));
+            noteStampRow.appendChild(visibleNoteEl.cloneNode(true));
             noteBlock.appendChild(noteStampRow);
           } else {
-            noteBlock.appendChild(noteEl.cloneNode(true));
+            noteBlock.appendChild(visibleNoteEl.cloneNode(true));
           }
 
           noteBlock.appendChild(createFooter(notePageNo, true));
@@ -3079,6 +3195,22 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
       reportType.toLowerCase() === "report_summarized"
     ) {
       try {
+        // Measure/split at real PDF page width. Viewport 1200px under-wraps text
+        // (especially mixed-case flex WYSIWYG), so row heights look too short and
+        // pages overflow → duplicate footer numbers (PAGE 2 twice, etc.).
+        const isSummarizedViewport =
+          reportType.toLowerCase() === "report_summarized";
+        await page.setViewport({
+          width: isSummarizedViewport
+            ? Math.round(11.69 * 96)
+            : Math.round(8.5 * 96),
+          height: isSummarizedViewport
+            ? Math.round(8.27 * 96)
+            : Math.round(14 * 96),
+          deviceScaleFactor: 1,
+        });
+        await new Promise((r) => setTimeout(r, 150));
+
         // ⭐ Use the new enhanced function
         const splitResult = await splitReportWithGroupedRows(page, reportType);
 
@@ -3232,7 +3364,11 @@ function generateReportHTML(
   }
   td.cell-text-left,
   th.cell-text-left,
-  .main-table td.cell-text-left {
+  .main-table td.cell-text-left,
+  td.flex-wysiwyg-value,
+  .main-table td.flex-wysiwyg-value,
+  td.flex-wysiwyg-value table th,
+  td.flex-wysiwyg-value table td {
     text-align: left !important;
     text-transform: none !important;
   }

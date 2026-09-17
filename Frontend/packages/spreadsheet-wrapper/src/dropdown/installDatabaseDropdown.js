@@ -19,6 +19,10 @@ import {
   openDatabaseDropdownForCell,
 } from "./openDatabaseDropdown.js";
 import { createSelectionAnchor } from "./selectionAnchor.js";
+import {
+  applyQuickDefaultDropdown,
+  resolveTargetRangeForValidation,
+} from "./quickDefaultDropdown.js";
 
 function registerDatabaseDropdownMenus(
   univerAPI,
@@ -32,6 +36,8 @@ function registerDatabaseDropdownMenus(
   ) {
     return;
   }
+
+  let lastAppliedProviderId = null;
 
   const providerMenus = registry.list().map((provider) =>
     univerAPI.createMenu({
@@ -50,6 +56,7 @@ function registerDatabaseDropdownMenus(
 
         const assigned = setDatabaseProviderId(range, provider.id);
         const shellApplied = applyDatabaseDropdownShell(univerAPI, range);
+        lastAppliedProviderId = provider.id;
 
         if (assigned || shellApplied) {
           onWorkbookDataChange?.();
@@ -69,6 +76,22 @@ function registerDatabaseDropdownMenus(
   });
 
   databaseDropdownSubmenu.appendTo(["contextMenu.mainArea", "contextMenu.others"]);
+
+  univerAPI
+    .createMenu({
+      id: DATABASE_DROPDOWN_MENU_IDS.QUICK_ADD,
+      title: "Dropdown",
+      order: 1199,
+      action: () => {
+        const range = resolveTargetRangeForValidation(univerAPI);
+        if (!range) {
+          return;
+        }
+
+        applyQuickDefaultDropdown(univerAPI, range, onWorkbookDataChange);
+      },
+    })
+    .appendTo(["contextMenu.mainArea", "contextMenu.others"]);
 
   univerAPI
     .createMenu({

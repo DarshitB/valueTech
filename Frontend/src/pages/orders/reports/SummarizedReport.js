@@ -114,25 +114,35 @@ const WysiwygTextarea = ({
   };
 
   const handlePaste = (e) => {
+    if (readOnly) return;
     e.preventDefault();
-    // Get plain text only - strip all formatting (bold, italic, etc.)
-    let plainText = e.clipboardData.getData("text/plain");
+    const html = e.clipboardData.getData("text/html");
+    const text = e.clipboardData.getData("text/plain");
 
-    // Remove extra spaces and normalize line breaks
-    plainText = plainText
-      .replace(/\r\n/g, "\n") // Normalize line breaks
-      .replace(/\r/g, "\n") // Normalize line breaks
-      .split("\n")
-      .map((line) => line.trim()) // Remove leading/trailing spaces from each line
-      .filter((line) => line.length > 0) // Remove empty lines
-      .join("\n");
-
-    // Convert to HTML with line breaks, but as plain text (no formatting)
-    const htmlText = plainText.replace(/\n/g, "<br>");
-
-    // Insert as plain text with line breaks (no bold, italic, etc.)
-    document.execCommand("insertHTML", false, htmlText || "");
+    if (html) {
+      document.execCommand("insertHTML", false, sanitizePastedHtml(html));
+    } else {
+      document.execCommand("insertText", false, text);
+    }
   };
+
+  function sanitizePastedHtml(html) {
+    const temp = document.createElement("div");
+    temp.innerHTML = html;
+    temp.querySelectorAll("*").forEach((el) => {
+      Array.from(el.attributes).forEach((attr) => {
+        if (
+          attr.name === "style" ||
+          attr.name === "class" ||
+          attr.name === "id" ||
+          attr.name.startsWith("data-")
+        ) {
+          el.removeAttribute(attr.name);
+        }
+      });
+    });
+    return temp.innerHTML;
+  }
 
   // Handle placeholder display
   useEffect(() => {

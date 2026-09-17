@@ -2,6 +2,7 @@ export const DATABASE_PROVIDER_METADATA_KEY = "provider";
 
 export const DATABASE_DROPDOWN_MENU_IDS = {
   ROOT: "company.database-dropdown",
+  QUICK_ADD: "company.database-dropdown.quick-add",
   BANK: "company.database-dropdown.bank",
   BRANCH: "company.database-dropdown.branch",
   STATE: "company.database-dropdown.state",

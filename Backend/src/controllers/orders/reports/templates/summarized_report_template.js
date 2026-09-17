@@ -357,6 +357,11 @@ function getCellValue(row, colId) {
 }
 
 function formatSummarizedCellDisplay(colId, value) {
+  // Invoice Date only: empty/null → NA (not blank) in appendix table
+  if (colId === "invoice_date") {
+    const invoiceDate = String(value ?? "").trim();
+    return invoiceDate ? invoiceDate : "NA";
+  }
   if (value === null || value === undefined || value === "") return "";
   const normalizedValue = String(value ?? "").trim();
   const isDashOnlyValue =
@@ -474,6 +479,9 @@ function generateSummarizedFlexibleFieldsForSection(flexibleFields, sectionName)
 
   if (sectionFields.length === 0) return "";
 
+  const isWysiwygFlexSection =
+    sectionName === "OVER_ALL_FEED_BACK_OF_THE_INSPECTED";
+
   let html = "";
   let i = 0;
 
@@ -509,8 +517,11 @@ function generateSummarizedFlexibleFieldsForSection(flexibleFields, sectionName)
       const { field } = rowFields[k];
       const isLast = k === n - 1;
       const valueColSpan = isLast ? baseValue + remainder : baseValue;
+      const valueTdClass = isWysiwygFlexSection
+        ? ' class="flex-wysiwyg-value"'
+        : "";
       html += `<td style="font-weight: bold;">${field.field_label || ""}</td>`;
-      html += `<td colspan="${valueColSpan}">${field.field_value || ""}</td>`;
+      html += `<td colspan="${valueColSpan}"${valueTdClass}>${field.field_value || ""}</td>`;
     }
     html += "</tr>";
 
@@ -596,13 +607,27 @@ function generateSummarizedNormalFieldsHTML(
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: -30px;
             margin-bottom: 0;
         }
 
         table.main-table {
             table-layout: fixed;
             width: 100%;
+            margin-top: -30px;
+        }
+        td.flex-wysiwyg-value table {
+            margin-top: 0;
+            margin-bottom: 2px;
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: auto;
+        }
+        td.flex-wysiwyg-value table th,
+        td.flex-wysiwyg-value table td {
+            width: auto;
+            text-align: start;
+            text-transform: none;
+            vertical-align: top;
         }
         table.main-table col.col-1,
         table.main-table col.col-2,
@@ -729,11 +754,18 @@ function generateSummarizedNormalFieldsHTML(
             text-transform: uppercase;
             word-wrap: break-word;
         }
+        td.flex-wysiwyg-value {
+            text-align: start;
+            text-transform: none;
+        }
         table.main-table th,
         table.main-table td {
             box-sizing: border-box;
             overflow: hidden;
             overflow-wrap: break-word;
+        }
+        table.main-table td.flex-wysiwyg-value {
+            overflow: visible;
         }
         table.main-table tr.tyre-image-row td,
         table.main-table tr.signature-row td { overflow: visible; }
@@ -817,9 +849,9 @@ function generateSummarizedNormalFieldsHTML(
         </tr>
         <tr>
             <td>INITIATED BY:</td>
-            <td colspan="2">${renderFieldValue(formData.initiated_by) || "NOT AVAILABLE"}</td>
+            <td colspan="2" ${SUMMARIZED_CELL_TEXT_LEFT_ATTR}>${renderFieldValue(formData.initiated_by) || "NOT AVAILABLE"}</td>
             <td>PLACE OF INSPECTION:</td>
-            <td colspan="3">${renderFieldValue(formData.place_of_inspection)}</td>
+            <td colspan="3" ${SUMMARIZED_CELL_TEXT_LEFT_ATTR}>${renderFieldValue(formData.place_of_inspection)}</td>
             <td>DATE OF INSPECTION:</td>
             <td>${renderFieldValue(formData.date_of_inspection) || "-"}</td>
         </tr>
@@ -827,13 +859,13 @@ function generateSummarizedNormalFieldsHTML(
             <td>REGISTERED OWNER NAME:</td>
             <th colspan="3">${formData.registered_owner_name}</th>
             <td>ADDRESS:</td>
-            <td colspan="4">${renderFieldValue(formData.registered_owner_address)}</td>
+            <td colspan="4" ${SUMMARIZED_CELL_TEXT_LEFT_ATTR}>${renderFieldValue(formData.registered_owner_address)}</td>
         </tr>
         <tr data-proposed-owner-address="true">
             <td>PROPOSED OWNER NAME:</td>
             <th colspan="3">${formData.proposed_owner_name}</th>
             <td>ADDRESS:</td>
-            <td colspan="4">${renderFieldValue(formData.proposed_owner_address)}</td>
+            <td colspan="4" ${SUMMARIZED_CELL_TEXT_LEFT_ATTR}>${renderFieldValue(formData.proposed_owner_address)}</td>
         </tr>
         <tr>
             <th colspan="9">${formData.inspected_equipment_heading}</th>
@@ -844,7 +876,7 @@ function generateSummarizedNormalFieldsHTML(
             <td>REGISTRATION DATE:</td>
             <td>${formData.registration_date === "00-00-0000" ? "NA" : formData.registration_date}</td>
             <td>LOCATION OF MACHINERY:</td>
-            <td colspan="3">${renderFieldValue(formData.location_of_machinery)}</td>
+            <td colspan="3" ${SUMMARIZED_CELL_TEXT_LEFT_ATTR}>${renderFieldValue(formData.location_of_machinery)}</td>
         </tr>
         <tr>
             <td>OWNER SERIAL NO:</td>
@@ -874,7 +906,7 @@ function generateSummarizedNormalFieldsHTML(
         </tr>
         <tr>
             <td>HYP WITH:</td>
-            <td colspan="4">${renderFieldValue(formData.hyp_with)}</td>
+            <td colspan="4" ${SUMMARIZED_CELL_TEXT_LEFT_ATTR}>${renderFieldValue(formData.hyp_with)}</td>
             <td colspan="2">SUPPLIER NAME:</td>
             <td colspan="2">${formData.supplier_names ? formData.supplier_names : "NOT AVAILABLE"}</td>
         </tr>
@@ -943,7 +975,7 @@ function generateSummarizedNormalFieldsHTML(
         ${formData.fix_but_flex_heading_11 && formData.fix_but_flex_value_11 && formData.fix_but_flex_heading_12 && formData.fix_but_flex_value_12
           ? `<tr>
             <td>${formData.fix_but_flex_heading_11}:</td>
-            <td colspan="3">${renderFieldValue(formData.fix_but_flex_value_11)}</td>
+            <td colspan="3" ${SUMMARIZED_CELL_TEXT_LEFT_ATTR}>${renderFieldValue(formData.form_but_flex_value_11)}</td>
             <td>${formData.fix_but_flex_heading_12}:</td>
             <td colspan="4">${formData.fix_but_flex_value_12}</td>
         </tr>` : ""}

@@ -94,25 +94,35 @@ const WysiwygTextarea = ({
   };
 
   const handlePaste = (e) => {
+    if (readOnly) return;
     e.preventDefault();
-    // Get plain text only - strip all formatting (bold, italic, etc.)
-    let plainText = e.clipboardData.getData("text/plain");
+    const html = e.clipboardData.getData("text/html");
+    const text = e.clipboardData.getData("text/plain");
 
-    // Remove extra spaces and normalize line breaks
-    plainText = plainText
-      .replace(/\r\n/g, "\n") // Normalize line breaks
-      .replace(/\r/g, "\n") // Normalize line breaks
-      .split("\n")
-      .map((line) => line.trim()) // Remove leading/trailing spaces from each line
-      .filter((line) => line.length > 0) // Remove empty lines
-      .join("\n");
-
-    // Convert to HTML with line breaks, but as plain text (no formatting)
-    const htmlText = plainText.replace(/\n/g, "<br>");
-
-    // Insert as plain text with line breaks (no bold, italic, etc.)
-    document.execCommand("insertHTML", false, htmlText || "");
+    if (html) {
+      document.execCommand("insertHTML", false, sanitizePastedHtml(html));
+    } else {
+      document.execCommand("insertText", false, text);
+    }
   };
+
+  function sanitizePastedHtml(html) {
+    const temp = document.createElement("div");
+    temp.innerHTML = html;
+    temp.querySelectorAll("*").forEach((el) => {
+      Array.from(el.attributes).forEach((attr) => {
+        if (
+          attr.name === "style" ||
+          attr.name === "class" ||
+          attr.name === "id" ||
+          attr.name.startsWith("data-")
+        ) {
+          el.removeAttribute(attr.name);
+        }
+      });
+    });
+    return temp.innerHTML;
+  }
 
   // Handle placeholder display
   useEffect(() => {
@@ -1203,7 +1213,7 @@ function CEReport() {
         updated.valueation_report_for_heading =
           report.valueation_report_for_heading;
         if (String(report.valueation_report_for_heading).includes("(REPOSSESSION)")) {
-          updated.valuation_purpose = "Repo Purpose";
+          updated.valuation_purpose = "REPO PURPOSE";
         }
       } else {
         // Generate from category_suffix only if no saved value exists
@@ -1212,7 +1222,7 @@ function CEReport() {
           : "";
         const isRepo = isRepoPurpose(report.valuation_purpose) || report.is_repo === true;
         updated.valueation_report_for_heading = buildValuationReportHeading(categorySuffixUpper, isRepo);
-        if (isRepo) updated.valuation_purpose = "Repo Purpose";
+        if (isRepo) updated.valuation_purpose = "REPO PURPOSE";
       }
 
       // Generate other headings from category_suffix
@@ -3755,14 +3765,17 @@ function CEReport() {
                     <label htmlFor="valuation_purpose">
                       Valuation Purpose <span class="text-danger">*</span>
                     </label>
-                    <input
-                      type="text"
-                      className="form-field"
-                      id="valuation_purpose"
-                      name="valuation_purpose"
+                    <SingleSearchSelect
+                      options={[
+                        { value: "FINANCIAL USAGE", label: "FINANCIAL USAGE" },
+                        { value: "INUSRANCE USAGE", label: "INUSRANCE USAGE" },
+                        { value: "REPO PURPOSE", label: "REPO PURPOSE" },
+                      ]}
                       value={reportFormData.valuation_purpose}
-                      readOnly
-                      placeholder="Fixed purpose"
+                      onChange={(value) =>
+                        handleSelectChange("valuation_purpose", value)
+                      }
+                      required
                     />
                   </div>
                 </div>

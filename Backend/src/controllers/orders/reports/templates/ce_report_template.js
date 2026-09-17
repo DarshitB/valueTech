@@ -210,14 +210,29 @@ function generateCEReportHTML(formData, extraData, bgImageBase64, stampImageBase
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: -30px; /* Adjusted: 195px desired - 225px spacer = -30px offset */
             margin-bottom: 0; /* No bottom margin - bottom padding handled by wrapper */
         }
         
-        /* Main table only: 6 equal columns (100%/6 each); colspan N = N/6 width. */
+        /* Main table only: 6 equal columns (100%/6 each); colspan N = N/6 width.
+           Letterhead offset only on outer report table — not nested WYSIWYG tables. */
         table.main-table {
             table-layout: fixed;
             width: 100%;
+            margin-top: -30px; /* Adjusted: 195px desired - 225px spacer = -30px offset */
+        }
+        td.flex-wysiwyg-value table {
+            margin-top: 0;
+            margin-bottom: 2px;
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: auto;
+        }
+        td.flex-wysiwyg-value table th,
+        td.flex-wysiwyg-value table td {
+            width: auto;
+            text-align: start;
+            text-transform: none;
+            vertical-align: top;
         }
         table.main-table col.col-1,
         table.main-table col.col-2,
@@ -448,6 +463,11 @@ body.single-page{
             font-size: 9.3px;
             text-transform: uppercase;
             word-wrap: break-word;
+        }
+        /* WYSIWYG flex value only — not forced center/uppercase */
+        td.flex-wysiwyg-value {
+            text-align: start;
+            text-transform: none;
         }
         table.main-table th,
         table.main-table td {
@@ -1111,6 +1131,9 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName) {
         return "";
     }
 
+    const isWysiwygFlexSection =
+        sectionName === "OVER_ALL_FEED_BACK_OF_THE_INSPECTED";
+
     let html = "";
 
     // Process fields row by row, ensuring total columns don't exceed 6
@@ -1140,9 +1163,12 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName) {
 
             // Check if this field fits in the current row
             if (currentRowColumns + fieldColumns <= 6) {
+                const valueTdClass = isWysiwygFlexSection
+                    ? ' class="flex-wysiwyg-value"'
+                    : "";
                 html += `
           <td style="font-weight: bold;">${field.field_label || ""}</td>
-          <td colspan="${valueColSpan}">${renderFieldValue(field.field_value || "")}</td>
+          <td colspan="${valueColSpan}"${valueTdClass}>${renderFieldValue(field.field_value || "")}</td>
         `;
                 currentRowColumns += fieldColumns;
                 i++;

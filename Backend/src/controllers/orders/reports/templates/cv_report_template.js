@@ -203,8 +203,25 @@ function generateCVReportHTML(
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: -30px; /* Adjusted: 195px desired - 225px spacer = -30px offset */
             margin-bottom: 0; /* No bottom margin - bottom padding handled by wrapper */
+        }
+        /* Letterhead offset only for the outer report table */
+        table.main-table {
+            margin-top: -30px; /* Adjusted: 195px desired - 225px spacer = -30px offset */
+        }
+        /* Nested tables in flex WYSIWYG must not pull up over preceding text */
+        td.flex-wysiwyg-value table {
+            margin-top: 0;
+            margin-bottom: 2px;
+            width: 100%;
+            border-collapse: collapse;
+        }
+        td.flex-wysiwyg-value table th,
+        td.flex-wysiwyg-value table td {
+            width: auto;
+            text-align: start;
+            text-transform: none;
+            vertical-align: top;
         }
        
         /* Removed single-page stretching CSS to allow proper JS measurement */
@@ -409,6 +426,11 @@ body.single-page{
             text-transform: uppercase;
             width: 16.66%;
             word-wrap: break-word;
+        }
+        /* WYSIWYG flex value only — not forced center/uppercase */
+        td.flex-wysiwyg-value {
+            text-align: start;
+            text-transform: none;
         }
         
         ${reportTypeSelection === "Rough" ? `
@@ -918,6 +940,9 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName) {
         return "";
     }
 
+    const isWysiwygFlexSection =
+        sectionName === "OVER_ALL_FEED_BACK_OF_THE_INSPECTED";
+
     let html = "";
 
     // Process fields row by row, ensuring total columns don't exceed 6
@@ -947,9 +972,12 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName) {
 
             // Check if this field fits in the current row
             if (currentRowColumns + fieldColumns <= 6) {
+                const valueTdClass = isWysiwygFlexSection
+                    ? ' class="flex-wysiwyg-value"'
+                    : "";
                 html += `
           <td style="font-weight: bold;">${field.field_label || ""}</td>
-          <td colspan="${valueColSpan}">${renderFieldValue(field.field_value || "")}</td>
+          <td colspan="${valueColSpan}"${valueTdClass}>${renderFieldValue(field.field_value || "")}</td>
         `;
                 currentRowColumns += fieldColumns;
                 i++;
