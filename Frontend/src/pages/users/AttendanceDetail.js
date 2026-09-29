@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link, Navigate, useParams } from "react-router-dom";
 import DatePicker from "react-datepicker";
@@ -190,33 +190,39 @@ function AttendanceDetail() {
     });
   };
 
-  useLayoutEffect(() => {
-    if (isViewingOtherUser) {
-      setTitle(
-        <>
-          <Link to="/users" className="text-blue-600 hover:underline">
-            Users
-          </Link>{" "}
-          &gt;{" "}
-          <Link
-            to={`/users/${targetUserId}/attendance`}
-            className="text-blue-600 hover:underline"
-          >
-            {targetUserName}
-          </Link>{" "}
-          &gt; Attendance &gt; {formatDisplayDate(workingDateKey)}
-        </>
-      );
-    } else {
-      setTitle(
-        <>
-          <Link to="/attendance" className="text-blue-600 hover:underline">
-            Attendance
-          </Link>{" "}
-          &gt; {formatDisplayDate(workingDateKey)}
-        </>
-      );
-    }
+  // Set after the route reset so the full trail stays. Other pages are untouched.
+  useEffect(() => {
+    const applyTitle = () => {
+      if (isViewingOtherUser) {
+        setTitle(
+          <>
+            <Link to="/users" className="text-blue-600 hover:underline">
+              Users
+            </Link>{" "}
+            &gt;{" "}
+            <Link
+              to={`/users/${targetUserId}/attendance`}
+              className="text-blue-600 hover:underline"
+            >
+              {targetUserName}
+            </Link>{" "}
+            &gt; Attendance &gt; {formatDisplayDate(workingDateKey)}
+          </>
+        );
+      } else {
+        setTitle(
+          <>
+            <Link to="/attendance" className="text-blue-600 hover:underline">
+              Attendance
+            </Link>{" "}
+            &gt; {formatDisplayDate(workingDateKey)}
+          </>
+        );
+      }
+    };
+
+    const timer = setTimeout(applyTitle, 0);
+    return () => clearTimeout(timer);
   }, [
     setTitle,
     isViewingOtherUser,
