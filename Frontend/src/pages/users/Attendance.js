@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import DatePicker from "react-datepicker";
@@ -195,20 +195,33 @@ function Attendance() {
     }
   }, [dispatch, users]);
 
-  // Set page title / breadcrumb
-  useLayoutEffect(() => {
-    if (isViewingOtherUser) {
-      setTitle(
-        <>
-          <Link to="/users" className="text-blue-600 hover:underline">
-            Users
-          </Link>{" "}
-          &gt; {targetUserName} &gt; Attendance
-        </>
-      );
-    } else {
-      setTitle("Attendance");
-    }
+  // Set page title after the route reset clears it. Timeout runs after that
+  // reset so Users > name > Attendance stays. Other pages are untouched.
+  useEffect(() => {
+    const applyTitle = () => {
+      if (isViewingOtherUser) {
+        setTitle(
+          <>
+            <Link to="/users" className="text-blue-600 hover:underline">
+              Users
+            </Link>{" "}
+            &gt;{" "}
+            <Link
+              to="/attendance-date"
+              className="text-blue-600 hover:underline"
+            >
+              {targetUserName}
+            </Link>{" "}
+            &gt; Attendance
+          </>
+        );
+      } else {
+        setTitle("Attendance");
+      }
+    };
+
+    const timer = setTimeout(applyTitle, 0);
+    return () => clearTimeout(timer);
   }, [isViewingOtherUser, targetUserName, setTitle]);
 
   // Update current time every second for real-time clock
@@ -864,7 +877,7 @@ function Attendance() {
     }
   };
 
-  // Same continuous day list as before: From → min(today, To); empty days filled.
+  // Continuous day list, oldest first: From → min(today, To); empty days filled.
   // From/To only change which records were fetched from the DB.
   const displayAttendanceList = useMemo(() => {
     const fromKey = toDateKey(dateRange.from);
@@ -891,11 +904,11 @@ function Attendance() {
     });
 
     const rows = [];
-    const cursor = dateOnlyToLocalDate(endKey);
-    const start = dateOnlyToLocalDate(fromKey);
-    if (!cursor || !start) return [];
+    const cursor = dateOnlyToLocalDate(fromKey);
+    const end = dateOnlyToLocalDate(endKey);
+    if (!cursor || !end) return [];
 
-    while (cursor >= start) {
+    while (cursor <= end) {
       const key = toDateKey(cursor);
       const existing = recordsByDate.get(key);
 
@@ -913,7 +926,7 @@ function Attendance() {
         });
       }
 
-      cursor.setDate(cursor.getDate() - 1);
+      cursor.setDate(cursor.getDate() + 1);
     }
 
     return rows;

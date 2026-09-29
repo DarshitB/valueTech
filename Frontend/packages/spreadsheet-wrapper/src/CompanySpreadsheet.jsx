@@ -49,6 +49,7 @@ import {
   normalizeSelectionBorderColor,
   paintLocalSelectionBorder,
 } from "./selectionFillHandle";
+import { installFillRowHeightGuard } from "./fillRowHeightGuard";
 import {
   disablePresenceHighlightPointerEvents,
   installPresenceHighlightPointerPassthrough,
@@ -1006,6 +1007,7 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
     const changeEventDisposables = [];
     let databaseDropdownDisposable = () => {};
     let selectionFillHandleDisposable = () => {};
+    let fillRowHeightGuardDisposable = () => {};
     let presencePointerPassthroughDisposable = () => {};
     let hyperlinkClickOpenDisposable = () => {};
     let clipboardPermissionWarningDisposable = () => {};
@@ -1133,6 +1135,7 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
         univerAPI,
         () => selectionBorderColorRef.current
       );
+      fillRowHeightGuardDisposable = installFillRowHeightGuard(univerAPI);
       presencePointerPassthroughDisposable =
         installPresenceHighlightPointerPassthrough(univerAPI);
       hyperlinkClickOpenDisposable = installHyperlinkClickOpen(univerAPI);
@@ -1619,6 +1622,7 @@ const CompanySpreadsheet = forwardRef(function CompanySpreadsheet(
       changeEventDisposables.forEach((disposable) => disposable?.dispose?.());
       databaseDropdownDisposable?.();
       selectionFillHandleDisposable?.();
+      fillRowHeightGuardDisposable?.();
       presencePointerPassthroughDisposable?.();
       hyperlinkClickOpenDisposable?.();
       clipboardPermissionWarningDisposable?.();
