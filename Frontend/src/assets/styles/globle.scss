@@ -46,6 +46,17 @@
   &.btn-outline-primary {
     color: $primary-color !important;
   }
+  &.btn-excel {
+    background-color: #217346 !important;
+    border-color: #217346 !important;
+    color: #ffffff !important;
+    &:hover,
+    &:focus {
+      background-color: #185c37 !important;
+      border-color: #185c37 !important;
+      color: #ffffff !important;
+    }
+  }
 }
 .get-me-inside {
   text-decoration: underline;

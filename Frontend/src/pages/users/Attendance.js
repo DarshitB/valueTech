@@ -969,6 +969,194 @@ function Attendance() {
     holidays,
   ]);
 
+  const downloadAttendanceExcel = () => {
+    const durationWithDaysText = (totalMinutes) => {
+      const hoursLabel = formatDurationFromMinutes(totalMinutes);
+      const scheduled = getScheduledDayMinutes();
+      if (!scheduled) return hoursLabel;
+      const rawDays = Math.max(0, totalMinutes || 0) / scheduled;
+      const halfDays = Math.round(rawDays * 2) / 2;
+      const daysLabel = Number.isInteger(halfDays)
+        ? String(halfDays)
+        : halfDays.toFixed(1);
+      return `${hoursLabel}\n(${daysLabel} days)`;
+    };
+
+    const escapeXml = (value) =>
+      String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+
+    const headers = [
+      "Date",
+      "Status",
+      "Day In",
+      "Lunch In",
+      "Lunch Out",
+      "Day Out",
+      "Total Lunch Time",
+      "Total Break Time",
+      "Working Hours",
+    ];
+    if (canViewOvertimeWorked) headers.push("Overtime Worked");
+    headers.push("Total Hours");
+
+    const recordToCells = (record) => {
+      const dayStatus = getDayStatus(record.working_date);
+      const isLongLunch =
+        record?.lunch_in &&
+        record?.lunch_out &&
+        getLunchMinutes(record) > 60;
+      const cell = (text, red) => ({
+        text,
+        style: red ? "red" : "",
+      });
+      const cells = [
+        cell(formatDate(record.working_date)),
+        cell(dayStatus ? dayStatus.label : "-"),
+        cell(
+          formatTime(record.checkin_time),
+          isDayInLate(record.checkin_time)
+        ),
+        cell(formatTime(record.lunch_in)),
+        cell(formatTime(record.lunch_out)),
+        cell(
+          formatTime(record.checkout_time),
+          isDayOutEarly(record.checkout_time)
+        ),
+        cell(calculateTotalLunchTime(record), isLongLunch),
+        cell(calculateTotalBreakTime(record)),
+        cell(calculateWorkingHours(record)),
+      ];
+      if (canViewOvertimeWorked) {
+        cells.push(cell(calculateOvertimeWorked(record)));
+      }
+      cells.push(cell(calculateTotalHours(record)));
+      return cells;
+    };
+
+    const sumRecords = (records) => {
+      let lunchMinutes = 0;
+      let breakMinutes = 0;
+      let workingMinutes = 0;
+      let overtimeMinutes = 0;
+      let totalMinutes = 0;
+
+      records.forEach((record) => {
+        if (record?.lunch_in && record?.lunch_out) {
+          lunchMinutes += getLunchMinutes(record);
+        }
+        if (record?.checkin_time && record?.checkout_time) {
+          breakMinutes += getBreakMinutes(record);
+          const worked = getWorkedMinutes(record);
+          const overtime = getOvertimeMinutes(record);
+          totalMinutes += worked;
+          overtimeMinutes += overtime;
+          workingMinutes += Math.max(0, worked - overtime);
+        }
+      });
+
+      return {
+        lunchMinutes,
+        breakMinutes,
+        workingMinutes,
+        overtimeMinutes,
+        totalMinutes,
+      };
+    };
+
+    const totalCellsFor = (totals) => {
+      const cells = [
+        "Total",
+        "",
+        "",
+        "",
+        "",
+        "",
+        formatDurationFromMinutes(totals.lunchMinutes),
+        formatDurationFromMinutes(totals.breakMinutes),
+        durationWithDaysText(totals.workingMinutes),
+      ];
+      if (canViewOvertimeWorked) {
+        cells.push(durationWithDaysText(totals.overtimeMinutes));
+      }
+      cells.push(durationWithDaysText(totals.totalMinutes));
+      return cells;
+    };
+
+    const monthGroups = [];
+    displayAttendanceList.forEach((record) => {
+      const date = dateOnlyToLocalDate(toDateKey(record.working_date));
+      if (!date) return;
+      const monthKey = `${date.getFullYear()}-${String(
+        date.getMonth() + 1
+      ).padStart(2, "0")}`;
+      let group = monthGroups.find((item) => item.monthKey === monthKey);
+      if (!group) {
+        group = {
+          monthKey,
+          label: `${monthNames[date.getMonth()]} ${date.getFullYear()}`,
+          records: [],
+        };
+        monthGroups.push(group);
+      }
+      group.records.push(record);
+    });
+
+    const toRowXml = (cells, rowStyleId) =>
+      `<Row>${cells
+        .map((cell) => {
+          const text = typeof cell === "string" ? cell : cell.text;
+          const styleId =
+            (typeof cell === "object" && cell.style) || rowStyleId || "";
+          const style = styleId ? ` ss:StyleID="${styleId}"` : "";
+          return `<Cell${style}><Data ss:Type="String">${escapeXml(
+            text
+          )}</Data></Cell>`;
+        })
+        .join("")}</Row>`;
+
+    const xml = `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+<Styles>
+<Style ss:ID="header"><Font ss:Bold="1"/><Interior ss:Color="#E8E8E8" ss:Pattern="Solid"/></Style>
+<Style ss:ID="footer"><Font ss:Bold="1"/><Alignment ss:Vertical="Bottom" ss:WrapText="1"/></Style>
+<Style ss:ID="red"><Font ss:Color="#DC3545" ss:Bold="1"/></Style>
+</Styles>
+${monthGroups
+  .map((group) => {
+    const dataRows = group.records.map(recordToCells);
+    const totalCells = totalCellsFor(sumRecords(group.records));
+    return `<Worksheet ss:Name="${escapeXml(group.label)}">
+<Table>
+${toRowXml(headers, "header")}
+${dataRows.map((cells) => toRowXml(cells)).join("\n")}
+${toRowXml(totalCells, "footer")}
+</Table>
+</Worksheet>`;
+  })
+  .join("\n")}
+</Workbook>`;
+
+    const fromLabel = toDateOnlyString(dateRange.from) || "from";
+    const toLabel = toDateOnlyString(dateRange.to) || "to";
+    const safeName = String(targetUserName || "attendance")
+      .replace(/[^\w\-]+/g, "_")
+      .replace(/_+/g, "_");
+    const blob = new Blob([xml], { type: "application/vnd.ms-excel" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${safeName}_${fromLabel}_to_${toLabel}.xls`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="height-full-occupied attendance-container">
       {/* Statistics Cards */}
@@ -1082,6 +1270,13 @@ function Attendance() {
                     calendarClassName="attendance-date-calendar"
                     popperProps={{ strategy: "fixed" }}
                   />
+                  <button
+                    className="btn btn-excel"
+                    type="button"
+                    onClick={downloadAttendanceExcel}
+                  >
+                    Download Excel
+                  </button>
                   {hasPermission(
                     allowedPermissions,
                     "add_company_holiday"
