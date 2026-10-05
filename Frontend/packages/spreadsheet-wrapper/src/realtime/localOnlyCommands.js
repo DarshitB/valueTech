@@ -79,6 +79,56 @@ export function shouldKeepRealtimeCommandLocal(commandId, options = {}) {
   return false;
 }
 
+/**
+ * Must match Backend isAllowedRealtimeCommand (spreadsheetProtocol.js). The V2
+ * outbox retries a rejected head forever, so one disallowed id (e.g. the cell
+ * editor's doc.mutation.rich-text-editing) blocked every later cell commit.
+ */
+const SERVER_REJECTED_COMMAND_IDS = new Set([
+  "sheet.command.copy",
+  "sheet.command.cut",
+  "sheet.command.select-all",
+  "sheet.operation.set-selections",
+]);
+
+const SERVER_ALLOWED_EXACT_COMMAND_IDS = new Set([
+  "univer.command.undo",
+  "univer.command.redo",
+  "doc.command.break-line",
+  "formula.command.insert-function",
+  "data-validation.mutation.addRule",
+  "data-validation.mutation.removeRule",
+  "data-validation.mutation.updateRule",
+  "sheets.command.update-data-validation-setting",
+  "sheets.command.update-data-validation-options",
+  "sheets.command.clear-range-data-validation",
+]);
+
+/**
+ * @param {unknown} commandId
+ * @param {{ safeUndoEnabled?: boolean }} [options]
+ * @returns {boolean}
+ */
+export function isServerRelayableRealtimeCommand(commandId, options = {}) {
+  const normalized = String(commandId ?? "").trim();
+  if (!normalized) {
+    return false;
+  }
+  if (shouldKeepRealtimeCommandLocal(normalized, options)) {
+    return false;
+  }
+  if (SERVER_REJECTED_COMMAND_IDS.has(normalized)) {
+    return false;
+  }
+  if (SERVER_ALLOWED_EXACT_COMMAND_IDS.has(normalized)) {
+    return true;
+  }
+  return (
+    normalized.startsWith("sheet.command.") ||
+    normalized.startsWith("sheet.mutation.")
+  );
+}
+
 const PRESERVE_ACTIVE_WORKSHEET_COMMAND_IDS = new Set([
   "sheet.command.insert-sheet",
   "sheet.mutation.insert-sheet",

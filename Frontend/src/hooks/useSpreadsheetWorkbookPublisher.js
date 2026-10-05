@@ -21,7 +21,7 @@ import {
   removeSpreadsheetOutbox,
   loadSpreadsheetOutbox,
 } from "../realtime/spreadsheet/collaborationOutbox";
-import { shouldKeepRealtimeCommandLocal } from "@spreadsheet-wrapper/realtime/localOnlyCommands";
+import { isServerRelayableRealtimeCommand } from "@spreadsheet-wrapper/realtime/localOnlyCommands";
 
 /**
  * client_sequence must stay unique while the server still remembers this
@@ -362,6 +362,18 @@ export function useSpreadsheetWorkbookPublisher({
               protocol: isAuthoritativeV2 ? "v2" : "v1-offline-queue",
               ack_latency_ms: ackLatencyMs,
             });
+            // Retrying can never succeed for this code, and the head would
+            // block every later command behind it.
+            if (response?.code === "COMMAND_NOT_ALLOWED") {
+              acknowledgeLocalCommand(coordinator, {
+                operationId: nextCommand.operationId,
+                requestId,
+                clientId: nextCommand.clientId,
+                clientSequence,
+              });
+              persistOutbox();
+              continue;
+            }
             if (delayedRetryTimerRef.current) {
               clearTimeout(delayedRetryTimerRef.current);
             }
@@ -488,7 +500,7 @@ export function useSpreadsheetWorkbookPublisher({
 
     const commandId = String(commandPayload?.commandId ?? "").trim();
     if (
-      shouldKeepRealtimeCommandLocal(commandId, {
+      !isServerRelayableRealtimeCommand(commandId, {
         safeUndoEnabled,
       })
     ) {
