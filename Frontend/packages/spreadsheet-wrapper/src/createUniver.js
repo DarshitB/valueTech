@@ -13,6 +13,8 @@ import UniverPresetSheetsFindReplaceEnUS from "@univerjs/preset-sheets-find-repl
 import { UniverSheetsHyperLinkPreset } from "@univerjs/preset-sheets-hyper-link";
 import UniverPresetSheetsHyperLinkEnUS from "@univerjs/preset-sheets-hyper-link/locales/en-US";
 
+import { installSmoothSheetPaint } from "./smoothSheetPaint";
+
 import "@univerjs/preset-sheets-core/lib/index.css";
 import "@univerjs/preset-sheets-data-validation/lib/index.css";
 import "@univerjs/preset-sheets-find-replace/lib/index.css";
@@ -25,6 +27,8 @@ export function createCompanyUniver(container) {
   if (!container) {
     throw new Error("Spreadsheet container element is required.");
   }
+
+  installSmoothSheetPaint();
 
   return createUniver({
     locale: LocaleType.EN_US,

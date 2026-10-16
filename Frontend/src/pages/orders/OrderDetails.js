@@ -684,21 +684,16 @@ function OrderDetails() {
     });
   }, []);
 
-  // Prefill email subject for COMMERCIAL VEHICLE / CONSTRUCTION EQUIPMENT orders
+  // Prefill email subject once per modal open. After the user edits it
+  // (including Marine), leave their text alone. Subject formats stay per category.
   useEffect(() => {
-    const isMarineMailSubject =
-      order?.category_name === "MARINE" ||
-      order?.category_report_type === "report_marine";
-
     if (
       showMailModal &&
       mailReportReadyForSubject &&
       !orderReportLoading &&
       currentReport?.order_id === Number(id) &&
       currentReport?.report &&
-      // Wait for empty subject, or always rebuild Marine so @variables resolve
-      // from the freshly fetched report_variables (not a stale save snapshot).
-      (!mailFormData.subject || isMarineMailSubject)
+      !mailFormData.subject
     ) {
       const report = currentReport.report;
       const subCategoryName = order.sub_category_name || "";

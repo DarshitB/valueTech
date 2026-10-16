@@ -233,16 +233,26 @@ function registerSpreadsheetCellLeases(
       const access = await authorize({
         socket,
         spreadsheetId,
-        requiredPermission: "edit_spreadsheet",
+        // Same rule as opening and saving the sheet. edit_spreadsheet is only
+        // for renaming and assignments. A view-level collaborator must stay in
+        // the room and be able to type.
+        requiredPermission: null,
         creatorBypassesPermission: true,
       });
       if (!access.allowed) {
-        leaveSpreadsheetSession(io, socket, spreadsheetId);
+        const removedFromRoom = access.reason !== "missing_permission";
+        if (removedFromRoom) {
+          leaveSpreadsheetSession(io, socket, spreadsheetId);
+        }
         emitSpreadsheetError(
           socket,
           {
-            code: "SPREADSHEET_ACCESS_REVOKED",
-            message: "Spreadsheet access has been revoked",
+            code: removedFromRoom
+              ? "SPREADSHEET_ACCESS_REVOKED"
+              : "SPREADSHEET_EDIT_NOT_ALLOWED",
+            message: removedFromRoom
+              ? "Spreadsheet access has been revoked"
+              : "You can view this spreadsheet but cannot edit it",
             eventName,
             requestId,
             spreadsheetId,

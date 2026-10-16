@@ -4,6 +4,7 @@
  * Events (client → server):
  *   spreadsheet:join  { spreadsheet_id }
  *   spreadsheet:leave { spreadsheet_id }
+ *   spreadsheet:presence-sync { spreadsheet_id }
  *
  * Events (server → client):
  *   spreadsheet:joined   { ok, spreadsheet_id, request_id, protocol }
@@ -38,6 +39,7 @@ const {
   authorizeSpreadsheetSocketEvent,
 } = require("./spreadsheetSocketAccess");
 const {
+  emitPresenceToSocket,
   joinSpreadsheetSession,
   leaveSpreadsheetSession,
 } = require("./spreadsheetSessionLifecycle");
@@ -206,7 +208,7 @@ function registerSpreadsheetPresence(
         });
       }
 
-      joinSpreadsheetSession(io, socket, spreadsheetId);
+      await joinSpreadsheetSession(io, socket, spreadsheetId);
       socket.data.collaborationProtocol = useDurableV2 ? "v2" : "v1";
 
       let replay = null;
@@ -360,6 +362,60 @@ function registerSpreadsheetPresence(
         acknowledgement
       );
     }
+  });
+
+  // Pull the current roster. The join broadcast can be missed by a client
+  // that was already open, so every session asks again.
+  socket.on("spreadsheet:presence-sync", async (payload = {}) => {
+    payload = normalizeSocketPayload(payload);
+    const spreadsheetId = payload.spreadsheet_id;
+    const requestId = resolveRequestId(payload);
+
+    if (
+      !consumeSocketRateLimit(
+        socket,
+        "spreadsheet:presence-sync",
+        RATE_LIMITS.presenceSync
+      )
+    ) {
+      return;
+    }
+
+    if (
+      !validateRequestId(payload.request_id) ||
+      !isPayloadWithinLimit(payload, PAYLOAD_LIMITS.presenceSync) ||
+      !validateSpreadsheetId(spreadsheetId)
+    ) {
+      emitSpreadsheetError(socket, {
+        code: "INVALID_PRESENCE_SYNC",
+        message: "Valid spreadsheet_id is required",
+        eventName: "spreadsheet:presence-sync",
+        requestId,
+        spreadsheetId: validateSpreadsheetId(spreadsheetId)
+          ? spreadsheetId
+          : null,
+      });
+      return;
+    }
+
+    if (socket.data?.spreadsheetId !== spreadsheetId) {
+      return;
+    }
+
+    if (!socket.rooms.has(roomName(spreadsheetId))) {
+      const currentAttempt = joinAttempt;
+      try {
+        const access = await authorize({ socket, spreadsheetId });
+        if (currentAttempt !== joinAttempt || !socket.connected) return;
+        if (!access.allowed) return;
+        await joinSpreadsheetSession(io, socket, spreadsheetId);
+      } catch {
+        return;
+      }
+      return;
+    }
+
+    emitPresenceToSocket(socket, spreadsheetId);
   });
 
   // Explicit leave (e.g. navigating away without disconnect)

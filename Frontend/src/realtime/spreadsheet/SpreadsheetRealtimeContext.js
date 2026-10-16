@@ -15,9 +15,12 @@ import { createSpreadsheetRequestId } from "./protocolRequest";
 const SOCKET_URL =
   process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
 
+const PRESENCE_SYNC_INTERVAL_MS = 4000;
+
 const SpreadsheetRealtimeContext = createContext({
   socket: null,
   spreadsheetId: null,
+  onlineUsers: [],
   isRoomReady: false,
   collaborationProtocol: "v1",
   collaborationV2Enabled: false,
@@ -60,6 +63,7 @@ export function SpreadsheetRealtimeProvider({
   children,
 }) {
   const [socket, setSocket] = useState(null);
+  const [onlineUsers, setOnlineUsers] = useState([]);
   const [isRoomReady, setIsRoomReady] = useState(false);
   const [collaborationProtocol, setCollaborationProtocol] = useState("v1");
   const [lastAuthoritativeRevision, setLastAuthoritativeRevision] =
@@ -93,16 +97,28 @@ export function SpreadsheetRealtimeProvider({
   );
 
   useLayoutEffect(() => {
+    if (!Number.isSafeInteger(initialRevision) || initialRevision < 0) {
+      return;
+    }
+    if (
+      authoritativeRevisionRef.current == null ||
+      initialRevision > authoritativeRevisionRef.current
+    ) {
+      authoritativeRevisionRef.current = initialRevision;
+      setLastAuthoritativeRevision(initialRevision);
+    }
+  }, [initialRevision]);
+
+  useLayoutEffect(() => {
     spreadsheetIdRef.current = spreadsheetId;
 
     if (!spreadsheetId) {
       setSocket(null);
+      setOnlineUsers([]);
       setIsRoomReady(false);
       setCollaborationProtocol("v1");
-      authoritativeRevisionRef.current = Number.isSafeInteger(initialRevision)
-        ? initialRevision
-        : null;
-      setLastAuthoritativeRevision(authoritativeRevisionRef.current);
+      authoritativeRevisionRef.current = null;
+      setLastAuthoritativeRevision(null);
       setSyncStart(null);
       return undefined;
     }
@@ -110,6 +126,7 @@ export function SpreadsheetRealtimeProvider({
     const token = localStorage.getItem("token");
     if (!token) {
       setSocket(null);
+      setOnlineUsers([]);
       setIsRoomReady(false);
       return undefined;
     }
@@ -118,12 +135,23 @@ export function SpreadsheetRealtimeProvider({
 
     const nextSocket = io(SOCKET_URL, {
       auth: { token },
+      forceNew: true,
       transports: ["websocket", "polling"],
     });
 
     let tornDown = false;
+    let allowPresenceSync = true;
     let pendingJoinRequestId = null;
     let presenceFallbackTimer = null;
+    let presenceSyncTimer = null;
+
+    const requestPresenceSync = () => {
+      if (tornDown || !allowPresenceSync || !nextSocket.connected) return;
+      nextSocket.emit("spreadsheet:presence-sync", {
+        spreadsheet_id: spreadsheetId,
+        request_id: createSpreadsheetRequestId("presence"),
+      });
+    };
 
     const markRoomReady = (requestId, source) => {
       if (
@@ -140,6 +168,7 @@ export function SpreadsheetRealtimeProvider({
         presenceFallbackTimer = null;
       }
       setIsRoomReady(true);
+      requestPresenceSync();
       recordSpreadsheetCollaborationEvent("join_acknowledged", {
         spreadsheetId,
         requestId: requestId || null,
@@ -222,6 +251,7 @@ export function SpreadsheetRealtimeProvider({
 
     const handlePresence = (payload = {}) => {
       if (payload.spreadsheet_id !== spreadsheetIdRef.current) return;
+      setOnlineUsers(Array.isArray(payload.users) ? payload.users : []);
       recordSpreadsheetCollaborationEvent("room_ready", {
         spreadsheetId,
         participantCount: Array.isArray(payload.users)
@@ -249,6 +279,7 @@ export function SpreadsheetRealtimeProvider({
 
     const handleDisconnect = (reason) => {
       setIsRoomReady(false);
+      setOnlineUsers([]);
       setCollaborationProtocol("v1");
       setSyncStart(null);
       pendingJoinRequestId = null;
@@ -278,6 +309,14 @@ export function SpreadsheetRealtimeProvider({
       ) {
         setIsRoomReady(false);
       }
+
+      if (payload.code === "SPREADSHEET_SESSION_REPLACED") {
+        allowPresenceSync = false;
+        if (presenceSyncTimer) {
+          clearInterval(presenceSyncTimer);
+          presenceSyncTimer = null;
+        }
+      }
     };
 
     function teardown() {
@@ -288,7 +327,12 @@ export function SpreadsheetRealtimeProvider({
         clearTimeout(presenceFallbackTimer);
         presenceFallbackTimer = null;
       }
+      if (presenceSyncTimer) {
+        clearInterval(presenceSyncTimer);
+        presenceSyncTimer = null;
+      }
       window.removeEventListener("pagehide", handlePageHide);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       nextSocket.off("spreadsheet:presence", handlePresence);
       nextSocket.off("spreadsheet:joined", handleJoined);
       nextSocket.off("spreadsheet:sync-start", handleSyncStart);
@@ -303,6 +347,12 @@ export function SpreadsheetRealtimeProvider({
       teardown();
     }
 
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        requestPresenceSync();
+      }
+    }
+
     nextSocket.on("connect", joinRoom);
     nextSocket.on("spreadsheet:presence", handlePresence);
     nextSocket.on("spreadsheet:joined", handleJoined);
@@ -311,6 +361,11 @@ export function SpreadsheetRealtimeProvider({
     nextSocket.on("connect_error", handleConnectError);
     nextSocket.on("disconnect", handleDisconnect);
     window.addEventListener("pagehide", handlePageHide);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    presenceSyncTimer = setInterval(
+      requestPresenceSync,
+      PRESENCE_SYNC_INTERVAL_MS
+    );
 
     if (nextSocket.connected) {
       joinRoom();
@@ -321,14 +376,16 @@ export function SpreadsheetRealtimeProvider({
     return () => {
       teardown();
       setSocket(null);
+      setOnlineUsers([]);
     };
-  }, [spreadsheetId, initialRevision, reportAuthoritativeRevision]);
+  }, [spreadsheetId, reportAuthoritativeRevision]);
 
   const value = useMemo(
     () => {
       return {
         socket,
         spreadsheetId: spreadsheetId || null,
+        onlineUsers,
         isRoomReady,
         collaborationProtocol,
         collaborationV2Enabled: collaborationConfig.v2Enabled,
@@ -342,6 +399,7 @@ export function SpreadsheetRealtimeProvider({
     [
       socket,
       spreadsheetId,
+      onlineUsers,
       isRoomReady,
       collaborationProtocol,
       collaborationConfig.v2Enabled,

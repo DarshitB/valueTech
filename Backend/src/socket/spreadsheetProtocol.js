@@ -9,6 +9,7 @@ const CELL_PATTERN = /^[A-Z]{1,4}[1-9][0-9]{0,6}$/i;
 const PAYLOAD_LIMITS = Object.freeze({
   join: 2 * 1024,
   leave: 2 * 1024,
+  presenceSync: 2 * 1024,
   activeCell: 4 * 1024,
   command: 256 * 1024,
   replay: 4 * 1024,
@@ -19,6 +20,7 @@ const PAYLOAD_LIMITS = Object.freeze({
 const RATE_LIMITS = Object.freeze({
   join: { limit: 10, windowMs: 60_000 },
   leave: { limit: 20, windowMs: 60_000 },
+  presenceSync: { limit: 40, windowMs: 60_000 },
   activeCell: { limit: 180, windowMs: 60_000 },
   command: { limit: 600, windowMs: 60_000 },
   replay: { limit: 30, windowMs: 60_000 },

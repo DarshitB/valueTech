@@ -15,11 +15,39 @@ function getPublicPresenceUsers(spreadsheetId) {
   }));
 }
 
-function broadcastPresence(io, spreadsheetId) {
-  io.to(roomName(spreadsheetId)).emit("spreadsheet:presence", {
+function buildPresencePayload(spreadsheetId) {
+  return {
     spreadsheet_id: spreadsheetId,
     users: getPublicPresenceUsers(spreadsheetId),
-  });
+  };
+}
+
+function broadcastPresence(io, spreadsheetId, extraSockets = []) {
+  const payload = buildPresencePayload(spreadsheetId);
+  const room = roomName(spreadsheetId);
+  io.to(room).emit("spreadsheet:presence", payload);
+
+  // A socket can still be the active presence entry after it drops out of the
+  // Socket.IO room. Deliver the same roster directly so that client updates.
+  const notified = new Set();
+  const targets = [
+    ...extraSockets,
+    ...presenceStore.getUsers(spreadsheetId).map((user) =>
+      io.sockets.sockets?.get(user.socketId)
+    ),
+  ];
+
+  for (const target of targets) {
+    if (!target || notified.has(target.id) || target.rooms?.has(room)) {
+      continue;
+    }
+    notified.add(target.id);
+    target.emit("spreadsheet:presence", payload);
+  }
+}
+
+function emitPresenceToSocket(socket, spreadsheetId) {
+  socket.emit("spreadsheet:presence", buildPresencePayload(spreadsheetId));
 }
 
 function broadcastClearedActiveCell(socket, cleared) {
@@ -109,6 +137,11 @@ function leaveSpreadsheetSession(io, socket, requestedSpreadsheetId = null) {
     return null;
   }
 
+  broadcastClearedActiveCell(socket, activeCell);
+  broadcastClearedLeases(socket, releasedLeases);
+  // Broadcast while this socket is still in the room. Leaving first dropped
+  // the update, so the person who just joined kept a stale roster.
+  broadcastPresence(io, spreadsheetId, [socket]);
   socket.leave(roomName(spreadsheetId));
   if (socket.data?.spreadsheetId === spreadsheetId) {
     socket.data.spreadsheetId = null;
@@ -116,16 +149,13 @@ function leaveSpreadsheetSession(io, socket, requestedSpreadsheetId = null) {
     socket.data.authoritativeRevision = null;
   }
 
-  broadcastClearedActiveCell(socket, activeCell);
-  broadcastClearedLeases(socket, releasedLeases);
-  broadcastPresence(io, spreadsheetId);
   scheduleRoomStateCleanup(io, spreadsheetId);
   return spreadsheetId;
 }
 
-function joinSpreadsheetSession(io, socket, spreadsheetId) {
+async function joinSpreadsheetSession(io, socket, spreadsheetId) {
   const previousSpreadsheetId = socket.data?.spreadsheetId || null;
-  if (previousSpreadsheetId) {
+  if (previousSpreadsheetId && previousSpreadsheetId !== spreadsheetId) {
     leaveSpreadsheetSession(io, socket, previousSpreadsheetId);
   }
 
@@ -134,6 +164,11 @@ function joinSpreadsheetSession(io, socket, spreadsheetId) {
     userName: socket.user.name,
     socketId: socket.id,
   });
+
+  await socket.join(roomName(spreadsheetId));
+  socket.data ||= {};
+  socket.data.spreadsheetId = spreadsheetId;
+  clearUserDedup(spreadsheetId, socket.user.id);
 
   if (replacedSocketId && replacedSocketId !== socket.id) {
     const replacedSocket = io.sockets.sockets?.get(replacedSocketId);
@@ -150,11 +185,6 @@ function joinSpreadsheetSession(io, socket, spreadsheetId) {
     }
   }
 
-  socket.join(roomName(spreadsheetId));
-  socket.data ||= {};
-  socket.data.spreadsheetId = spreadsheetId;
-  clearUserDedup(spreadsheetId, socket.user.id);
-
   broadcastPresence(io, spreadsheetId);
   emitActiveCellsSnapshot(socket, spreadsheetId);
   emitCellLeasesSnapshot(socket, spreadsheetId);
@@ -163,6 +193,7 @@ function joinSpreadsheetSession(io, socket, spreadsheetId) {
 module.exports = {
   broadcastPresence,
   emitActiveCellsSnapshot,
+  emitPresenceToSocket,
   getPublicPresenceUsers,
   joinSpreadsheetSession,
   leaveSpreadsheetSession,
