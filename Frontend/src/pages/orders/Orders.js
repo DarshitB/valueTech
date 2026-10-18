@@ -23,6 +23,11 @@ import FormModel from "../../components/FormModel";
 import SingleSearchSelect from "../../components/SingleSearchSelect";
 import { selectPermissions } from "../../redux/selectors/authSelectors";
 import { hasPermission } from "../../utils/permissionUtils";
+import {
+  readUserFilter,
+  removeUserFilter,
+  writeUserFilter,
+} from "../../utils/userFilterStorage";
 import { toast } from "react-toastify";
 import { Link } from "react-router-dom";
 import { searchOrdersByRegistration } from "../../api/order.api";
@@ -198,86 +203,86 @@ function Orders() {
     );
   }, [allowedPermissions]);
 
-  // State for order type filter - load from localStorage (shared with Dashboard)
+  // State for order type filter - saved in this browser for the logged-in user
   const [selectedOrderType, setSelectedOrderType] = useState(() => {
-    const saved = localStorage.getItem("filter_orders_orderType");
+    const saved = readUserFilter("filter_orders_orderType", currentUser?.id);
     return saved || "";
   });
 
-  // State for priority filter - load from localStorage (shared with Dashboard)
+  // State for priority filter - saved in this browser for the logged-in user
   const [selectedPriority, setSelectedPriority] = useState(() => {
-    const saved = localStorage.getItem("filter_orders_priority");
+    const saved = readUserFilter("filter_orders_priority", currentUser?.id);
     return saved || "";
   });
 
-  // State for additional filters - load from localStorage (shared with Dashboard)
+  // State for additional filters - saved in this browser for the logged-in user
   const [selectedBank, setSelectedBank] = useState(() => {
-    const saved = localStorage.getItem("filter_orders_bank");
+    const saved = readUserFilter("filter_orders_bank", currentUser?.id);
     return saved || "";
   });
 
   const [selectedBranch, setSelectedBranch] = useState(() => {
-    const saved = localStorage.getItem("filter_orders_branch");
+    const saved = readUserFilter("filter_orders_branch", currentUser?.id);
     return saved || "";
   });
 
   const [selectedOfficer, setSelectedOfficer] = useState(() => {
-    const saved = localStorage.getItem("filter_orders_officer");
+    const saved = readUserFilter("filter_orders_officer", currentUser?.id);
     return saved || "";
   });
 
   const [selectedManager, setSelectedManager] = useState(() => {
-    const saved = localStorage.getItem("filter_orders_manager");
+    const saved = readUserFilter("filter_orders_manager", currentUser?.id);
     return saved || "";
   });
 
   const [selectedFieldVerifier, setSelectedFieldVerifier] = useState(() => {
-    const saved = localStorage.getItem("filter_orders_fieldVerifier");
+    const saved = readUserFilter("filter_orders_fieldVerifier", currentUser?.id);
     return saved || "";
   });
 
   const [selectedValuerName, setSelectedValuerName] = useState(() => {
-    const saved = localStorage.getItem("filter_orders_valuerName");
+    const saved = readUserFilter("filter_orders_valuerName", currentUser?.id);
     return saved || "";
   });
 
   const [selectedOrderStatus, setSelectedOrderStatus] = useState(() => {
-    const saved = localStorage.getItem("filter_orders_orderStatus");
+    const saved = readUserFilter("filter_orders_orderStatus", currentUser?.id);
     return saved || "";
   });
 
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState(() => {
-    const saved = localStorage.getItem("filter_orders_paymentStatus");
+    const saved = readUserFilter("filter_orders_paymentStatus", currentUser?.id);
     return saved || "";
   });
 
   const [selectedCategory, setSelectedCategory] = useState(() => {
-    const saved = localStorage.getItem("filter_orders_category");
+    const saved = readUserFilter("filter_orders_category", currentUser?.id);
     return saved || "";
   });
 
   const [selectedAssetCategory, setSelectedAssetCategory] = useState(() => {
-    const saved = localStorage.getItem("filter_orders_assetCategory");
+    const saved = readUserFilter("filter_orders_assetCategory", currentUser?.id);
     return saved || "";
   });
 
   const [selectedSubCategory, setSelectedSubCategory] = useState(() => {
-    const saved = localStorage.getItem("filter_orders_subCategory");
+    const saved = readUserFilter("filter_orders_subCategory", currentUser?.id);
     return saved || "";
   });
 
   const [selectedCreatedBy, setSelectedCreatedBy] = useState(() => {
-    const saved = localStorage.getItem("filter_orders_createdBy");
+    const saved = readUserFilter("filter_orders_createdBy", currentUser?.id);
     return saved || "";
   });
 
   const [selectedUserAssigned, setSelectedUserAssigned] = useState(() => {
-    const saved = localStorage.getItem("filter_orders_userAssigned");
+    const saved = readUserFilter("filter_orders_userAssigned", currentUser?.id);
     return saved || "";
   });
 
   const [selectedR2State, setSelectedR2State] = useState(() => {
-    const saved = localStorage.getItem("filter_orders_r2State");
+    const saved = readUserFilter("filter_orders_r2State", currentUser?.id);
     return saved || "";
   });
 
@@ -288,13 +293,13 @@ function Orders() {
 
   // State for date filter
   const [selectedDatePreset, setSelectedDatePreset] = useState(() => {
-    const saved = localStorage.getItem("filter_orders_datePreset");
+    const saved = readUserFilter("filter_orders_datePreset", currentUser?.id);
     return saved || "";
   });
 
   const [selectedDateRange, setSelectedDateRange] = useState(() => {
-    const savedStart = localStorage.getItem("filter_orders_dateRangeStart");
-    const savedEnd = localStorage.getItem("filter_orders_dateRangeEnd");
+    const savedStart = readUserFilter("filter_orders_dateRangeStart", currentUser?.id);
+    const savedEnd = readUserFilter("filter_orders_dateRangeEnd", currentUser?.id);
     return {
       start: parseLocalDateParam(savedStart),
       end: parseLocalDateParam(savedEnd),
@@ -303,16 +308,12 @@ function Orders() {
 
   // Mail-sent date filter (any mail send event in range via status history)
   const [selectedMailSentDatePreset, setSelectedMailSentDatePreset] = useState(
-    () => localStorage.getItem("filter_orders_mailSentDatePreset") || ""
+    () => readUserFilter("filter_orders_mailSentDatePreset", currentUser?.id) || ""
   );
   const [selectedMailSentDateRange, setSelectedMailSentDateRange] = useState(
     () => {
-      const savedStart = localStorage.getItem(
-        "filter_orders_mailSentDateRangeStart"
-      );
-      const savedEnd = localStorage.getItem(
-        "filter_orders_mailSentDateRangeEnd"
-      );
+      const savedStart = readUserFilter("filter_orders_mailSentDateRangeStart", currentUser?.id);
+      const savedEnd = readUserFilter("filter_orders_mailSentDateRangeEnd", currentUser?.id);
       return {
         start: parseLocalDateParam(savedStart),
         end: parseLocalDateParam(savedEnd),
@@ -997,28 +998,28 @@ function Orders() {
     setSelectedMailSentDateRange({ start: null, end: null });
 
     // Clear from localStorage
-    localStorage.removeItem("filter_orders_orderType");
-    localStorage.removeItem("filter_orders_priority");
-    localStorage.removeItem("filter_orders_bank");
-    localStorage.removeItem("filter_orders_branch");
-    localStorage.removeItem("filter_orders_officer");
-    localStorage.removeItem("filter_orders_manager");
-    localStorage.removeItem("filter_orders_fieldVerifier");
-    localStorage.removeItem("filter_orders_valuerName");
-    localStorage.removeItem("filter_orders_orderStatus");
-    localStorage.removeItem("filter_orders_paymentStatus");
-    localStorage.removeItem("filter_orders_category");
-    localStorage.removeItem("filter_orders_assetCategory");
-    localStorage.removeItem("filter_orders_subCategory");
-    localStorage.removeItem("filter_orders_createdBy");
-    localStorage.removeItem("filter_orders_userAssigned");
-    localStorage.removeItem("filter_orders_r2State");
-    localStorage.removeItem("filter_orders_datePreset");
-    localStorage.removeItem("filter_orders_dateRangeStart");
-    localStorage.removeItem("filter_orders_dateRangeEnd");
-    localStorage.removeItem("filter_orders_mailSentDatePreset");
-    localStorage.removeItem("filter_orders_mailSentDateRangeStart");
-    localStorage.removeItem("filter_orders_mailSentDateRangeEnd");
+    removeUserFilter("filter_orders_orderType", currentUser?.id);
+    removeUserFilter("filter_orders_priority", currentUser?.id);
+    removeUserFilter("filter_orders_bank", currentUser?.id);
+    removeUserFilter("filter_orders_branch", currentUser?.id);
+    removeUserFilter("filter_orders_officer", currentUser?.id);
+    removeUserFilter("filter_orders_manager", currentUser?.id);
+    removeUserFilter("filter_orders_fieldVerifier", currentUser?.id);
+    removeUserFilter("filter_orders_valuerName", currentUser?.id);
+    removeUserFilter("filter_orders_orderStatus", currentUser?.id);
+    removeUserFilter("filter_orders_paymentStatus", currentUser?.id);
+    removeUserFilter("filter_orders_category", currentUser?.id);
+    removeUserFilter("filter_orders_assetCategory", currentUser?.id);
+    removeUserFilter("filter_orders_subCategory", currentUser?.id);
+    removeUserFilter("filter_orders_createdBy", currentUser?.id);
+    removeUserFilter("filter_orders_userAssigned", currentUser?.id);
+    removeUserFilter("filter_orders_r2State", currentUser?.id);
+    removeUserFilter("filter_orders_datePreset", currentUser?.id);
+    removeUserFilter("filter_orders_dateRangeStart", currentUser?.id);
+    removeUserFilter("filter_orders_dateRangeEnd", currentUser?.id);
+    removeUserFilter("filter_orders_mailSentDatePreset", currentUser?.id);
+    removeUserFilter("filter_orders_mailSentDateRangeStart", currentUser?.id);
+    removeUserFilter("filter_orders_mailSentDateRangeEnd", currentUser?.id);
   };
 
   // Helper function to get date range based on preset
@@ -1475,7 +1476,7 @@ function Orders() {
                 onChange={(value) => {
                   const val = value || "";
                   setSelectedOrderType(val);
-                  localStorage.setItem("filter_orders_orderType", val);
+                  writeUserFilter("filter_orders_orderType", currentUser?.id, val);
                 }}
                 placeholder="All Types"
               />
@@ -1495,7 +1496,7 @@ function Orders() {
                   onChange={(value) => {
                     const val = value || "";
                     setSelectedPriority(val);
-                    localStorage.setItem("filter_orders_priority", val);
+                    writeUserFilter("filter_orders_priority", currentUser?.id, val);
                   }}
                   placeholder="All Priorities"
                 />
@@ -1514,7 +1515,7 @@ function Orders() {
                 onChange={(value) => {
                   const val = value || "";
                   setSelectedOrderStatus(val);
-                  localStorage.setItem("filter_orders_orderStatus", val);
+                  writeUserFilter("filter_orders_orderStatus", currentUser?.id, val);
                 }}
                 placeholder="All Status"
               />
@@ -1535,18 +1536,18 @@ function Orders() {
                     const val = value || "";
                     const previousValue = selectedDatePreset;
                     setSelectedDatePreset(val);
-                    localStorage.setItem("filter_orders_datePreset", val);
+                    writeUserFilter("filter_orders_datePreset", currentUser?.id, val);
                     // Clear date range when changing from "fromTo" to another preset or empty
                     if (previousValue === "fromTo" && val !== "fromTo") {
                       setSelectedDateRange({ start: null, end: null });
-                      localStorage.removeItem("filter_orders_dateRangeStart");
-                      localStorage.removeItem("filter_orders_dateRangeEnd");
+                      removeUserFilter("filter_orders_dateRangeStart", currentUser?.id);
+                      removeUserFilter("filter_orders_dateRangeEnd", currentUser?.id);
                     }
                     // Clear date range when preset is selected (except for fromTo)
                     if (val && val !== "fromTo") {
                       setSelectedDateRange({ start: null, end: null });
-                      localStorage.removeItem("filter_orders_dateRangeStart");
-                      localStorage.removeItem("filter_orders_dateRangeEnd");
+                      removeUserFilter("filter_orders_dateRangeStart", currentUser?.id);
+                      removeUserFilter("filter_orders_dateRangeEnd", currentUser?.id);
                     }
                   }}
                   placeholder="Created Date Preset"
@@ -1562,12 +1563,9 @@ function Orders() {
                             start: date,
                           }));
                           if (date) {
-                            localStorage.setItem(
-                              "filter_orders_dateRangeStart",
-                              toApiDateParam(date)
-                            );
+                            writeUserFilter("filter_orders_dateRangeStart", currentUser?.id, toApiDateParam(date));
                           } else {
-                            localStorage.removeItem("filter_orders_dateRangeStart");
+                            removeUserFilter("filter_orders_dateRangeStart", currentUser?.id);
                           }
                           // Set preset to fromTo if dates are manually selected
                           if (
@@ -1575,7 +1573,7 @@ function Orders() {
                             (date || selectedDateRange.end)
                           ) {
                             setSelectedDatePreset("fromTo");
-                            localStorage.setItem("filter_orders_datePreset", "fromTo");
+                            writeUserFilter("filter_orders_datePreset", currentUser?.id, "fromTo");
                           }
                         }}
                         selectsStart
@@ -1600,12 +1598,9 @@ function Orders() {
                             end: date,
                           }));
                           if (date) {
-                            localStorage.setItem(
-                              "filter_orders_dateRangeEnd",
-                              toApiDateParam(date)
-                            );
+                            writeUserFilter("filter_orders_dateRangeEnd", currentUser?.id, toApiDateParam(date));
                           } else {
-                            localStorage.removeItem("filter_orders_dateRangeEnd");
+                            removeUserFilter("filter_orders_dateRangeEnd", currentUser?.id);
                           }
                           // Set preset to fromTo if dates are manually selected
                           if (
@@ -1613,7 +1608,7 @@ function Orders() {
                             (selectedDateRange.start || date)
                           ) {
                             setSelectedDatePreset("fromTo");
-                            localStorage.setItem("filter_orders_datePreset", "fromTo");
+                            writeUserFilter("filter_orders_datePreset", currentUser?.id, "fromTo");
                           }
                         }}
                         selectsEnd
@@ -1654,27 +1649,16 @@ function Orders() {
                     const val = value || "";
                     const previousValue = selectedMailSentDatePreset;
                     setSelectedMailSentDatePreset(val);
-                    localStorage.setItem(
-                      "filter_orders_mailSentDatePreset",
-                      val
-                    );
+                    writeUserFilter("filter_orders_mailSentDatePreset", currentUser?.id, val);
                     if (previousValue === "fromTo" && val !== "fromTo") {
                       setSelectedMailSentDateRange({ start: null, end: null });
-                      localStorage.removeItem(
-                        "filter_orders_mailSentDateRangeStart"
-                      );
-                      localStorage.removeItem(
-                        "filter_orders_mailSentDateRangeEnd"
-                      );
+                      removeUserFilter("filter_orders_mailSentDateRangeStart", currentUser?.id);
+                      removeUserFilter("filter_orders_mailSentDateRangeEnd", currentUser?.id);
                     }
                     if (val && val !== "fromTo") {
                       setSelectedMailSentDateRange({ start: null, end: null });
-                      localStorage.removeItem(
-                        "filter_orders_mailSentDateRangeStart"
-                      );
-                      localStorage.removeItem(
-                        "filter_orders_mailSentDateRangeEnd"
-                      );
+                      removeUserFilter("filter_orders_mailSentDateRangeStart", currentUser?.id);
+                      removeUserFilter("filter_orders_mailSentDateRangeEnd", currentUser?.id);
                     }
                   }}
                   placeholder="Mail Sent Preset"
@@ -1688,20 +1672,12 @@ function Orders() {
                           setSelectedMailSentDateRange((prev) => {
                             const nextEnd = prev.end || date;
                             if (date) {
-                              localStorage.setItem(
-                                "filter_orders_mailSentDateRangeStart",
-                                toApiDateParam(date)
-                              );
+                              writeUserFilter("filter_orders_mailSentDateRangeStart", currentUser?.id, toApiDateParam(date));
                               if (nextEnd) {
-                                localStorage.setItem(
-                                  "filter_orders_mailSentDateRangeEnd",
-                                  toApiDateParam(nextEnd)
-                                );
+                                writeUserFilter("filter_orders_mailSentDateRangeEnd", currentUser?.id, toApiDateParam(nextEnd));
                               }
                             } else {
-                              localStorage.removeItem(
-                                "filter_orders_mailSentDateRangeStart"
-                              );
+                              removeUserFilter("filter_orders_mailSentDateRangeStart", currentUser?.id);
                             }
                             return { start: date, end: nextEnd };
                           });
@@ -1710,10 +1686,7 @@ function Orders() {
                             (date || selectedMailSentDateRange.end)
                           ) {
                             setSelectedMailSentDatePreset("fromTo");
-                            localStorage.setItem(
-                              "filter_orders_mailSentDatePreset",
-                              "fromTo"
-                            );
+                            writeUserFilter("filter_orders_mailSentDatePreset", currentUser?.id, "fromTo");
                           }
                         }}
                         selectsStart
@@ -1740,24 +1713,16 @@ function Orders() {
                             end: date,
                           }));
                           if (date) {
-                            localStorage.setItem(
-                              "filter_orders_mailSentDateRangeEnd",
-                              toApiDateParam(date)
-                            );
+                            writeUserFilter("filter_orders_mailSentDateRangeEnd", currentUser?.id, toApiDateParam(date));
                           } else {
-                            localStorage.removeItem(
-                              "filter_orders_mailSentDateRangeEnd"
-                            );
+                            removeUserFilter("filter_orders_mailSentDateRangeEnd", currentUser?.id);
                           }
                           if (
                             !selectedMailSentDatePreset &&
                             (selectedMailSentDateRange.start || date)
                           ) {
                             setSelectedMailSentDatePreset("fromTo");
-                            localStorage.setItem(
-                              "filter_orders_mailSentDatePreset",
-                              "fromTo"
-                            );
+                            writeUserFilter("filter_orders_mailSentDatePreset", currentUser?.id, "fromTo");
                           }
                         }}
                         selectsEnd
@@ -1827,7 +1792,7 @@ function Orders() {
                   onChange={(value) => {
                     const val = value || "";
                     setSelectedCategory(val);
-                    localStorage.setItem("filter_orders_category", val);
+                    writeUserFilter("filter_orders_category", currentUser?.id, val);
                   }}
                   placeholder="All Categories"
                 />
@@ -1849,7 +1814,7 @@ function Orders() {
                     onChange={(value) => {
                       const val = value || "";
                       setSelectedAssetCategory(val);
-                      localStorage.setItem("filter_orders_assetCategory", val);
+                      writeUserFilter("filter_orders_assetCategory", currentUser?.id, val);
                     }}
                     placeholder="All Asset Categories"
                   />
@@ -1871,7 +1836,7 @@ function Orders() {
                     onChange={(value) => {
                       const val = value || "";
                       setSelectedSubCategory(val);
-                      localStorage.setItem("filter_orders_subCategory", val);
+                      writeUserFilter("filter_orders_subCategory", currentUser?.id, val);
                     }}
                     placeholder="All Sub Categories"
                   />
@@ -1891,7 +1856,7 @@ function Orders() {
                   onChange={(value) => {
                     const val = value || "";
                     setSelectedValuerName(val);
-                    localStorage.setItem("filter_orders_valuerName", val);
+                    writeUserFilter("filter_orders_valuerName", currentUser?.id, val);
                   }}
                   placeholder="All Valuers"
                 />
@@ -1910,7 +1875,7 @@ function Orders() {
                   onChange={(value) => {
                     const val = value || "";
                     setSelectedManager(val);
-                    localStorage.setItem("filter_orders_manager", val);
+                    writeUserFilter("filter_orders_manager", currentUser?.id, val);
                   }}
                   placeholder="All Managers"
                 />
@@ -1930,7 +1895,7 @@ function Orders() {
                   onChange={(value) => {
                     const val = value || "";
                     setSelectedBank(val);
-                    localStorage.setItem("filter_orders_bank", val);
+                    writeUserFilter("filter_orders_bank", currentUser?.id, val);
                   }}
                   placeholder="All Banks"
                 />
@@ -1949,7 +1914,7 @@ function Orders() {
                   onChange={(value) => {
                     const val = value || "";
                     setSelectedBranch(val);
-                    localStorage.setItem("filter_orders_branch", val);
+                    writeUserFilter("filter_orders_branch", currentUser?.id, val);
                   }}
                   placeholder="All Branches"
                 />
@@ -1971,7 +1936,7 @@ function Orders() {
                     onChange={(value) => {
                       const val = value || "";
                       setSelectedOfficer(val);
-                      localStorage.setItem("filter_orders_officer", val);
+                      writeUserFilter("filter_orders_officer", currentUser?.id, val);
                     }}
                     placeholder="All Officers"
                   />
@@ -1993,7 +1958,7 @@ function Orders() {
                     onChange={(value) => {
                       const val = value || "";
                       setSelectedFieldVerifier(val);
-                      localStorage.setItem("filter_orders_fieldVerifier", val);
+                      writeUserFilter("filter_orders_fieldVerifier", currentUser?.id, val);
                     }}
                     placeholder="All Field Verifiers"
                   />
@@ -2015,7 +1980,7 @@ function Orders() {
                     onChange={(value) => {
                       const val = value || "";
                       setSelectedPaymentStatus(val);
-                      localStorage.setItem("filter_orders_paymentStatus", val);
+                      writeUserFilter("filter_orders_paymentStatus", currentUser?.id, val);
                     }}
                     placeholder="All Payment Statuses"
                   />
@@ -2034,7 +1999,7 @@ function Orders() {
                   onChange={(value) => {
                     const val = value || "";
                     setSelectedCreatedBy(val);
-                    localStorage.setItem("filter_orders_createdBy", val);
+                    writeUserFilter("filter_orders_createdBy", currentUser?.id, val);
                   }}
                   placeholder="All Created By"
                 />
@@ -2052,7 +2017,7 @@ function Orders() {
                   onChange={(value) => {
                     const val = value || "";
                     setSelectedR2State(val);
-                    localStorage.setItem("filter_orders_r2State", val);
+                    writeUserFilter("filter_orders_r2State", currentUser?.id, val);
                   }}
                   placeholder="All R2 States"
                 />
@@ -2071,7 +2036,7 @@ function Orders() {
                   onChange={(value) => {
                     const val = value || "";
                     setSelectedUserAssigned(val);
-                    localStorage.setItem("filter_orders_userAssigned", val);
+                    writeUserFilter("filter_orders_userAssigned", currentUser?.id, val);
                   }}
                   placeholder="All Users Assigned"
                 />
