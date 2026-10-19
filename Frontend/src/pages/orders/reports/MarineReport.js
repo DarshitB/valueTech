@@ -63,6 +63,8 @@ const MARINE_ALWAYS_SEND_FORM_KEYS = [
   "proposed_owner",
   "proposed_owner_address",
   "report_title_other",
+  "main_engines_condition",
+  "auxiliary_machineries_generators_condition",
 ];
 
 const appendMissingMarineFormFields = (formData, formState) => {
@@ -375,6 +377,8 @@ function MarineReport() {
     proposed_owner: "",
     proposed_owner_address: "",
     certifications_vessel_note: "",
+    main_engines_condition: "",
+    auxiliary_machineries_generators_condition: "",
     disclaimer: "",
   });
 
@@ -740,6 +744,8 @@ function MarineReport() {
       vessel_photo_id: null,
       proposed_owner: "",
       proposed_owner_address: "",
+      main_engines_condition: "",
+      auxiliary_machineries_generators_condition: "",
       disclaimer: "",
     };
 
@@ -5666,6 +5672,17 @@ function MarineReport() {
                     </div>
                   </div>
                   {renderFlexibleFields("MAIN_ENGINES")}
+                  <div className="form-group">
+                    <label className="mt-3">Main Engines Condition</label>
+                    <input
+                      className="form-field"
+                      type="text"
+                      name="main_engines_condition"
+                      value={reportFormData.main_engines_condition || ""}
+                      onChange={handleFormChange}
+                      placeholder="Enter main engines condition"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -5690,6 +5707,20 @@ function MarineReport() {
                     </div>
                   </div>
                   {renderFlexibleFields("AUXILIARY_MACHINERIES_GENERATORS")}
+                  <div className="form-group">
+                    <label className="mt-3">Auxiliary Machineries - Generators Condition</label>
+                    <input
+                      className="form-field"
+                      type="text"
+                      name="auxiliary_machineries_generators_condition"
+                      value={
+                        reportFormData.auxiliary_machineries_generators_condition ||
+                        ""
+                      }
+                      onChange={handleFormChange}
+                      placeholder="Enter auxiliary machineries generators condition"
+                    />
+                  </div>
                 </div>
               </div>
 

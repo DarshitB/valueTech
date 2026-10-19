@@ -4809,6 +4809,8 @@ function filterValidReportFields(formData, reportType) {
       "present_condition_2",
       "present_condition_3",
       "auxiliary_machinerie_other_auxiliary_machinerie_condition",
+      "main_engines_condition",
+      "auxiliary_machineries_generators_condition",
       "steering_details",
       "propeller_asd_vessel_condition",
       // DIMENSIONS

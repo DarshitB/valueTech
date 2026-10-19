@@ -1559,8 +1559,8 @@ function generateMarineReportHTML(
               const heading = `<h2><span class="main-counter">${mainCounterValue}</span>. MACHINERIES :</h2>`;
               
               // Only show condition if MAIN_ENGINES flexible fields have content
-              const conditionContent = (mainEnginesContent && mainEnginesContent.trim() !== "")
-                ? `<p><b>Condition: </b>Engine found in working condition as per the survey and inspection onsite of the vessel.</p>`
+              const conditionContent = (mainEnginesContent && mainEnginesContent.trim() !== "") && getValue(formData.main_engines_condition)
+                ? `<p><b>Condition: </b>${getValue(formData.main_engines_condition)}</p>`
                 : "";
               
               return heading + mainEnginesContent + conditionContent;
@@ -1576,20 +1576,33 @@ function generateMarineReportHTML(
               );
               
               // Only show condition if AUXILIARY_MACHINERIES_GENERATORS flexible fields have content
-              const conditionContent = (auxiliaryMachinerieGeneratorsContent && auxiliaryMachinerieGeneratorsContent.trim() !== "") && formData.auxiliary_machinerie_other_auxiliary_machinerie_condition
-                ? `<p><b>Condition: </b>Aux Harbour generators found in working condition as per the ${getValue(formData.auxiliary_machinerie_other_auxiliary_machinerie_condition)}</p>`
+              const conditionContent = (auxiliaryMachinerieGeneratorsContent && auxiliaryMachinerieGeneratorsContent.trim() !== "") && getValue(formData.auxiliary_machineries_generators_condition)
+                ? `<p><b>Condition: </b>${getValue(formData.auxiliary_machineries_generators_condition)}</p>`
                 : "";
               
               return auxiliaryMachinerieGeneratorsContent + conditionContent;
             })()}
 
-            ${generateFlexibleFieldsForSection(
-              formData.flexible_fields || [],
-              "AUXILIARY_MACHINERIES_HARBOUR_GENERATORS",
-              null, // Don't use main counter
-              null,
-              getNextSubCounter // Use sub-counter instead
-            )}
+            ${(() => {
+              const harbourGeneratorsContent = generateFlexibleFieldsForSection(
+                formData.flexible_fields || [],
+                "AUXILIARY_MACHINERIES_HARBOUR_GENERATORS",
+                null,
+                null,
+                getNextSubCounter
+              );
+              const harbourCondition = getValue(
+                formData.auxiliary_machinerie_other_auxiliary_machinerie_condition
+              );
+              const conditionContent =
+                harbourGeneratorsContent &&
+                harbourGeneratorsContent.trim() !== "" &&
+                harbourCondition
+                  ? `<p><b>Condition: </b>Aux Harbour generators found in working condition as per the ${harbourCondition}</p>`
+                  : "";
+
+              return harbourGeneratorsContent + conditionContent;
+            })()}
 
             ${(() => {
               if (!getValue(formData.steering_details)) {
