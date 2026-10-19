@@ -5674,13 +5674,27 @@ function MarineReport() {
                   {renderFlexibleFields("MAIN_ENGINES")}
                   <div className="form-group">
                     <label className="mt-3">Main Engines Condition</label>
-                    <input
-                      className="form-field"
-                      type="text"
-                      name="main_engines_condition"
-                      value={reportFormData.main_engines_condition || ""}
-                      onChange={handleFormChange}
-                      placeholder="Enter main engines condition"
+                    <SingleSearchSelect
+                      options={[
+                        {
+                          value: "survey and inspection onsite of the vessel",
+                          label: "survey and inspection onsite of the vessel",
+                        },
+                        {
+                          value:
+                            "documents and previous reports provided by client",
+                          label:
+                            "documents and previous reports provided by client",
+                        },
+                      ]}
+                      value={
+                        reportFormData.main_engines_condition ||
+                        "survey and inspection onsite of the vessel"
+                      }
+                      onChange={(value) =>
+                        handleSelectChange("main_engines_condition", value)
+                      }
+                      placeholder="Select main engines condition"
                     />
                   </div>
                 </div>
@@ -5708,17 +5722,33 @@ function MarineReport() {
                   </div>
                   {renderFlexibleFields("AUXILIARY_MACHINERIES_GENERATORS")}
                   <div className="form-group">
-                    <label className="mt-3">Auxiliary Machineries - Generators Condition</label>
-                    <input
-                      className="form-field"
-                      type="text"
-                      name="auxiliary_machineries_generators_condition"
+                    <label className="mt-3">
+                      Auxiliary Machineries - Generators Condition
+                    </label>
+                    <SingleSearchSelect
+                      options={[
+                        {
+                          value: "survey and inspection onsite of the vessel",
+                          label: "survey and inspection onsite of the vessel",
+                        },
+                        {
+                          value:
+                            "documents and previous reports provided by client",
+                          label:
+                            "documents and previous reports provided by client",
+                        },
+                      ]}
                       value={
                         reportFormData.auxiliary_machineries_generators_condition ||
-                        ""
+                        "survey and inspection onsite of the vessel"
                       }
-                      onChange={handleFormChange}
-                      placeholder="Enter auxiliary machineries generators condition"
+                      onChange={(value) =>
+                        handleSelectChange(
+                          "auxiliary_machineries_generators_condition",
+                          value
+                        )
+                      }
+                      placeholder="Select auxiliary machineries generators condition"
                     />
                   </div>
                 </div>
