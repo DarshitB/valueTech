@@ -82,6 +82,25 @@ function applyPrivilegedSelfActionFilter(queryBuilder, userId) {
   });
 }
 
+/**
+ * Bound notification READ queries to recent rows only (default 90 days).
+ * Does not change create rules or who is notified — only how far back
+ * count/list scans go. Tune via NOTIFICATION_READ_WINDOW_DAYS.
+ */
+function getNotificationReadWindowDays() {
+  const parsed = parseInt(process.env.NOTIFICATION_READ_WINDOW_DAYS, 10);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+  return 90;
+}
+
+function applyNotificationReadWindow(queryBuilder) {
+  const days = getNotificationReadWindowDays();
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  return queryBuilder.where("notifications.created_at", ">=", since);
+}
+
 const notification = {
   // Get ALL notifications (read + unread) for a user with optional last_check filter
   // Filter based on order permissions (same logic as order model)
@@ -142,6 +161,9 @@ const notification = {
         .leftJoin("order_comments", "notifications.comment_id", "order_comments.id")
         .leftJoin("officers", "orders.officer_id", "officers.id")
         .whereNull("orders.deleted_at");
+
+      // Limit scan to recent rows (read-path only; create/who-notify unchanged)
+      baseNotificationQuery = applyNotificationReadWindow(baseNotificationQuery);
 
       // Apply order permission filters
       if (!hasPrivilegedRole) {
@@ -310,6 +332,9 @@ const notification = {
       })
       .whereNull("orders.deleted_at");
 
+    // Limit scan to recent rows (read-path only; create/who-notify unchanged)
+    query = applyNotificationReadWindow(query);
+
     // Apply order permission filters (same as getAllNotificationsWithFilter)
     if (!hasPrivilegedRole) {
       // Get accessible order IDs
@@ -428,6 +453,9 @@ const notification = {
             .where("user_id", userId);
         })
         .whereNull("orders.deleted_at");
+
+      // Limit scan to recent rows (read-path only; create/who-notify unchanged)
+      baseNotificationQuery = applyNotificationReadWindow(baseNotificationQuery);
 
       // Apply order permission filters
       if (!hasPrivilegedRole) {

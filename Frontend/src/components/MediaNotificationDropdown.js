@@ -12,6 +12,8 @@ import { hasPermission } from "../utils/permissionUtils";
 import {
   formatMediaActivityDescription,
   isMediaUploadNotification,
+  NOTIFICATION_POLL_INTERVAL_MS,
+  runNotificationPoll,
   VIEW_MEDIA_NOTIFICATIONS_PERMISSION,
 } from "../utils/notificationUtils";
 import "./NotificationDropdown.scss";
@@ -116,7 +118,9 @@ function MediaNotificationDropdown() {
 
   useEffect(() => {
     if (!canViewMediaNotifications) return undefined;
-    pollingIntervalRef.current = setInterval(fetchNotificationsData, 30000);
+    pollingIntervalRef.current = setInterval(() => {
+      runNotificationPoll(fetchNotificationsData);
+    }, NOTIFICATION_POLL_INTERVAL_MS);
     return () => {
       if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
     };

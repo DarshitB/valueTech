@@ -12,6 +12,8 @@ import { hasPermission } from "../utils/permissionUtils";
 import {
   getNotificationActorName,
   isBellNotification,
+  NOTIFICATION_POLL_INTERVAL_MS,
+  runNotificationPoll,
 } from "../utils/notificationUtils";
 import "./NotificationDropdown.scss";
 
@@ -144,16 +146,15 @@ function NotificationDropdown() {
     fetchNotificationsData();
   }, [fetchNotificationsData]);
 
-  // Set up polling for new notifications (every 30 seconds)
+  // Poll for new notifications (interval shared; skip when tab hidden)
   useEffect(() => {
     if (!currentUser?.id || !hasPermission(allowedPermissions, "view_order")) {
       return;
     }
 
-    // Poll every 30 seconds for new notifications
     pollingIntervalRef.current = setInterval(() => {
-      fetchNotificationsData();
-    }, 30000); // 30 seconds
+      runNotificationPoll(fetchNotificationsData);
+    }, NOTIFICATION_POLL_INTERVAL_MS);
 
     return () => {
       if (pollingIntervalRef.current) {

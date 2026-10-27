@@ -11,6 +11,8 @@ import { selectPermissions, selectUser } from "../redux/selectors/authSelectors"
 import { hasPermission } from "../utils/permissionUtils";
 import {
   isCommentNotification,
+  NOTIFICATION_POLL_INTERVAL_MS,
+  runNotificationPoll,
   VIEW_COMMENT_NOTIFICATIONS_PERMISSION,
 } from "../utils/notificationUtils";
 import "./NotificationDropdown.scss";
@@ -111,7 +113,9 @@ function CommentNotificationDropdown() {
 
   useEffect(() => {
     if (!canViewCommentNotifications) return undefined;
-    pollingIntervalRef.current = setInterval(fetchNotificationsData, 30000);
+    pollingIntervalRef.current = setInterval(() => {
+      runNotificationPoll(fetchNotificationsData);
+    }, NOTIFICATION_POLL_INTERVAL_MS);
     return () => {
       if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
     };

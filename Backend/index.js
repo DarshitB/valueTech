@@ -5,6 +5,9 @@ const logger = require("./src/utils/logger");
 const { resumePendingR2SyncJobs } = require("./src/utils/r2Helper");
 const { initSocket } = require("./src/socket");
 const { startAttendanceCronJobs } = require("./src/jobs/attendanceCron");
+const {
+  startNotificationCleanupCronJobs,
+} = require("./src/jobs/notificationCleanupCron");
 
 const PORT = process.env.PORT || 5000;
 
@@ -18,6 +21,7 @@ initSocket(server);
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   startAttendanceCronJobs();
+  startNotificationCleanupCronJobs();
   resumePendingR2SyncJobs().catch((err) => {
     console.error("[r2] failed to resume pending sync jobs:", err.message);
   });

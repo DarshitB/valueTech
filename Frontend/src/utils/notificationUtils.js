@@ -3,6 +3,22 @@ export const VIEW_MEDIA_NOTIFICATIONS_PERMISSION = "view_media_notifications";
 export const VIEW_COMMENT_NOTIFICATIONS_PERMISSION = "view_comment_notifications";
 
 /**
+ * Bell / comment / media dropdown poll interval.
+ * Raised from 30s to cut API load; realtime socket push can replace this later.
+ */
+export const NOTIFICATION_POLL_INTERVAL_MS = 120000; // 2 minutes
+
+/** Run a notification poll only when the browser tab is visible. */
+export function runNotificationPoll(fetchFn) {
+  if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+    return;
+  }
+  if (typeof fetchFn === "function") {
+    fetchFn();
+  }
+}
+
+/**
  * Media upload notifications: Assets Submitted (status 7) with "Uploaded" in activity_extra.
  * Matches mobile app uploads and dashboard ZIP uploads (same as Recent Activity).
  */
