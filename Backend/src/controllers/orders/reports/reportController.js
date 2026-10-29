@@ -1371,6 +1371,8 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
   // Determine background image based on report type
   let bgImageFileName = "vkassociate_letter_head.jpg"; // Default image
   let stampPngFile = null; // Optional stamp overlay
+  // Marine VDK only: optional second stamp (first + last page). Never set for other valuers/reports.
+  let stampPngFileSecondary = null;
 
   // Marine reports use separate letterhead images
   if (reportType.toLowerCase() === "report_marine") {
@@ -1389,7 +1391,9 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
         stampPngFile = "marine-vs-stamp.png";
       } else if (name === "VISHAL D. KOTHARI") {
         bgImageFileName = "marine-vdk.webp"; // Marine letterhead for VDK
-        stampPngFile = null; // empty stamp → no overlay on any page
+        // Dual stamps: #1 on all pages; #2 only first + last (see marine template)
+        stampPngFile = "marine-vdk-1.png";
+        stampPngFileSecondary = "marine-vdk-2.png";
       } else {
         // Default marine letterhead
         bgImageFileName = "marine-vs.webp";
@@ -1447,10 +1451,15 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
     typeof stampPngFile === "string" && stampPngFile.trim()
       ? stampPngFile.trim()
       : null;
+  stampPngFileSecondary =
+    typeof stampPngFileSecondary === "string" && stampPngFileSecondary.trim()
+      ? stampPngFileSecondary.trim()
+      : null;
 
   // Convert background image to base64 (optimized)
   let bgImageBase64 = null;
   let stampImageBase64 = null;
+  let stampImageBase64Secondary = null;
   try {
     if (fs.existsSync(bgPath)) {
       const imageBuffer = fs.readFileSync(bgPath);
@@ -1481,6 +1490,26 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
         stampImageBase64 = `data:${stampMime};base64,${stampBuffer.toString(
           "base64"
         )}`;
+      } else {
+        console.warn(`Stamp image not found: ${stampPath}`);
+      }
+    }
+
+    // Secondary stamp is optional and only used by marine VDK dual-stamp layout
+    if (stampPngFileSecondary) {
+      const secondaryStampPath = path.join(
+        process.cwd(),
+        "public",
+        "img",
+        stampPngFileSecondary
+      );
+      if (fs.existsSync(secondaryStampPath)) {
+        const secondaryStampBuffer = fs.readFileSync(secondaryStampPath);
+        stampImageBase64Secondary = `data:image/png;base64,${secondaryStampBuffer.toString(
+          "base64"
+        )}`;
+      } else {
+        console.warn(`Secondary stamp image not found: ${secondaryStampPath}`);
       }
     }
   } catch (error) {
@@ -1508,7 +1537,8 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
     extraData,
     bgImageBase64,
     stampImageBase64,
-    templateFormData.report_type_selection
+    templateFormData.report_type_selection,
+    stampImageBase64Secondary
   );
   /* const debugPath = path.join(process.cwd(), 'debug_marine.html');
   fs.writeFileSync(debugPath, htmlContent);
@@ -3296,7 +3326,8 @@ function generateReportHTML(
   extraData,
   bgImageBase64,
   stampImageBase64,
-  reportTypeSelection
+  reportTypeSelection,
+  stampImageBase64Secondary = null
 ) {
   // Route to appropriate template based on report type
   switch (reportType.toLowerCase()) {
@@ -3398,7 +3429,8 @@ function generateReportHTML(
         extraData,
         bgImageBase64,
         stampImageBase64,
-        reportTypeSelection
+        reportTypeSelection,
+        stampImageBase64Secondary
       );
 
     // Future report types can be added here
@@ -5146,6 +5178,8 @@ function filterValidReportFields(formData, reportType) {
       "date_place_of_last_sire_inspection",
       "valuer_special_remarks",
       "disclaimer",
+      "front_page_paragraph",
+      "second_page_paragraph",
     ],
   };
 

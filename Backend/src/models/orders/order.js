@@ -27,6 +27,75 @@ async function attachR2CoverageToOrders(orders) {
   }));
 }
 
+/**
+ * Non-deleted media/doc counts per order:
+ * - images/videos from order_media_image_video (deleted_at IS NULL)
+ * - docs from order_media_documents (deleted_at IS NULL) — same as /orders/:id/details/documents
+ */
+async function enrichOrdersWithMediaCounts(orders) {
+  if (!Array.isArray(orders) || orders.length === 0) {
+    return orders;
+  }
+
+  const orderIds = orders.map((order) => order.id);
+
+  const [mediaCountRows, documentCountRows] = await Promise.all([
+    db("order_media_image_video")
+      .select("order_id")
+      .select(
+        db.raw(
+          "SUM(CASE WHEN media_type = 'image' THEN 1 ELSE 0 END) AS image_count"
+        )
+      )
+      .select(
+        db.raw(
+          "SUM(CASE WHEN media_type = 'video' THEN 1 ELSE 0 END) AS video_count"
+        )
+      )
+      .whereIn("order_id", orderIds)
+      .whereNull("deleted_at")
+      .groupBy("order_id"),
+    // Only "Upload Documents" (right panel) — exclude report/collage on the left
+    db("order_media_documents")
+      .select("order_id")
+      .count("* as document_count")
+      .whereIn("order_id", orderIds)
+      .where("document_type", "documents")
+      .whereNull("deleted_at")
+      .groupBy("order_id"),
+  ]);
+
+  const mediaCountByOrderId = new Map(
+    mediaCountRows.map((row) => [
+      Number(row.order_id),
+      {
+        image_count: Number(row.image_count || 0),
+        video_count: Number(row.video_count || 0),
+      },
+    ])
+  );
+
+  const documentCountByOrderId = new Map(
+    documentCountRows.map((row) => [
+      Number(row.order_id),
+      Number(row.document_count || 0),
+    ])
+  );
+
+  return orders.map((order) => {
+    const counts = mediaCountByOrderId.get(Number(order.id)) || {
+      image_count: 0,
+      video_count: 0,
+    };
+    return {
+      ...order,
+      image_count: counts.image_count,
+      video_count: counts.video_count,
+      document_count: documentCountByOrderId.get(Number(order.id)) || 0,
+    };
+  });
+}
+
 // Helper: robust role parsing to distinguish ADMIN vs SUPER/DEVELOPER ADMIN variants
 function parseRole(roleNameRaw) {
   const roleName = (roleNameRaw || "").toUpperCase().trim();
@@ -423,8 +492,8 @@ const order = {
     baseQuery.orderBy("orders.created_at", "asc");
 
     const orders = await baseQuery;
-
-    return enrichOrdersWithAssignedUsersAndRefNo(orders);
+    const enriched = await enrichOrdersWithAssignedUsersAndRefNo(orders);
+    return enrichOrdersWithMediaCounts(enriched);
   },
 
   // Get all orders that are finalized (status 13) or on hold (status 14) - same logic as getAllOrders but only these statuses

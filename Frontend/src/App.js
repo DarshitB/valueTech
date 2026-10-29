@@ -3,6 +3,7 @@ import AppRoutes from "./routes/AppRoutes";
 import { fetchCurrentUser } from "./redux/reducers/authReducer"; // path based on your structure
 import { useEffect } from "react";
 import { PageTitleProvider } from "./context/PageTitleContext";
+import ScrollToTop from "./components/ScrollToTop";
 
 function App() {
   const dispatch = useDispatch();
@@ -23,6 +24,7 @@ function App() {
   return (
     <>
       <PageTitleProvider>
+        <ScrollToTop />
         <AppRoutes />
       </PageTitleProvider>
     </>

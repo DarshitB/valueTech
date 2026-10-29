@@ -380,9 +380,11 @@ function MarineReport() {
     main_engines_condition: "",
     auxiliary_machineries_generators_condition: "",
     disclaimer: "",
+    front_page_paragraph: "",
+    second_page_paragraph: "",
   });
 
-  // Set initial disclaimer on mount
+  // Set initial disclaimer + front/second-page paragraphs on mount
   useEffect(() => {
     if (reportFormData.execute_above && (!reportFormData.disclaimer || reportFormData.disclaimer.trim() === "")) {
       const initialDisclaimer = generateDisclaimer(reportFormData.execute_above, reportFormData);
@@ -390,6 +392,38 @@ function MarineReport() {
         setReportFormData((prev) => ({
           ...prev,
           disclaimer: initialDisclaimer,
+        }));
+      }
+    }
+    if (
+      reportFormData.execute_above &&
+      (!reportFormData.front_page_paragraph ||
+        reportFormData.front_page_paragraph.trim() === "")
+    ) {
+      const initialFrontPageParagraph = generateFrontPageParagraph(
+        reportFormData.execute_above,
+        reportFormData
+      );
+      if (initialFrontPageParagraph) {
+        setReportFormData((prev) => ({
+          ...prev,
+          front_page_paragraph: initialFrontPageParagraph,
+        }));
+      }
+    }
+    if (
+      reportFormData.execute_above &&
+      (!reportFormData.second_page_paragraph ||
+        reportFormData.second_page_paragraph.trim() === "")
+    ) {
+      const initialSecondPageParagraph = generateSecondPageParagraph(
+        reportFormData.execute_above,
+        reportFormData
+      );
+      if (initialSecondPageParagraph) {
+        setReportFormData((prev) => ({
+          ...prev,
+          second_page_paragraph: initialSecondPageParagraph,
         }));
       }
     }
@@ -659,6 +693,82 @@ function MarineReport() {
     return patterns.some(pattern => disclaimerUpper.includes(pattern));
   }, []);
 
+  // First-page boxed paragraph ("To execute above...") — same rules as disclaimer
+  const generateFrontPageParagraph = useCallback((executeAbove, formData) => {
+    const valuerName = formData.valuer_name || "";
+    const licenseNo = formData.license_no || "";
+    const vesselName = formData.name_of_the_vessel || "";
+    const location = formData.inspection_location_front_page || "";
+    const inspectionDate = formData.inspection_date_front_page || "";
+
+    switch (executeAbove) {
+      case "Desktop Valuation":
+        return `To execute above desktop valuation by marine valuer ${valuerName} (Viraj Kothari) with Licence No. ${licenseNo} has been taken the task of desktop valuation for Marine Vessel - ${vesselName} on the basis of desktop assessment, class certification, engine overhauling report & status survey report provided by client shared in soft copy. Also completed the study of entire vessel documents that was previously located ${location}, on ${inspectionDate} information received from client. Above report has been furnished under his guidance & expertise only, kindly note that above valuation consists of their attestation as per international valuation standard. Above report has sign & stamp as required in the format.`;
+      case "Physical Survey & Inspection":
+        return `To execute above physical survey & inspection valuation by valuer ${valuerName} (Viraj Kothari with Licence No. ${licenseNo} has been taken the task of survey & inspection valuation for Marine Vessel - ${vesselName} on the basis of physical survey & inspection, class reports, certification, engine overhauling report, status survey report provided by client and information shared in soft copy. Also completed the study of entire vessel located at ${location}, on ${inspectionDate}. Above report has been furnished under his guidance & his expertise only, which kindly note that above valuation also consist their attestation as per international valuation standard. Above report has sign & stamp as required in the format.`;
+      case "Condition Valuation":
+        return `To execute above condition valuation by valuer ${valuerName} (Viraj Kothari with Licence No. ${licenseNo} has been taken the task of survey & inspection condition valuation for Marine Vessel - ${vesselName} on the basis of physical survey & inspection, class reports, certification, engine overhauling report, status survey report provided by client and information shared in soft copy. Also completed the study of entire vessel located at ${location}, on ${inspectionDate}. Above report has been furnished under his guidance & his expertise only, which kindly note that above conditional valuation also consist their attestation as per international valuation standard. Above report has sign & stamp as required in the format.`;
+      case "Marine Vessel Verification (AVR)":
+        return `To execute above marine asset verification by valuer ${valuerName} (Viraj Kothari with Licence No. ${licenseNo} has been taken the task of survey & inspection asset verification for Marine Vessel - ${vesselName} on the basis of physical survey & inspection, class reports, certification, engine overhauling report, status survey report provided by client and information shared in soft copy. Also completed the study of entire vessel located at ${location}, on ${inspectionDate}. Above report has been furnished under his guidance & his expertise only, which kindly note that above conditional valuation also consist their attestation as per international valuation standard. Above report has sign & stamp as required in the format.`;
+      default:
+        return "";
+    }
+  }, []);
+
+  const isAutoGeneratedFrontPageParagraph = useCallback((paragraph) => {
+    if (!paragraph || paragraph.trim() === "") return true;
+
+    const paragraphUpper = paragraph.toUpperCase();
+    const patterns = [
+      "TO EXECUTE ABOVE DESKTOP VALUATION",
+      "TO EXECUTE ABOVE PHYSICAL SURVEY",
+      "TO EXECUTE ABOVE CONDITION VALUATION",
+      "TO EXECUTE ABOVE MARINE ASSET VERIFICATION",
+    ];
+    return patterns.some((pattern) => paragraphUpper.includes(pattern));
+  }, []);
+
+  // Second-page certify paragraph — same rules as front_page_paragraph / disclaimer
+  const generateSecondPageParagraph = useCallback((executeAbove, formData) => {
+    const clientName = formData.client_name_with_full_address || "";
+    const vesselName = formData.name_of_the_vessel || "";
+    const officialNo = formData.official_no || "";
+    const officialNoText = officialNo ? ` Official No.: ${officialNo},` : ",";
+    const location = formData.inspection_location_front_page || "";
+    const bankName = formData.bank_name || "";
+    const branchName = formData.branch_name || "";
+    const stateName = formData.state_name || "";
+    const bankLine = `${bankName}${branchName ? `, ${branchName}` : ""}${
+      stateName ? `, ${stateName}` : ""
+    }`;
+
+    switch (executeAbove) {
+      case "Desktop Valuation":
+        return `This is to certify that we, the undersigned surveyors did desktop valuation through desktop assessment through documents study, at the request of ${clientName}., for the “${vesselName}”${officialNoText} whilst she was previously in deep water at ${location} during day light hours for the purpose of desktop assessment to ascertain her estimated assumption Condition and determine desktop valuation for financial purpose / financial usage, to be hypothecated from ${bankLine}.`;
+      case "Physical Survey & Inspection":
+        return `This is to certify that we, the undersigned surveyors did survey & inspection valuation through physical survey & inspection as well as documents study, at the request of ${clientName}, for the “${vesselName}”${officialNoText} whilst she is currently in deep water at ${location} during day light hours for the purpose of affecting a general inspection to ascertain her present Physical Condition and determine valuation for financial purpose / financial usage, to be hypothecate from ${bankLine}.`;
+      case "Condition Valuation":
+        return `This is to certify that we, the undersigned surveyors did condition valuation through physical survey & inspection as well as documents study, at the request of ${clientName}., for the “${vesselName}”${officialNoText} whilst she is currently in deep water at ${location} during day light hours for the purpose of affecting a general inspection to ascertain her present Physical Condition and determine valuation for financial purpose / financial usage, to be hypothecate from ${bankLine}.`;
+      case "Marine Vessel Verification (AVR)":
+        return `This is to certify that we, the undersigned surveyors did marine asset verification through physical survey & inspection as well as documents study, at the request of ${clientName}., for the “${vesselName}”${officialNoText} whilst she is currently in deep water at Vadinar Port, Vadinar, Gujarat during day light hours for the purpose of affecting a general inspection to ascertain & verify her present Physical Condition and determine valuation for financial purpose / financial usage, to be hypothecate from ${bankLine}.`;
+      default:
+        return "";
+    }
+  }, []);
+
+  const isAutoGeneratedSecondPageParagraph = useCallback((paragraph) => {
+    if (!paragraph || paragraph.trim() === "") return true;
+
+    const paragraphUpper = paragraph.toUpperCase();
+    const patterns = [
+      "DID DESKTOP VALUATION THROUGH DESKTOP ASSESSMENT",
+      "DID SURVEY & INSPECTION VALUATION THROUGH PHYSICAL SURVEY",
+      "DID CONDITION VALUATION THROUGH PHYSICAL SURVEY",
+      "DID MARINE ASSET VERIFICATION THROUGH PHYSICAL SURVEY",
+    ];
+    return patterns.some((pattern) => paragraphUpper.includes(pattern));
+  }, []);
+
   // Reset form data when component mounts or order ID changes
   useEffect(() => {
     // Get current date in DD-MM-YYYY format
@@ -747,14 +857,30 @@ function MarineReport() {
       main_engines_condition: "",
       auxiliary_machineries_generators_condition: "",
       disclaimer: "",
+      front_page_paragraph: "",
+      second_page_paragraph: "",
     };
 
-    // Generate initial disclaimer based on default execute_above value
+    // Generate initial disclaimer / page paragraphs based on default execute_above
     const executeAbove = initialFormData.execute_above;
     if (executeAbove) {
       const initialDisclaimer = generateDisclaimer(executeAbove, initialFormData);
       if (initialDisclaimer) {
         initialFormData.disclaimer = initialDisclaimer;
+      }
+      const initialFrontPageParagraph = generateFrontPageParagraph(
+        executeAbove,
+        initialFormData
+      );
+      if (initialFrontPageParagraph) {
+        initialFormData.front_page_paragraph = initialFrontPageParagraph;
+      }
+      const initialSecondPageParagraph = generateSecondPageParagraph(
+        executeAbove,
+        initialFormData
+      );
+      if (initialSecondPageParagraph) {
+        initialFormData.second_page_paragraph = initialSecondPageParagraph;
       }
     }
 
@@ -765,7 +891,13 @@ function MarineReport() {
 
     // Clear the cleared fields tracking when form resets
     clearedFieldsRef.current.clear();
-  }, [id, getCurrentDate, generateDisclaimer]);
+  }, [
+    id,
+    getCurrentDate,
+    generateDisclaimer,
+    generateFrontPageParagraph,
+    generateSecondPageParagraph,
+  ]);
 
   useEffect(() => {
     fetchMarineVariables();
@@ -1006,6 +1138,67 @@ function MarineReport() {
     reportFormData.officer_name,
     generateDisclaimer,
     isAutoGeneratedDisclaimer,
+  ]);
+
+  // Auto-update first-page paragraph when its dependent fields change
+  // (same lock rule as disclaimer: only while still auto-generated)
+  useEffect(() => {
+    const executeAbove = reportFormData.execute_above;
+    if (!executeAbove) return;
+
+    const currentParagraph = reportFormData.front_page_paragraph || "";
+    if (!isAutoGeneratedFrontPageParagraph(currentParagraph)) return;
+
+    const newParagraph = generateFrontPageParagraph(
+      executeAbove,
+      reportFormData
+    );
+    if (newParagraph && newParagraph !== currentParagraph) {
+      setReportFormData((prev) => ({
+        ...prev,
+        front_page_paragraph: newParagraph,
+      }));
+    }
+  }, [
+    reportFormData.execute_above,
+    reportFormData.valuer_name,
+    reportFormData.license_no,
+    reportFormData.name_of_the_vessel,
+    reportFormData.inspection_location_front_page,
+    reportFormData.inspection_date_front_page,
+    generateFrontPageParagraph,
+    isAutoGeneratedFrontPageParagraph,
+  ]);
+
+  // Auto-update second-page certify paragraph when dependent fields change
+  useEffect(() => {
+    const executeAbove = reportFormData.execute_above;
+    if (!executeAbove) return;
+
+    const currentParagraph = reportFormData.second_page_paragraph || "";
+    if (!isAutoGeneratedSecondPageParagraph(currentParagraph)) return;
+
+    const newParagraph = generateSecondPageParagraph(
+      executeAbove,
+      reportFormData
+    );
+    if (newParagraph && newParagraph !== currentParagraph) {
+      setReportFormData((prev) => ({
+        ...prev,
+        second_page_paragraph: newParagraph,
+      }));
+    }
+  }, [
+    reportFormData.execute_above,
+    reportFormData.client_name_with_full_address,
+    reportFormData.name_of_the_vessel,
+    reportFormData.official_no,
+    reportFormData.inspection_location_front_page,
+    reportFormData.bank_name,
+    reportFormData.branch_name,
+    reportFormData.state_name,
+    generateSecondPageParagraph,
+    isAutoGeneratedSecondPageParagraph,
   ]);
 
   // Helper function to format currency in Indian format
@@ -1268,13 +1461,26 @@ function MarineReport() {
         updated.license_no = getLicenseNumber(value);
       }
 
-      // Auto-update disclaimer when execute_above changes (always update if auto-generated)
+      // Auto-update disclaimer / page paragraphs when execute_above changes
+      // (only while still auto-generated — same lock rule as Disclaimer)
       if (name === "execute_above") {
         const currentDisclaimer = prev.disclaimer || "";
-        // Always update if disclaimer is auto-generated
         if (isAutoGeneratedDisclaimer(currentDisclaimer) && value) {
-          const newDisclaimer = generateDisclaimer(value, prev);
-          updated.disclaimer = newDisclaimer;
+          updated.disclaimer = generateDisclaimer(value, prev);
+        }
+        const currentFrontPageParagraph = prev.front_page_paragraph || "";
+        if (isAutoGeneratedFrontPageParagraph(currentFrontPageParagraph) && value) {
+          updated.front_page_paragraph = generateFrontPageParagraph(value, prev);
+        }
+        const currentSecondPageParagraph = prev.second_page_paragraph || "";
+        if (
+          isAutoGeneratedSecondPageParagraph(currentSecondPageParagraph) &&
+          value
+        ) {
+          updated.second_page_paragraph = generateSecondPageParagraph(
+            value,
+            prev
+          );
         }
       }
 
@@ -2222,9 +2428,17 @@ function MarineReport() {
     // Always use live order bank initial so PDF matches frontend Ref NO. display
     formData.set("ref_no_bank", order?.bank_initial || "");
 
-    // Ensure disclaimer is always included in payload (even if null/empty/undefined)
+    // Ensure disclaimer / front-page paragraph always included in payload
     const disclaimerValue = reportFormData.disclaimer ?? "";
     formData.set("disclaimer", disclaimerValue);
+    formData.set(
+      "front_page_paragraph",
+      reportFormData.front_page_paragraph ?? ""
+    );
+    formData.set(
+      "second_page_paragraph",
+      reportFormData.second_page_paragraph ?? ""
+    );
     formData.set(
       "report_variables",
       JSON.stringify(
@@ -2441,9 +2655,17 @@ function MarineReport() {
     // Always use live order bank initial so saved data matches frontend Ref NO. display
     formData.set("ref_no_bank", order?.bank_initial || "");
 
-    // Ensure disclaimer is always included in payload (even if null/empty/undefined)
+    // Ensure disclaimer / front-page paragraph always included in payload
     const disclaimerValue = reportFormData.disclaimer ?? "";
     formData.set("disclaimer", disclaimerValue);
+    formData.set(
+      "front_page_paragraph",
+      reportFormData.front_page_paragraph ?? ""
+    );
+    formData.set(
+      "second_page_paragraph",
+      reportFormData.second_page_paragraph ?? ""
+    );
     formData.set(
       "report_variables",
       JSON.stringify(
@@ -3316,6 +3538,38 @@ function MarineReport() {
                       value={reportFormData.inspection_date_front_page}
                       onChange={handleFormChange}
                       placeholder="Enter Inspection Date"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-12">
+                  <div className="form-group">
+                    <label htmlFor="front_page_paragraph">
+                      Front Page Paragraph
+                    </label>
+                    <WysiwygTextarea
+                      className="form-field"
+                      id="front_page_paragraph"
+                      name="front_page_paragraph"
+                      value={reportFormData.front_page_paragraph}
+                      onChange={handleFormChange}
+                      rows={8}
+                      placeholder="Auto-generated from Execute Above and related fields"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-12">
+                  <div className="form-group">
+                    <label htmlFor="second_page_paragraph">
+                      Second Page Paragraph
+                    </label>
+                    <WysiwygTextarea
+                      className="form-field"
+                      id="second_page_paragraph"
+                      name="second_page_paragraph"
+                      value={reportFormData.second_page_paragraph}
+                      onChange={handleFormChange}
+                      rows={8}
+                      placeholder="Auto-generated from Execute Above and related fields"
                     />
                   </div>
                 </div>

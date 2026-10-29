@@ -22,6 +22,7 @@ const renderFieldValue = (value) => {
  * @param {Object} extraData - Extra data (bank info, categories, etc.)
  * @param {string} bgImageBase64 - Background image as base64
  * @param {string|null} stampImageBase64 - Optional stamp image (base64)
+ * @param {string|null} stampImageBase64Secondary - Optional 2nd stamp (marine VDK only)
  * @returns {string} HTML content
  */
 function generateMarineReportHTML(
@@ -29,7 +30,8 @@ function generateMarineReportHTML(
   extraData,
   bgImageBase64,
   stampImageBase64,
-  reportTypeSelection
+  reportTypeSelection,
+  stampImageBase64Secondary = null
 ) {
   // Helper function to get value safely
   const getValue = (field) => field || "";
@@ -41,11 +43,27 @@ function generateMarineReportHTML(
       ? formData.report_title_other || ""
       : formData.report_title;
 
-  const isVkaValuer =
-    String(formData.valuer_name || "").trim().toUpperCase() === "V.K. ASSOCIATES";
+  const valuerNameNormalized = String(formData.valuer_name || "")
+    .trim()
+    .toUpperCase();
+  const isVkaValuer = valuerNameNormalized === "V.K. ASSOCIATES";
+  const isVdkValuer = valuerNameNormalized === "VISHAL D. KOTHARI";
   const hasStampImage = Boolean(
     stampImageBase64 && String(stampImageBase64).trim()
   );
+  // Dual-stamp layout is VDK-only and only when both stamp assets loaded
+  const hasSecondaryStampImage = Boolean(
+    isVdkValuer &&
+      stampImageBase64Secondary &&
+      String(stampImageBase64Secondary).trim()
+  );
+  const useVdkDualStamp = hasStampImage && hasSecondaryStampImage;
+
+  const bodyValuerClass = isVkaValuer
+    ? "valuer-vka"
+    : useVdkDualStamp
+      ? "valuer-vdk"
+      : "";
 
   // Helper function to convert number to word (e.g., 1 -> ONE, 2 -> TWO)
   const numberToWord = (num) => {
@@ -415,6 +433,76 @@ function generateMarineReportHTML(
             height: 200px;
         }
 
+        /*
+         * VISHAL D. KOTHARI (marine) only — dual stamps.
+         * First page: #1 left + #2 right, ~30% smaller, slightly lower than default.
+         * Middle pages: only #1, same subsequent-page position as other marine valuers.
+         * Last page: #1 + #2 side by side in the declaration stamp area.
+         */
+        body.valuer-vdk .first-page .stamp-overlay.stamp-overlay-primary {
+            left: 80px;
+            right: auto;
+            top: 761px;
+            width: 126px; /* 180px * 0.7 */
+            height: 126px;
+        }
+
+        body.valuer-vdk .first-page .stamp-overlay.stamp-overlay-secondary {
+            left: auto;
+            right: 80px; /* mirror of left inset */
+            top: 761px;
+            width: 126px;
+            height: 126px;
+        }
+
+        /* VDK last page: stamps + name stay on the left (not pushed right) */
+        body.valuer-vdk .last-page-declaration .stamp-signature {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: flex-start;
+            margin-top: 20px;
+            gap: 8px;
+        }
+
+        body.valuer-vdk .last-page-declaration .stamp-signature .left-stamp {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 10px;
+            width: auto;
+            height: 120px; /* 150px * 0.8 */
+        }
+
+        /* Equal visual boxes so differently cropped PNGs look the same size */
+        body.valuer-vdk .last-page-declaration .stamp-signature .left-stamp .vdk-stamp-slot {
+            width: 120px;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+
+        body.valuer-vdk .last-page-declaration .stamp-signature .left-stamp .vdk-stamp-slot img,
+        body.valuer-vdk .last-page-declaration .stamp-signature .left-stamp img {
+            width: 120px !important;
+            height: 120px !important;
+            max-width: 120px !important;
+            max-height: 120px !important;
+            object-fit: contain;
+            object-position: center;
+            flex-shrink: 0;
+        }
+
+        body.valuer-vdk .last-page-declaration .stamp-signature .right-text {
+            text-align: left;
+            margin: 0;
+            padding: 0;
+        }
+
         /* Last page declaration section */
         .last-page-declaration {
             margin-top: 30px;
@@ -762,6 +850,23 @@ function generateMarineReportHTML(
                 z-index: 10000;
             }
 
+            /* Marine VDK first-page dual stamps (print) — keep middle-page rules unchanged */
+            body.valuer-vdk .first-page .stamp-overlay.stamp-overlay-primary {
+                left: 80px;
+                right: auto;
+                top: 761px;
+                width: 126px;
+                height: 126px;
+            }
+
+            body.valuer-vdk .first-page .stamp-overlay.stamp-overlay-secondary {
+                left: auto;
+                right: 80px;
+                top: 761px;
+                width: 126px;
+                height: 126px;
+            }
+
             .last-page-declaration {
                 page-break-inside: avoid;
             }
@@ -907,7 +1012,7 @@ function generateMarineReportHTML(
         ` : ''}
     </style>
 </head>
-<body${isVkaValuer ? ' class="valuer-vka"' : ""}>
+<body${bodyValuerClass ? ` class="${bodyValuerClass}"` : ""}>
     ${reportTypeSelection === "Rough" ? '<div class="watermark">Rough</div>' : ''}
     <!-- ============================================
          INSTRUCTIONS FOR HTML CONTENT:
@@ -936,13 +1041,20 @@ function generateMarineReportHTML(
     
       <!-- First Page -->
     <div class="page first-page" data-page="1">
-        <!-- Stamp Overlay on First Page -->
+        <!-- Stamp Overlay on First Page (VDK: dual left+right; others: single) -->
         ${
-          hasStampImage
-            ? `<div class="stamp-overlay">
+          useVdkDualStamp
+            ? `<div class="stamp-overlay stamp-overlay-primary">
+            <img src="${stampImageBase64}" alt="Stamp">
+        </div>
+        <div class="stamp-overlay stamp-overlay-secondary">
+            <img src="${stampImageBase64Secondary}" alt="Stamp">
+        </div>`
+            : hasStampImage
+              ? `<div class="stamp-overlay">
             <img src="${stampImageBase64}" alt="Stamp">
         </div>`
-            : ""
+              : ""
         }
         <div class="page-content">
             <div class="report-hero-page">
@@ -998,21 +1110,29 @@ function generateMarineReportHTML(
                 <div class="report-hero-page-second">
                 ${
                   (() => {
-                    const raw = (getValue(formData.execute_above) || "").trim();
-                    const lower = raw.toLowerCase();
-                    const letter =
-                      lower === "desktop valuation"
-                        ? `To execute above desktop valuation by marine valuer ${getValue(formData.valuer_name)} (Viraj Kothari) with Licence No. ${getValue(formData.license_no)} has been taken the task of desktop valuation for Marine Vessel - ${getValue(formData.name_of_the_vessel)} on the basis of desktop assessment, class certification, engine overhauling report & status survey report provided by client shared in soft copy. Also completed the study of entire vessel documents that was previously located ${getValue(formData.inspection_location_front_page)}, on ${getValue(formData.inspection_date_front_page)} information received from client. Above report has been furnished under his guidance & expertise only, kindly note that above valuation consists of their attestation as per international valuation standard. Above report has sign & stamp as required in the format.`
-                        : lower === "physical survey & inspection"
-                        ? `To execute above physical survey & inspection valuation by valuer ${getValue(formData.valuer_name)} (Viraj Kothari with Licence No. ${getValue(formData.license_no)} has been taken the task of survey & inspection valuation for Marine Vessel - ${getValue(formData.name_of_the_vessel)} on the basis of physical survey & inspection, class reports, certification, engine overhauling report, status survey report provided by client and information shared in soft copy. Also completed the study of entire vessel located at ${getValue(formData.inspection_location_front_page)}, on ${getValue(formData.inspection_date_front_page)}. Above report has been furnished under his guidance & his expertise only, which kindly note that above valuation also consist their attestation as per international valuation standard. Above report has sign & stamp as required in the format.`
-                        : lower === "condition valuation"
-                        ? `To execute above condition valuation by valuer ${getValue(formData.valuer_name)} (Viraj Kothari with Licence No. ${getValue(formData.license_no)} has been taken the task of survey & inspection condition valuation for Marine Vessel - ${getValue(formData.name_of_the_vessel)} on the basis of physical survey & inspection, class reports, certification, engine overhauling report, status survey report provided by client and information shared in soft copy. Also completed the study of entire vessel located at ${getValue(formData.inspection_location_front_page)}, on ${getValue(formData.inspection_date_front_page)}. Above report has been furnished under his guidance & his expertise only, which kindly note that above conditional valuation also consist their attestation as per international valuation standard. Above report has sign & stamp as required in the format.`
-                        : lower === "marine vessel verification (avr)"
-                        ? `To execute above marine asset verification by valuer ${getValue(formData.valuer_name)} (Viraj Kothari with Licence No. ${getValue(formData.license_no)} has been taken the task of survey & inspection asset verification for Marine Vessel - ${getValue(formData.name_of_the_vessel)} on the basis of physical survey & inspection, class reports, certification, engine overhauling report, status survey report provided by client and information shared in soft copy. Also completed the study of entire vessel located at ${getValue(formData.inspection_location_front_page)}, on ${getValue(formData.inspection_date_front_page)}. Above report has been furnished under his guidance & his expertise only, which kindly note that above conditional valuation also consist their attestation as per international valuation standard. Above report has sign & stamp as required in the format.`
-                        : "";                    
+                    // Prefer saved/editable form field (same idea as disclaimer).
+                    // Fallback keeps old reports working before the column is backfilled.
+                    const savedLetter = String(
+                      formData.front_page_paragraph || ""
+                    ).trim();
+                    let letter = savedLetter;
+                    if (!letter) {
+                      const raw = (getValue(formData.execute_above) || "").trim();
+                      const lower = raw.toLowerCase();
+                      letter =
+                        lower === "desktop valuation"
+                          ? `To execute above desktop valuation by marine valuer ${getValue(formData.valuer_name)} (Viraj Kothari) with Licence No. ${getValue(formData.license_no)} has been taken the task of desktop valuation for Marine Vessel - ${getValue(formData.name_of_the_vessel)} on the basis of desktop assessment, class certification, engine overhauling report & status survey report provided by client shared in soft copy. Also completed the study of entire vessel documents that was previously located ${getValue(formData.inspection_location_front_page)}, on ${getValue(formData.inspection_date_front_page)} information received from client. Above report has been furnished under his guidance & expertise only, kindly note that above valuation consists of their attestation as per international valuation standard. Above report has sign & stamp as required in the format.`
+                          : lower === "physical survey & inspection"
+                          ? `To execute above physical survey & inspection valuation by valuer ${getValue(formData.valuer_name)} (Viraj Kothari with Licence No. ${getValue(formData.license_no)} has been taken the task of survey & inspection valuation for Marine Vessel - ${getValue(formData.name_of_the_vessel)} on the basis of physical survey & inspection, class reports, certification, engine overhauling report, status survey report provided by client and information shared in soft copy. Also completed the study of entire vessel located at ${getValue(formData.inspection_location_front_page)}, on ${getValue(formData.inspection_date_front_page)}. Above report has been furnished under his guidance & his expertise only, which kindly note that above valuation also consist their attestation as per international valuation standard. Above report has sign & stamp as required in the format.`
+                          : lower === "condition valuation"
+                          ? `To execute above condition valuation by valuer ${getValue(formData.valuer_name)} (Viraj Kothari with Licence No. ${getValue(formData.license_no)} has been taken the task of survey & inspection condition valuation for Marine Vessel - ${getValue(formData.name_of_the_vessel)} on the basis of physical survey & inspection, class reports, certification, engine overhauling report, status survey report provided by client and information shared in soft copy. Also completed the study of entire vessel located at ${getValue(formData.inspection_location_front_page)}, on ${getValue(formData.inspection_date_front_page)}. Above report has been furnished under his guidance & his expertise only, which kindly note that above conditional valuation also consist their attestation as per international valuation standard. Above report has sign & stamp as required in the format.`
+                          : lower === "marine vessel verification (avr)"
+                          ? `To execute above marine asset verification by valuer ${getValue(formData.valuer_name)} (Viraj Kothari with Licence No. ${getValue(formData.license_no)} has been taken the task of survey & inspection asset verification for Marine Vessel - ${getValue(formData.name_of_the_vessel)} on the basis of physical survey & inspection, class reports, certification, engine overhauling report, status survey report provided by client and information shared in soft copy. Also completed the study of entire vessel located at ${getValue(formData.inspection_location_front_page)}, on ${getValue(formData.inspection_date_front_page)}. Above report has been furnished under his guidance & his expertise only, which kindly note that above conditional valuation also consist their attestation as per international valuation standard. Above report has sign & stamp as required in the format.`
+                          : "";
+                    }
                     return `
                     <p style="font-size: 13px;line-height: 1.2;text-align: center;margin-bottom: 0;margin-top: 0;">
-                        ${letter}
+                        ${renderFieldValue(letter)}
                     </p>`;
                   })()
                 }
@@ -1041,24 +1161,31 @@ function generateMarineReportHTML(
 
                 ${
                   (() => {
-                    const raw = (getValue(formData.execute_above) || "").trim();
-                    const lower = raw.toLowerCase();
-                    const officialNoText = getValue(formData.official_no)
-                      ? ` Official No.: ${getValue(formData.official_no)},`
-                      : ",";
-                    const letter =
-                      lower === "desktop valuation"
-                        ? `This is to certify that we, the undersigned surveyors did desktop valuation through desktop assessment through documents study, at the request of ${getValue(formData.client_name_with_full_address)}., for the “${getValue(formData.name_of_the_vessel)}”${officialNoText} whilst she was previously in deep water at ${getValue(formData.inspection_location_front_page)} during day light hours for the purpose of desktop assessment to ascertain her estimated assumption Condition and determine desktop valuation for financial purpose / financial usage, to be hypothecated from ${getValue(formData.bank_name)}${formData.branch_name ? ", " + formData.branch_name : ""}${formData.state_name ? ", " + formData.state_name : ""}.`
-                        : lower === "physical survey & inspection"
-                        ? `This is to certify that we, the undersigned surveyors did survey & inspection valuation through physical survey & inspection as well as documents study, at the request of ${getValue(formData.client_name_with_full_address)}, for the “${getValue(formData.name_of_the_vessel)}”${officialNoText} whilst she is currently in deep water at ${getValue(formData.inspection_location_front_page)} during day light hours for the purpose of affecting a general inspection to ascertain her present Physical Condition and determine valuation for financial purpose / financial usage, to be hypothecate from ${getValue(formData.bank_name)}${formData.branch_name ? ", " + formData.branch_name : ""}${formData.state_name ? ", " + formData.state_name : ""}.`
-                        : lower === "condition valuation"
-                        ? `This is to certify that we, the undersigned surveyors did condition valuation through physical survey & inspection as well as documents study, at the request of ${getValue(formData.client_name_with_full_address)}., for the “${getValue(formData.name_of_the_vessel)}”${officialNoText} whilst she is currently in deep water at ${getValue(formData.inspection_location_front_page)} during day light hours for the purpose of affecting a general inspection to ascertain her present Physical Condition and determine valuation for financial purpose / financial usage, to be hypothecate from ${getValue(formData.bank_name)}${formData.branch_name ? ", " + formData.branch_name : ""}${formData.state_name ? ", " + formData.state_name : ""}.`
-                        : lower === "marine vessel verification (avr)"
-                        ? `This is to certify that we, the undersigned surveyors did marine asset verification through physical survey & inspection as well as documents study, at the request of ${getValue(formData.client_name_with_full_address)}., for the “${getValue(formData.name_of_the_vessel)}”${officialNoText} whilst she is currently in deep water at Vadinar Port, Vadinar, Gujarat during day light hours for the purpose of affecting a general inspection to ascertain & verify her present Physical Condition and determine valuation for financial purpose / financial usage, to be hypothecate from ${getValue(formData.bank_name)}${formData.branch_name ? ", " + formData.branch_name : ""}${formData.state_name ? ", " + formData.state_name : ""}.`
-                        : "";                     
+                    // Prefer saved/editable form field (same idea as front_page_paragraph).
+                    const savedLetter = String(
+                      formData.second_page_paragraph || ""
+                    ).trim();
+                    let letter = savedLetter;
+                    if (!letter) {
+                      const raw = (getValue(formData.execute_above) || "").trim();
+                      const lower = raw.toLowerCase();
+                      const officialNoText = getValue(formData.official_no)
+                        ? ` Official No.: ${getValue(formData.official_no)},`
+                        : ",";
+                      letter =
+                        lower === "desktop valuation"
+                          ? `This is to certify that we, the undersigned surveyors did desktop valuation through desktop assessment through documents study, at the request of ${getValue(formData.client_name_with_full_address)}., for the “${getValue(formData.name_of_the_vessel)}”${officialNoText} whilst she was previously in deep water at ${getValue(formData.inspection_location_front_page)} during day light hours for the purpose of desktop assessment to ascertain her estimated assumption Condition and determine desktop valuation for financial purpose / financial usage, to be hypothecated from ${getValue(formData.bank_name)}${formData.branch_name ? ", " + formData.branch_name : ""}${formData.state_name ? ", " + formData.state_name : ""}.`
+                          : lower === "physical survey & inspection"
+                          ? `This is to certify that we, the undersigned surveyors did survey & inspection valuation through physical survey & inspection as well as documents study, at the request of ${getValue(formData.client_name_with_full_address)}, for the “${getValue(formData.name_of_the_vessel)}”${officialNoText} whilst she is currently in deep water at ${getValue(formData.inspection_location_front_page)} during day light hours for the purpose of affecting a general inspection to ascertain her present Physical Condition and determine valuation for financial purpose / financial usage, to be hypothecate from ${getValue(formData.bank_name)}${formData.branch_name ? ", " + formData.branch_name : ""}${formData.state_name ? ", " + formData.state_name : ""}.`
+                          : lower === "condition valuation"
+                          ? `This is to certify that we, the undersigned surveyors did condition valuation through physical survey & inspection as well as documents study, at the request of ${getValue(formData.client_name_with_full_address)}., for the “${getValue(formData.name_of_the_vessel)}”${officialNoText} whilst she is currently in deep water at ${getValue(formData.inspection_location_front_page)} during day light hours for the purpose of affecting a general inspection to ascertain her present Physical Condition and determine valuation for financial purpose / financial usage, to be hypothecate from ${getValue(formData.bank_name)}${formData.branch_name ? ", " + formData.branch_name : ""}${formData.state_name ? ", " + formData.state_name : ""}.`
+                          : lower === "marine vessel verification (avr)"
+                          ? `This is to certify that we, the undersigned surveyors did marine asset verification through physical survey & inspection as well as documents study, at the request of ${getValue(formData.client_name_with_full_address)}., for the “${getValue(formData.name_of_the_vessel)}”${officialNoText} whilst she is currently in deep water at Vadinar Port, Vadinar, Gujarat during day light hours for the purpose of affecting a general inspection to ascertain & verify her present Physical Condition and determine valuation for financial purpose / financial usage, to be hypothecate from ${getValue(formData.bank_name)}${formData.branch_name ? ", " + formData.branch_name : ""}${formData.state_name ? ", " + formData.state_name : ""}.`
+                          : "";
+                    }
                     return `
                     <p style="font-size: 14px;line-height: 1.2;text-align: justify;">
-                        ${letter}
+                        ${renderFieldValue(letter)}
                     </p>`;
                   })()
                 }
@@ -3844,11 +3971,16 @@ function generateMarineReportHTML(
                 <div class="declaration-text">ISSUED WITHOUT PREJUDICE</div>
                 <div class="stamp-signature${hasStampImage ? "" : " no-stamp"}">
                     ${
-                      hasStampImage
+                      useVdkDualStamp
                         ? `<div class="left-stamp">
+                        <span class="vdk-stamp-slot"><img src="${stampImageBase64}" alt="Stamp"></span>
+                        <span class="vdk-stamp-slot"><img src="${stampImageBase64Secondary}" alt="Stamp"></span>
+                    </div>`
+                        : hasStampImage
+                          ? `<div class="left-stamp">
                         <img src="${stampImageBase64}" alt="Stamp">
                     </div>`
-                        : ""
+                          : ""
                     }
                     <div class="right-text">
                         <div>${getValue(formData.valuer_name)},</div>

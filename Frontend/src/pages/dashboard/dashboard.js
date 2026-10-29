@@ -3386,6 +3386,18 @@ function Dashboard() {
                             ) && <th style={{ width: "150px" }}>Manager</th>}
                             {hasPermission(
                               allowedPermissions,
+                              "view_order_table_images_db",
+                            ) && <th style={{ width: "100px" }}>Images</th>}
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_table_videos_db",
+                            ) && <th style={{ width: "100px" }}>Videos</th>}
+                            {hasPermission(
+                              allowedPermissions,
+                              "view_order_table_docs_db",
+                            ) && <th style={{ width: "100px" }}>Docs</th>}
+                            {hasPermission(
+                              allowedPermissions,
                               "view_order_table_field_verifier_db",
                             ) && (
                               <th style={{ width: "150px" }}>Field Verifier</th>
@@ -3677,6 +3689,24 @@ function Dashboard() {
                                 allowedPermissions,
                                 "view_order_table_manager_db",
                               ) && <td>{order.manager_name || "-"}</td>}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_images_db",
+                              ) && (
+                                <td>{Number(order.image_count) || 0}</td>
+                              )}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_videos_db",
+                              ) && (
+                                <td>{Number(order.video_count) || 0}</td>
+                              )}
+                              {hasPermission(
+                                allowedPermissions,
+                                "view_order_table_docs_db",
+                              ) && (
+                                <td>{Number(order.document_count) || 0}</td>
+                              )}
                               {hasPermission(
                                 allowedPermissions,
                                 "view_order_table_field_verifier_db",

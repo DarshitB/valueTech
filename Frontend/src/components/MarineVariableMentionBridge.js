@@ -202,6 +202,11 @@ export default function MarineVariableMentionBridge({
   const targetRef = useRef(null);
   const contextRef = useRef(null);
   const menuRef = useRef(null);
+  const openRef = useRef(false);
+  const queryRef = useRef("");
+
+  openRef.current = open;
+  queryRef.current = query;
 
   const excludedSet = useMemo(
     () => new Set(excludedInputNames || []),
@@ -241,8 +246,12 @@ export default function MarineVariableMentionBridge({
 
       targetRef.current = el;
       contextRef.current = context;
+      // Only reset highlight when the filter query changes or the menu was closed.
+      // Re-running this on ArrowUp/Down keyup used to snap selection back to 0.
+      if (!openRef.current || queryRef.current !== context.query) {
+        setActiveIndex(0);
+      }
       setQuery(context.query);
-      setActiveIndex(0);
       setOpen(true);
 
       const rect = getCaretViewportRect(el, context);
@@ -274,6 +283,17 @@ export default function MarineVariableMentionBridge({
 
     const onKeyUp = (event) => {
       if (event.key === "Escape") return;
+      // Navigation / confirm are handled in keydown while the menu is open.
+      // Calling updateFromTarget here would reset activeIndex to 0.
+      if (
+        open &&
+        (event.key === "ArrowDown" ||
+          event.key === "ArrowUp" ||
+          event.key === "Enter" ||
+          event.key === "Tab")
+      ) {
+        return;
+      }
       updateFromTarget(event.target);
     };
 
