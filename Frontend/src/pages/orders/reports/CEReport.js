@@ -35,6 +35,7 @@ import {
   convertNumberToWordsIndian,
   hasAmountInWordsContent,
 } from "../../../utils/reportAmountInWords";
+import { insertWysiwygClipboardData } from "../../../utils/wysiwygPaste";
 
 // WYSIWYG Textarea Component - preserves HTML formatting
 const WysiwygTextarea = ({
@@ -96,33 +97,26 @@ const WysiwygTextarea = ({
   const handlePaste = (e) => {
     if (readOnly) return;
     e.preventDefault();
+    // Must read clipboard synchronously — delayed getData is often empty.
     const html = e.clipboardData.getData("text/html");
     const text = e.clipboardData.getData("text/plain");
 
-    if (html) {
-      document.execCommand("insertHTML", false, sanitizePastedHtml(html));
-    } else {
-      document.execCommand("insertText", false, text);
-    }
-  };
+    isUpdatingRef.current = true;
+    insertWysiwygClipboardData({ html, text, editor: editorRef.current });
 
-  function sanitizePastedHtml(html) {
-    const temp = document.createElement("div");
-    temp.innerHTML = html;
-    temp.querySelectorAll("*").forEach((el) => {
-      Array.from(el.attributes).forEach((attr) => {
-        if (
-          attr.name === "style" ||
-          attr.name === "class" ||
-          attr.name === "id" ||
-          attr.name.startsWith("data-")
-        ) {
-          el.removeAttribute(attr.name);
-        }
+    if (editorRef.current && onChange) {
+      onChange({
+        target: {
+          name,
+          value: editorRef.current.innerHTML,
+        },
       });
-    });
-    return temp.innerHTML;
-  }
+    }
+
+    setTimeout(() => {
+      isUpdatingRef.current = false;
+    }, 0);
+  };
 
   // Handle placeholder display
   useEffect(() => {

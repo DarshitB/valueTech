@@ -8,9 +8,13 @@ import React, {
 } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchOrderById } from "../../../redux/reducers/orderReducer";
+import {
+  fetchOrderById,
+  fetchOrderByOrderNumber,
+} from "../../../redux/reducers/orderReducer";
 import {
   fetchOrderReport,
+  fetchOrderReportLookup,
   generateOrderReport,
   saveOrderReport,
   clearCurrentReport,
@@ -33,6 +37,140 @@ import {
   convertNumberToWordsIndian,
   hasAmountInWordsContent,
 } from "../../../utils/reportAmountInWords";
+import { insertWysiwygClipboardData } from "../../../utils/wysiwygPaste";
+
+/** Fields belonging only to INSPECTED EQUIPMENT DETAILS (exclude other report sections). */
+const INSPECTED_EQUIPMENT_SECTION_KEYS = [
+  // inspected_equipment_heading intentionally excluded — never overwrite on fetch
+  "registration_no",
+  "registration_date",
+  "location_of_machinery",
+  "owner_serial_no",
+  "manufacture_year",
+  "supplier_names",
+  "asset_make",
+  "new_asset_make",
+  "model",
+  "control_system",
+  "machine_serial_no",
+  "laf_id",
+  "application_usage",
+  "invoice_no_heading",
+  "invoice_no",
+  "invoice_date",
+  "hyp_with",
+  "machine_type",
+];
+
+const INSPECTED_EQUIPMENT_FLEX_SECTION = "INSPECTED_EQUIPMENT_DETAILS";
+
+/** Fields belonging only to COMMENTS ON EQUIPMENT (exclude other report sections). */
+const COMMENTS_ON_EQUIPMENT_SECTION_KEYS = [
+  // comments_on_equipment_heading intentionally excluded — never overwrite on fetch
+  "asset_classification",
+  "machine_technology",
+  "control_panel_unit",
+  "machine_condition",
+  "electrical_condition",
+  "mechanical_condition",
+  "machine_colour",
+  "color_condition",
+  "damages_if_any",
+  "fix_but_flex_heading_1",
+  "fix_but_flex_value_1",
+  "fix_but_flex_heading_2",
+  "fix_but_flex_value_2",
+  "fix_but_flex_heading_3",
+  "fix_but_flex_value_3",
+  "fix_but_flex_heading_4",
+  "fix_but_flex_value_4",
+  "fix_but_flex_heading_5",
+  "fix_but_flex_value_5",
+  "fix_but_flex_heading_6",
+  "fix_but_flex_value_6",
+  "fix_but_flex_heading_7",
+  "fix_but_flex_value_7",
+  "fix_but_flex_heading_8",
+  "fix_but_flex_value_8",
+  "fix_but_flex_heading_9",
+  "fix_but_flex_value_9",
+  "fix_but_flex_heading_10",
+  "fix_but_flex_value_10",
+  "fix_but_flex_heading_11",
+  "fix_but_flex_value_11",
+  "fix_but_flex_heading_12",
+  "fix_but_flex_value_12",
+];
+
+const COMMENTS_ON_EQUIPMENT_FLEX_SECTION =
+  "COMMENTS_ON_EQUIPMENT_AT_THE_TIME_OF_INSPECTION";
+
+function deriveNaOptionFromValue(value) {
+  const upper = String(value ?? "")
+    .toUpperCase()
+    .trim();
+  if (upper === "NOT AVAILABLE") {
+    return { option: "NOT_AVAILABLE", fieldValue: "" };
+  }
+  if (upper === "NOT APPLICABLE") {
+    return { option: "NOT_APPLICABLE", fieldValue: "" };
+  }
+  return { option: null, fieldValue: value != null ? value : "" };
+}
+
+function parseInvoiceNoDate(raw) {
+  const fieldValue = String(raw || "").trim();
+  if (!fieldValue) return { invoice_no: "", invoice_date: "" };
+  if (fieldValue.startsWith("Dated ")) {
+    return {
+      invoice_no: "",
+      invoice_date: fieldValue.replace("Dated ", "").trim(),
+    };
+  }
+  const parts = fieldValue.split(" Dated ");
+  if (parts.length === 2) {
+    return { invoice_no: parts[0].trim(), invoice_date: parts[1].trim() };
+  }
+  return { invoice_no: fieldValue, invoice_date: "" };
+}
+
+/** Combine API flexible rows for one section into UI-ready rows (pairs for col_span 2). */
+function combineFlexibleFieldsForSection(apiFields, sectionName) {
+  const list = (apiFields || [])
+    .filter((f) => f.section_name === sectionName)
+    .slice()
+    .sort((a, b) => (a.field_order || 0) - (b.field_order || 0));
+
+  const combined = [];
+  for (let i = 0; i < list.length; i++) {
+    const first = list[i];
+    if (first.col_span === 2) {
+      const second =
+        list[i + 1] && list[i + 1].col_span === 2 ? list[i + 1] : null;
+      combined.push({
+        id: `${sectionName}_${first.id || first.field_order || i}_combined`,
+        section_name: sectionName,
+        col_span: 2,
+        field_label: first.field_label || "",
+        field_value: first.field_value || "",
+        field_label_2: second?.field_label || "",
+        field_value_2: second?.field_value || "",
+        field_order: first.field_order || i + 1,
+      });
+      if (second) i++;
+    } else {
+      combined.push({
+        id: `${sectionName}_${first.id || first.field_order || i}`,
+        section_name: sectionName,
+        col_span: 1,
+        field_label: first.field_label || "",
+        field_value: first.field_value || "",
+        field_order: first.field_order || i + 1,
+      });
+    }
+  }
+  return combined;
+}
 
 // WYSIWYG Textarea Component - preserves HTML formatting
 const WysiwygTextarea = ({
@@ -111,33 +249,26 @@ const WysiwygTextarea = ({
   const handlePaste = (e) => {
     if (readOnly) return;
     e.preventDefault();
+    // Must read clipboard synchronously — delayed getData is often empty.
     const html = e.clipboardData.getData("text/html");
     const text = e.clipboardData.getData("text/plain");
 
-    if (html) {
-      document.execCommand("insertHTML", false, sanitizePastedHtml(html));
-    } else {
-      document.execCommand("insertText", false, text);
-    }
-  };
+    isUpdatingRef.current = true;
+    insertWysiwygClipboardData({ html, text, editor: editorRef.current });
 
-  function sanitizePastedHtml(html) {
-    const temp = document.createElement("div");
-    temp.innerHTML = html;
-    temp.querySelectorAll("*").forEach((el) => {
-      Array.from(el.attributes).forEach((attr) => {
-        if (
-          attr.name === "style" ||
-          attr.name === "class" ||
-          attr.name === "id" ||
-          attr.name.startsWith("data-")
-        ) {
-          el.removeAttribute(attr.name);
-        }
+    if (editorRef.current && onChange) {
+      onChange({
+        target: {
+          name,
+          value: normalizeWysiwygHtml(editorRef.current.innerHTML),
+        },
       });
-    });
-    return temp.innerHTML;
-  }
+    }
+
+    setTimeout(() => {
+      isUpdatingRef.current = false;
+    }, 0);
+  };
 
   // Handle placeholder display
   useEffect(() => {
@@ -240,6 +371,16 @@ function MachineryReport() {
   const [registrationNoOption, setRegistrationNoOption] = useState(null); // null, "NOT_AVAILABLE", "NOT_APPLICABLE"
   const [registrationDateOption, setRegistrationDateOption] = useState(null);
   const [locationOfMachineryOption, setLocationOfMachineryOption] = useState(null);
+  // Fetch Inspected Equipment Details from another order number (section-only fill)
+  const [inspectedEquipmentOrderNumber, setInspectedEquipmentOrderNumber] =
+    useState("");
+  const [inspectedEquipmentFetchLoading, setInspectedEquipmentFetchLoading] =
+    useState(false);
+  // Fetch Comments on Equipment from another order number (section-only fill)
+  const [commentsOnEquipmentOrderNumber, setCommentsOnEquipmentOrderNumber] =
+    useState("");
+  const [commentsOnEquipmentFetchLoading, setCommentsOnEquipmentFetchLoading] =
+    useState(false);
   // Ref to track if we've seen the report loading state (to ensure we wait for the fetch to actually happen)
   const reportLoadingStartedRef = useRef(false);
   // Set page title using custom hook
@@ -1389,6 +1530,227 @@ function MachineryReport() {
       }));
     }
   }, []);
+
+  // Fill ONLY Inspected Equipment Details from a machinery report of another order
+  const handleFetchInspectedEquipmentByOrderNumber = useCallback(async () => {
+    const sourceOrderNumber = String(inspectedEquipmentOrderNumber || "").trim();
+    if (!sourceOrderNumber) {
+      toast.error("Please enter order number first.");
+      return;
+    }
+
+    setInspectedEquipmentFetchLoading(true);
+    try {
+      const matchedOrder = await dispatch(
+        fetchOrderByOrderNumber(sourceOrderNumber)
+      ).unwrap();
+
+      if (!matchedOrder?.id) {
+        toast.error("Order number not found.");
+        return;
+      }
+
+      let report = {};
+      try {
+        const reportPayload = await dispatch(
+          fetchOrderReportLookup({
+            orderId: matchedOrder.id,
+            reportType: "report_machinery",
+          })
+        ).unwrap();
+        report = reportPayload?.data?.report || reportPayload?.report || {};
+      } catch (_) {
+        report = {};
+      }
+
+      if (!report || Object.keys(report).length === 0) {
+        toast.error("No machinery report found for this order.");
+        return;
+      }
+
+      const regNo = deriveNaOptionFromValue(report.registration_no);
+      const regDate = deriveNaOptionFromValue(report.registration_date);
+      const locMach = deriveNaOptionFromValue(report.location_of_machinery);
+
+      setRegistrationNoOption(regNo.option);
+      setRegistrationDateOption(regDate.option);
+      setLocationOfMachineryOption(locMach.option);
+
+      let invoiceNo = report.invoice_no != null ? String(report.invoice_no) : "";
+      let invoiceDate =
+        report.invoice_date != null ? String(report.invoice_date) : "";
+      if ((!invoiceNo || !invoiceDate) && report.invoice_no_date) {
+        const parsed = parseInvoiceNoDate(report.invoice_no_date);
+        if (!invoiceNo) invoiceNo = parsed.invoice_no;
+        if (!invoiceDate) invoiceDate = parsed.invoice_date;
+      }
+
+      const assetMakeRaw = report.asset_make;
+      const isOtherAssetMake =
+        String(assetMakeRaw || "").toUpperCase() === "OTHERS";
+      setShowOtherAssetMake(isOtherAssetMake);
+      setOtherAssetMake(
+        isOtherAssetMake ? String(report.new_asset_make || "") : ""
+      );
+
+      setReportFormData((prev) => {
+        const next = { ...prev };
+        INSPECTED_EQUIPMENT_SECTION_KEYS.forEach((key) => {
+          if (key === "registration_no") {
+            next.registration_no = regNo.fieldValue;
+            return;
+          }
+          if (key === "registration_date") {
+            next.registration_date = regDate.fieldValue;
+            return;
+          }
+          if (key === "location_of_machinery") {
+            next.location_of_machinery = locMach.fieldValue;
+            return;
+          }
+          if (key === "invoice_no") {
+            next.invoice_no = invoiceNo;
+            return;
+          }
+          if (key === "invoice_date") {
+            next.invoice_date = invoiceDate;
+            return;
+          }
+          if (key === "asset_make") {
+            next.asset_make =
+              assetMakeRaw != null && assetMakeRaw !== ""
+                ? assetMakeRaw
+                : "";
+            return;
+          }
+          if (key === "new_asset_make") {
+            next.new_asset_make = isOtherAssetMake
+              ? String(report.new_asset_make || "")
+              : "";
+            return;
+          }
+          if (key === "invoice_no_heading") {
+            next.invoice_no_heading =
+              report.invoice_no_heading ||
+              prev.invoice_no_heading ||
+              "Invoice No. & Date";
+            return;
+          }
+          if (Object.prototype.hasOwnProperty.call(report, key)) {
+            next[key] = report[key] != null ? report[key] : "";
+          }
+        });
+        return next;
+      });
+
+      const inspectedFlex = combineFlexibleFieldsForSection(
+        report.flexible_fields,
+        INSPECTED_EQUIPMENT_FLEX_SECTION
+      );
+      setFlexibleFields((prev) => [
+        ...prev.filter(
+          (f) => f.section_name !== INSPECTED_EQUIPMENT_FLEX_SECTION
+        ),
+        ...inspectedFlex,
+      ]);
+
+      if (initialFormDataRef.current !== null) {
+        isDirtyRef.current = true;
+      }
+
+      toast.success(
+        `Inspected Equipment filled from order ${
+          matchedOrder.order_number || sourceOrderNumber
+        }.`
+      );
+    } catch (err) {
+      const message =
+        typeof err === "string"
+          ? err
+          : err?.message || "Could not fetch machinery report for this order.";
+      toast.error(message);
+    } finally {
+      setInspectedEquipmentFetchLoading(false);
+    }
+  }, [dispatch, inspectedEquipmentOrderNumber]);
+
+  // Fill ONLY Comments on Equipment section from a machinery report of another order
+  const handleFetchCommentsOnEquipmentByOrderNumber = useCallback(async () => {
+    const sourceOrderNumber = String(commentsOnEquipmentOrderNumber || "").trim();
+    if (!sourceOrderNumber) {
+      toast.error("Please enter order number first.");
+      return;
+    }
+
+    setCommentsOnEquipmentFetchLoading(true);
+    try {
+      const matchedOrder = await dispatch(
+        fetchOrderByOrderNumber(sourceOrderNumber)
+      ).unwrap();
+
+      if (!matchedOrder?.id) {
+        toast.error("Order number not found.");
+        return;
+      }
+
+      let report = {};
+      try {
+        const reportPayload = await dispatch(
+          fetchOrderReportLookup({
+            orderId: matchedOrder.id,
+            reportType: "report_machinery",
+          })
+        ).unwrap();
+        report = reportPayload?.data?.report || reportPayload?.report || {};
+      } catch (_) {
+        report = {};
+      }
+
+      if (!report || Object.keys(report).length === 0) {
+        toast.error("No machinery report found for this order.");
+        return;
+      }
+
+      setReportFormData((prev) => {
+        const next = { ...prev };
+        COMMENTS_ON_EQUIPMENT_SECTION_KEYS.forEach((key) => {
+          if (Object.prototype.hasOwnProperty.call(report, key)) {
+            next[key] = report[key] != null ? report[key] : "";
+          }
+        });
+        return next;
+      });
+
+      const commentsFlex = combineFlexibleFieldsForSection(
+        report.flexible_fields,
+        COMMENTS_ON_EQUIPMENT_FLEX_SECTION
+      );
+      setFlexibleFields((prev) => [
+        ...prev.filter(
+          (f) => f.section_name !== COMMENTS_ON_EQUIPMENT_FLEX_SECTION
+        ),
+        ...commentsFlex,
+      ]);
+
+      if (initialFormDataRef.current !== null) {
+        isDirtyRef.current = true;
+      }
+
+      toast.success(
+        `Comments on Equipment filled from order ${
+          matchedOrder.order_number || sourceOrderNumber
+        }.`
+      );
+    } catch (err) {
+      const message =
+        typeof err === "string"
+          ? err
+          : err?.message || "Could not fetch machinery report for this order.";
+      toast.error(message);
+    } finally {
+      setCommentsOnEquipmentFetchLoading(false);
+    }
+  }, [dispatch, commentsOnEquipmentOrderNumber]);
 
   // Capture a clean snapshot the first time initial loading finishes.
   // Any change after this point is considered "dirty".
@@ -3144,7 +3506,74 @@ function MachineryReport() {
               {/* Inspected Equipment Details Section */}
               <div className="row">
                 <div className="col-12">
-                  <h4>INSPECTED EQUIPMENT DETAILS</h4>
+                  <div
+                    className="d-flex flex-wrap justify-content-between align-items-end gap-2"
+                    style={{ marginBottom: "8px" }}
+                  >
+                    <h4 style={{ margin: 0 }}>INSPECTED EQUIPMENT DETAILS</h4>
+                    <div className="form-group mb-0">
+                      <label htmlFor="inspected_equipment_order_number">
+                        Order Number
+                      </label>
+                      <div className="d-flex gap-2 align-items-center">
+                        <input
+                          type="text"
+                          className="form-field flex-grow-1"
+                          id="inspected_equipment_order_number"
+                          value={inspectedEquipmentOrderNumber}
+                          onChange={(e) =>
+                            setInspectedEquipmentOrderNumber(e.target.value)
+                          }
+                          onKeyDown={(e) => {
+                            if (
+                              e.key === "Enter" &&
+                              String(inspectedEquipmentOrderNumber).trim() &&
+                              !inspectedEquipmentFetchLoading
+                            ) {
+                              e.preventDefault();
+                              handleFetchInspectedEquipmentByOrderNumber();
+                            }
+                          }}
+                          placeholder="Enter Order Number"
+                          disabled={inspectedEquipmentFetchLoading}
+                          style={{ marginBottom: 0, width: "200px" }}
+                        />
+                        <button
+                          type="button"
+                          className={`form-field registration-option-btn${
+                            inspectedEquipmentFetchLoading ? " active" : ""
+                          }`}
+                          onClick={handleFetchInspectedEquipmentByOrderNumber}
+                          disabled={
+                            inspectedEquipmentFetchLoading ||
+                            !String(inspectedEquipmentOrderNumber).trim()
+                          }
+                          style={{
+                            marginBottom: 0,
+                            padding: "8px 12px",
+                            whiteSpace: "nowrap",
+                            minWidth: "72px",
+                          }}
+                        >
+                          {inspectedEquipmentFetchLoading ? (
+                            <span
+                              className="d-inline-flex align-items-center gap-1"
+                              aria-live="polite"
+                            >
+                              <span
+                                className="spinner-border spinner-border-sm"
+                                role="status"
+                                aria-hidden="true"
+                              />
+                              Loading
+                            </span>
+                          ) : (
+                            "Get"
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                   <hr />
                 </div>
                 <div className="col-12">
@@ -3656,7 +4085,76 @@ function MachineryReport() {
               {/* Comments on Equipment at the Time of Inspection Section */}
               <div className="row">
                 <div className="col-12">
-                  <h4>COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION</h4>
+                  <div
+                    className="d-flex flex-wrap justify-content-between align-items-end gap-2"
+                    style={{ marginBottom: "8px" }}
+                  >
+                    <h4 style={{ margin: 0 }}>
+                      COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION
+                    </h4>
+                    <div className="form-group mb-0">
+                      <label htmlFor="comments_on_equipment_order_number">
+                        Order Number
+                      </label>
+                      <div className="d-flex gap-2 align-items-center">
+                        <input
+                          type="text"
+                          className="form-field flex-grow-1"
+                          id="comments_on_equipment_order_number"
+                          value={commentsOnEquipmentOrderNumber}
+                          onChange={(e) =>
+                            setCommentsOnEquipmentOrderNumber(e.target.value)
+                          }
+                          onKeyDown={(e) => {
+                            if (
+                              e.key === "Enter" &&
+                              String(commentsOnEquipmentOrderNumber).trim() &&
+                              !commentsOnEquipmentFetchLoading
+                            ) {
+                              e.preventDefault();
+                              handleFetchCommentsOnEquipmentByOrderNumber();
+                            }
+                          }}
+                          placeholder="Enter Order Number"
+                          disabled={commentsOnEquipmentFetchLoading}
+                          style={{ marginBottom: 0, width: "200px" }}
+                        />
+                        <button
+                          type="button"
+                          className={`form-field registration-option-btn${
+                            commentsOnEquipmentFetchLoading ? " active" : ""
+                          }`}
+                          onClick={handleFetchCommentsOnEquipmentByOrderNumber}
+                          disabled={
+                            commentsOnEquipmentFetchLoading ||
+                            !String(commentsOnEquipmentOrderNumber).trim()
+                          }
+                          style={{
+                            marginBottom: 0,
+                            padding: "8px 12px",
+                            whiteSpace: "nowrap",
+                            minWidth: "72px",
+                          }}
+                        >
+                          {commentsOnEquipmentFetchLoading ? (
+                            <span
+                              className="d-inline-flex align-items-center gap-1"
+                              aria-live="polite"
+                            >
+                              <span
+                                className="spinner-border spinner-border-sm"
+                                role="status"
+                                aria-hidden="true"
+                              />
+                              Loading
+                            </span>
+                          ) : (
+                            "Get"
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                   <hr />
                 </div>
                 <div className="col-12">

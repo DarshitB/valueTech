@@ -4364,7 +4364,15 @@ function generateMarineReportHTML(
                         }
                     };
 
-                    if (currentPageContent.children.length > 0) {
+                    // Explicit "start on new page" from form checkbox (field_5).
+                    // Only forces a break before this block; all later layout
+                    // (45% leftover, desc split, image fit) stays unchanged.
+                    if (
+                        element.getAttribute("data-cmb-new-page") === "true" &&
+                        currentPageContent.children.length > 0
+                    ) {
+                        startNewPage();
+                    } else if (currentPageContent.children.length > 0) {
                         const leftover = pageContentHeight - getUsedContentHeight(currentPageContent);
                         if (leftover < MIN_IMAGE_SPACE) {
                             startNewPage();
@@ -4931,6 +4939,12 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName, getNextMa
       const description = field.field_2 || "";
       const imageUrl = field.field_3 || "";
       const imageId = field.field_4 || "";
+      // field_5: "1" = force this block to start on a new page
+      const startOnNewPage = ["1", "true", "yes", "on"].includes(
+        String(field.field_5 ?? "")
+          .toLowerCase()
+          .trim()
+      );
 
       if (heading || description || imageUrl) {
         const counterValue = getNextMainCounter ? getNextMainCounter() : (field.field_order || "");
@@ -4942,7 +4956,9 @@ function generateFlexibleFieldsForSection(flexibleFields, sectionName, getNextMa
         // Description MUST be a <div>, not <p>: WYSIWYG HTML often contains
         // nested <p> tags, and browsers close the outer <p> early which drops
         // most of the description from the DOM.
-        html += `<div class="custom-media-block" data-cmb-block="true" data-cmb-group="${cmbGroupId}">`;
+        html += `<div class="custom-media-block" data-cmb-block="true" data-cmb-group="${cmbGroupId}"${
+          startOnNewPage ? ' data-cmb-new-page="true"' : ""
+        }>`;
         html += `<h2><span class="main-counter">${counterValue}</span>. ${renderedHeading}</h2>`;
         if (description) {
           const renderedDescription = renderFieldValue(description);

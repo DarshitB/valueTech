@@ -2721,6 +2721,7 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
         const PAGE_HEIGHT_PX = Math.round(8.27 * 96); // A4 landscape height in px
         const SAFETY_MARGIN = 10;
         // Stamp is absolute (bottom -50px, height 105px) — reserve overlap only, not full page block.
+        // Keep at 65 so packing stays as before (e.g. 8 data rows can still fit on one page).
         const STAMP_CLEARANCE = stampSourceImg ? 65 : 0;
 
         const spacerRow = thead.querySelector(".spacer-row");
@@ -3209,6 +3210,51 @@ async function generateReportPDF(reportType, formData, extraData, outputPath) {
 
           noteBlock.appendChild(createFooter(notePageNo, true));
           summaryRoot.appendChild(noteBlock);
+        }
+
+        // Appendix-only blank-page guard: never break after the real last page,
+        // and drop any trailing page with no table/note. Stamp left/bottom CSS
+        // untouched; clearance above already absorbs the -50px hang.
+        const appendixPages = Array.from(
+          summaryRoot.querySelectorAll(".summary-appendix-page")
+        );
+
+        while (appendixPages.length > 0) {
+          const last = appendixPages[appendixPages.length - 1];
+          const dataRowCount = last.querySelectorAll(
+            "tbody tr:not(.summary-grand-total-row)"
+          ).length;
+          const hasGrand = Boolean(
+            last.querySelector("tr.summary-grand-total-row")
+          );
+          const noteNode = last.querySelector(
+            ".summary-note, .summary-note-stamp-row"
+          );
+          let noteMeaningful = false;
+          if (noteNode) {
+            const clone = noteNode.cloneNode(true);
+            clone
+              .querySelectorAll(".summary-stamp-source, .summary-note-stamp")
+              .forEach((el) => el.remove());
+            noteMeaningful =
+              (clone.textContent || "").replace(/\s+/g, "").length > 0;
+          }
+          if (dataRowCount === 0 && !hasGrand && !noteMeaningful) {
+            last.remove();
+            appendixPages.pop();
+            continue;
+          }
+          break;
+        }
+
+        if (appendixPages.length > 0) {
+          const last = appendixPages[appendixPages.length - 1];
+          last.style.pageBreakAfter = "auto";
+          last.style.breakAfter = "auto";
+          const cont = last.querySelector(
+            ".summary-continue-text, .continue-text"
+          );
+          if (cont) cont.textContent = "";
         }
       }, appendixStartPage, currentReportType);
     }

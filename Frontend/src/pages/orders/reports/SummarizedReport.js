@@ -38,6 +38,7 @@ import {
   convertNumberToWordsIndian,
   hasAmountInWordsContent,
 } from "../../../utils/reportAmountInWords";
+import { insertWysiwygClipboardData } from "../../../utils/wysiwygPaste";
 
 // WYSIWYG Textarea Component - preserves HTML formatting
 const WysiwygTextarea = ({
@@ -116,33 +117,26 @@ const WysiwygTextarea = ({
   const handlePaste = (e) => {
     if (readOnly) return;
     e.preventDefault();
+    // Must read clipboard synchronously — delayed getData is often empty.
     const html = e.clipboardData.getData("text/html");
     const text = e.clipboardData.getData("text/plain");
 
-    if (html) {
-      document.execCommand("insertHTML", false, sanitizePastedHtml(html));
-    } else {
-      document.execCommand("insertText", false, text);
-    }
-  };
+    isUpdatingRef.current = true;
+    insertWysiwygClipboardData({ html, text, editor: editorRef.current });
 
-  function sanitizePastedHtml(html) {
-    const temp = document.createElement("div");
-    temp.innerHTML = html;
-    temp.querySelectorAll("*").forEach((el) => {
-      Array.from(el.attributes).forEach((attr) => {
-        if (
-          attr.name === "style" ||
-          attr.name === "class" ||
-          attr.name === "id" ||
-          attr.name.startsWith("data-")
-        ) {
-          el.removeAttribute(attr.name);
-        }
+    if (editorRef.current && onChange) {
+      onChange({
+        target: {
+          name,
+          value: normalizeWysiwygHtml(editorRef.current.innerHTML),
+        },
       });
-    });
-    return temp.innerHTML;
-  }
+    }
+
+    setTimeout(() => {
+      isUpdatingRef.current = false;
+    }, 0);
+  };
 
   // Handle placeholder display
   useEffect(() => {
@@ -519,6 +513,29 @@ const normalizeSummarizedRows = (rows, dynamicColumns = []) => {
   }));
 };
 
+/**
+ * When auto-increment is on, SR NO. follows data-row order (1, 2, 3…).
+ * Merged title rows are skipped and get a blank sr_no.
+ */
+const applySummarizedSrNoAutoIncrement = (rows) => {
+  let n = 0;
+  return (Array.isArray(rows) ? rows : []).map((row) => {
+    if (isSummarizedMergedTitleRow(row)) {
+      return { ...row, sr_no: "" };
+    }
+    n += 1;
+    return { ...row, sr_no: String(n) };
+  });
+};
+
+const withSummarizedSrNoAutoIncrement = (tableData) => {
+  if (!tableData?.srNoAutoIncrement) return tableData;
+  return {
+    ...tableData,
+    rows: applySummarizedSrNoAutoIncrement(tableData.rows),
+  };
+};
+
 const getDefaultSummarizedTableData = () => ({
   dynamicColumns: [],
   rows: [buildEmptySummarizedRow([])],
@@ -528,6 +545,8 @@ const getDefaultSummarizedTableData = () => ({
   /** Saved custom labels for fixed columns (keyed by column id). */
   fixedColumnHeaders: {},
   hideInReportColumnIds: [],
+  /** When true, SR NO. is forced to 1..n by data-row order. */
+  srNoAutoIncrement: false,
 });
 
 const SUMMARIZED_VERTICAL_MERGE_BLOCKLIST = new Set([
@@ -2561,6 +2580,7 @@ function SummarizedReport() {
             ? parsed.fixedColumnHeaders
             : {},
         hideInReportColumnIds,
+        srNoAutoIncrement: Boolean(parsed?.srNoAutoIncrement),
       });
     } catch (err) {
       setSummarizedTableData(getDefaultSummarizedTableData());
@@ -2672,7 +2692,7 @@ function SummarizedReport() {
   );
 
   const getSummarizedColumnWidth = useCallback((colId) => {
-    if (colId === "sr_no") return 90;
+    if (colId === "sr_no") return 110;
     if (colId === "subcategory_id") return 200;
     if (colId === "source_order_number") return 240;
     if (colId === "machine_description") return 400;
@@ -2940,6 +2960,35 @@ function SummarizedReport() {
     ],
   );
 
+  const handleSummarizedSrNoAutoIncrementChange = useCallback(
+    (enabled) => {
+      const next = {
+        ...summarizedTableData,
+        srNoAutoIncrement: Boolean(enabled),
+      };
+      // Turning on: preset 1..n now. Inputs stay editable afterward.
+      handleSummarizedTableDataChange(
+        enabled ? withSummarizedSrNoAutoIncrement(next) : next,
+      );
+    },
+    [summarizedTableData, handleSummarizedTableDataChange],
+  );
+
+  /** Apply auto SR NO. when row structure changes and the flag is on. */
+  const commitSummarizedRowsWithOptionalSrNoRenumber = useCallback(
+    (nextRows, extra = {}) => {
+      const next = {
+        ...summarizedTableData,
+        ...extra,
+        rows: nextRows,
+      };
+      handleSummarizedTableDataChange(
+        next.srNoAutoIncrement ? withSummarizedSrNoAutoIncrement(next) : next,
+      );
+    },
+    [summarizedTableData, handleSummarizedTableDataChange],
+  );
+
   const handleFetchSummarizedOrderIntoRow = useCallback(
     async (rowIndex, orderNumberFromInput) => {
       const rows = summarizedTableData.rows || [];
@@ -3196,11 +3245,8 @@ function SummarizedReport() {
       buildEmptySummarizedRow(dynamicCols),
     ];
     scrollSummarizedTableToBottomRef.current = true;
-    handleSummarizedTableDataChange({
-      ...summarizedTableData,
-      rows: nextRows,
-    });
-  }, [summarizedTableData, handleSummarizedTableDataChange]);
+    commitSummarizedRowsWithOptionalSrNoRenumber(nextRows);
+  }, [summarizedTableData, commitSummarizedRowsWithOptionalSrNoRenumber]);
 
   const handleInsertSummarizedRowAt = useCallback(
     (insertIndex) => {
@@ -3212,12 +3258,9 @@ function SummarizedReport() {
         newRow,
         ...existingRows.slice(insertIndex),
       ];
-      handleSummarizedTableDataChange({
-        ...summarizedTableData,
-        rows: nextRows,
-      });
+      commitSummarizedRowsWithOptionalSrNoRenumber(nextRows);
     },
-    [summarizedTableData, handleSummarizedTableDataChange],
+    [summarizedTableData, commitSummarizedRowsWithOptionalSrNoRenumber],
   );
 
   useLayoutEffect(() => {
@@ -3257,12 +3300,9 @@ function SummarizedReport() {
       // Keep the first row as the base fixed row.
       if (rowIndex === 0 || existingRows.length <= 1) return;
       const nextRows = existingRows.filter((_, idx) => idx !== rowIndex);
-      handleSummarizedTableDataChange({
-        ...summarizedTableData,
-        rows: nextRows,
-      });
+      commitSummarizedRowsWithOptionalSrNoRenumber(nextRows);
     },
-    [summarizedTableData, handleSummarizedTableDataChange],
+    [summarizedTableData, commitSummarizedRowsWithOptionalSrNoRenumber],
   );
 
   const handleToggleSummarizedRowMerge = useCallback(
@@ -3277,12 +3317,9 @@ function SummarizedReport() {
             : String(row.mergedRowText ?? ""),
         };
       });
-      handleSummarizedTableDataChange({
-        ...summarizedTableData,
-        rows: nextRows,
-      });
+      commitSummarizedRowsWithOptionalSrNoRenumber(nextRows);
     },
-    [summarizedTableData, handleSummarizedTableDataChange],
+    [summarizedTableData, commitSummarizedRowsWithOptionalSrNoRenumber],
   );
 
   const handleSummarizedMergedRowTextChange = useCallback(
@@ -3544,6 +3581,18 @@ function SummarizedReport() {
             setCellValue(formattedValue);
           }}
           placeholder="DD-MM-YYYY"
+        />
+      );
+    } else if (columnId === "sr_no") {
+      cellContent = (
+        <input
+          type="text"
+          inputMode="numeric"
+          className="form-field mb-0"
+          style={summarizedInputStyle}
+          value={cellValue}
+          onChange={(e) => setCellValue(e.target.value.replace(/\D/g, ""))}
+          placeholder=""
         />
       );
     } else if (SUMMARIZED_DIGITS_ONLY_COLUMN_IDS.has(columnId)) {
@@ -7424,6 +7473,28 @@ function SummarizedReport() {
                                   {renderSummarizedHideInReportCheckbox(
                                     SUMMARIZED_SR_NO_COLUMN.id,
                                   )}
+                                  <label
+                                    className="d-flex align-items-center gap-2 mb-0"
+                                    style={{
+                                      fontSize: "12px",
+                                      fontWeight: 500,
+                                      cursor: "pointer",
+                                    }}
+                                    title="Number SR NO. automatically by data row order (1, 2, 3…)"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(
+                                        summarizedTableData.srNoAutoIncrement,
+                                      )}
+                                      onChange={(e) =>
+                                        handleSummarizedSrNoAutoIncrementChange(
+                                          e.target.checked,
+                                        )
+                                      }
+                                    />
+                                    Auto IN
+                                  </label>
                                 </div>
                               </th>
                             )}

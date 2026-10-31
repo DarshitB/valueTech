@@ -10,6 +10,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchOrderById,
+  fetchOrderByOrderNumber,
   fetchComments,
   addComment,
   updatePaymentStatus,
@@ -214,6 +215,8 @@ function OrderDetails() {
   const [showMailModal, setShowMailModal] = useState(false);
   const [isSendingMail, setIsSendingMail] = useState(false);
   const [mailLastMailLoading, setMailLastMailLoading] = useState(false);
+  const [mailLookupOrderNumber, setMailLookupOrderNumber] = useState("");
+  const [mailLookupLoading, setMailLookupLoading] = useState(false);
   // True only after the mail-modal report refetch finishes (avoids stale @variables).
   const [mailReportReadyForSubject, setMailReportReadyForSubject] =
     useState(false);
@@ -1706,6 +1709,8 @@ function OrderDetails() {
   const OpenMailModal = () => {
     setIsSendingMail(false); // Reset sending state when opening modal
     setRemovedDocumentIds([]); // Reset removed documents when opening modal
+    setMailLookupOrderNumber("");
+    setMailLookupLoading(false);
     setShowMailModal(true);
     // Reset mail_attachment to false when opening modal
     setMailFormData((prev) => ({
@@ -1715,6 +1720,106 @@ function OrderDetails() {
       collage_compress: false,
     }));
   };
+
+  // Fill To/CC/BCC from another order's saved mail (only emails present in dropdowns)
+  const handleFetchMailRecipientsByOrderNumber = useCallback(async () => {
+    const sourceOrderNumber = String(mailLookupOrderNumber || "").trim();
+    if (!sourceOrderNumber) {
+      toast.error("Please enter order number first.");
+      return;
+    }
+
+    setMailLookupLoading(true);
+    try {
+      const matchedOrder = await dispatch(
+        fetchOrderByOrderNumber(sourceOrderNumber)
+      ).unwrap();
+
+      if (!matchedOrder?.id) {
+        toast.error("Order number not found.");
+        return;
+      }
+
+      const res = await getOrderLastMail(matchedOrder.id);
+      const row = res?.data?.data;
+      if (!row) {
+        toast.error("No saved mail found for this order.");
+        return;
+      }
+
+      const toAllowed = new Set(
+        (bankOfficersOptions || []).map((o) =>
+          String(o.value || "")
+            .trim()
+            .toLowerCase()
+        )
+      );
+      const ccBccAllowed = new Set(
+        (allOfficersEmails || []).map((o) =>
+          String(o.value || "")
+            .trim()
+            .toLowerCase()
+        )
+      );
+
+      const pickEmails = (list, allowed) =>
+        (Array.isArray(list) ? list : [])
+          .map((email) =>
+            String(email || "")
+              .trim()
+              .toLowerCase()
+          )
+          .filter((email) => email && allowed.has(email));
+
+      const nextTo = pickEmails(row.to, toAllowed);
+      const nextCc = pickEmails(row.cc, ccBccAllowed);
+      const nextBcc = pickEmails(row.bcc, ccBccAllowed);
+
+      setMailFormData((prev) => ({
+        ...prev,
+        to: nextTo,
+        cc: nextCc,
+        bcc: nextBcc,
+      }));
+
+      const sourceCount =
+        (Array.isArray(row.to) ? row.to.length : 0) +
+        (Array.isArray(row.cc) ? row.cc.length : 0) +
+        (Array.isArray(row.bcc) ? row.bcc.length : 0);
+      const appliedCount = nextTo.length + nextCc.length + nextBcc.length;
+
+      if (appliedCount === 0) {
+        toast.warning(
+          "No To/CC/BCC recipients from that order are available in this order's dropdowns."
+        );
+      } else if (appliedCount < sourceCount) {
+        toast.success(
+          `To/CC/BCC filled from order ${
+            matchedOrder.order_number || sourceOrderNumber
+          } (skipped recipients not in dropdown).`
+        );
+      } else {
+        toast.success(
+          `To/CC/BCC filled from order ${
+            matchedOrder.order_number || sourceOrderNumber
+          }.`
+        );
+      }
+    } catch (err) {
+      const message =
+        typeof err === "string"
+          ? err
+          : err?.message || "Could not fetch saved mail for this order.";
+      toast.error(message);
+    } finally {
+      setMailLookupLoading(false);
+    }
+  }, [
+    dispatch,
+    mailLookupOrderNumber,
+    bankOfficersOptions,
+    allOfficersEmails,
+  ]);
 
   const [copyingPublicLink, setCopyingPublicLink] = useState(null); // "documents" | "images" | null
 
@@ -3540,6 +3645,71 @@ function OrderDetails() {
             ) : (
               <form className="body-form-box" onSubmit={handleMailFormSubmit}>
                 <div className="body-form-box">
+                  <div className="form-group">
+                    <label htmlFor="mail_lookup_order_number">
+                      Get Order To / CC / BCC
+                    </label>
+                    <div className="d-flex gap-2 align-items-center">
+                      <input
+                        type="text"
+                        className="form-field flex-grow-1"
+                        id="mail_lookup_order_number"
+                        value={mailLookupOrderNumber}
+                        onChange={(e) =>
+                          setMailLookupOrderNumber(e.target.value)
+                        }
+                        onKeyDown={(e) => {
+                          if (
+                            e.key === "Enter" &&
+                            String(mailLookupOrderNumber).trim() &&
+                            !mailLookupLoading &&
+                            !isSendingMail
+                          ) {
+                            e.preventDefault();
+                            handleFetchMailRecipientsByOrderNumber();
+                          }
+                        }}
+                        placeholder="Enter Order Number"
+                        disabled={mailLookupLoading || isSendingMail}
+                        style={{ marginBottom: 0 }}
+                      />
+                      <button
+                        type="button"
+                        className={`form-field registration-option-btn${
+                          mailLookupLoading ? " active" : ""
+                        }`}
+                        onClick={handleFetchMailRecipientsByOrderNumber}
+                        disabled={
+                          mailLookupLoading ||
+                          isSendingMail ||
+                          !String(mailLookupOrderNumber).trim()
+                        }
+                        style={{
+                          marginBottom: 0,
+                          padding: "8px 12px",
+                          whiteSpace: "nowrap",
+                          minWidth: "72px",
+                        }}
+                      >
+                        {mailLookupLoading ? (
+                          <span
+                            className="d-inline-flex align-items-center gap-1"
+                            aria-live="polite"
+                          >
+                            <span
+                              className="spinner-border spinner-border-sm"
+                              role="status"
+                              aria-hidden="true"
+                            />
+                            Loading
+                          </span>
+                        ) : (
+                          "Get"
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="form-group">
                     <label htmlFor="to">To*</label>
                     <SingleSearchSelect

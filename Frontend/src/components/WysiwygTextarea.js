@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from "react";
+import { insertWysiwygClipboardData } from "../utils/wysiwygPaste";
 
 const normalizeWysiwygHtml = (html) => {
   if (typeof html !== "string") return html;
@@ -74,18 +75,32 @@ function WysiwygTextarea({
   };
 
   const handlePaste = (e) => {
+    if (readOnly) return;
     e.preventDefault();
-    let plainText = e.clipboardData.getData("text/plain");
-    plainText = plainText
-      .replace(/\r\n/g, "\n")
-      .replace(/\r/g, "\n")
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-      .join("\n");
+    // Must read clipboard synchronously — delayed getData is often empty.
+    const html = e.clipboardData.getData("text/html");
+    const text = e.clipboardData.getData("text/plain");
 
-    const htmlText = plainText.replace(/\n/g, "<br>");
-    document.execCommand("insertHTML", false, htmlText || "");
+    isUpdatingRef.current = true;
+
+    insertWysiwygClipboardData({
+      html,
+      text,
+      editor: editorRef.current,
+    });
+
+    if (editorRef.current && onChange) {
+      onChange({
+        target: {
+          name,
+          value: normalizeWysiwygHtml(editorRef.current.innerHTML),
+        },
+      });
+    }
+
+    setTimeout(() => {
+      isUpdatingRef.current = false;
+    }, 0);
   };
 
   useEffect(() => {

@@ -40,6 +40,7 @@ import { DeleteIcon, CloseIcon } from "../../../components/icons";
 import { convertNumberToWordsIndian } from "../../../utils/numberToWordsIndian";
 import { MARINE_REPORT_TYPE } from "../../../utils/marineReportEditLock";
 import MarineVariableMentionBridge from "../../../components/MarineVariableMentionBridge";
+import { insertWysiwygClipboardData } from "../../../utils/wysiwygPaste";
 
 /** Stable string id — API returns numeric id; modal keys are always strings. */
 const normalizeFlexibleFieldId = (field, fallbackIndex = 0) => {
@@ -143,33 +144,26 @@ const WysiwygTextarea = ({ value, onChange, placeholder, rows = 4, className = "
 
   const handlePaste = (e) => {
     e.preventDefault();
+    // Must read clipboard synchronously — delayed getData is often empty.
     const html = e.clipboardData.getData("text/html");
     const text = e.clipboardData.getData("text/plain");
-  
-    if (html) {
-      document.execCommand("insertHTML", false, sanitizePastedHtml(html));
-    } else {
-      document.execCommand("insertText", false, text);
-    }
-  };
 
-  function sanitizePastedHtml(html) {
-    const temp = document.createElement("div");
-    temp.innerHTML = html;
-    temp.querySelectorAll("*").forEach((el) => {
-      Array.from(el.attributes).forEach((attr) => {
-        if (
-          attr.name === "style" ||
-          attr.name === "class" ||
-          attr.name === "id" ||
-          attr.name.startsWith("data-")
-        ) {
-          el.removeAttribute(attr.name);
-        }
+    isUpdatingRef.current = true;
+    insertWysiwygClipboardData({ html, text, editor: editorRef.current });
+
+    if (editorRef.current && onChange) {
+      onChange({
+        target: {
+          name,
+          value: editorRef.current.innerHTML,
+        },
       });
-    });
-    return temp.innerHTML;
-  }
+    }
+
+    setTimeout(() => {
+      isUpdatingRef.current = false;
+    }, 0);
+  };
 
   // Handle placeholder display
   useEffect(() => {
@@ -1698,10 +1692,12 @@ function MarineReport() {
       newField = {
         ...createFlexibleFieldBase(sectionName, nextOrder),
         // field_1: heading, field_2: description, field_3: image_path, field_4: image_id
+        // field_5: "1" = start this block on a new page in generated report
         field_1: "",
         field_2: "",
         field_3: "",
         field_4: null,
+        field_5: "",
         image_file: null,
         image_preview: "",
       };
@@ -1882,6 +1878,37 @@ function MarineReport() {
           >
             <DeleteIcon />
           </button>
+
+          <div className="col-md-12">
+            <div className="form-group mb-2">
+              <label
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  cursor: "pointer",
+                  marginBottom: 0,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={
+                    field.field_5 === "1" ||
+                    field.field_5 === 1 ||
+                    field.field_5 === true
+                  }
+                  onChange={(e) =>
+                    handleFlexibleFieldChange(
+                      field.id,
+                      "field_5",
+                      e.target.checked ? "1" : ""
+                    )
+                  }
+                />
+                Start on new page in generated report
+              </label>
+            </div>
+          </div>
 
           <div className="col-md-12">
             <div className="form-group">
@@ -2492,6 +2519,13 @@ function MarineReport() {
             field.field_4
           );
         }
+        // field_5: start this custom media block on a new page ("1" / "")
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_5]`,
+          field.field_5 === "1" || field.field_5 === 1 || field.field_5 === true
+            ? "1"
+            : ""
+        );
       }
 
       // Add equipment fields using generic field_ keys
@@ -2719,6 +2753,13 @@ function MarineReport() {
             field.field_4
           );
         }
+        // field_5: start this custom media block on a new page ("1" / "")
+        formData.append(
+          `flexible_fields[${formDataIndex}][field_5]`,
+          field.field_5 === "1" || field.field_5 === 1 || field.field_5 === true
+            ? "1"
+            : ""
+        );
       }
 
       // Add equipment fields using generic field_ keys
