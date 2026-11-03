@@ -70,21 +70,31 @@ const orderMediaPortal = {
 
   /**
    * Update status for multiple media records
-   * payload: Array of objects with id and status
+   * payload: Array of objects with id, status, and optional orientation
+   * Orientation is persisted only when status === 1 (approve) and a value is provided.
    * Returns: Promise that resolves to updated records
    */
   updateMultipleStatus: (updates, updatedBy) => {
-    const promises = updates.map(({ id, status }) =>
-      db("order_media_image_video")
+    const promises = updates.map(({ id, status, orientation }) => {
+      const patch = {
+        status: status,
+        updated_at: new Date(),
+        updated_by: updatedBy,
+      };
+
+      // Persist orientation only on approve when explicitly provided (reject/pending leave it unchanged)
+      if (Number(status) === 1 && orientation !== undefined && orientation !== null) {
+        const raw = String(orientation).toLowerCase();
+        patch.orientation =
+          raw === "left" || raw === "right" || raw === "up" ? raw : "default";
+      }
+
+      return db("order_media_image_video")
         .where("id", id)
         .whereNull("deleted_at")
-        .update({
-          status: status,
-          updated_at: new Date(),
-          updated_by: updatedBy,
-        })
-        .returning(["id", "order_id", "status", "updated_at", "updated_by"])
-    );
+        .update(patch)
+        .returning(["id", "order_id", "status", "orientation", "updated_at", "updated_by"]);
+    });
 
     return Promise.all(promises);
   },

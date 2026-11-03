@@ -79,6 +79,17 @@ const STATUS_INFO = {
 const IMAGE_RETRY_MAX = 3;
 const IMAGE_RETRY_BASE_DELAY = 2000;
 
+/** Normalize orientation label: only left|right|up pass through; everything else → "default" */
+function normalizeOrientationLabel(raw) {
+  return raw === "left" || raw === "right" || raw === "up" ? raw : "default";
+}
+
+/** Read orientation from a media API record */
+function getDbOrientation(mediaItem) {
+  if (!mediaItem) return "default";
+  return normalizeOrientationLabel(mediaItem.orientation);
+}
+
 function RetryImage({ src, alt, style }) {
   const [displaySrc, setDisplaySrc] = useState(src);
   const [failed, setFailed] = useState(false);
@@ -375,26 +386,38 @@ function OrderImages() {
   }, [handleLightboxClose]);
 
   // Handle approval/rejection change for individual media item in lightbox (defined early for keyboard effect)
+  // On approve (status 1), also persist current local orientation for that media id.
   const handleApprovalChange = useCallback(
     (mediaId, status) => {
-      const mediaItem = media?.media?.find((item) => item.id === parseInt(mediaId, 10));
+      const parsedId = parseInt(mediaId, 10);
+      const mediaItem = media?.media?.find((item) => item.id === parsedId);
+      const currentOrientation = normalizeOrientationLabel(
+        imageOrientations[parsedId] ?? imageOrientations[mediaId]
+      );
+
       if (mediaItem && mediaItem.status === status) {
-        toast.info(
-          `Image is already ${status === 1 ? "approved" : status === 2 ? "rejected" : "pending"}`
-        );
-        return;
+        // Allow re-approve when orientation changed so rotate → Approve can persist
+        if (status === 1 && currentOrientation !== getDbOrientation(mediaItem)) {
+          // fall through
+        } else {
+          toast.info(
+            `Image is already ${status === 1 ? "approved" : status === 2 ? "rejected" : "pending"}`
+          );
+          return;
+        }
       }
+
       setLightboxApprovals((prev) => ({ ...prev, [mediaId]: status }));
-      dispatch(
-        updateOrderMediaStatus({
-          updates: [{ id: parseInt(mediaId, 10), status }],
-        })
-      ).then((result) => {
+      const update = { id: parsedId, status };
+      if (status === 1) {
+        update.orientation = currentOrientation;
+      }
+      dispatch(updateOrderMediaStatus({ updates: [update] })).then((result) => {
         if (result.meta.requestStatus === "fulfilled") dispatch(fetchOrderMedia(id));
         else toast.error("Failed to update media status");
       });
     },
-    [dispatch, id, media?.media]
+    [dispatch, id, media?.media, imageOrientations]
   );
 
   // Handle keyboard events for lightbox navigation and approval/rejection
@@ -518,13 +541,6 @@ function OrderImages() {
               : "default";
       return { ...prev, [imageId]: next };
     });
-  };
-
-  // Normalize orientation from DB: null/undefined/"default" -> "default"; valid values pass through
-  const getDbOrientation = (mediaItem) => {
-    if (!mediaItem) return "default";
-    const raw = mediaItem.orientation;
-    return raw === "left" || raw === "right" || raw === "up" ? raw : "default";
   };
 
   // Handle image selection with sequence tracking (status 4 can be selected for collage only)
@@ -873,7 +889,11 @@ function OrderImages() {
       .map((imageId) => {
         const mediaItem = media?.media?.find((m) => m.id === imageId);
         if (mediaItem?.status === 4) return null; // Text Image not in approve/reject
-        return { id: imageId, status: 1 }; // 1 = approved
+        return {
+          id: imageId,
+          status: 1, // approved
+          orientation: normalizeOrientationLabel(imageOrientations[imageId]),
+        };
       })
       .filter(Boolean);
 

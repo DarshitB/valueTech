@@ -2676,6 +2676,19 @@ exports.sendMail = async (req, res, next) => {
           : Boolean(public_link_with_image),
       show_table: typeof show_table === "boolean" ? show_table : false,
       show_qrcode: typeof show_qrcode === "boolean" ? show_qrcode : false,
+      sr_no:
+        sr_no != null && String(sr_no).trim() !== ""
+          ? String(sr_no).trim()
+          : "1",
+      customer_name:
+        customer_name != null && String(customer_name).trim() !== ""
+          ? String(customer_name).trim()
+          : null,
+      asset_identification_number:
+        asset_identification_number != null &&
+        String(asset_identification_number).trim() !== ""
+          ? String(asset_identification_number).trim()
+          : null,
       updated_at: new Date(),
     };
     await db("order_last_mail")
@@ -2692,6 +2705,9 @@ exports.sendMail = async (req, res, next) => {
         "public_link_with_image",
         "show_table",
         "show_qrcode",
+        "sr_no",
+        "customer_name",
+        "asset_identification_number",
         "updated_at",
       ]);
 
@@ -2748,6 +2764,12 @@ exports.getLastMail = async (req, res, next) => {
       public_link_with_image: Boolean(row.public_link_with_image),
       show_table: row.show_table !== null && row.show_table !== undefined ? Boolean(row.show_table) : false,
       show_qrcode: row.show_qrcode !== null && row.show_qrcode !== undefined ? Boolean(row.show_qrcode) : false,
+      sr_no: row.sr_no != null && String(row.sr_no).trim() !== "" ? String(row.sr_no).trim() : "1",
+      customer_name: row.customer_name != null ? String(row.customer_name) : "",
+      asset_identification_number:
+        row.asset_identification_number != null
+          ? String(row.asset_identification_number)
+          : "",
       updated_at: row.updated_at,
     };
     return res.status(200).json({ success: true, data });

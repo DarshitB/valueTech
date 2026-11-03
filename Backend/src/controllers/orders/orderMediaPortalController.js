@@ -181,12 +181,14 @@ async function getOrderMedia(req, res, next) {
 /**
  * PATCH /api/portal/order-media/status
  * Update status for multiple media records
- * Body: { updates: [{ id: 1, status: 1 }, { id: 2, status: 0 }] }
+ * Body: { updates: [{ id: 1, status: 1, orientation?: "default"|"left"|"right"|"up" }, ...] }
+ * orientation is optional; only applied when status === 1 (approve).
  */
 async function updateMediaStatus(req, res, next) {
   try {
     const { updates } = req.body;
     const { id: userId } = req.user;
+    const ALLOWED_ORIENTATIONS = new Set(["default", "left", "right", "up"]);
 
     if (!updates || !Array.isArray(updates) || updates.length === 0) {
       throw new BadRequestError(
@@ -210,6 +212,17 @@ async function updateMediaStatus(req, res, next) {
       // Validate id is a number
       if (isNaN(parseInt(update.id))) {
         throw new BadRequestError("Invalid media ID format");
+      }
+
+      // Optional orientation: only meaningful on approve; reject unknown values
+      if (update.orientation !== undefined && update.orientation !== null) {
+        const o = String(update.orientation).toLowerCase();
+        if (!ALLOWED_ORIENTATIONS.has(o)) {
+          throw new BadRequestError(
+            "orientation must be one of: default, left, right, up"
+          );
+        }
+        update.orientation = o;
       }
     }
 

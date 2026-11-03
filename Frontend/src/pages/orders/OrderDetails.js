@@ -567,6 +567,10 @@ function OrderDetails() {
         if (cancelled) return;
         const row = res?.data?.data;
         if (row) {
+          const savedSrNo =
+            row.sr_no != null && String(row.sr_no).trim() !== ""
+              ? Number(row.sr_no)
+              : 1;
           setMailFormData((prev) => ({
             to: Array.isArray(row.to) ? row.to : [],
             cc: Array.isArray(row.cc) ? row.cc : [],
@@ -576,7 +580,12 @@ function OrderDetails() {
               : row.subject != null
                 ? String(row.subject)
                 : "",
-            assetIdentificationNumber: "",
+            customerName:
+              row.customer_name != null ? String(row.customer_name) : "",
+            assetIdentificationNumber:
+              row.asset_identification_number != null
+                ? String(row.asset_identification_number)
+                : "",
             comments: row.comments != null && String(row.comments).trim() !== ""
               ? String(row.comments)
               : "PLEASE FIND ATTACHED",
@@ -587,15 +596,18 @@ function OrderDetails() {
             collage_compress: Boolean(row.collage_compress),
             show_table: row.show_table !== undefined ? Boolean(row.show_table) : false,
             show_qrcode: row.show_qrcode !== undefined ? Boolean(row.show_qrcode) : false,
-            srNo: 1,
+            srNo: Number.isFinite(savedSrNo) && savedSrNo > 0 ? savedSrNo : 1,
           }));
         } else {
+          // No last-mail row yet: keep current defaults (Sr No 1, empty customer/asset → report auto-fill still works)
           setMailFormData((prev) => ({
             ...prev,
             comments: "PLEASE FIND ATTACHED",
             show_table: false,
             show_qrcode: false,
             srNo: 1,
+            customerName: "",
+            assetIdentificationNumber: "",
           }));
         }
       })
@@ -607,6 +619,8 @@ function OrderDetails() {
             show_table: false,
             show_qrcode: false,
             srNo: 1,
+            customerName: "",
+            assetIdentificationNumber: "",
           }));
         }
       })
