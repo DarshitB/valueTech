@@ -363,6 +363,14 @@ function MachineryReport() {
     allowedPermissions,
     "view_finalized_sub_category_orders"
   );
+  const canFetchInspectedEquipmentByOrder = hasPermission(
+    allowedPermissions,
+    "machinery_report_fetch_inspected_equipment_by_order"
+  );
+  const canFetchCommentsOnEquipmentByOrder = hasPermission(
+    allowedPermissions,
+    "machinery_report_fetch_comments_on_equipment_by_order"
+  );
   const [showOtherAssetMake, setShowOtherAssetMake] = useState(false);
   const [otherAssetMake, setOtherAssetMake] = useState("");
   // State to track if initial report fetch has completed (using state instead of ref to trigger re-renders)
@@ -1533,6 +1541,7 @@ function MachineryReport() {
 
   // Fill ONLY Inspected Equipment Details from a machinery report of another order
   const handleFetchInspectedEquipmentByOrderNumber = useCallback(async () => {
+    if (!canFetchInspectedEquipmentByOrder) return;
     const sourceOrderNumber = String(inspectedEquipmentOrderNumber || "").trim();
     if (!sourceOrderNumber) {
       toast.error("Please enter order number first.");
@@ -1672,10 +1681,11 @@ function MachineryReport() {
     } finally {
       setInspectedEquipmentFetchLoading(false);
     }
-  }, [dispatch, inspectedEquipmentOrderNumber]);
+  }, [dispatch, inspectedEquipmentOrderNumber, canFetchInspectedEquipmentByOrder]);
 
   // Fill ONLY Comments on Equipment section from a machinery report of another order
   const handleFetchCommentsOnEquipmentByOrderNumber = useCallback(async () => {
+    if (!canFetchCommentsOnEquipmentByOrder) return;
     const sourceOrderNumber = String(commentsOnEquipmentOrderNumber || "").trim();
     if (!sourceOrderNumber) {
       toast.error("Please enter order number first.");
@@ -1750,7 +1760,7 @@ function MachineryReport() {
     } finally {
       setCommentsOnEquipmentFetchLoading(false);
     }
-  }, [dispatch, commentsOnEquipmentOrderNumber]);
+  }, [dispatch, commentsOnEquipmentOrderNumber, canFetchCommentsOnEquipmentByOrder]);
 
   // Capture a clean snapshot the first time initial loading finishes.
   // Any change after this point is considered "dirty".
@@ -3511,68 +3521,70 @@ function MachineryReport() {
                     style={{ marginBottom: "8px" }}
                   >
                     <h4 style={{ margin: 0 }}>INSPECTED EQUIPMENT DETAILS</h4>
-                    <div className="form-group mb-0">
-                      <label htmlFor="inspected_equipment_order_number">
-                        Order Number
-                      </label>
-                      <div className="d-flex gap-2 align-items-center">
-                        <input
-                          type="text"
-                          className="form-field flex-grow-1"
-                          id="inspected_equipment_order_number"
-                          value={inspectedEquipmentOrderNumber}
-                          onChange={(e) =>
-                            setInspectedEquipmentOrderNumber(e.target.value)
-                          }
-                          onKeyDown={(e) => {
-                            if (
-                              e.key === "Enter" &&
-                              String(inspectedEquipmentOrderNumber).trim() &&
-                              !inspectedEquipmentFetchLoading
-                            ) {
-                              e.preventDefault();
-                              handleFetchInspectedEquipmentByOrderNumber();
+                    {canFetchInspectedEquipmentByOrder && (
+                      <div className="form-group mb-0">
+                        <label htmlFor="inspected_equipment_order_number">
+                          Order Number
+                        </label>
+                        <div className="d-flex gap-2 align-items-center">
+                          <input
+                            type="text"
+                            className="form-field flex-grow-1"
+                            id="inspected_equipment_order_number"
+                            value={inspectedEquipmentOrderNumber}
+                            onChange={(e) =>
+                              setInspectedEquipmentOrderNumber(e.target.value)
                             }
-                          }}
-                          placeholder="Enter Order Number"
-                          disabled={inspectedEquipmentFetchLoading}
-                          style={{ marginBottom: 0, width: "200px" }}
-                        />
-                        <button
-                          type="button"
-                          className={`form-field registration-option-btn${
-                            inspectedEquipmentFetchLoading ? " active" : ""
-                          }`}
-                          onClick={handleFetchInspectedEquipmentByOrderNumber}
-                          disabled={
-                            inspectedEquipmentFetchLoading ||
-                            !String(inspectedEquipmentOrderNumber).trim()
-                          }
-                          style={{
-                            marginBottom: 0,
-                            padding: "8px 12px",
-                            whiteSpace: "nowrap",
-                            minWidth: "72px",
-                          }}
-                        >
-                          {inspectedEquipmentFetchLoading ? (
-                            <span
-                              className="d-inline-flex align-items-center gap-1"
-                              aria-live="polite"
-                            >
+                            onKeyDown={(e) => {
+                              if (
+                                e.key === "Enter" &&
+                                String(inspectedEquipmentOrderNumber).trim() &&
+                                !inspectedEquipmentFetchLoading
+                              ) {
+                                e.preventDefault();
+                                handleFetchInspectedEquipmentByOrderNumber();
+                              }
+                            }}
+                            placeholder="Enter Order Number"
+                            disabled={inspectedEquipmentFetchLoading}
+                            style={{ marginBottom: 0, width: "200px" }}
+                          />
+                          <button
+                            type="button"
+                            className={`form-field registration-option-btn${
+                              inspectedEquipmentFetchLoading ? " active" : ""
+                            }`}
+                            onClick={handleFetchInspectedEquipmentByOrderNumber}
+                            disabled={
+                              inspectedEquipmentFetchLoading ||
+                              !String(inspectedEquipmentOrderNumber).trim()
+                            }
+                            style={{
+                              marginBottom: 0,
+                              padding: "8px 12px",
+                              whiteSpace: "nowrap",
+                              minWidth: "72px",
+                            }}
+                          >
+                            {inspectedEquipmentFetchLoading ? (
                               <span
-                                className="spinner-border spinner-border-sm"
-                                role="status"
-                                aria-hidden="true"
-                              />
-                              Loading
-                            </span>
-                          ) : (
-                            "Get"
-                          )}
-                        </button>
+                                className="d-inline-flex align-items-center gap-1"
+                                aria-live="polite"
+                              >
+                                <span
+                                  className="spinner-border spinner-border-sm"
+                                  role="status"
+                                  aria-hidden="true"
+                                />
+                                Loading
+                              </span>
+                            ) : (
+                              "Get"
+                            )}
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                   <hr />
                 </div>
@@ -4092,68 +4104,70 @@ function MachineryReport() {
                     <h4 style={{ margin: 0 }}>
                       COMMENTS ON EQUIPMENT AT THE TIME OF INSPECTION
                     </h4>
-                    <div className="form-group mb-0">
-                      <label htmlFor="comments_on_equipment_order_number">
-                        Order Number
-                      </label>
-                      <div className="d-flex gap-2 align-items-center">
-                        <input
-                          type="text"
-                          className="form-field flex-grow-1"
-                          id="comments_on_equipment_order_number"
-                          value={commentsOnEquipmentOrderNumber}
-                          onChange={(e) =>
-                            setCommentsOnEquipmentOrderNumber(e.target.value)
-                          }
-                          onKeyDown={(e) => {
-                            if (
-                              e.key === "Enter" &&
-                              String(commentsOnEquipmentOrderNumber).trim() &&
-                              !commentsOnEquipmentFetchLoading
-                            ) {
-                              e.preventDefault();
-                              handleFetchCommentsOnEquipmentByOrderNumber();
+                    {canFetchCommentsOnEquipmentByOrder && (
+                      <div className="form-group mb-0">
+                        <label htmlFor="comments_on_equipment_order_number">
+                          Order Number
+                        </label>
+                        <div className="d-flex gap-2 align-items-center">
+                          <input
+                            type="text"
+                            className="form-field flex-grow-1"
+                            id="comments_on_equipment_order_number"
+                            value={commentsOnEquipmentOrderNumber}
+                            onChange={(e) =>
+                              setCommentsOnEquipmentOrderNumber(e.target.value)
                             }
-                          }}
-                          placeholder="Enter Order Number"
-                          disabled={commentsOnEquipmentFetchLoading}
-                          style={{ marginBottom: 0, width: "200px" }}
-                        />
-                        <button
-                          type="button"
-                          className={`form-field registration-option-btn${
-                            commentsOnEquipmentFetchLoading ? " active" : ""
-                          }`}
-                          onClick={handleFetchCommentsOnEquipmentByOrderNumber}
-                          disabled={
-                            commentsOnEquipmentFetchLoading ||
-                            !String(commentsOnEquipmentOrderNumber).trim()
-                          }
-                          style={{
-                            marginBottom: 0,
-                            padding: "8px 12px",
-                            whiteSpace: "nowrap",
-                            minWidth: "72px",
-                          }}
-                        >
-                          {commentsOnEquipmentFetchLoading ? (
-                            <span
-                              className="d-inline-flex align-items-center gap-1"
-                              aria-live="polite"
-                            >
+                            onKeyDown={(e) => {
+                              if (
+                                e.key === "Enter" &&
+                                String(commentsOnEquipmentOrderNumber).trim() &&
+                                !commentsOnEquipmentFetchLoading
+                              ) {
+                                e.preventDefault();
+                                handleFetchCommentsOnEquipmentByOrderNumber();
+                              }
+                            }}
+                            placeholder="Enter Order Number"
+                            disabled={commentsOnEquipmentFetchLoading}
+                            style={{ marginBottom: 0, width: "200px" }}
+                          />
+                          <button
+                            type="button"
+                            className={`form-field registration-option-btn${
+                              commentsOnEquipmentFetchLoading ? " active" : ""
+                            }`}
+                            onClick={handleFetchCommentsOnEquipmentByOrderNumber}
+                            disabled={
+                              commentsOnEquipmentFetchLoading ||
+                              !String(commentsOnEquipmentOrderNumber).trim()
+                            }
+                            style={{
+                              marginBottom: 0,
+                              padding: "8px 12px",
+                              whiteSpace: "nowrap",
+                              minWidth: "72px",
+                            }}
+                          >
+                            {commentsOnEquipmentFetchLoading ? (
                               <span
-                                className="spinner-border spinner-border-sm"
-                                role="status"
-                                aria-hidden="true"
-                              />
-                              Loading
-                            </span>
-                          ) : (
-                            "Get"
-                          )}
-                        </button>
+                                className="d-inline-flex align-items-center gap-1"
+                                aria-live="polite"
+                              >
+                                <span
+                                  className="spinner-border spinner-border-sm"
+                                  role="status"
+                                  aria-hidden="true"
+                                />
+                                Loading
+                              </span>
+                            ) : (
+                              "Get"
+                            )}
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                   <hr />
                 </div>
