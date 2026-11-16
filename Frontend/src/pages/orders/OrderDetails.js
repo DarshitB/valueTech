@@ -68,6 +68,7 @@ import SingleSearchSelect from "../../components/SingleSearchSelect";
 import { toast } from "react-toastify";
 import { searchOrdersByRegistration } from "../../api/order.api";
 import ConfirmationModal from "../../components/ConfirmationModal";
+import OrderEditModal from "../../components/OrderEditModal";
 
 // Utility: Convert date to 'time ago' string
 function timeAgo(dateString) {
@@ -227,6 +228,7 @@ function OrderDetails() {
   const [showRevisionConfirmation, setShowRevisionConfirmation] =
     useState(false);
   const [showOnHoldConfirmation, setShowOnHoldConfirmation] = useState(false);
+  const [showEditOrderModal, setShowEditOrderModal] = useState(false);
   const [isCompletingOrder, setIsCompletingOrder] = useState(false);
   const [isPuttingOnHold, setIsPuttingOnHold] = useState(false);
   const [isMovingToStatus9, setIsMovingToStatus9] = useState(false);
@@ -2462,40 +2464,22 @@ function OrderDetails() {
           "view_order_media_files"
         ) && (
             <>
-              {order?.valuer_name && order.valuer_name.trim() !== "" ? (
-                order?.current_status_id === 10 && !isExemptAdmin ? (
-                  <span
-                    title="Images (Disabled)"
-                    className="tooltip-link disabled"
-                    style={{ cursor: "not-allowed" }}
-                  >
-                    <ImageCollageIcon />
-                  </span>
-                ) : (
-                  <Link
-                    to={`/orders/${id}/details/images`}
-                    title="Images"
-                    className="tooltip-link"
-                  >
-                    <ImageCollageIcon />
-                  </Link>
-                )
-              ) : (
-                <button
-                  title="Images"
-                  className="tooltip-link"
-                  onClick={() => showValuerNameError("Images")}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    padding: 0,
-                    cursor: "pointer",
-                    outline: "none",
-                    boxShadow: "none",
-                  }}
+              {order?.current_status_id === 10 && !isExemptAdmin ? (
+                <span
+                  title="Images (Disabled)"
+                  className="tooltip-link disabled"
+                  style={{ cursor: "not-allowed" }}
                 >
                   <ImageCollageIcon />
-                </button>
+                </span>
+              ) : (
+                <Link
+                  to={`/orders/${id}/details/images`}
+                  title="Images"
+                  className="tooltip-link"
+                >
+                  <ImageCollageIcon />
+                </Link>
               )}
             </>
           )}
@@ -2576,6 +2560,23 @@ function OrderDetails() {
               <MailIcon />
             </Link>
           )}
+        {hasPermission(allowedPermissions, "edit_order_details_page") && (
+          <button
+            type="button"
+            title="Edit Order"
+            className="tooltip-link button"
+            onClick={() => setShowEditOrderModal(true)}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              color: "#5864bd",
+            }}
+          >
+            <EditIcon color="#5864bd" />
+          </button>
+        )}
         {shouldShowR2SyncUi && canSyncR2 && (
           <button
             type="button"
@@ -2649,6 +2650,7 @@ function OrderDetails() {
     setShowRevisionConfirmation,
     OpenPaymentModal,
     OpenMailModal,
+    setShowEditOrderModal,
     r2SyncStatus,
     r2SyncLoading,
     shouldShowR2SyncUi,
@@ -4297,6 +4299,15 @@ function OrderDetails() {
           onCancel={() => setShowOnHoldConfirmation(false)}
         />
       )}
+
+      <OrderEditModal
+        order={order}
+        isOpen={showEditOrderModal}
+        onClose={() => setShowEditOrderModal(false)}
+        onSuccess={() => {
+          if (id) dispatch(fetchOrderById(id));
+        }}
+      />
     </section>
   );
 }
